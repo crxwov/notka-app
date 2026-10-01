@@ -11,3 +11,6 @@ __pycache__/
 # скриншоты проверок дизайна (десятки мегабайт)
 .impeccable/review/
 .impeccable/hook.cache.json
+
+# данные пользователей (у кого Плюс, промокоды)
+data/

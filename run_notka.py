@@ -55,6 +55,57 @@ def run_backend() -> None:
     uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
 
 
+def open_tunnel(port: int, wait_seconds: int = 90) -> str:
+    """Start cloudflared and return the public https address it was given.
+
+    pycloudflared's own helper gives up after a fixed number of log lines,
+    and newer cloudflared versions print more than that before the address
+    appears — so here the log is simply read until the address shows up
+    (or the time runs out), however many lines come first.
+    """
+    import atexit
+    import re
+
+    from pycloudflared.util import get_info
+
+    attempts = 20  # the request to Cloudflare is sometimes cut off by the network; it usually goes through on a retry
+    for attempt in range(attempts):
+        proc = subprocess.Popen(
+            [get_info().executable, "tunnel", "--url", f"http://127.0.0.1:{port}"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+        )
+        atexit.register(proc.terminate)
+        found: list[str] = []
+
+        def read_log(process=proc, out=found) -> None:
+            # keeps reading after the address is found too: a full pipe would freeze cloudflared
+            for line in process.stderr:
+                # the tunnel's own address is several words joined by hyphens;
+                # api.trycloudflare.com, which the log also mentions, is not it
+                match = re.search(r"https://[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com", line)
+                if match and not out:
+                    out.append(match.group(0))
+
+        threading.Thread(target=read_log, daemon=True).start()
+        deadline = time.time() + wait_seconds
+        while time.time() < deadline and not found and proc.poll() is None:
+            time.sleep(0.3)
+        if found:
+            return found[0]
+        proc.terminate()
+        if attempt + 1 < attempts:
+            print(f"Cloudflare не ответил (попытка {attempt + 1} из {attempts}), пробую ещё раз...")
+            time.sleep(2)
+
+    print("Не получилось открыть публичную ссылку через Cloudflare.")
+    print("Проверь интернет и запусти start.bat ещё раз.")
+    input("Нажми Enter, чтобы закрыть...")
+    sys.exit(1)
+
+
 def main() -> None:
     print("Запускаю бэкенд (поиск и плеер)...")
     backend_thread = threading.Thread(target=run_backend, daemon=True)
@@ -63,10 +114,7 @@ def main() -> None:
     print(f"Бэкенд работает: http://127.0.0.1:{PORT}")
 
     print("Открываю публичную ссылку (через Cloudflare, это займёт 5-15 секунд)...")
-    from pycloudflared import try_cloudflare
-
-    result = try_cloudflare(port=PORT)
-    tunnel_url = str(result.tunnel).rstrip("/")
+    tunnel_url = open_tunnel(PORT)
     miniapp_url = f"{tunnel_url}/app/"
     print(f"Публичная ссылка бэкенда: {tunnel_url}")
     print(f"Ссылка на мини-апп:       {miniapp_url}")

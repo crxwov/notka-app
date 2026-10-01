@@ -13,7 +13,7 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=45" />
+<link rel="stylesheet" href="styles.css?v=60" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -66,6 +66,7 @@
   <symbol id="i-cast" viewBox="0 0 24 24"><path d="M4 15.5V6.8A1.8 1.8 0 0 1 5.8 5h12.4A1.8 1.8 0 0 1 20 6.8v8.4a1.8 1.8 0 0 1-1.8 1.8H16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 19.5h.01M4 16.7a2.8 2.8 0 0 1 2.8 2.8M4 13.8a5.7 5.7 0 0 1 5.7 5.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-6.5M12 20V4.5M19 20v-10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3.5v10M8 9.8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 14.5v3a2.5 2.5 0 0 0 2.5 2.5h10a2.5 2.5 0 0 0 2.5-2.5v-3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.3 0 2-.9 2-1.9 0-1.4-1-1.9-1-3 0-1 .8-1.8 1.9-1.8h1.9a3.7 3.7 0 0 0 3.7-3.7c0-3.7-3.8-6.6-8.5-6.6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="8" cy="11" r="1.2" fill="currentColor"/><circle cx="11" cy="7.6" r="1.2" fill="currentColor"/><circle cx="15.4" cy="8.6" r="1.2" fill="currentColor"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.1-3.6 3.8-5.6 7-5.6s5.9 2 7 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 3.8a5.3 5.3 0 0 0-5.3 5.3v3.1c0 .7-.2 1.3-.6 1.8L5 15.6h14l-1.1-1.6c-.4-.5-.6-1.1-.6-1.8V9.1A5.3 5.3 0 0 0 12 3.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 18.6a2.1 2.1 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
@@ -79,7 +80,9 @@
 <!-- ============ the light: one living orb behind every screen ============ -->
 <div class="light" id="light" aria-hidden="true">
   <div class="light-art" id="light-art"></div>
+  <div class="light-pattern"><i></i><i></i><i></i></div>
   <div class="light-group">
+    <div class="light-shape"><i></i><i></i><i></i></div>
     <div class="orb orb-violet"></div>
     <div class="orb orb-magenta"></div>
     <div class="orb orb-orange"></div>
@@ -137,6 +140,7 @@
         <h1 class="mix-title">Мой микс</h1>
         <span class="mix-sub" id="mymix-sub">Из твоих любимых треков</span>
       </button>
+      <button class="mood-btn" id="mood-open-btn" type="button"><span class="mood-dot" aria-hidden="true"></span>Под настроение</button>
     </section>
 
     <button class="field field-btn" id="home-search-btn" type="button">
@@ -381,9 +385,18 @@
       <h1 class="hero-title" id="profile-name">Гость</h1>
       <p class="hero-sub" id="profile-sub">Вход через Telegram</p>
     </div>
+    <button class="plus-card" id="menu-plus" type="button" hidden>
+      <span class="plus-card-mark" aria-hidden="true"><svg width="22" height="22"><use href="#i-plus"/></svg></span>
+      <span class="row-meta">
+        <span class="row-title">Нотка Плюс</span>
+        <span class="row-sub">Поддержать проект и получить дополнения</span>
+      </span>
+      <svg class="row-chevron" width="20" height="20" aria-hidden="true"><use href="#i-chevron"/></svg>
+    </button>
     <div class="group">
       <button class="group-row" id="menu-account" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-user"/></svg><span class="group-label">Аккаунт</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       <button class="group-row" id="menu-stats" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-chart"/></svg><span class="group-label">Статистика</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-look" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-palette"/></svg><span class="group-label">Оформление</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       <button class="group-row" id="menu-sound" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-sound"/></svg><span class="group-label">Звук и загрузки</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       <button class="group-row" id="menu-about" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg><span class="group-label">О Нотке</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
     </div>
@@ -510,7 +523,7 @@
     <div class="hero about-hero" data-reveal>
       <span class="about-mark" aria-hidden="true"><span class="about-mark-glow"></span><svg width="72" height="72"><use href="#logo-note"/></svg></span>
       <h1 class="hero-title">Нотка</h1>
-      <p class="hero-sub">Версия 1.1</p>
+      <p class="hero-sub" id="about-version">Версия 1.1</p>
     </div>
     <p class="about-lead" data-reveal>Музыка прямо в Telegram. Ничего не нужно устанавливать и нигде регистрироваться: открываешь чат, находишь трек — и он уже играет.</p>
 
@@ -552,6 +565,181 @@
     <p class="fineprint">© Нотка</p>
   </main>
 
+  <!-- ============ МИКС ПОД НАСТРОЕНИЕ ============ -->
+  <main class="screen" id="screen-mood" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="mood-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+    <h1 class="mood-title" data-reveal>Какое сейчас настроение?</h1>
+    <p class="mood-lede" data-reveal>Микс вырастет из твоей музыки — той, что подходит под это настроение.</p>
+    <div class="mood-cloud" id="mood-cloud" data-reveal>
+      <button class="mood-orb" type="button" data-mood="energize" style="--h:24;--s:132px;--dy:0px;--d:5.2s"><span>Бодрое</span></button>
+      <button class="mood-orb" type="button" data-mood="chill" style="--h:190;--s:118px;--dy:26px;--d:6.4s"><span>Спокойное</span></button>
+      <button class="mood-orb" type="button" data-mood="focus" style="--h:150;--s:108px;--dy:-4px;--d:5.8s"><span>Для работы</span></button>
+      <button class="mood-orb" type="button" data-mood="sad" style="--h:232;--s:112px;--dy:-6px;--d:6.9s"><span>Грустное</span></button>
+      <button class="mood-orb" type="button" data-mood="party" style="--h:318;--s:128px;--dy:14px;--d:5.5s"><span>Вечеринка</span></button>
+      <button class="mood-orb" type="button" data-mood="sleep" style="--h:262;--s:104px;--dy:-10px;--d:7.3s"><span>Для сна</span></button>
+      <button class="mood-orb" type="button" data-mood="workout" style="--h:4;--s:100px;--dy:-4px;--d:5.0s"><span>Спорт</span></button>
+      <button class="mood-orb" type="button" data-mood="romance" style="--h:342;--s:120px;--dy:10px;--d:6.1s"><span>Романтика</span></button>
+    </div>
+    <h2 class="mood-h" data-reveal>Или жанр на русском</h2>
+    <div class="mood-genres" id="mood-genres" data-reveal>
+      <button class="mood-genre" type="button" data-mood="ru_pop" style="--h:300"><i aria-hidden="true"></i>Поп</button>
+      <button class="mood-genre" type="button" data-mood="ru_rock" style="--h:12"><i aria-hidden="true"></i>Рок</button>
+      <button class="mood-genre" type="button" data-mood="ru_hiphop" style="--h:46"><i aria-hidden="true"></i>Хип-хоп</button>
+    </div>
+    <p class="mood-note" id="mood-note" data-reveal>Микс под настроение — часть Нотки Плюс. Без Плюса сыграют три трека на пробу.</p>
+  </main>
+
+  <!-- ============ ОФОРМЛЕНИЕ ============ -->
+  <main class="screen" id="screen-look" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="look-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <div class="bar-title">Оформление</div>
+      <span class="bar-spacer"></span>
+    </header>
+    <h1 class="look-title" data-reveal>Сделай Нотку своей</h1>
+    <p class="look-note" id="look-note" data-reveal>Стандартное оформление — для всех. Остальное входит в Нотку Плюс; без Плюса его можно включить на минуту и посмотреть.</p>
+
+    <section class="look-sec" data-reveal>
+      <h2 class="look-h"><span class="look-n" aria-hidden="true">1</span>Плеер</h2>
+      <div class="look-stage" id="look-stage">
+        <button class="look-slide" type="button" data-theme="standard">
+          <span class="look-obj"><span class="look-std js-art"></span></span>
+          <span class="look-slide-name">Стандарт</span>
+        </button>
+        <button class="look-slide" type="button" data-theme="vinyl">
+          <span class="look-obj"><span class="show-disc"><span class="show-disc-art js-art"></span><span class="vinyl-grooves"></span></span></span>
+          <span class="look-slide-name">Винил</span>
+        </button>
+        <button class="look-slide" type="button" data-theme="cassette">
+          <span class="look-obj show-cassette">
+            <span class="cassette" aria-hidden="true">
+              <span class="cassette-sticker">
+                <span class="cassette-band"><b>A</b><i>Нотка</i></span>
+                <span class="cassette-cover js-art"></span>
+                <span class="cassette-lines"><b class="js-title"></b><i class="js-artist"></i></span>
+              </span>
+              <span class="cassette-window"><i class="reel reel-l"></i><i class="reel reel-r"></i></span>
+              <span class="cassette-foot"></span>
+            </span>
+          </span>
+          <span class="look-slide-name">Кассета</span>
+        </button>
+        <button class="look-slide" type="button" data-theme="cd">
+          <span class="look-obj"><span class="show-disc show-disc-cd"><span class="show-disc-art js-art"></span><span class="cd-sheen"></span></span></span>
+          <span class="look-slide-name">Диск</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="look-sec" data-reveal>
+      <h2 class="look-h"><span class="look-n" aria-hidden="true">2</span>Цвет света</h2>
+      <div class="shelf look-swatches" id="look-colors"></div>
+      <p class="look-sub" id="look-covers-title">Или цвета одной обложки — свет останется таким для любой музыки</p>
+      <div class="shelf look-covers" id="look-covers"></div>
+    </section>
+
+    <section class="look-sec" data-reveal>
+      <h2 class="look-h"><span class="look-n" aria-hidden="true">3</span>Узор света</h2>
+      <div class="pattern-opts" id="look-patterns">
+        <button class="pattern-opt" type="button" data-bg="light"><span class="pattern-thumb pt-light" aria-hidden="true"><i></i><i></i><i></i></span><span class="pattern-name">Свет</span></button>
+        <button class="pattern-opt" type="button" data-bg="prism"><span class="pattern-thumb pt-prism" aria-hidden="true"><i></i><i></i><i></i></span><span class="pattern-name">Призма</span></button>
+        <button class="pattern-opt" type="button" data-bg="rings"><span class="pattern-thumb pt-rings" aria-hidden="true"><i></i><i></i><i></i></span><span class="pattern-name">Кольца</span></button>
+        <button class="pattern-opt" type="button" data-bg="stars"><span class="pattern-thumb pt-stars" aria-hidden="true"><i></i><i></i><i></i></span><span class="pattern-name">Искры</span></button>
+        <button class="pattern-opt" type="button" data-bg="calm"><span class="pattern-thumb pt-calm" aria-hidden="true"><i></i><i></i><i></i></span><span class="pattern-name">Покой</span></button>
+      </div>
+    </section>
+
+    <div class="look-try" id="look-try" hidden>
+      <span>На пробу, минута</span>
+      <button class="theme-try-keep" id="look-try-keep" type="button">Оставить с Плюсом</button>
+    </div>
+  </main>
+
+  <!-- ============ НОТКА ПЛЮС ============ -->
+  <main class="screen" id="screen-plus" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="plus-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+
+    <!-- the stage: the player themes, live, wearing the listener's own cover -->
+    <div class="plus-stage" id="plus-stage" data-show="vinyl" data-reveal aria-hidden="true">
+      <span class="plus-stage-glow" id="plus-stage-glow"></span>
+      <span class="show-item show-vinyl">
+        <span class="show-disc"><span class="show-disc-art" id="plus-disc-art"></span><span class="vinyl-grooves"></span></span>
+        <span class="tonearm show-arm"><i></i></span>
+      </span>
+      <span class="show-item show-cassette">
+        <span class="cassette" aria-hidden="true">
+          <span class="cassette-sticker">
+            <span class="cassette-band"><b>A</b><i>Нотка</i></span>
+            <span class="cassette-cover" id="plus-cassette-art"></span>
+            <span class="cassette-lines"><b id="plus-cassette-title"></b><i id="plus-cassette-artist"></i></span>
+          </span>
+          <span class="cassette-window"><i class="reel reel-l"></i><i class="reel reel-r"></i></span>
+          <span class="cassette-foot"></span>
+        </span>
+      </span>
+      <span class="show-item show-cd">
+        <span class="show-disc show-disc-cd"><span class="show-disc-art" id="plus-cd-art"></span><span class="cd-sheen"></span></span>
+      </span>
+    </div>
+    <div class="plus-stage-tabs" id="plus-stage-tabs" data-reveal>
+      <button class="chip active" type="button" data-show="vinyl">Винил</button>
+      <button class="chip" type="button" data-show="cassette">Кассета</button>
+      <button class="chip" type="button" data-show="cd">Диск</button>
+    </div>
+
+    <h1 class="plus-title" data-reveal>Нотка Плюс</h1>
+    <p class="plus-promise" data-reveal>Нотка бесплатная.<br>Плюс&nbsp;— чтобы она стала твоей.</p>
+    <button class="pill-btn pill-quiet plus-try" id="plus-try-btn" type="button" data-reveal>Примерить на своей музыке</button>
+
+    <section class="scene" data-reveal>
+      <div class="scene-demo demo-moods" aria-hidden="true"><i>Бодрое</i><i>Спокойное</i><i>Для работы</i><i>Грустное</i><i>Вечеринка</i></div>
+      <h2 class="scene-title">Микс под настроение</h2>
+      <p class="scene-text">Скажи, что сейчас нужно — бодрое, спокойное, для работы, — и «Мой микс» подстроится.</p>
+    </section>
+
+    <section class="scene" data-reveal>
+      <div class="scene-demo demo-translate" aria-hidden="true">
+        <span><b>Hold the light a little longer</b><i>Подержи свет ещё немного</i></span>
+        <span><b>We were louder than the rain</b><i>Мы были громче дождя</i></span>
+        <span><b>Meet me where the night begins</b><i>Встреть меня там, где начинается ночь</i></span>
+      </div>
+      <h2 class="scene-title">Перевод текста <span class="tag tag-soon">скоро</span></h2>
+      <p class="scene-text">Строка на русском — сразу под оригиналом, в такт музыке.</p>
+    </section>
+
+    <div class="scene-pair">
+      <section class="scene" data-reveal style="--i:0">
+        <div class="scene-demo demo-recap" aria-hidden="true"><i></i><i></i><span><b id="plus-recap-num">0</b><em id="plus-recap-word">минут</em></span></div>
+        <h2 class="scene-title">Твои итоги <span class="tag tag-soon">скоро</span></h2>
+        <p class="scene-text">Месяц и год в карточках, которыми хочется поделиться.</p>
+      </section>
+      <section class="scene" data-reveal style="--i:1">
+        <div class="scene-demo demo-thanks" aria-hidden="true"><svg width="44" height="44"><use href="#i-heart-fill"/></svg></div>
+        <h2 class="scene-title">Спасибо от нас</h2>
+        <p class="scene-text">Твоё имя среди друзей Нотки и новые функции раньше всех.</p>
+      </section>
+    </div>
+
+    <div class="plus-honest" data-reveal>
+      <p><b>Куда идут деньги.</b> Плюс оплачивает сервер, на котором Нотка работает для всех.</p>
+      <p><b>Что остаётся бесплатным.</b> Вся музыка, поиск, «Мой микс», плейлисты, тексты песен, статистика и скачивание — всё, что есть сейчас.</p>
+    </div>
+
+    <div class="plus-bar" id="plus-bar">
+      <div class="plus-plans" id="plus-plans" role="radiogroup" aria-label="Тариф">
+        <button class="plus-plan is-on" type="button" role="radio" aria-checked="true" data-plan="month"><b>75 ★</b><span>в месяц</span></button>
+        <button class="plus-plan" type="button" role="radio" aria-checked="false" data-plan="year"><b>600 ★</b><span>в год, −33%</span></button>
+      </div>
+      <button class="pill-btn pill-primary pill-block plus-buy" id="plus-buy-btn" type="button">Попробовать 7 дней бесплатно</button>
+      <p class="plus-bar-note" id="plus-bar-note"></p>
+      <button class="text-btn plus-promo-link" id="plus-promo-btn" type="button">У меня есть промокод</button>
+    </div>
+  </main>
+
   <!-- ============ FULL-SCREEN PLAYER ============ -->
   <main class="screen screen-player" id="screen-player" hidden>
     <canvas class="player-prism" id="player-prism" aria-hidden="true"></canvas>
@@ -565,6 +753,21 @@
 
     <div class="player-art-wrap">
       <span class="cover player-art" id="player-art"></span>
+      <span class="vinyl-deco" aria-hidden="true"></span>
+      <span class="tonearm" aria-hidden="true"><i></i></span>
+      <span class="cassette" aria-hidden="true">
+          <span class="cassette-sticker">
+            <span class="cassette-band"><b>A</b><i>Нотка</i></span>
+            <span class="cassette-cover" id="cassette-art"></span>
+            <span class="cassette-lines"><b id="cassette-title"></b><i id="cassette-artist"></i></span>
+          </span>
+          <span class="cassette-window"><i class="reel reel-l"></i><i class="reel reel-r"></i></span>
+          <span class="cassette-foot"></span>
+        </span>
+      <div class="theme-try" id="theme-try" hidden>
+        <span id="theme-try-text"></span>
+        <button class="theme-try-keep" id="theme-try-keep" type="button">Оставить</button>
+      </div>
       <div class="lyrics" id="player-lyrics" inert>
         <div class="lyrics-skeleton" id="lyrics-skeleton" aria-hidden="true" hidden><span></span><span></span><span></span><span></span><span></span><span></span></div>
         <ol class="lyrics-lines" id="lyrics-lines" aria-label="Текст песни"></ol>
@@ -650,9 +853,25 @@
       <button class="sheet-row" id="menu-track-album-link" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-disc"/></svg><span>Перейти к альбому</span></button>
       <button class="sheet-row" id="menu-track-artist-link" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-mic"/></svg><span>Перейти к исполнителю</span></button>
       <div class="player-only" id="menu-player-extras">
+        <button class="sheet-row" id="player-theme-btn" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-disc"/></svg><span>Тема плеера</span><span class="tag" id="theme-row-state">Стандарт</span></button>
         <button class="sheet-row" id="player-sleep-btn" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-moon"/></svg><span>Таймер сна</span><span class="tag" id="sleep-row-status" hidden></span></button>
       </div>
       <button class="sheet-row sheet-cancel" id="track-menu-close" type="button">Отмена</button>
+    </div>
+  </div>
+
+  <div id="player-theme-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-label="Тема плеера">
+    <div class="sheet">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <p class="sheet-title">Тема плеера</p>
+      <div class="theme-opts" id="theme-opts">
+        <button class="theme-opt" type="button" data-theme="standard"><span class="theme-thumb thumb-standard" aria-hidden="true"></span><span class="theme-name">Стандарт</span></button>
+        <button class="theme-opt" type="button" data-theme="vinyl"><span class="theme-thumb thumb-vinyl" aria-hidden="true"></span><span class="theme-name">Винил</span><span class="tag tag-plus">Плюс</span></button>
+        <button class="theme-opt" type="button" data-theme="cassette"><span class="theme-thumb thumb-cassette" aria-hidden="true"><i></i><i></i></span><span class="theme-name">Кассета</span><span class="tag tag-plus">Плюс</span></button>
+        <button class="theme-opt" type="button" data-theme="cd"><span class="theme-thumb thumb-cd" aria-hidden="true"></span><span class="theme-name">Диск</span><span class="tag tag-plus">Плюс</span></button>
+      </div>
+      <p class="sheet-note" id="theme-sheet-note">Тему можно трогать: нажатие ставит на паузу, а пластинку и диск можно крутить, кассету — мотать. Темы «Плюс» включаются на минуту на пробу.</p>
+      <button class="sheet-row sheet-cancel" id="player-theme-close" type="button">Готово</button>
     </div>
   </div>
 
@@ -759,6 +978,29 @@
     </div>
   </div>
 
+  <div id="promo-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="promo-title">
+    <div class="modal promo-modal">
+      <div id="promo-step-enter">
+        <p class="sheet-title" id="promo-title">Промокод</p>
+        <input id="promo-input" class="modal-input promo-input" type="text" placeholder="КОД" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Промокод" />
+        <p class="import-error" id="promo-error" role="alert" hidden></p>
+        <div class="modal-actions">
+          <button class="pill-btn pill-quiet" id="promo-cancel" type="button">Отмена</button>
+          <button class="pill-btn pill-primary" id="promo-confirm" type="button"><span class="import-go-label">Активировать</span><span class="spinner" aria-hidden="true"></span></button>
+        </div>
+      </div>
+      <div id="promo-step-done" hidden>
+        <span class="promo-burst" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><b><svg width="34" height="34"><use href="#i-check"/></svg></b></span>
+        <p class="promo-done-title">Плюс включён</p>
+        <p class="promo-done-until" id="promo-done-until"></p>
+        <p class="promo-done-left" id="promo-done-left"></p>
+        <div class="modal-actions">
+          <button class="pill-btn pill-primary" id="promo-done-btn" type="button">Отлично</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="details-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="details-title">
     <div class="modal">
       <p class="sheet-title" id="details-title">Название и описание</p>
@@ -800,9 +1042,9 @@
 <audio id="audio" preload="none"></audio>
 <input type="file" accept="image/*" id="avatar-file-input" hidden>
 
-<script src="config.js"></script>
+<script src="config.js?v=2"></script>
 <script src="prism.js?v=2"></script>
 <script src="shredder.js?v=4"></script>
-<script src="app.js?v=41"></script>
+<script src="app.js?v=54"></script>
 </body>
 </html>

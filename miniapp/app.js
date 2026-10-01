@@ -4,6 +4,7 @@
       ? window.NOTKA_CONFIG.API_BASE_URL
       : "http://localhost:8080";
   const STORAGE_KEY = "notka_state_v2";
+  const playerCassette = document.querySelector(".player-art-wrap .cassette");
   const BG_COLOR = "#0C0A12";
 
   // ============================================================
@@ -585,7 +586,9 @@
   }
   function syncPrism() {
     // the rays burst from behind the cover — with the lyrics open there is no cover
-    const on = currentScreen === "player" && document.body.classList.contains("is-playing") && !document.body.classList.contains("lyrics-open");
+    // …and only the standard player has the square cover they are drawn around
+    const on = currentScreen === "player" && document.body.classList.contains("is-playing") && !document.body.classList.contains("lyrics-open")
+      && (document.body.dataset.playerTheme || "standard") === "standard";
     if (on) {
       if (!ensurePrism()) return;
       requestAnimationFrame(placePrism);
@@ -616,15 +619,22 @@
     }, 450);
   }
 
+  // What the playing track gives the light. «Оформление» can put a chosen
+  // palette or one pinned cover in its place (see paintLight).
+  const DEFAULT_PALETTE = { core: "#FFE3B8", warm: "#FF6A2E", mid: "#E23C8C", deep: "#6D34E0" };
+  let trackLight = { palette: null, art: null };
+
   async function lightForTrack(track) {
-    showArtUnderLight(track.artwork ? hiResArtwork(track.artwork) : null);
+    trackLight = { palette: trackLight.palette, art: track.artwork ? hiResArtwork(track.artwork) : null };
+    paintLight();
     let palette = await paletteFromArtwork(track.artwork);
     if (!palette && track.artwork && !paletteCache.has(track.artwork)) {
       await new Promise((r) => setTimeout(r, 1200));
       palette = await paletteFromArtwork(track.artwork); // one more try on a flaky network
     }
     if (!currentTrack || currentTrack.id !== track.id) return;
-    applyPalette(palette || brandPaletteFor(track.id));
+    trackLight.palette = palette || brandPaletteFor(track.id);
+    paintLight();
   }
 
   // ============================================================
@@ -647,6 +657,9 @@
     account: $("screen-account"),
     sound: $("screen-sound"),
     about: $("screen-about"),
+    plus: $("screen-plus"),
+    look: $("screen-look"),
+    mood: $("screen-mood"),
     stats: $("screen-stats"),
   };
   const bottomNav = $("bottom-nav");
@@ -692,6 +705,10 @@
     if (name === "sound") renderSoundScreen();
     if (name === "stats") renderStatsScreen();
     if (name === "about") revealIn("screen-about", true);
+    if (name === "plus") openPlusScreen();
+    if (name === "look") renderLookScreen();
+    if (name === "mood") { $("mood-note").hidden = hasPlus(); revealIn("screen-mood", true); requestAnimationFrame(startMoodPhysics); }
+    if (name === "profile") $("menu-plus").hidden = !plusPreview();
     if (name === "playlist" && currentPlaylistId && opts.replace) openPlaylist(currentPlaylistId, true);
     if (TAB_SCREENS.has(name)) {
       document.querySelectorAll(".tab").forEach((b) => {
@@ -1382,6 +1399,206 @@
     playTrack(mix[0], mix, { mymix: true, source: "mix" });
     if (openPlayer) showScreen("player");
   }
+  // «Под настроение» (Нотка Плюс): the mix made from YouTube Music's own
+  // mood and genre playlists, shuffled anew every time. Without Плюс —
+  // three tracks to taste it.
+  const MOODS = { energize: "Бодрое", chill: "Спокойное", focus: "Для работы", sad: "Грустное", party: "Вечеринка", sleep: "Для сна", workout: "Спорт", romance: "Романтика", ru_pop: "Русский поп", ru_rock: "Русский рок", ru_hiphop: "Русский хип-хоп" };
+  document.querySelectorAll("#mood-cloud .mood-orb").forEach((orb, n) => orb.style.setProperty("--n", n));
+
+  // What the mix should lean towards: the artists this listener has in
+  // their favorites, playlists and listening history, and how much of
+  // their music is in Russian. Sent along with the mood.
+  function tasteProfile() {
+    const weight = new Map();
+    let russian = 0, total = 0;
+    const add = (t, w) => {
+      if (!t) return;
+      total++;
+      if (/[а-яё]/i.test(`${t.title || ""} ${t.artist || ""}`)) russian++;
+      (t.artist || "").split(/,|&| feat\.? /i).forEach((name) => {
+        name = name.trim();
+        if (name) weight.set(name, (weight.get(name) || 0) + w);
+      });
+    };
+    state.favorites.forEach((t) => add(t, 3));
+    state.playlists.forEach((p) => Object.values(p.tracksCache || {}).forEach((t) => add(t, 1)));
+    Object.values(state.listens.tracks).forEach((x) => add(x.track, 1 + Math.min(5, x.plays)));
+    // their own tracks, the dearest first: the favorites, then what is played most, then the playlists
+    const seeds = [];
+    const taken = new Set();
+    const seed = (t) => {
+      if (!t || !t.source || !t.sourceId || taken.has(t.id) || seeds.length >= 40) return;
+      taken.add(t.id);
+      seeds.push({ source: t.source, id: t.sourceId });
+    };
+    state.favorites.forEach(seed);
+    Object.values(state.listens.tracks).sort((a, b) => b.plays - a.plays || b.seconds - a.seconds).forEach((x) => seed(x.track));
+    state.playlists.forEach((p) => Object.values(p.tracksCache || {}).forEach(seed));
+    return {
+      seeds,
+      artists: Array.from(weight.entries()).sort((a, b) => b[1] - a[1]).slice(0, 40).map((e) => e[0]),
+      ru_share: total >= 5 ? russian / total : null,
+    };
+  }
+
+  let moodBuilding = false;
+  async function startMoodMix(key, picked) {
+    if (moodBuilding) return;
+    moodBuilding = true;
+    const screen = $("screen-mood");
+    screen.classList.add("is-picking");
+    if (picked) picked.classList.add("is-picked");
+    let tracks = [];
+    try {
+      const res = await fetch(`${API_BASE_URL}/mood`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(Object.assign({ key }, tasteProfile())),
+      });
+      if (res.ok) tracks = (await res.json()).results || [];
+    } catch (e) { /* said below */ }
+    moodBuilding = false;
+    screen.classList.remove("is-picking");
+    if (picked) picked.classList.remove("is-picked");
+    if (!tracks.length) { haptic("error"); showToast("Не получилось собрать микс, попробуй ещё раз"); return; }
+    shuffleOn = false;
+    haptic("success");
+    if (hasPlus()) {
+      // from here on it goes on like «Мой микс»: more of the same is added as it plays
+      playTrack(tracks[0], tracks, { mymix: true, source: "mix", context: `Мой микс · ${MOODS[key]}` });
+    } else {
+      const taste = tracks.slice(0, 3);
+      playTrack(taste[0], taste, { source: "mood-taste", context: `${MOODS[key]} · проба` });
+      showToast("Три трека на пробу. Весь микс под настроение — в Нотке Плюс");
+    }
+    if (currentScreen === "mood") goBack();
+  }
+  $("mood-open-btn").addEventListener("click", () => { haptic("light"); showScreen("mood"); });
+  $("mood-back-btn").addEventListener("click", goBack);
+
+  // ---- the lights are bodies: they drift, can be dragged and thrown,
+  // and bounce off each other and off the edges of their field. A touch
+  // that doesn't move is a choice. ----
+  const moodCloud = $("mood-cloud");
+  const moodOrbs = Array.from(moodCloud.querySelectorAll(".mood-orb"));
+  const MOOD_START = [[0.2, 0.2], [0.55, 0.3], [0.84, 0.17], [0.2, 0.62], [0.53, 0.68], [0.84, 0.56], [0.36, 0.92], [0.72, 0.9]];
+  let moodBodies = [];
+  let moodFrame = 0;
+  let moodHeld = null; // the light under the finger
+  let moodPointerAt = 0;
+
+  function startMoodPhysics() {
+    cancelAnimationFrame(moodFrame);
+    moodCloud.classList.add("is-live");
+    const W = moodCloud.clientWidth, H = moodCloud.clientHeight;
+    moodHeld = null;
+    moodBodies = moodOrbs.map((el, i) => {
+      const r = el.offsetWidth / 2;
+      const start = MOOD_START[i % MOOD_START.length];
+      return { el, r, m: r * r, x: start[0] * W, y: start[1] * H, vx: (Math.random() - 0.5) * 70, vy: (Math.random() - 0.5) * 70, phase: Math.random() * 6.28 };
+    });
+    let last = performance.now();
+    const step = (now) => {
+      if (currentScreen !== "mood") { moodFrame = 0; return; }
+      const dt = Math.min(0.032, (now - last) / 1000);
+      last = now;
+      const width = moodCloud.clientWidth, height = moodCloud.clientHeight;
+      const slow = Math.pow(0.3, dt); // a body keeps 30% of its speed each second
+      for (const b of moodBodies) {
+        if (moodHeld && moodHeld.body === b) continue;
+        // a faint pull to the middle keeps them together; a slow sway keeps them alive
+        b.vx += ((width / 2 - b.x) * 0.4 + Math.cos(now / 1700 + b.phase) * 16) * dt;
+        b.vy += ((height / 2 - b.y) * 0.4 + Math.sin(now / 1400 + b.phase) * 16) * dt;
+        b.vx *= slow;
+        b.vy *= slow;
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.75; }
+        if (b.x > width - b.r) { b.x = width - b.r; b.vx = -Math.abs(b.vx) * 0.75; }
+        if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy) * 0.75; }
+        if (b.y > height - b.r) { b.y = height - b.r; b.vy = -Math.abs(b.vy) * 0.75; }
+      }
+      // two lights that touch push apart and trade speed along the line between them
+      for (let i = 0; i < moodBodies.length; i++) {
+        for (let j = i + 1; j < moodBodies.length; j++) {
+          const a = moodBodies[i], b = moodBodies[j];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy) || 0.01;
+          const overlap = a.r + b.r - dist;
+          if (overlap <= 0) continue;
+          const nx = dx / dist, ny = dy / dist;
+          // the one under the finger doesn't give way
+          const ia = moodHeld && moodHeld.body === a ? 0 : 1 / a.m;
+          const ib = moodHeld && moodHeld.body === b ? 0 : 1 / b.m;
+          if (ia + ib === 0) continue;
+          a.x -= nx * overlap * (ia / (ia + ib));
+          a.y -= ny * overlap * (ia / (ia + ib));
+          b.x += nx * overlap * (ib / (ia + ib));
+          b.y += ny * overlap * (ib / (ia + ib));
+          const closing = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+          if (closing >= 0) continue;
+          const push = (-(1 + 0.86) * closing) / (ia + ib);
+          a.vx -= push * ia * nx;
+          a.vy -= push * ia * ny;
+          b.vx += push * ib * nx;
+          b.vy += push * ib * ny;
+          if (moodHeld && closing < -260 && now - moodHeld.knockAt > 140) { moodHeld.knockAt = now; haptic("light"); }
+        }
+      }
+      for (const b of moodBodies) b.el.style.transform = `translate(${(b.x - b.r).toFixed(1)}px, ${(b.y - b.r).toFixed(1)}px)`;
+      moodFrame = requestAnimationFrame(step);
+    };
+    moodFrame = requestAnimationFrame(step);
+  }
+
+  moodCloud.addEventListener("pointerdown", (e) => {
+    const el = e.target.closest(".mood-orb");
+    const body = el && moodBodies.find((b) => b.el === el);
+    if (!body || moodBuilding) return;
+    const box = moodCloud.getBoundingClientRect();
+    const px = e.clientX - box.left, py = e.clientY - box.top;
+    moodHeld = { body, id: e.pointerId, dx: px - body.x, dy: py - body.y, startX: px, startY: py, moved: false, lastX: px, lastY: py, lastT: performance.now(), knockAt: 0 };
+    el.classList.add("is-held");
+    try { moodCloud.setPointerCapture(e.pointerId); } catch (err) { /* works without capture too */ }
+  });
+  moodCloud.addEventListener("pointermove", (e) => {
+    if (!moodHeld || e.pointerId !== moodHeld.id) return;
+    const h = moodHeld, b = h.body;
+    const box = moodCloud.getBoundingClientRect();
+    const px = e.clientX - box.left, py = e.clientY - box.top;
+    if (!h.moved && Math.hypot(px - h.startX, py - h.startY) < 8) return;
+    h.moved = true;
+    const now = performance.now();
+    const dt = Math.max(0.008, (now - h.lastT) / 1000);
+    // the speed of the finger becomes the speed of the light: what it hits is knocked away, and letting go throws it
+    b.vx = b.vx * 0.5 + ((px - h.lastX) / dt) * 0.5;
+    b.vy = b.vy * 0.5 + ((py - h.lastY) / dt) * 0.5;
+    b.x = Math.max(b.r, Math.min(box.width - b.r, px - h.dx));
+    b.y = Math.max(b.r, Math.min(box.height - b.r, py - h.dy));
+    h.lastX = px; h.lastY = py; h.lastT = now;
+  });
+  const releaseMoodOrb = (e) => {
+    if (!moodHeld || e.pointerId !== moodHeld.id) return;
+    const h = moodHeld;
+    moodHeld = null;
+    moodPointerAt = Date.now();
+    h.body.el.classList.remove("is-held");
+    const speed = Math.hypot(h.body.vx, h.body.vy);
+    if (speed > 1500) { h.body.vx *= 1500 / speed; h.body.vy *= 1500 / speed; }
+    if (!h.moved && e.type === "pointerup") { haptic("light"); startMoodMix(h.body.el.dataset.mood, h.body.el); }
+  };
+  moodCloud.addEventListener("pointerup", releaseMoodOrb);
+  moodCloud.addEventListener("pointercancel", releaseMoodOrb);
+
+  $("screen-mood").addEventListener("click", (e) => {
+    const pick = e.target.closest(".mood-orb, .mood-genre");
+    if (!pick) return;
+    // a light touched with a finger has already been handled above; this is for the keyboard and the genres
+    if (pick.classList.contains("mood-orb") && Date.now() - moodPointerAt < 600) return;
+    haptic("light");
+    startMoodMix(pick.dataset.mood, pick);
+  });
+
   $("mymix-open-btn").addEventListener("click", () => {
     if (mymixActive && currentTrack) showScreen("player");
     else startMymix(false);
@@ -2126,6 +2343,401 @@
   // ============================================================
   $("about-back-btn").addEventListener("click", goBack);
 
+  // «Нотка Плюс» is not on sale yet (payments need the permanent server and
+  // the extras themselves), so its screen is shown only in preview mode:
+  // five taps on the version line in «О Нотке» switch it on and off.
+  function plusPreview() {
+    if (window.NOTKA_CONFIG && window.NOTKA_CONFIG.PLUS_PREVIEW) return true;
+    try { return localStorage.getItem("notka_plus_preview") === "1"; } catch (e) { return false; }
+  }
+  let versionTaps = 0, versionTapAt = 0;
+  $("about-version").addEventListener("click", () => {
+    const now = Date.now();
+    versionTaps = now - versionTapAt < 600 ? versionTaps + 1 : 1;
+    versionTapAt = now;
+    if (versionTaps < 5) return;
+    versionTaps = 0;
+    const on = !plusPreview();
+    try { localStorage.setItem("notka_plus_preview", on ? "1" : "0"); } catch (e) { return; }
+    haptic("success");
+    showToast(on ? "Предпросмотр «Нотки Плюс» включён — смотри в профиле" : "Предпросмотр «Нотки Плюс» выключен");
+  });
+  $("menu-plus").addEventListener("click", () => showScreen("plus"));
+  $("plus-back-btn").addEventListener("click", goBack);
+
+  // Who has Плюс. Real subscriptions will come from the server once
+  // payments are connected; until then, in preview mode, the buy button
+  // switches Плюс on and off on this device — to walk the whole path.
+  // Real Плюс comes from the server (a promo code now, a payment later): it
+  // answers for the Telegram user behind this Mini App. The last answer is
+  // remembered, so the app doesn't wait for the network to look right.
+  const tgInitData = (tg && tg.initData) || "";
+  function plusUntil() {
+    try { return +localStorage.getItem("notka_plus_until") || 0; } catch (e) { return 0; }
+  }
+  function hasRealPlus() { return plusUntil() * 1000 > Date.now(); }
+  function hasPlus() {
+    if (hasRealPlus()) return true;
+    try { return localStorage.getItem("notka_plus_local") === "1"; } catch (e) { return false; }
+  }
+  function rememberPlus(until) {
+    try { localStorage.setItem("notka_plus_until", String(until || 0)); } catch (e) { /* stays for this session */ }
+    syncPlusUI();
+    applyLook();
+  }
+  async function refreshPlus() {
+    if (!tgInitData) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/plus/status`, { headers: { "X-Telegram-Init-Data": tgInitData } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.known) rememberPlus(data.until);
+    } catch (e) { /* the last known answer stays */ }
+  }
+  function longDate(seconds) {
+    return new Date(seconds * 1000).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  }
+  let plusPlan = "month";
+  function syncPlusUI() {
+    const on = hasPlus();
+    const real = hasRealPlus();
+    $("plus-bar").classList.toggle("is-active", on);
+    $("plus-bar").classList.toggle("is-real", real);
+    $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";
+    $("plus-bar-note").textContent = real
+      ? `Плюс включён до ${longDate(plusUntil())}`
+      : on
+      ? "Плюс включён в режиме предпросмотра. Оплата не списывалась."
+      : `Потом ${plusPlan === "year" ? "600 ★ в год" : "75 ★ в месяц"}. Отмена в любой момент.`;
+  }
+  $("plus-plans").addEventListener("click", (e) => {
+    const plan = e.target.closest(".plus-plan");
+    if (!plan) return;
+    plusPlan = plan.dataset.plan;
+    $("plus-plans").querySelectorAll(".plus-plan").forEach((p) => {
+      p.classList.toggle("is-on", p === plan);
+      p.setAttribute("aria-checked", p === plan ? "true" : "false");
+    });
+    haptic("light");
+    syncPlusUI();
+  });
+
+  // The stage on top of the page: the themes play live, with the cover of
+  // what the listener has on (or had on last), and take turns by themselves.
+  const plusStage = $("plus-stage");
+  let plusStageTimer = null;
+  let plusStageHoldUntil = 0;
+  function setPlusStage(name) {
+    plusStage.dataset.show = name;
+    $("plus-stage-tabs").querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c.dataset.show === name));
+  }
+  function openPlusScreen() {
+    const track = currentTrack || (state.recent || [])[0] || state.favorites[0] || null;
+    const art = track && track.artwork ? `url("${hiResArtwork(track.artwork).replace(/"/g, "%22")}")` : "";
+    $("plus-disc-art").style.backgroundImage = art;
+    $("plus-cassette-art").style.backgroundImage = art;
+    $("plus-stage-glow").style.backgroundImage = art;
+    $("plus-cd-art").style.backgroundImage = art;
+    $("plus-cassette-title").textContent = track ? track.title || "Без названия" : "Твоя музыка";
+    $("plus-cassette-artist").textContent = track ? track.artist || "" : "в Нотке Плюс";
+    // the listener's own minutes; a newcomer has none yet, and a zero would read as a verdict
+    const minutes = Math.round(state.listens.seconds / 60);
+    $("plus-recap-num").textContent = minutes ? minutes.toLocaleString("ru-RU") : "♪";
+    $("plus-recap-word").textContent = minutes ? plural(minutes, "минута", "минуты", "минут") : "твои итоги";
+    syncPlusUI();
+    revealIn("screen-plus", true);
+    clearInterval(plusStageTimer);
+    plusStageTimer = setInterval(() => {
+      if (currentScreen !== "plus") { clearInterval(plusStageTimer); return; }
+      if (Date.now() < plusStageHoldUntil) return;
+      const order = ["vinyl", "cassette", "cd"];
+      setPlusStage(order[(order.indexOf(plusStage.dataset.show) + 1) % order.length]);
+    }, 4200);
+  }
+  $("plus-stage-tabs").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    haptic("light");
+    plusStageHoldUntil = Date.now() + 12000; // the listener chose: no switching for a while
+    setPlusStage(chip.dataset.show);
+  });
+  $("plus-try-btn").addEventListener("click", () => {
+    haptic("light");
+    setPlayerTheme(plusStage.dataset.show);
+    if (currentTrack) showScreen("player");
+    else showToast("Тема включена. Запусти любой трек и открой плеер");
+  });
+
+  $("plus-buy-btn").addEventListener("click", () => {
+    const on = !hasPlus();
+    try { localStorage.setItem("notka_plus_local", on ? "1" : "0"); } catch (e) { return; }
+    haptic(on ? "success" : "light");
+    showToast(on ? "Плюс включён для предпросмотра. Оплата не списывалась" : "Плюс выключен");
+    syncPlusUI();
+    if (on) keepTriedLook(); else { endLookTry(); applyLook(); }
+  });
+
+  // ============================================================
+  // HOW НОТКА LOOKS — the player theme, the color of the light, the
+  // pattern of the background. The standard look is for everyone; the
+  // rest belongs to Плюс, and anyone can switch it on for a minute to see
+  // it on their own music.
+  // ============================================================
+  const PLAYER_THEMES = { standard: { name: "Стандарт" }, vinyl: { name: "Винил", plus: true }, cassette: { name: "Кассета", plus: true }, cd: { name: "Диск", plus: true } };
+  const LIGHT_PRESETS = {
+    sunset: { name: "Закат", palette: DEFAULT_PALETTE },
+    ocean: { name: "Океан", palette: { core: "#D6F4FF", warm: "#2FA8FF", mid: "#3B5BFF", deep: "#1B2A8C" } },
+    forest: { name: "Лес", palette: { core: "#E9FFD6", warm: "#4FD08A", mid: "#1FA39A", deep: "#145C6B" } },
+    rose: { name: "Роза", palette: { core: "#FFE1EC", warm: "#FF6FA3", mid: "#C94BD6", deep: "#5B2A9E" } },
+    neon: { name: "Неон", palette: { core: "#E8FFF9", warm: "#2CF5C2", mid: "#9B5CFF", deep: "#2A1A8F" } },
+    gold: { name: "Золото", palette: { core: "#FFF3C9", warm: "#FFC24B", mid: "#FF7A3D", deep: "#7A2E1E" } },
+    mono: { name: "Серебро", palette: { core: "#FFFFFF", warm: "#C9C4D6", mid: "#8E88A0", deep: "#3B3650" } },
+  };
+  const BG_PATTERNS = { light: "Свет", prism: "Призма", rings: "Кольца", stars: "Искры", calm: "Покой" };
+  // light: "track" | "preset:<id>" | "pinned" (the palette and cover are in lightPinned)
+  const LOOK_DEFAULTS = { playerTheme: "standard", light: "track", bgPattern: "light" };
+  const LOOK_TRY_MS = 60000;
+  let lookTried = {}; // what is switched on for a try, without Плюс
+  let lookTryTimer = null;
+
+  function lookKnown(key, value) {
+    if (key === "playerTheme") return !!PLAYER_THEMES[value];
+    if (key === "bgPattern") return !!BG_PATTERNS[value];
+    return value === "track" || value === "pinned" || (typeof value === "string" && value.startsWith("preset:") && !!LIGHT_PRESETS[value.slice(7)]);
+  }
+  function lookValue(key) {
+    if (key in lookTried) return lookTried[key];
+    const saved = Store.getSetting(key);
+    return lookKnown(key, saved) && (saved === LOOK_DEFAULTS[key] || hasPlus()) ? saved : LOOK_DEFAULTS[key];
+  }
+  function pinnedLight() {
+    return lookTried.lightPinned || Store.getSetting("lightPinned") || null;
+  }
+  function paintLight() {
+    const mode = lookValue("light");
+    let palette = trackLight.palette || DEFAULT_PALETTE, art = trackLight.art;
+    if (mode.startsWith("preset:")) { palette = LIGHT_PRESETS[mode.slice(7)].palette; art = null; }
+    else if (mode === "pinned" && pinnedLight()) { palette = pinnedLight().palette; art = pinnedLight().artwork; }
+    showArtUnderLight(art || null);
+    applyPalette(palette);
+  }
+  function applyLook() {
+    const theme = lookValue("playerTheme");
+    document.body.dataset.playerTheme = theme;
+    document.body.dataset.bg = lookValue("bgPattern");
+    paintLight();
+    syncPrism();
+    // every picker shows what is on now
+    $("theme-row-state").textContent = PLAYER_THEMES[theme].name;
+    const mark = (el, on) => { el.classList.toggle("is-on", on); el.setAttribute("aria-pressed", on ? "true" : "false"); };
+    document.querySelectorAll(".theme-opt, .look-slide").forEach((opt) => mark(opt, opt.dataset.theme === theme));
+    document.querySelectorAll(".pattern-opt").forEach((opt) => mark(opt, opt.dataset.bg === lookValue("bgPattern")));
+    const light = lookValue("light");
+    document.querySelectorAll(".swatch").forEach((opt) => mark(opt, opt.dataset.light === light));
+    const pin = light === "pinned" && pinnedLight();
+    document.querySelectorAll(".look-cover").forEach((opt) => mark(opt, !!pin && opt.dataset.art === pin.artwork));
+    const trying = Object.keys(lookTried).length > 0;
+    $("look-try").hidden = !trying;
+    $("look-note").hidden = hasPlus();
+    $("theme-try").hidden = !("playerTheme" in lookTried);
+    if ("playerTheme" in lookTried) $("theme-try-text").textContent = `«${PLAYER_THEMES[theme].name}» — тема Плюса`;
+  }
+  function endLookTry() {
+    clearTimeout(lookTryTimer);
+    lookTryTimer = null;
+    lookTried = {};
+  }
+  function setLook(key, value, pinned) {
+    if (value === LOOK_DEFAULTS[key] || hasPlus()) {
+      delete lookTried[key];
+      if (key === "light") delete lookTried.lightPinned;
+      if (pinned) Store.setSetting("lightPinned", pinned);
+      Store.setSetting(key, value);
+      if (!Object.keys(lookTried).length) endLookTry();
+    } else {
+      // not a subscriber: it is on for a minute, then everything goes back
+      lookTried[key] = value;
+      if (pinned) lookTried.lightPinned = pinned;
+      clearTimeout(lookTryTimer);
+      lookTryTimer = setTimeout(() => {
+        endLookTry();
+        applyLook();
+        showToast("Это оформление остаётся с Ноткой Плюс");
+      }, LOOK_TRY_MS);
+    }
+    applyLook();
+  }
+  // Плюс was just switched on while something was being tried: it stays
+  function keepTriedLook() {
+    const tried = lookTried;
+    endLookTry();
+    if (tried.lightPinned) Store.setSetting("lightPinned", tried.lightPinned);
+    ["playerTheme", "light", "bgPattern"].forEach((key) => { if (key in tried) Store.setSetting(key, tried[key]); });
+    applyLook();
+  }
+  const setPlayerTheme = (name) => setLook("playerTheme", name);
+
+  $("player-theme-btn").addEventListener("click", () => { closeOverlay("track-menu-sheet"); openOverlay("player-theme-sheet"); });
+  $("player-theme-close").addEventListener("click", () => closeOverlay("player-theme-sheet"));
+  document.querySelectorAll(".theme-opts").forEach((box) => box.addEventListener("click", (e) => {
+    const opt = e.target.closest(".theme-opt");
+    if (!opt) return;
+    haptic("light");
+    setPlayerTheme(opt.dataset.theme);
+  }));
+  $("theme-try-keep").addEventListener("click", () => { closeOverlay("player-theme-sheet"); showScreen("plus"); });
+  $("look-try-keep").addEventListener("click", () => showScreen("plus"));
+
+  // ---- the «Оформление» screen ----
+  function renderLookScreen() {
+    const colors = $("look-colors");
+    if (!colors.children.length) {
+      const swatch = (value, name, p) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "swatch" + (p ? "" : " swatch-auto");
+        b.dataset.light = value;
+        const orb = document.createElement("i");
+        if (p) { orb.style.setProperty("--a", p.core); orb.style.setProperty("--b", p.warm); orb.style.setProperty("--c", p.mid); orb.style.setProperty("--d", p.deep); }
+        b.appendChild(orb);
+        b.appendChild(document.createTextNode(name));
+        return b;
+      };
+      colors.appendChild(swatch("track", "Как у трека", null));
+      Object.entries(LIGHT_PRESETS).forEach(([id, preset]) => colors.appendChild(swatch(`preset:${id}`, preset.name, preset.palette)));
+      Array.from(colors.children).forEach((el, i) => el.style.setProperty("--i", i));
+    }
+    // the themes on the stage wear the cover of what is on now (or was on last)
+    const worn = currentTrack || (state.recent || [])[0] || state.favorites[0] || null;
+    const wornArt = worn && worn.artwork ? `url("${hiResArtwork(worn.artwork).replace(/"/g, "%22")}")` : "";
+    const stage = $("look-stage");
+    stage.querySelectorAll(".js-art").forEach((el) => { el.style.backgroundImage = wornArt; });
+    stage.querySelector(".js-title").textContent = worn ? worn.title || "Без названия" : "Твоя музыка";
+    stage.querySelector(".js-artist").textContent = worn ? worn.artist || "" : "в Нотке";
+    // covers to take the colors from: what is on now, what was on lately, the favorites
+    const covers = $("look-covers");
+    covers.innerHTML = "";
+    const seen = new Set();
+    const pin = pinnedLight();
+    const sources = [currentTrack].concat(state.recent || [], state.favorites).filter((t) => t && t.artwork);
+    if (pin) sources.unshift({ artwork: pin.artwork, title: pin.title, id: "pinned" });
+    sources.forEach((t) => {
+      const art = hiResArtwork(t.artwork);
+      if (seen.has(art) || seen.size >= 14) return;
+      seen.add(art);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "look-cover";
+      b.dataset.art = art;
+      b.setAttribute("aria-label", `Цвета обложки «${t.title || ""}»`);
+      const cover = document.createElement("span");
+      cover.className = "cover";
+      setCoverEl(cover, t.artwork, t.id);
+      b.appendChild(cover);
+      b.addEventListener("click", async () => {
+        haptic("light");
+        const palette = await paletteFromArtwork(t.artwork);
+        if (!palette) { showToast("Не получилось взять цвета этой обложки"); return; }
+        setLook("light", "pinned", { palette, artwork: art, title: t.title || "" });
+      });
+      b.style.setProperty("--i", covers.children.length);
+      covers.appendChild(b);
+    });
+    $("look-covers-title").hidden = covers.children.length === 0;
+    applyLook();
+    revealIn("screen-look", true);
+    // the theme that is on stands in view
+    const on = stage.querySelector(".look-slide.is-on");
+    if (on) stage.scrollLeft = Math.max(0, on.offsetLeft - 20);
+  }
+  $("look-stage").addEventListener("click", (e) => {
+    const slide = e.target.closest(".look-slide");
+    if (!slide) return;
+    haptic("light");
+    setPlayerTheme(slide.dataset.theme);
+  });
+  $("look-colors").addEventListener("click", (e) => {
+    const opt = e.target.closest(".swatch");
+    if (!opt) return;
+    haptic("light");
+    setLook("light", opt.dataset.light);
+  });
+  $("look-patterns").addEventListener("click", (e) => {
+    const opt = e.target.closest(".pattern-opt");
+    if (!opt) return;
+    haptic("light");
+    setLook("bgPattern", opt.dataset.bg);
+  });
+  $("menu-look").addEventListener("click", () => showScreen("look"));
+  $("look-back-btn").addEventListener("click", goBack);
+
+  applyLook();
+  syncPlusUI();
+  refreshPlus();  syncPlusUI();
+  refreshPlus();
+
+  // ---- promo code: typed in by hand, or brought by a link from an ad ----
+  const promoInput = $("promo-input");
+  const PROMO_PROBLEMS = {
+    NOT_FOUND: "Такого промокода нет. Проверь, нет ли опечатки.",
+    BAD_CODE: "Такого промокода нет. Проверь, нет ли опечатки.",
+    EXPIRED: "Этот промокод уже не действует.",
+    EXHAUSTED: "Этот промокод уже разобрали — активации закончились.",
+    ALREADY_USED: "Этот промокод уже был активирован на твоём аккаунте.",
+    TOO_MANY_TRIES: "Слишком много попыток. Попробуй через час.",
+    NOT_IN_TELEGRAM: "Промокод можно активировать только из Telegram.",
+  };
+  function promoError(text) {
+    $("promo-error").textContent = text || "";
+    $("promo-error").hidden = !text;
+  }
+  function openPromo(code) {
+    promoInput.value = code || "";
+    promoError("");
+    $("promo-confirm").classList.remove("is-busy");
+    $("promo-step-enter").hidden = false;
+    $("promo-step-done").hidden = true;
+    openOverlay("promo-modal");
+    if (code) redeemPromo();
+    else setTimeout(() => promoInput.focus(), 60);
+  }
+  async function redeemPromo() {
+    const code = promoInput.value.trim();
+    if (!code) { promoInput.focus(); return; }
+    if ($("promo-confirm").classList.contains("is-busy")) return;
+    promoError("");
+    $("promo-confirm").classList.add("is-busy");
+    let data = null, problem = null;
+    try {
+      const res = await fetch(`${API_BASE_URL}/plus/redeem`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitData },
+        body: JSON.stringify({ code }),
+      });
+      const body = await res.json();
+      if (res.ok) data = body;
+      else problem = PROMO_PROBLEMS[body && body.error && body.error.code] || "Не получилось активировать промокод. Попробуй ещё раз.";
+    } catch (e) {
+      problem = "Нет связи с Ноткой. Попробуй ещё раз.";
+    }
+    $("promo-confirm").classList.remove("is-busy");
+    if (!data) { promoError(problem); haptic("error"); return; }
+    rememberPlus(data.until);
+    keepTriedLook();
+    haptic("success");
+    $("promo-done-until").textContent = `${data.days} ${plural(data.days, "день", "дня", "дней")} Плюса — до ${longDate(data.until)}`;
+    // a limited run is felt when the number is seen
+    $("promo-done-left").textContent = data.limit > 1 ? `Ты в числе первых ${data.limit}. Осталось активаций: ${data.left}` : "";
+    $("promo-step-enter").hidden = true;
+    $("promo-step-done").hidden = false;
+  }
+  $("plus-promo-btn").addEventListener("click", () => openPromo(""));
+  $("promo-cancel").addEventListener("click", () => closeOverlay("promo-modal"));
+  $("promo-done-btn").addEventListener("click", () => closeOverlay("promo-modal"));
+  $("promo-confirm").addEventListener("click", redeemPromo);
+  promoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") redeemPromo(); });
+  promoInput.addEventListener("input", () => promoError(""));
+
   // ============================================================
   // LISTENING STATS (local)
   // ============================================================
@@ -2473,6 +3085,11 @@
     $("player-title").textContent = track.title || "Без названия";
     $("player-artist").textContent = track.artist || "Неизвестный исполнитель";
     setCoverEl($("player-art"), hiResArtwork(track.artwork), track.id);
+    // the cassette theme wears the cover as its label
+    const art = hiResArtwork(track.artwork);
+    $("cassette-art").style.backgroundImage = art ? `url("${art.replace(/"/g, "%22")}")` : "";
+    $("cassette-title").textContent = track.title || "Без названия";
+    $("cassette-artist").textContent = track.artist || "";
     syncPlayerFav();
   }
   function syncPlayerFav() {
@@ -2526,7 +3143,7 @@
     // ("Мой микс" / an album or playlist name / "Поиск"…). When neither is
     // given (skipping to the next track in the same queue, say) we simply
     // keep showing whatever context was already on screen.
-    if (opts.mymix) currentContextLabel = "Мой микс";
+    if (opts.mymix) currentContextLabel = opts.context || "Мой микс";
     else if (opts.context) currentContextLabel = opts.context;
     else if (track.album && currentQueue.length <= 1) currentContextLabel = track.album;
     $("player-context").textContent = currentContextLabel === "Поиск" ? "Из поиска" : currentContextLabel;
@@ -3230,6 +3847,70 @@
   const miniProgress = $("mp-progress");
 
   let isScrubbing = false;
+
+  // ---- a theme can be touched. A tap pauses or plays. A record or a
+  // disc is turned by the finger: a full turn is a quarter of a minute of
+  // music. A cassette is wound by a drag across it: its width is a minute.
+  const artWrap = document.querySelector(".player-art-wrap");
+  const TURN_SECONDS = 15, CASSETTE_SECONDS = 60;
+  let artGrab = null;
+  const artTheme = () => document.body.dataset.playerTheme || "standard";
+  artWrap.addEventListener("pointerdown", (e) => {
+    if (artTheme() === "standard" || document.body.classList.contains("lyrics-open") || !currentTrack) return;
+    if (e.target.closest("#theme-try, #player-lyrics")) return;
+    const el = artTheme() === "cassette" ? playerCassette : $("player-art");
+    const r = el.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    artGrab = { id: e.pointerId, x: e.clientX, y: e.clientY, cx, cy, width: r.width, moved: false, turned: 0, angle: Math.atan2(e.clientY - cy, e.clientX - cx), from: audio.currentTime || 0, to: null, tick: 0 };
+    try { artWrap.setPointerCapture(e.pointerId); } catch (err) { /* the gesture still works without capture */ }
+  });
+  artWrap.addEventListener("pointermove", (e) => {
+    if (!artGrab || e.pointerId !== artGrab.id) return;
+    const g = artGrab;
+    if (!g.moved) {
+      if (Math.hypot(e.clientX - g.x, e.clientY - g.y) < 8) return;
+      g.moved = true;
+      isScrubbing = true;
+      document.body.classList.add("art-held");
+    }
+    const dur = effectiveDuration();
+    let shift;
+    if (artTheme() === "cassette") {
+      const dx = e.clientX - g.x;
+      shift = (dx / g.width) * CASSETTE_SECONDS;
+      playerCassette.style.setProperty("--reel-rot", `${dx * 4}deg`);
+    } else {
+      const angle = Math.atan2(e.clientY - g.cy, e.clientX - g.cx);
+      let step = angle - g.angle;
+      if (step > Math.PI) step -= 2 * Math.PI;
+      if (step < -Math.PI) step += 2 * Math.PI;
+      g.angle = angle;
+      g.turned += (step * 180) / Math.PI;
+      shift = (g.turned / 360) * TURN_SECONDS;
+      artWrap.style.setProperty("--scrub", `${g.turned}deg`);
+      // a soft click under the finger every sixth of a turn
+      const tick = Math.round(g.turned / 60);
+      if (tick !== g.tick) { g.tick = tick; haptic("select"); }
+    }
+    if (dur) {
+      g.to = Math.max(0, Math.min(dur - 0.5, g.from + shift));
+      renderProgress((g.to / dur) * 100, g.to);
+    }
+  });
+  const endArtGrab = (e) => {
+    if (!artGrab || (e && e.pointerId !== artGrab.id)) return;
+    const g = artGrab;
+    artGrab = null;
+    document.body.classList.remove("art-held");
+    artWrap.style.removeProperty("--scrub");
+    playerCassette.style.removeProperty("--reel-rot");
+    if (!g.moved) { if (!e || e.type === "pointerup") togglePlayPause(); return; }
+    isScrubbing = false;
+    if (g.to != null && e && e.type === "pointerup") { try { audio.currentTime = g.to; } catch (err) { /* not seekable yet */ } }
+  };
+  artWrap.addEventListener("pointerup", endArtGrab);
+  artWrap.addEventListener("pointercancel", endArtGrab);
   let lastPositionSync = 0;
 
   // Telegram's in-app WebView frequently misjudges the *real* length of
@@ -3263,6 +3944,7 @@
     progressFill.style.width = `${p}%`;
     progressThumb.style.left = `${p}%`;
     miniProgress.style.width = `${p}%`;
+    playerCassette.style.setProperty("--p", (p / 100).toFixed(3)); // the tape moves from reel to reel
     progressTrack.setAttribute("aria-valuenow", String(Math.round(p)));
     progressTrack.setAttribute("aria-valuetext", formatDuration(seconds));
     $("player-time-current").textContent = formatDuration(seconds);
@@ -3434,10 +4116,17 @@
     return {
       t: q.get("t") || (start.startsWith("t_") ? start.slice(2) : ""),
       p: q.get("p") || (start.startsWith("p_") ? start.slice(2) : ""),
+      promo: q.get("promo") || (start.startsWith("promo_") ? start.slice(6) : ""),
     };
   }
   async function openDeepLink() {
-    const { t, p } = deepLinkTarget();
+    const { t, p, promo } = deepLinkTarget();
+    if (promo) {
+      // a link from an ad: the Плюс page opens and the code activates itself
+      showScreen("plus");
+      openPromo(promo);
+      return;
+    }
     if (t) {
       const m = t.match(/^([a-z]{2})_(.+)$/);
       const source = m && CODE_SOURCES[m[1]];

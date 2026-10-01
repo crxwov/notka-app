@@ -1,3 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
+import re
+import time
+import random
 import asyncio
 import threading
 
@@ -285,10 +289,51 @@ def map_artist(artist_id: str, raw: dict, client=None) -> ArtistInfo:
     )
 
 
+# «Микс под настроение»: our keys -> the category on YouTube Music's
+# "Moods & genres" page whose playlists the mix is made of.
+MOODS = {
+    "energize": "Energize",
+    "chill": "Chill",
+    "focus": "Focus",
+    "sad": "Sad",
+    "party": "Party",
+    "sleep": "Sleep",
+    "workout": "Workout",
+    "romance": "Romance",
+    "ru_pop": "Russian pop",
+    "ru_rock": "Russian rock",
+    "ru_hiphop": "Russian hip-hop",
+}
+# the same moods among Russian music: found by search, since YouTube
+# Music's mood pages are made of the world's playlists
+RU_MOOD_QUERIES = {
+    "energize": "бодрая русская музыка",
+    "chill": "спокойная русская музыка",
+    "focus": "музыка для работы и учёбы",
+    "sad": "грустные русские песни",
+    "party": "русские хиты для вечеринки",
+    "sleep": "музыка для сна",
+    "workout": "музыка для тренировок",
+    "romance": "русские песни о любви",
+}
+GENRE_QUERIES = {
+    "ru_pop": "русская поп музыка хиты",
+    "ru_rock": "русский рок хиты",
+    "ru_hiphop": "русский хип-хоп хиты",
+}
+_OTHER_SCENES = re.compile(
+    r"bollywood|hindi|punjabi|tamil|telugu|desi|bhakti|devotional|malayalam|kannada|marathi|bengali|bhojpuri|haryanvi"
+    r"|k-?pop|j-?pop|mandopop|cantopop|c-?pop|thai|viet|indones|opm|pinoy"
+    r"|latin|reggaet|mexican|corridos|banda|sertanejo|brasil|samba|pagode|forr|cumbia|bachata|salsa|urbano"
+    r"|arab|khaleeji|t[uü]rk|afro|amapiano|naija|country|christian|gospel|worship|kids|children|schlager",
+    re.IGNORECASE,
+)
+
 class YoutubeMusicProvider:
     name = SOURCE_NAME
 
     def __init__(self, settings: Settings) -> None:
+        self._mood_cache: dict = {}
         self.settings = settings
         self._resolver = YtDlpResolver(settings, self.name)
         self._ytmusic = None
@@ -405,6 +450,142 @@ class YoutubeMusicProvider:
                 }
             )
         return found[:limit]
+
+    async def mood_tracks(
+        self, key: str, limit: int, artists: list[str] | None = None, ru_share: float | None = None
+    ) -> list[TrackCandidate]:
+        """A mix for a mood or a genre (see MOODS), fitted to the listener:
+        ``artists`` are the ones they listen to, ``ru_share`` — how much of
+        their music is in Russian (0..1)."""
+        return await asyncio.to_thread(self._mood_tracks_sync, key, limit, artists or [], ru_share)
+
+    def _mood_playlists(self, key: str) -> tuple[list[str], list[str]]:
+        """Playlist ids for a mood: (the world's, Russian ones). Cached for hours."""
+        client = self._client()
+        now = time.time()
+        cached = self._mood_cache.get(key)
+        if cached and now - cached[0] < 6 * 3600:
+            return cached[1], cached[2]
+
+        def by_search(query: str) -> list[str]:
+            found = client.search(query, filter="playlists", limit=12) or []
+            return [i for i in ((item.get("browseId") or "").removeprefix("VL") for item in found) if i]
+
+        if key in GENRE_QUERIES:
+            # the genre pages hold songs next to playlists, which
+            # ytmusicapi's parser can't read — so they are found by search
+            world, russian = [], by_search(GENRE_QUERIES[key])
+        else:
+            # YouTube Music's own "Moods & genres" page: the list of
+            # categories changes rarely, the playlists in one — more often
+            if now - self._mood_cache.get("categories_at", 0) > 86400:
+                categories = {}
+                for items in (client.get_mood_categories() or {}).values():
+                    for item in items:
+                        categories[(item.get("title") or "").lower()] = item.get("params")
+                self._mood_cache["categories"] = categories
+                self._mood_cache["categories_at"] = now
+            params = self._mood_cache["categories"].get(MOODS[key].lower())
+            # a mood's page mixes in playlists for other countries' scenes
+            # (Bollywood, Turkish pop, K-Pop…); those are left out
+            world = [
+                item["playlistId"]
+                for item in (client.get_mood_playlists(params) if params else []) or []
+                if item.get("playlistId") and not _OTHER_SCENES.search(item.get("title") or "")
+            ]
+            try:
+                russian = by_search(RU_MOOD_QUERIES[key])
+            except Exception:
+                russian = []
+        self._mood_cache[key] = (now, world, russian)
+        return world, russian
+
+    def _mood_pool_sync(self, key: str, ru_share: float | None) -> list[TrackCandidate]:
+        """Tracks from a few of the mood's playlists, shuffled, no repeats."""
+        return self._mood_candidates(key, ru_share)
+
+    def _mood_tracks_sync(self, key: str, limit: int, artists: list[str], ru_share: float | None) -> list[TrackCandidate]:
+        if key not in MOODS:
+            raise AppError(ErrorCode.INVALID_QUERY, "Unknown mood")
+        candidates = self._mood_candidates(key, ru_share)
+        seen = {t.id for t in candidates} | {f"{t.title.lower()}|{t.artist.lower()}" for t in candidates}
+
+        def fresh(track: TrackCandidate) -> bool:
+            same_song = f"{track.title.lower()}|{track.artist.lower()}"
+            if track.id in seen or same_song in seen:
+                return False
+            seen.update((track.id, same_song))
+            return True
+
+        # the listener's own artists come first…
+        known = {name.strip().lower() for name in artists if name and name.strip()}
+        def by_known_artist(track: TrackCandidate) -> bool:
+            return any(part.strip().lower() in known for part in re.split(r",|&| feat\.? ", track.artist))
+        theirs = [t for t in candidates if by_known_artist(t)] if known else []
+        others = [t for t in candidates if t not in theirs]
+
+        # …and from two of those, what YouTube Music would play next
+        def radio_of(track: TrackCandidate) -> list[TrackCandidate]:
+            try:
+                return self._radio_sync(track.source_id, 20)
+            except Exception:
+                return []
+        near: list[TrackCandidate] = []
+        if theirs:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                for tracks in pool.map(radio_of, theirs[:2]):
+                    near.extend(t for t in tracks if fresh(t))
+
+        head = theirs[:12] + near[:16]
+        random.shuffle(head)
+        if theirs:  # it opens with an artist the listener knows
+            head.remove(theirs[0])
+            head.insert(0, theirs[0])
+        return (head + others)[:limit]
+
+    def _mood_candidates(self, key: str, ru_share: float | None) -> list[TrackCandidate]:
+        if key not in MOODS:
+            raise AppError(ErrorCode.INVALID_QUERY, "Unknown mood")
+        client = self._client()
+        world, russian = self._mood_playlists(key)
+        if not world and not russian:
+            raise AppError(ErrorCode.PROVIDER_UNAVAILABLE, "This mood is not available right now")
+
+        # how many playlists of each kind: by how much Russian the listener
+        # has in their own music (half and half when that isn't known)
+        total = 4
+        share = 0.5 if ru_share is None else min(0.85, max(0.15, ru_share))
+        ru_count = min(len(russian), round(total * share)) if world else min(len(russian), total)
+        picked = random.sample(russian, ru_count) + random.sample(world, min(len(world), total - ru_count))
+
+        def read_playlist(playlist_id: str) -> list[TrackCandidate]:
+            try:
+                raw = client.get_playlist(playlist_id, limit=40)
+            except Exception:
+                return []
+            out = []
+            for entry in raw.get("tracks") or []:
+                album = entry.get("album") or {}
+                mapped = map_album_track(entry, "", album.get("id"), album.get("name"))
+                if mapped is not None:
+                    out.append(mapped)
+            return out
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            pools = list(pool.map(read_playlist, picked))
+
+        seen: set[str] = set()
+
+        def fresh(track: TrackCandidate) -> bool:
+            same_song = f"{track.title.lower()}|{track.artist.lower()}"
+            if track.id in seen or same_song in seen:
+                return False
+            seen.update((track.id, same_song))
+            return True
+
+        candidates = [t for tracks in pools for t in tracks if fresh(t)]
+        random.shuffle(candidates)
+        return candidates
 
     async def radio(self, video_id: str, limit: int) -> list[TrackCandidate]:
         """Tracks YouTube Music's own radio would play after this one —

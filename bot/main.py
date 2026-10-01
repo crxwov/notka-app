@@ -1,13 +1,15 @@
 import asyncio
+import os
 import re
 import logging
+import time
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -18,6 +20,7 @@ from aiogram.types import (
 )
 
 from bot.config import load_config
+from music_resolver.services import plus_store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("notka.bot")
@@ -54,6 +57,21 @@ async def main() -> None:
         # straight on it.
         parts = (message.text or "").split(maxsplit=1)
         payload = parts[1].strip() if len(parts) > 1 else ""
+        # t.me/<bot>?start=promo_CODE — a link from an ad: Нотка opens
+        # with the code already entered
+        promo = re.fullmatch(r"promo_([A-Za-zА-Яа-яЁё0-9_-]{3,24})", payload)
+        if promo:
+            sep = "&" if "?" in config.miniapp_url else "?"
+            await message.answer(
+                "У тебя промокод на Нотку Плюс 🎁\nЖми на кнопку — он активируется сам.",
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[[InlineKeyboardButton(
+                        text="🎁 Активировать Плюс",
+                        web_app=WebAppInfo(url=f"{config.miniapp_url}{sep}promo={plus_store.normalize_code(promo.group(1))}"),
+                    )]]
+                ),
+            )
+            return
         if re.fullmatch(r"[tp]_[A-Za-z0-9_-]{2,60}", payload):
             is_track = payload.startswith("t_")
             sep = "&" if "?" in config.miniapp_url else "?"
@@ -77,6 +95,57 @@ async def main() -> None:
         await message.answer(
             "Кнопка «Нотка» слева от поля ввода тоже всегда под рукой.",
             reply_markup=ReplyKeyboardRemove(),
+        )
+
+    # ---- for the owner (ADMIN_IDS in .env): promo codes for «Нотка Плюс» ----
+    admin_ids = {int(x) for x in re.findall(r"\d+", os.environ.get("ADMIN_IDS", ""))}
+
+    @dp.message(Command("id"))
+    async def handle_id(message: Message) -> None:
+        await message.answer(f"Твой номер в Telegram: {message.from_user.id}")
+
+    @dp.message(Command("promo"))
+    async def handle_promo(message: Message, command: CommandObject) -> None:
+        if message.from_user.id not in admin_ids:
+            await message.answer("Не понял команду. Жми /start, чтобы открыть Нотку.")
+            return
+        args = (command.args or "").split()
+        me = await bot.get_me()
+        if not args:
+            codes = plus_store.list_codes()
+            if not codes:
+                await message.answer(
+                    "Промокодов пока нет.\n\n"
+                    "Создать: /promo КОД ДНЕЙ СКОЛЬКО_АКТИВАЦИЙ [СКОЛЬКО_ДНЕЙ_ДЕЙСТВУЕТ]\n"
+                    "Например: /promo НОТКА 30 100 14 — месяц Плюса, первым 100 людям, код живёт 14 дней."
+                )
+                return
+            lines = []
+            for code, entry in codes.items():
+                state = "выключен" if entry.get("off") else (
+                    "истёк" if entry.get("expires") and entry["expires"] < time.time() else "действует")
+                lines.append(f"{code} — {entry['days']} дн., активировано {len(entry['used'])} из {entry['limit']}, {state}")
+            await message.answer("Промокоды:\n" + "\n".join(lines) + "\n\nВыключить: /promo off КОД")
+            return
+        if args[0].lower() == "off" and len(args) == 2:
+            ok = plus_store.disable_code(args[1])
+            await message.answer("Код выключен." if ok else "Такого кода нет.")
+            return
+        try:
+            code, days, limit = args[0], int(args[1]), int(args[2])
+            valid_days = int(args[3]) if len(args) > 3 else None
+            plus_store.create_code(code, days, limit, valid_days)
+        except (IndexError, ValueError, plus_store.PromoError):
+            await message.answer(
+                "Не получилось. Формат: /promo КОД ДНЕЙ СКОЛЬКО_АКТИВАЦИЙ [СКОЛЬКО_ДНЕЙ_ДЕЙСТВУЕТ]\n"
+                "Код — от 3 до 24 букв и цифр без пробелов."
+            )
+            return
+        code = plus_store.normalize_code(code)
+        await message.answer(
+            f"Готово: {code} даёт {days} дн. Плюса, первым {limit}"
+            + (f", действует {valid_days} дн." if valid_days else "")
+            + f"\n\nСсылка для рекламы (код вводится сам):\nhttps://t.me/{me.username}?start=promo_{code}"
         )
 
     @dp.message()
