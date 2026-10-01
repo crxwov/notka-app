@@ -3,6 +3,7 @@ import json
 import os
 import re
 import secrets
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -15,7 +16,9 @@ from fastapi.responses import FileResponse, RedirectResponse, Response
 from music_resolver.config import Settings
 from music_resolver.errors import AppError, ErrorCode
 from music_resolver.models import AlbumResponse, ArtistResponse, ResolveResponse, SearchResponse
+from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
+from music_resolver.utils.remux import defragment, defragment_all
 
 # Some CDNs (incl. googlevideo.com) reject requests with no/odd User-Agent.
 _UPSTREAM_USER_AGENT = (
@@ -139,6 +142,9 @@ async def _ensure_cached(
             try:
                 tmp_path, mime = await download_to_file(source_id, _CACHE_DIR, key)
                 tmp_path = Path(tmp_path)
+                # YouTube's m4a comes in 10-second fragments; some players
+                # (Telegram's WebView) go silent after the first one
+                await asyncio.to_thread(defragment, tmp_path)
                 tmp_path.replace(data_path)
                 meta_path.write_text(mime)
             except AppError:
@@ -179,6 +185,9 @@ async def _ensure_cached(
 
 def create_router(service: MusicService, settings: Settings) -> APIRouter:
     router = APIRouter()
+
+    # tracks cached before audio was rewritten on download (see remux.py)
+    threading.Thread(target=defragment_all, args=(_CACHE_DIR,), daemon=True).start()
 
     def match_suffix_for(provider, source_id: str) -> str | None:
         # For a catalog-only source (currently just itunes) whose track id
@@ -300,6 +309,19 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         except Exception as exc:
             raise AppError(ErrorCode.PROVIDER_UNAVAILABLE, "Radio is unavailable") from exc
         return SearchResponse(results=tracks)
+
+    # ---- «Текст»: the lyrics of a track, synced line by line when a
+    # source has timings for it. An empty list means "no lyrics found". ----
+    @router.get("/lyrics")
+    async def lyrics(
+        title: str = Query(..., min_length=1, max_length=300),
+        artist: str = Query(default="", max_length=300),
+        duration: float | None = Query(default=None, ge=0, le=36000),
+        source: str | None = Query(default=None),
+        id: str | None = Query(default=None),
+    ) -> dict:
+        provider = service.manager.get("youtube_music") if source == "youtube_music" and id else None
+        return await find_lyrics(title, artist, duration, youtube_music_provider=provider, video_id=id)
 
     # ---- gets a track ready to play: the app calls this before pointing
     # its player at /stream (so a failure comes back as a readable error),

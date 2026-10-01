@@ -575,7 +575,8 @@
     el.style.setProperty("--pr", `${Math.max(art.width, art.height) / 2 + 24}px`);
   }
   function syncPrism() {
-    const on = currentScreen === "player" && document.body.classList.contains("is-playing");
+    // the rays burst from behind the cover — with the lyrics open there is no cover
+    const on = currentScreen === "player" && document.body.classList.contains("is-playing") && !document.body.classList.contains("lyrics-open");
     if (on) {
       if (!ensurePrism()) return;
       requestAnimationFrame(placePrism);
@@ -2006,6 +2007,7 @@
     updateDock();
     renderQueueSheet();
     lightForTrack(track);
+    loadLyrics();
     resetProgress(track);
     extendMixIfNeeded();
     haptic("light");
@@ -2138,6 +2140,105 @@
   $("player-back-btn").addEventListener("click", goBack);
   $("player-more-btn").addEventListener("click", () => { if (currentTrack) openTrackMenu(currentTrack); });
   $("player-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
+
+  // «Текст»: the lyrics take the cover's place in the player. They are
+  // fetched only while that view is open; when a source has timings, the
+  // line being sung is lit and kept in view, and a tap on a line jumps to it.
+  const lyricsBox = $("player-lyrics");
+  const lyricsList = $("lyrics-lines");
+  const lyricsCache = new Map(); // track id -> { lines, synced }
+  let lyricsOpen = false;
+  let lyricsTrackId = null; // whose text is on screen (or being fetched)
+  let lyricsData = null;
+  let lyricsActive = -1;
+  let lyricsTouchedAt = 0;
+
+  function renderLyrics(data) {
+    $("lyrics-skeleton").hidden = true;
+    lyricsData = data;
+    lyricsActive = -1;
+    lyricsList.innerHTML = "";
+    lyricsList.classList.toggle("is-synced", !!data.synced);
+    $("lyrics-note").textContent = data.lines.length ? "" : "Для этого трека текста пока нет.";
+    const frag = document.createDocumentFragment();
+    data.lines.forEach((line, i) => {
+      const li = document.createElement("li");
+      li.className = "lyrics-line";
+      li.textContent = line.text;
+      li.dataset.i = i;
+      frag.appendChild(li);
+    });
+    lyricsList.appendChild(frag);
+    lyricsBox.scrollTop = 0;
+    syncLyrics(true);
+  }
+
+  async function loadLyrics() {
+    const track = currentTrack;
+    if (!lyricsOpen || !track || lyricsTrackId === track.id) return;
+    lyricsTrackId = track.id;
+    if (lyricsCache.has(track.id)) { renderLyrics(lyricsCache.get(track.id)); return; }
+    if (!track.title) { renderLyrics({ lines: [], synced: false }); return; }
+    lyricsData = null;
+    lyricsList.innerHTML = "";
+    $("lyrics-note").textContent = "";
+    $("lyrics-skeleton").hidden = false;
+    lyricsBox.scrollTop = 0;
+    let data = null;
+    try {
+      const q = `title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist || "")}`
+        + (track.duration ? `&duration=${Math.round(track.duration)}` : "") + `&${trackQuery(track)}`;
+      const res = await fetch(`${API_BASE_URL}/lyrics?${q}`);
+      if (res.ok) data = await res.json();
+    } catch (e) { /* shown as "couldn't load" below */ }
+    if (lyricsTrackId !== track.id) return;
+    $("lyrics-skeleton").hidden = true;
+    if (!data || !Array.isArray(data.lines)) {
+      lyricsTrackId = null; // opening the text again retries
+      $("lyrics-note").textContent = "Не получилось загрузить текст. Попробуй ещё раз чуть позже.";
+      return;
+    }
+    lyricsCache.set(track.id, data);
+    renderLyrics(data);
+  }
+
+  function syncLyrics(jump) {
+    if (!lyricsOpen || !lyricsData || !lyricsData.synced || currentScreen !== "player") return;
+    const lines = lyricsData.lines;
+    const t = audio.currentTime + 0.25; // light a line a touch early, as the ear expects
+    let i = -1;
+    while (i + 1 < lines.length && lines[i + 1].t <= t) i++;
+    if (i === lyricsActive && !jump) return;
+    lyricsActive = i;
+    const items = lyricsList.children;
+    for (let k = 0; k < items.length; k++) {
+      items[k].classList.toggle("is-active", k === i);
+      items[k].classList.toggle("is-past", k < i);
+    }
+    // don't pull the text away from someone who is scrolling it by hand
+    if (!jump && Date.now() - lyricsTouchedAt < 3000) return;
+    const top = i < 0 ? 0 : Math.max(0, items[i].offsetTop - lyricsBox.clientHeight * 0.3);
+    lyricsBox.scrollTo({ top, behavior: jump ? "auto" : "smooth" });
+  }
+
+  function setLyricsOpen(on) {
+    lyricsOpen = on;
+    document.body.classList.toggle("lyrics-open", on);
+    lyricsBox.inert = !on;
+    $("player-lyrics-btn").setAttribute("aria-pressed", on ? "true" : "false");
+    syncPrism();
+    if (on) { loadLyrics(); syncLyrics(true); }
+  }
+  $("player-lyrics-btn").addEventListener("click", () => { haptic("light"); setLyricsOpen(!lyricsOpen); });
+  ["touchstart", "wheel"].forEach((type) => lyricsBox.addEventListener(type, () => { lyricsTouchedAt = Date.now(); }, { passive: true }));
+  lyricsList.addEventListener("click", (e) => {
+    const li = e.target.closest(".lyrics-line");
+    if (!li || !lyricsData || !lyricsData.synced) return;
+    try { audio.currentTime = lyricsData.lines[+li.dataset.i].t; } catch (err) { return; }
+    lyricsTouchedAt = 0;
+    haptic("light");
+    syncLyrics(true);
+  });
 
   $("queue-sheet-close").addEventListener("click", () => closeOverlay("queue-sheet"));
   $("player-sleep-btn").addEventListener("click", () => { closeOverlay("track-menu-sheet"); openOverlay("sleep-timer-sheet"); });
@@ -2665,6 +2766,7 @@
 
   audio.addEventListener("timeupdate", () => {
     recordListening();
+    syncLyrics();
     const dur = effectiveDuration();
     if (!dur || isScrubbing) return;
     applyFade(audio.currentTime, dur);
