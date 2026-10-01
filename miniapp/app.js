@@ -1094,6 +1094,7 @@
   const stateResults = $("search-state-results");
   let debounceTimer = null;
   let lastSearchResults = null; // raw track results from backend, for the active query
+  let lastSearchArtists = null; // artists (with photos) found for the same query
   let searchTab = "all"; // all | tracks | artists | albums
   let searchToken = 0;
 
@@ -1187,11 +1188,28 @@
     return li;
   }
 
+  // Artists for a query: the ones the artist search found (with their
+  // photos), those who also appear among the found tracks first; then the
+  // artists that only the tracks mention, shown with a cover of theirs.
+  function searchArtists(tracks) {
+    const norm = (name) => name.trim().toLowerCase();
+    const groups = groupByArtist(tracks);
+    const found = (lastSearchArtists || []).map((a) => {
+      const own = groups.find((g) => norm(g.name) === norm(a.name));
+      return { name: a.name, artistId: a.id, source: a.source, photo: a.photo, tracks: own ? own.tracks : [] };
+    });
+    const seen = new Set(found.map((a) => norm(a.name)));
+    found.sort((a, b) => (b.tracks.length ? 1 : 0) - (a.tracks.length ? 1 : 0));
+    return found.concat(groups.filter((g) => !seen.has(norm(g.name))));
+  }
   function artistRow(group, tracks) {
+    const ownCover = group.tracks.find((t) => t.artwork);
     return groupRow({
       title: group.name,
-      sub: `Исполнитель · ${pluralTracks(group.tracks.length)}`,
-      cover: null,
+      // how many tracks an artist has is not known here — the number of
+      // their tracks that happened to be found says nothing, so none is shown
+      sub: "Исполнитель",
+      cover: group.photo || (ownCover ? ownCover.artwork : null),
       seed: group.name,
       round: true,
       onClick: () => openArtistScreen(group.name, tracks, { artistId: group.artistId, source: group.source }),
@@ -1237,12 +1255,12 @@
     if (searchTab === "tracks") {
       stateResults.appendChild(resultsSection(null, trackRows(tracks)));
     } else if (searchTab === "artists") {
-      stateResults.appendChild(resultsSection(null, groupByArtist(tracks).map((g) => artistRow(g, tracks))));
+      stateResults.appendChild(resultsSection(null, searchArtists(tracks).map((g) => artistRow(g, tracks))));
     } else if (searchTab === "albums") {
       stateResults.appendChild(resultsSection(null, groupByAlbum(tracks).map(albumRow)));
     } else {
       stateResults.appendChild(resultsSection("Треки", trackRows(tracks.slice(0, 8))));
-      const artists = groupByArtist(tracks).slice(0, 3);
+      const artists = searchArtists(tracks).slice(0, 3);
       if (artists.length) stateResults.appendChild(resultsSection("Исполнители", artists.map((g) => artistRow(g, tracks))));
       const albums = groupByAlbum(tracks).filter((a) => a.albumId).slice(0, 3);
       if (albums.length) stateResults.appendChild(resultsSection("Альбомы", albums.map(albumRow)));
@@ -1261,15 +1279,24 @@
     }
     showSearchState("search-state-loading");
     document.body.classList.add("search-loading");
+    lastSearchArtists = null;
+    // artists are looked up alongside the tracks; they are an addition, so
+    // the results don't wait for them long and never fail because of them
+    const artistsReady = fetch(`${API_BASE_URL}/artists?q=${encodeURIComponent(query)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (token === searchToken && data) lastSearchArtists = data.results || []; })
+      .catch(() => {});
     try {
       const url = `${API_BASE_URL}/search?q=${encodeURIComponent(query)}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      await Promise.race([artistsReady, new Promise((done) => setTimeout(done, 1200))]);
       if (token !== searchToken) return; // a newer query already won
       document.body.classList.remove("search-loading");
       lastSearchResults = data.results || [];
       renderFilteredResults();
+      if (!lastSearchArtists) artistsReady.then(() => { if (token === searchToken && lastSearchArtists && lastSearchResults) renderFilteredResults(); });
     } catch (err) {
       if (token !== searchToken) return;
       document.body.classList.remove("search-loading");

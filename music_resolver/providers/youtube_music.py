@@ -385,6 +385,27 @@ class YoutubeMusicProvider:
                 return item["browseId"]
         return None
 
+    async def search_artists(self, query: str, limit: int) -> list[dict]:
+        """Artists matching the query, each with its photo — for the search screen."""
+        return await asyncio.to_thread(self._search_artists_sync, query, limit)
+
+    def _search_artists_sync(self, query: str, limit: int) -> list[dict]:
+        found: list[dict] = []
+        for item in self._client().search(query, filter="artists", limit=limit) or []:
+            name = (item.get("artist") or "").strip()
+            browse_id = item.get("browseId")
+            if not name or not browse_id:
+                continue
+            found.append(
+                {
+                    "id": browse_id,
+                    "source": "youtube_music",
+                    "name": name,
+                    "photo": _best_thumbnail_url(item.get("thumbnails")),
+                }
+            )
+        return found[:limit]
+
     async def radio(self, video_id: str, limit: int) -> list[TrackCandidate]:
         """Tracks YouTube Music's own radio would play after this one —
         the basis for «Мой микс» (see /radio)."""

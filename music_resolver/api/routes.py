@@ -243,6 +243,22 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     ) -> SearchResponse:
         return await service.search(q, limit=limit or settings.search_limit)
 
+    # ---- artists for the search screen: names with photos. Search itself
+    # must not fail because of this, so trouble here is an empty list. ----
+    @router.get("/artists")
+    async def artists(
+        q: str = Query(..., min_length=1, max_length=200),
+        limit: int = Query(default=8, ge=1, le=20),
+    ) -> dict:
+        provider = service.manager.get("youtube_music")
+        if provider is None or not hasattr(provider, "search_artists"):
+            return {"results": []}
+        try:
+            found = await asyncio.wait_for(provider.search_artists(q, limit), timeout=settings.provider_timeout)
+        except Exception:
+            found = []
+        return {"results": found}
+
     @router.get("/resolve", response_model=ResolveResponse)
     async def resolve(
         source: str | None = Query(default=None),
