@@ -946,12 +946,101 @@ body.is-playing .play-src.is-current .ic-pause { display: block; }
 }
 .share-link:empty { display: none; }
 
-.stats-lede { font-size: 20px; line-height: 1.4; font-weight: 600; letter-spacing: -0.015em; margin: 8px 0 22px; text-wrap: pretty; }
-.stats-lede b { color: var(--now); font-weight: 700; }
-.stat-row { display: flex; align-items: center; gap: 12px; }
-.stat-rank { width: 20px; font-size: 14px; color: var(--text-3); text-align: right; }
-.stat-bar { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.stat-bar i { display: block; height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--c-warm), var(--c-core)); }
+/* STATISTICS — a poster of your listening, not a table: one huge number
+   in the colors of the light, the first artist as a poster, the rest as a
+   chart with big numerals, albums as a scatter of sleeves. Every part
+   comes in as it scrolls into view. */
+.stats-chips { margin: 4px 0 6px; }
+.stats-lede { font-size: 18px; line-height: 1.45; color: var(--text-2); text-align: center; padding: 18% 12px 0; text-wrap: pretty; }
+
+[data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity 0.7s var(--ease-out), transform 0.9s var(--ease-out); }
+[data-reveal].is-seen { opacity: 1; transform: none; }
+
+.stats-big { display: flex; flex-direction: column; align-items: flex-start; padding: 22px 0 0; }
+.stats-big-num {
+  font-size: clamp(88px, 31vw, 132px);
+  line-height: 0.92;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+  margin-left: -0.04em;
+  padding-right: 0.06em;
+  background: linear-gradient(100deg, var(--c-core) 0%, var(--c-warm) 48%, var(--c-mid) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 10px 34px color-mix(in srgb, var(--c-warm) 45%, transparent));
+}
+.stats-big-num.is-long { font-size: clamp(64px, 22vw, 104px); }
+.stats-big-word { font-size: 30px; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; margin-top: 6px; }
+.stats-big-note { font-size: 16px; line-height: 1.4; color: var(--text-2); margin-top: 10px; text-wrap: pretty; }
+.stats-facts { display: flex; margin: 24px 0 30px; }
+.stats-fact { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding-left: 14px; box-shadow: inset 1px 0 0 var(--line); font-size: 13px; color: var(--text-2); }
+.stats-fact:first-child { padding-left: 0; box-shadow: none; }
+.stats-fact b { font-size: 24px; line-height: 1.15; font-weight: 800; letter-spacing: -0.03em; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* № 1 — a poster. Their own picture, blurred, pools as light underneath. */
+.stats-poster-wrap { position: relative; margin: 0 0 34px; }
+.stats-hero-glow { position: absolute; inset: 14% 6% -7%; border-radius: 40px; background: var(--orb-mini) center / cover; filter: blur(38px) saturate(1.6); opacity: 0.7; }
+.stats-poster { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1.12; border-radius: 34px; overflow: hidden; text-align: left; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); transition: transform 0.35s var(--ease-out); }
+.stats-poster:active { transform: scale(0.975); }
+.stats-poster-img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; transform: scale(1.22); transition: transform 2.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.is-seen .stats-poster-img { transform: scale(1.02); }
+.stats-poster-shade { position: absolute; inset: 0; background: linear-gradient(to top, rgba(8, 6, 14, 0.92) 0%, rgba(8, 6, 14, 0.55) 30%, rgba(8, 6, 14, 0) 58%), linear-gradient(to bottom left, rgba(8, 6, 14, 0.45), rgba(8, 6, 14, 0) 40%); }
+.stats-poster-rank {
+  position: absolute;
+  top: -0.14em;
+  right: 0.08em;
+  font-size: clamp(150px, 52vw, 220px);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.9);
+  transform: translateX(46%);
+  opacity: 0;
+  transition: transform 1.2s var(--ease-out) 0.25s, opacity 0.8s var(--ease-out) 0.25s;
+}
+.is-seen .stats-poster-rank { transform: none; opacity: 1; }
+.stats-poster-text { position: absolute; left: 22px; right: 22px; bottom: 22px; display: flex; flex-direction: column; }
+.stats-poster-text > * { opacity: 0; transform: translateY(18px); transition: opacity 0.7s var(--ease-out), transform 0.9s var(--ease-out); }
+.is-seen .stats-poster-text > * { opacity: 1; transform: none; }
+.is-seen .stats-poster-text > :nth-child(1) { transition-delay: 0.35s; }
+.is-seen .stats-poster-text > :nth-child(2) { transition-delay: 0.45s; }
+.is-seen .stats-poster-text > :nth-child(3) { transition-delay: 0.55s; }
+.stats-hero-over { font-size: 14px; font-weight: 600; color: var(--now); }
+.stats-hero-name { font-size: clamp(34px, 11vw, 46px); line-height: 1.02; font-weight: 800; letter-spacing: -0.04em; margin-top: 4px; overflow-wrap: anywhere; text-wrap: balance; }
+.stats-hero-sub { font-size: 15px; color: rgba(244, 239, 255, 0.78); margin-top: 8px; }
+
+#screen-stats .block { margin-bottom: 34px; }
+
+/* the chart: a hollow numeral with the face leaning on it */
+.rank-shelf { gap: 6px; align-items: flex-start; padding-top: 4px; }
+.rank-shelf .shelf-card { width: auto; flex-direction: column; align-items: flex-start; }
+.rank-pair { display: flex; align-items: flex-end; margin-bottom: 10px; }
+.rank-num {
+  font-size: 104px;
+  line-height: 0.8;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(244, 239, 255, 0.55);
+  margin-right: -20px;
+  padding-right: 6px;
+}
+.rank-shelf .shelf-card .cover { position: relative; width: 104px; height: 104px; border-radius: 50%; margin-bottom: 0; box-shadow: 0 16px 30px -14px rgba(4, 2, 10, 0.8); }
+.rank-shelf .shelf-title, .rank-shelf .shelf-sub { max-width: 150px; padding-left: 4px; }
+.rank-shelf .shelf-card { opacity: 0; transform: translateY(26px) scale(0.86); transition: opacity 0.6s var(--ease-out), transform 0.9s var(--ease-out); transition-delay: calc(var(--i) * 90ms + 120ms); }
+.is-seen .rank-shelf .shelf-card { opacity: 1; transform: none; }
+
+/* albums lie like sleeves tossed on a table; a touch straightens one */
+.sleeve-shelf { gap: 18px; padding-top: 14px; padding-bottom: 14px; }
+.sleeve-shelf .shelf-card { --tilt: -3.5deg; opacity: 0; transform: translateY(40px) rotate(0deg); transition: opacity 0.6s var(--ease-out), transform 1s var(--ease-out); transition-delay: calc(var(--i) * 100ms + 120ms); }
+.sleeve-shelf .shelf-card:nth-child(even) { --tilt: 2.5deg; }
+.sleeve-shelf .shelf-card:nth-child(3n) { --tilt: -1.5deg; }
+.is-seen .sleeve-shelf .shelf-card { opacity: 1; transform: rotate(var(--tilt)); }
+.is-seen .sleeve-shelf .shelf-card:active { transform: rotate(0deg) scale(0.97); transition-delay: 0s; transition-duration: 0.25s; }
+.sleeve-shelf .shelf-card .cover { box-shadow: 0 22px 36px -18px rgba(4, 2, 10, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
 
 .shelf-artists .shelf-card { width: 96px; align-items: center; text-align: center; }
 .shelf-artists .shelf-card .cover { width: 96px; height: 96px; border-radius: 50%; }

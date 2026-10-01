@@ -13,7 +13,7 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=37" />
+<link rel="stylesheet" href="styles.css?v=40" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -64,6 +64,7 @@
   <symbol id="i-mic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.1-3.6 3.8-5.6 7-5.6s5.9 2 7 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.3 6.3 0 0 0 10.1 10.1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="i-cast" viewBox="0 0 24 24"><path d="M4 15.5V6.8A1.8 1.8 0 0 1 5.8 5h12.4A1.8 1.8 0 0 1 20 6.8v8.4a1.8 1.8 0 0 1-1.8 1.8H16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 19.5h.01M4 16.7a2.8 2.8 0 0 1 2.8 2.8M4 13.8a5.7 5.7 0 0 1 5.7 5.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-6.5M12 20V4.5M19 20v-10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.1-3.6 3.8-5.6 7-5.6s5.9 2 7 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 3.8a5.3 5.3 0 0 0-5.3 5.3v3.1c0 .7-.2 1.3-.6 1.8L5 15.6h14l-1.1-1.6c-.4-.5-.6-1.1-.6-1.8V9.1A5.3 5.3 0 0 0 12 3.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 18.6a2.1 2.1 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
@@ -363,6 +364,7 @@
     </div>
     <div class="group">
       <button class="group-row" id="menu-account" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-user"/></svg><span class="group-label">Аккаунт</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-stats" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-chart"/></svg><span class="group-label">Статистика</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       <button class="group-row" id="menu-sound" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-sound"/></svg><span class="group-label">Звук и загрузки</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       <button class="group-row" id="menu-about" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg><span class="group-label">О Нотке</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
     </div>
@@ -387,7 +389,6 @@
     </div>
 
     <div class="group">
-      <button class="group-row" id="account-stats-row" type="button"><span class="group-label">Статистика прослушивания</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       <div class="group-row" id="account-sessions-row"><span class="group-label">Где открыта Нотка<span class="group-sub">Любимое и плейлисты хранятся на этом устройстве</span></span><span class="group-value" id="account-sessions-count">—</span></div>
     </div>
 
@@ -412,12 +413,50 @@
       <div class="bar-title">Статистика</div>
       <span class="bar-spacer"></span>
     </header>
-    <p class="stats-lede" id="stats-lede">Послушай пару треков — и здесь появится твоя статистика.</p>
+    <div class="chips stats-chips" id="stats-periods" role="tablist" aria-label="За какое время">
+      <button class="chip" type="button" role="tab" aria-selected="false" data-period="7">Неделя</button>
+      <button class="chip" type="button" role="tab" aria-selected="false" data-period="30">Месяц</button>
+      <button class="chip active" type="button" role="tab" aria-selected="true" data-period="all">Всё время</button>
+    </div>
+    <p class="stats-lede" id="stats-lede" hidden></p>
     <div id="stats-body" hidden>
-      <h2 class="group-caption">Кого ты слушаешь</h2>
-      <div class="group" id="stats-top-artists"></div>
-      <h2 class="group-caption">Чаще всего</h2>
-      <ul class="track-list" id="stats-top-tracks"></ul>
+      <div class="stats-big" data-reveal>
+        <span class="stats-big-num" id="stats-num-minutes">0</span>
+        <span class="stats-big-word"><span id="stats-label-minutes">минут</span> музыки</span>
+        <span class="stats-big-note" id="stats-note"></span>
+      </div>
+      <div class="stats-facts" data-reveal>
+        <span class="stats-fact"><b id="stats-num-tracks">0</b><span id="stats-label-tracks">треков</span></span>
+        <span class="stats-fact"><b id="stats-num-artists">0</b><span id="stats-label-artists">исполнителей</span></span>
+        <span class="stats-fact"><b id="stats-num-plays">0</b><span id="stats-label-plays">прослушиваний</span></span>
+      </div>
+
+      <div class="stats-poster-wrap" data-reveal>
+        <span class="stats-hero-glow" id="stats-hero-glow" aria-hidden="true"></span>
+        <button class="stats-poster" id="stats-hero" type="button">
+          <span class="cover stats-poster-img" id="stats-hero-cover"></span>
+          <span class="stats-poster-shade" aria-hidden="true"></span>
+          <span class="stats-poster-rank" aria-hidden="true">1</span>
+          <span class="stats-poster-text">
+            <span class="stats-hero-over">Твой исполнитель № 1</span>
+            <span class="stats-hero-name" id="stats-hero-name"></span>
+            <span class="stats-hero-sub" id="stats-hero-sub"></span>
+          </span>
+        </button>
+      </div>
+
+      <section class="block" id="stats-artists-block" data-reveal>
+        <div class="block-head"><h2 class="h2">Следом идут</h2></div>
+        <div class="shelf rank-shelf" id="stats-top-artists"></div>
+      </section>
+      <section class="block" data-reveal>
+        <div class="block-head"><h2 class="h2">На повторе</h2></div>
+        <ul class="track-list" id="stats-top-tracks"></ul>
+      </section>
+      <section class="block" id="stats-albums-block" data-reveal>
+        <div class="block-head"><h2 class="h2">Альбомы, в которых ты живёшь</h2></div>
+        <div class="shelf sleeve-shelf" id="stats-top-albums"></div>
+      </section>
     </div>
     <p class="fineprint">Считается на этом устройстве</p>
   </main>
@@ -677,6 +716,6 @@
 <script src="config.js"></script>
 <script src="prism.js?v=2"></script>
 <script src="shredder.js?v=4"></script>
-<script src="app.js?v=32"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>
