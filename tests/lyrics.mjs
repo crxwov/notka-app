@@ -58,6 +58,22 @@ try {
   const t2 = await b.eval(`${audio}.currentTime`);
   check("tap on a line jumps to it", !!a2 && a2.i >= target && t2 > 100, JSON.stringify({ target, a2, t2: Math.round(t2) }));
 
+  check("the track menu is hidden while the text is open", await b.eval("getComputedStyle(document.getElementById('player-more-btn')).opacity === '0'"));
+
+  // a swipe down from the top of the text puts it away
+  await b.eval(`${audio}.currentTime = 1; true`);
+  await b.sleep(900);
+  const box = await b.eval("(() => { const r = document.getElementById('player-lyrics').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 80), top: document.getElementById('player-lyrics').scrollTop }; })()");
+  const touch = (type, y) => b.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x: box.x, y }] });
+  await touch("touchStart", box.y);
+  for (let i = 1; i <= 6; i++) { await touch("touchMove", box.y + i * 30); await b.sleep(30); }
+  await touch("touchEnd");
+  await b.sleep(900);
+  check("swipe down puts the text away", await b.eval("!document.body.classList.contains('lyrics-open')") , JSON.stringify(box));
+  check("the track menu is back", await b.eval("getComputedStyle(document.getElementById('player-more-btn')).opacity === '1'"));
+  await b.click("#player-lyrics-btn");
+  await b.sleep(600);
+
   await b.click("#player-lyrics-btn");
   await b.shot("lyrics-closing");
   await b.sleep(900);

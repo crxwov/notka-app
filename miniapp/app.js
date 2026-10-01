@@ -100,10 +100,13 @@
         accountName: parsed.accountName || null,
         accountAvatar: parsed.accountAvatar || null,
         onboardingSeen: !!parsed.onboardingSeenV2,
+        onboardingSeenV2: !!parsed.onboardingSeenV2, // kept under its own name, or the next save would forget it
         notifUnread: typeof parsed.notifUnread === "number" ? Math.min(parsed.notifUnread, 0) : 0,
         followedMeta: parsed.followedMeta || {},
         listens: parsed.listens || { seconds: 0, plays: 0, tracks: {}, artists: {} },
         sharedImports: parsed.sharedImports || {},
+        recent: parsed.recent || [], // the last tracks played, newest first
+        fresh: parsed.fresh || null, // { key, at, items } — «Новое от любимых исполнителей»
       };
     } catch (e) {
       return {
@@ -688,6 +691,7 @@
     if (name === "account") renderAccountScreen();
     if (name === "sound") renderSoundScreen();
     if (name === "stats") renderStatsScreen();
+    if (name === "about") revealIn("screen-about", true);
     if (name === "playlist" && currentPlaylistId && opts.replace) openPlaylist(currentPlaylistId, true);
     if (TAB_SCREENS.has(name)) {
       document.querySelectorAll(".tab").forEach((b) => {
@@ -998,6 +1002,157 @@
     $("home-see-all-favorites").hidden = state.favorites.length === 0;
     favs.forEach((track) => list.appendChild(buildTrackRow(track, { queue: state.favorites, context: "Любимые треки" })));
     updateMymixCardUI();
+    renderRecent();
+    refreshFresh();
+    revealIn("screen-home", false);
+  }
+
+  // Parts marked data-reveal come in when they scroll into view. With
+  // `replay` they start hidden again (a screen whose content was rebuilt).
+  const revealObservers = {};
+  function revealIn(screenId, replay) {
+    const root = $(screenId);
+    const parts = Array.from(root.querySelectorAll("[data-reveal]"));
+    if (replay) parts.forEach((el) => el.classList.remove("is-seen"));
+    if (revealObservers[screenId]) revealObservers[screenId].disconnect();
+    if (!("IntersectionObserver" in window)) { parts.forEach((el) => el.classList.add("is-seen")); return; }
+    const observer = revealObservers[screenId] = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-seen");
+        observer.unobserve(entry.target);
+      });
+    }, { root, threshold: 0.12 });
+    // after a frame, so the hidden state is painted first and the move is seen
+    requestAnimationFrame(() => requestAnimationFrame(() => parts.forEach((el) => { if (!el.classList.contains("is-seen")) observer.observe(el); })));
+  }
+
+  function shelfCard(coverUrl, seed, title, sub, onClick) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "shelf-card";
+    const cover = document.createElement("span");
+    cover.className = "cover";
+    setCoverEl(cover, coverUrl, seed);
+    const t = document.createElement("span");
+    t.className = "shelf-title";
+    t.textContent = title;
+    const sb = document.createElement("span");
+    sb.className = "shelf-sub";
+    sb.textContent = sub;
+    card.appendChild(cover);
+    card.appendChild(t);
+    card.appendChild(sb);
+    card.addEventListener("click", onClick);
+    return card;
+  }
+
+  // «Недавнее»: the last tracks that actually started playing.
+  function rememberRecent(track) {
+    const recent = state.recent || (state.recent = []);
+    state.recent = [slimTrack(track)].concat(recent.filter((t) => t.id !== track.id)).slice(0, 20);
+    persist();
+    if (currentScreen === "home") renderRecent();
+  }
+  function renderRecent() {
+    const recent = state.recent || [];
+    $("home-recent-block").hidden = recent.length === 0;
+    const shelf = $("home-recent");
+    // rebuilt only when the list changed, so the cards' entrance plays for
+    // new content and not on every return to Home
+    const sig = recent.map((t) => t.id).join("|");
+    if (shelf.dataset.sig === sig) return;
+    shelf.dataset.sig = sig;
+    shelf.innerHTML = "";
+    recent.forEach((t, i) => {
+      const card = shelfCard(t.artwork, t.id, t.title || "Без названия", t.artist || "", () => playTrack(t, recent, { context: "Недавнее" }));
+      card.style.setProperty("--i", Math.min(i, 6));
+      shelf.appendChild(card);
+    });
+    shelf.scrollLeft = 0;
+  }
+
+  // «Новое от любимых исполнителей»: the latest release (this year or last)
+  // of each artist you follow or listen to the most. Asking about every
+  // artist takes a while, so the answer is kept for six hours.
+  function freshArtists() {
+    const out = [];
+    const seen = new Set();
+    const add = (name, ref) => {
+      if (!ref.artistId || !ref.source || seen.has(ref.artistId)) return;
+      seen.add(ref.artistId);
+      out.push({ name, artistId: ref.artistId, source: ref.source });
+    };
+    state.followedArtists.forEach((name) => add(name, state.followedMeta[name] || {}));
+    Object.entries(state.listens.artists).sort((a, b) => b[1].seconds - a[1].seconds).slice(0, 6).forEach(([name]) => add(name, artistRef(name)));
+    return out.slice(0, 10);
+  }
+  let freshLoading = false;
+  async function refreshFresh() {
+    const artists = freshArtists();
+    const key = artists.map((a) => `${a.source}:${a.artistId}`).join(",");
+    if (!artists.length) { renderFresh(); return; }
+    const cache = state.fresh;
+    if ((cache && cache.key === key && Date.now() - cache.at < 6 * 3600 * 1000) || freshLoading) { renderFresh(); return; }
+    freshLoading = true;
+    renderFresh();
+    const minYear = new Date().getFullYear() - 1;
+    const items = [];
+    let answered = 0;
+    for (const a of artists) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/artist?source=${encodeURIComponent(a.source)}&id=${encodeURIComponent(a.artistId)}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+        answered++;
+        const latest = (data.albums || []).filter((x) => +x.year >= minYear).sort((x, y) => +y.year - +x.year)[0];
+        if (latest && !items.some((it) => it.id === latest.id)) {
+          items.push({ id: latest.id, source: latest.source || a.source, title: latest.title, cover: latest.cover, year: latest.year, type: latest.type, artist: data.name || a.name });
+        }
+      } catch (e) { /* this artist is skipped this time */ }
+    }
+    freshLoading = false;
+    // nobody answered (the backend is away): keep what was shown before
+    if (answered) {
+      items.sort((x, y) => +y.year - +x.year);
+      state.fresh = { key, at: Date.now(), items };
+      persist();
+    }
+    renderFresh();
+  }
+  function renderFresh() {
+    const items = freshArtists().length && state.fresh ? state.fresh.items : [];
+    const loading = freshLoading && !items.length;
+    $("home-fresh-block").hidden = !items.length && !loading;
+    const shelf = $("home-fresh");
+    const sig = loading ? "loading" : items.map((it) => it.id).join("|");
+    if (shelf.dataset.sig === sig) return;
+    shelf.dataset.sig = sig;
+    shelf.innerHTML = "";
+    if (loading) {
+      shelf.innerHTML = '<span class="shelf-skel" aria-hidden="true"><i></i><i></i><i></i></span>'.repeat(3);
+      return;
+    }
+    items.forEach((it, i) => {
+      const art = hiResArtwork(it.cover);
+      const card = shelfCard(art, it.id, it.title, `${it.artist} · ${it.type === "single" ? "сингл" : "альбом"}`, () => openAlbumById(it.source, it.id, it.title, it.artist));
+      card.style.setProperty("--i", Math.min(i, 6));
+      // the sleeve, its colors pooled as light beneath it, and the year on a tag
+      const cover = card.querySelector(".cover");
+      const wrap = document.createElement("span");
+      wrap.className = "fresh-art";
+      const glow = document.createElement("span");
+      glow.className = "fresh-glow";
+      if (art) glow.style.backgroundImage = `url("${art.replace(/"/g, "%22")}")`;
+      const tag = document.createElement("span");
+      tag.className = "fresh-tag";
+      tag.textContent = it.year;
+      card.insertBefore(wrap, cover);
+      wrap.appendChild(glow);
+      wrap.appendChild(cover);
+      wrap.appendChild(tag);
+      shelf.appendChild(card);
+    });
   }
 
   $("home-see-all-favorites").addEventListener("click", () => showScreen("favorites"));
@@ -1760,6 +1915,11 @@
   $("menu-account").addEventListener("click", () => showScreen("account"));
   $("menu-sound").addEventListener("click", () => showScreen("sound"));
   $("menu-about").addEventListener("click", () => showScreen("about"));
+  $("about-support-btn").addEventListener("click", () => {
+    const url = "https://t.me/notka_support";
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+    else window.open(url, "_blank");
+  });
 
   // ============================================================
   // ACCOUNT (name/avatar from Telegram, local listening stats)
@@ -1918,23 +2078,7 @@
     return "Больше недели чистой музыки без пауз.";
   }
 
-  // Each part of the screen comes in when it scrolls into view.
-  let statsObserver = null;
-  function revealStats() {
-    const parts = Array.from($("stats-body").querySelectorAll("[data-reveal]"));
-    parts.forEach((el) => el.classList.remove("is-seen"));
-    if (statsObserver) statsObserver.disconnect();
-    if (!("IntersectionObserver" in window)) { parts.forEach((el) => el.classList.add("is-seen")); return; }
-    statsObserver = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        entry.target.classList.add("is-seen");
-        statsObserver.unobserve(entry.target);
-      });
-    }, { root: $("screen-stats"), threshold: 0.18 });
-    // after a frame, so the "hidden" state is painted first and the move is seen
-    requestAnimationFrame(() => requestAnimationFrame(() => parts.forEach((el) => statsObserver.observe(el))));
-  }
+  function revealStats() { revealIn("screen-stats", true); }
 
   let statsPeriod = "all";
   let statsToken = 0;
@@ -2013,12 +2157,12 @@
 
     const list = $("stats-top-tracks");
     list.innerHTML = "";
-    const topTracks = S.tracks.slice(0, 5).map((x) => x.track);
+    const topTracks = S.tracks.slice(0, 3).map((x) => x.track);
     topTracks.forEach((t, i) => list.appendChild(buildTrackRow(t, { index: i + 1, queue: topTracks, context: "Статистика" })));
 
     const albumShelf = $("stats-top-albums");
     albumShelf.innerHTML = "";
-    const albums = S.albums.slice(0, 8);
+    const albums = S.albums.slice(0, 5);
     $("stats-albums-block").hidden = !albums.length;
     albums.forEach((al, i) => {
       const tr = al.track;
@@ -2273,6 +2417,7 @@
       audio.src = `${API_BASE_URL}/stream?${trackQuery(track)}`;
       await audio.play();
       if (token !== playToken) return;
+      rememberRecent(track);
       failStreak = 0;
       isStarting = false;
       setLoading(false);
@@ -2470,6 +2615,33 @@
   }
   $("player-lyrics-btn").addEventListener("click", () => { haptic("light"); setLyricsOpen(!lyricsOpen); });
   ["touchstart", "wheel"].forEach((type) => lyricsBox.addEventListener(type, () => { lyricsTouchedAt = Date.now(); }, { passive: true }));
+
+  // A swipe down on the text puts it away — when the text is at its very
+  // top, so that the same gesture further down just scrolls it. The text
+  // follows the finger and either leaves or settles back.
+  let lyricsPull = null;
+  lyricsBox.addEventListener("touchstart", (e) => {
+    lyricsPull = lyricsOpen && lyricsBox.scrollTop <= 0 && e.touches.length === 1 ? { y: e.touches[0].clientY, dy: 0 } : null;
+  }, { passive: true });
+  lyricsBox.addEventListener("touchmove", (e) => {
+    if (!lyricsPull) return;
+    lyricsPull.dy = e.touches[0].clientY - lyricsPull.y;
+    if (lyricsPull.dy <= 0 || lyricsBox.scrollTop > 0) { lyricsPull.dy = 0; lyricsBox.style.transform = ""; lyricsBox.style.opacity = ""; return; }
+    lyricsBox.style.transition = "none";
+    lyricsBox.style.transform = `translateY(${lyricsPull.dy * 0.6}px)`;
+    lyricsBox.style.opacity = String(Math.max(0.25, 1 - lyricsPull.dy / 320));
+  }, { passive: true });
+  const endLyricsPull = () => {
+    if (!lyricsPull) return;
+    const far = lyricsPull.dy > 80;
+    lyricsPull = null;
+    lyricsBox.style.transition = "";
+    lyricsBox.style.transform = "";
+    lyricsBox.style.opacity = "";
+    if (far) { haptic("light"); setLyricsOpen(false); }
+  };
+  lyricsBox.addEventListener("touchend", endLyricsPull);
+  lyricsBox.addEventListener("touchcancel", endLyricsPull);
   lyricsList.addEventListener("click", (e) => {
     const li = e.target.closest(".lyrics-line");
     if (!li || !lyricsData || !lyricsData.synced) return;

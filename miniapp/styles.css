@@ -1260,8 +1260,98 @@ button.group-row:active { background: var(--surface-1); }
 .notif-title { font-size: 16px; font-weight: 600; }
 .notif-sub { font-size: 14px; color: var(--text-2); margin-top: 2px; }
 
-.about-mark { display: flex; align-items: center; justify-content: center; width: 120px; height: 120px; border-radius: 34px; margin-bottom: 16px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); }
-.about-text { font-size: 16px; line-height: 1.6; color: var(--text-2); margin-bottom: 20px; }
+.about-hero { padding-top: 4px; }
+.about-mark { position: relative; display: flex; align-items: center; justify-content: center; width: 124px; height: 124px; border-radius: 36px; margin-bottom: 18px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line), inset 0 1px 0 rgba(255, 255, 255, 0.18); }
+.about-mark svg { position: relative; animation: about-float 5s ease-in-out infinite; }
+/* the mark sits on its own breathing light */
+.about-mark-glow { position: absolute; inset: -30%; border-radius: 50%; background: var(--orb-mini); filter: blur(34px); opacity: 0.55; animation: about-breathe 4.5s ease-in-out infinite; }
+@keyframes about-breathe { 0%, 100% { transform: scale(0.82); opacity: 0.4; } 50% { transform: scale(1.08); opacity: 0.7; } }
+@keyframes about-float { 0%, 100% { transform: translateY(2px); } 50% { transform: translateY(-3px); } }
+.about-lead { font-size: 21px; line-height: 1.38; font-weight: 600; letter-spacing: -0.015em; margin: 18px 2px 34px; text-wrap: pretty; }
+.about-h { margin: 0 2px 14px; }
+
+/* what Нотка can do — each card shows it rather than tells */
+.bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 30px; }
+.bento-card { display: flex; flex-direction: column; padding: 16px; border-radius: 24px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line), inset 0 1px 0 rgba(255, 255, 255, 0.1); overflow: hidden; transition-delay: calc(var(--i, 0) * 90ms); }
+.bento-tall { grid-row: span 2; }
+.bento-wide { grid-column: span 2; }
+.bento-title { font-size: 17px; line-height: 1.25; font-weight: 700; letter-spacing: -0.015em; }
+.bento-sub { font-size: 14px; line-height: 1.35; color: var(--text-2); margin-top: 4px; text-wrap: pretty; }
+.bento-demo { display: flex; margin-bottom: 14px; }
+.bento-tall .bento-demo { flex: 1; min-height: 132px; }
+
+.demo-mix { position: relative; align-items: center; justify-content: center; }
+.demo-mix b { position: relative; display: flex; align-items: center; justify-content: center; width: 62px; height: 62px; border-radius: 50%; background: var(--btn-light); color: var(--bg); box-shadow: 0 12px 28px -10px rgba(4, 2, 10, 0.7); }
+.demo-mix i { position: absolute; width: 62px; height: 62px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--c-warm); opacity: 0; animation: demo-ring 3.2s var(--ease-out) infinite; }
+.demo-mix i:nth-child(2) { animation-delay: 1.6s; box-shadow: 0 0 0 1.5px var(--c-mid); }
+@keyframes demo-ring { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(2.3); opacity: 0; } }
+
+.demo-lyrics { flex-direction: column; gap: 8px; padding-top: 4px; }
+.demo-lyrics i { display: block; height: 10px; border-radius: 5px; background: var(--text); opacity: 0.22; animation: demo-line 4.5s ease-in-out infinite; }
+.demo-lyrics i:nth-child(1) { width: 78%; }
+.demo-lyrics i:nth-child(2) { width: 56%; animation-delay: 1.5s; }
+.demo-lyrics i:nth-child(3) { width: 70%; animation-delay: 3s; }
+@keyframes demo-line { 0%, 30%, 100% { opacity: 0.22; } 6%, 24% { opacity: 1; } }
+
+.demo-bars { align-items: flex-end; gap: 7px; height: 46px; }
+.demo-bars i { flex: 1; border-radius: 6px 6px 3px 3px; background: linear-gradient(to top, var(--c-mid), var(--c-warm) 60%, var(--c-core)); transform-origin: bottom; animation: demo-bar 3.6s ease-in-out infinite; }
+.demo-bars i:nth-child(1) { height: 52%; }
+.demo-bars i:nth-child(2) { height: 100%; animation-delay: 0.3s; }
+.demo-bars i:nth-child(3) { height: 70%; animation-delay: 0.6s; }
+.demo-bars i:nth-child(4) { height: 36%; animation-delay: 0.9s; }
+@keyframes demo-bar { 0%, 100% { transform: scaleY(0.55); } 50% { transform: scaleY(1); } }
+
+.demo-search { align-items: center; gap: 10px; height: 46px; padding: 0 16px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px var(--line); color: var(--text-2); font-size: 16px; }
+.demo-words { position: relative; flex: 1; height: 22px; overflow: hidden; }
+.demo-words i { position: absolute; left: 0; top: 0; font-style: normal; color: var(--text); opacity: 0; transform: translateY(12px); animation: demo-word 6s var(--ease-in-out) infinite; }
+.demo-words i:nth-child(2) { animation-delay: 2s; }
+.demo-words i:nth-child(3) { animation-delay: 4s; }
+@keyframes demo-word { 0% { opacity: 0; transform: translateY(12px); } 5%, 28% { opacity: 1; transform: none; } 33%, 100% { opacity: 0; transform: translateY(-12px); } }
+
+.bento-mini { flex-direction: row; align-items: center; gap: 12px; padding: 14px; }
+.bento-mini .bento-title { font-size: 15px; }
+.bento-ic { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 1px var(--line); }
+.demo-heart { color: var(--liked); }
+.demo-heart svg { animation: demo-beat 2.4s ease-in-out infinite; }
+@keyframes demo-beat { 0%, 30%, 100% { transform: scale(1); } 10% { transform: scale(1.22); } 20% { transform: scale(0.96); } }
+
+/* a note from us, not a paragraph of settings text */
+.about-note { position: relative; padding: 22px 20px 20px; border-radius: 26px; margin-bottom: 14px; font-size: 17px; line-height: 1.5; background: linear-gradient(150deg, color-mix(in srgb, var(--c-warm) 22%, transparent), color-mix(in srgb, var(--c-deep) 26%, transparent)), var(--surface-1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.about-note p + p { margin-top: 12px; }
+.about-sign { display: block; margin-top: 16px; font-size: 15px; font-weight: 600; color: var(--now); }
+.about-data { font-size: 14px; line-height: 1.5; color: var(--text-3); text-align: center; margin: 22px 12px 6px; text-wrap: pretty; }
+
+/* HOME shelves: what was just played, and what the artists you listen to
+   have released lately. Cards slide in one after another. */
+.shelf-compact .shelf-card { width: 124px; }
+.shelf-compact .shelf-card .cover { width: 124px; height: 124px; border-radius: 14px; }
+#screen-home .shelf-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#screen-home .shelf { padding-top: 6px; padding-bottom: 10px; }
+#screen-home .is-seen .shelf-card { animation: card-in 0.75s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms); }
+@keyframes card-in { from { opacity: 0; transform: translateX(44px) scale(0.92); } to { opacity: 1; transform: none; } }
+#screen-home .shelf-card .cover { transition: transform 0.3s var(--ease-out), box-shadow 0.5s var(--ease-out); }
+/* the first card is what is playing now (or was last): it wears the light */
+body.is-playing #home-recent .shelf-card:first-child .cover { box-shadow: 0 0 0 2px var(--now), 0 10px 30px -6px var(--c-warm); }
+#screen-home [data-reveal] .track-row { opacity: 0; transform: translateY(16px); transition: opacity 0.55s var(--ease-out), transform 0.7s var(--ease-out); }
+#screen-home [data-reveal].is-seen .track-row { opacity: 1; transform: none; }
+#screen-home [data-reveal].is-seen .track-row:nth-child(2) { transition-delay: 0.06s; }
+#screen-home [data-reveal].is-seen .track-row:nth-child(3) { transition-delay: 0.12s; }
+#screen-home [data-reveal].is-seen .track-row:nth-child(4) { transition-delay: 0.18s; }
+#screen-home [data-reveal].is-seen .track-row:nth-child(5) { transition-delay: 0.24s; }
+
+/* a new release: a bigger sleeve, its own colors pooled as light beneath
+   it, and the year on a glass tag */
+.fresh-shelf { gap: 16px; }
+.fresh-shelf .shelf-card { width: 168px; }
+.fresh-art { position: relative; display: block; margin-bottom: 10px; }
+.fresh-art .cover { position: relative; width: 168px; height: 168px; border-radius: 20px; margin-bottom: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.fresh-glow { position: absolute; inset: 16% 8% -6%; border-radius: 24px; background: center / cover; filter: blur(18px) saturate(1.6); opacity: 0.6; }
+.fresh-tag { position: absolute; left: 10px; top: 10px; height: 26px; padding: 0 10px; display: flex; align-items: center; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--text); background: rgba(12, 10, 18, 0.5); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.shelf-skel { width: 168px; flex-shrink: 0; }
+.shelf-skel i { display: block; border-radius: 16px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.07) 35%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.07) 65%, rgba(255, 255, 255, 0.07) 100%); background-size: 300% 100%; animation: lyrics-shimmer 1.5s linear infinite; }
+.shelf-skel i:nth-child(1) { height: 168px; border-radius: 20px; margin-bottom: 10px; }
+.shelf-skel i:nth-child(2) { height: 14px; width: 80%; border-radius: 7px; margin-bottom: 7px; }
+.shelf-skel i:nth-child(3) { height: 12px; width: 55%; border-radius: 6px; }
 .fineprint { font-size: 13px; color: var(--text-3); text-align: center; margin-top: 8px; }
 
 /* ==========================================================
@@ -1460,6 +1550,9 @@ body:not(.is-playing) .player-art { transform: scale(0.94); }
   transition: opacity 0.6s var(--ease-in-out);
 }
 body.lyrics-open .screen-player::before { opacity: 1; }
+/* with the words on screen the track menu steps aside (it stays in place, so the title doesn't jump) */
+#player-more-btn { transition: opacity 0.35s var(--ease-out), transform 0.25s var(--ease-out); }
+body.lyrics-open #player-more-btn { opacity: 0; pointer-events: none; }
 
 /* «Текст»: the lyrics take the cover's place; the line being sung is lit,
    the rest waits in half-light. The list fades out at both edges. */

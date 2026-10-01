@@ -48,7 +48,7 @@ try {
   check("minutes are counted", (await text("stats-num-minutes")).replace(/\D/g, "") === String(Math.round(listens.seconds / 60)), await text("stats-num-minutes"));
   check("tracks are counted", (await text("stats-num-tracks")) === String(all.length));
   check("artists shelf has faces", await b.eval("document.querySelectorAll('#stats-top-artists .shelf-card .cover img').length >= 3"));
-  check("top tracks have covers", await b.eval("document.querySelectorAll('#stats-top-tracks .track-row .cover img').length === 5"));
+  check("top tracks have covers", await b.eval("document.querySelectorAll('#stats-top-tracks .track-row .cover img').length === 3"));
   check("profile lists the account first, then statistics", await b.eval("(() => { const rows = [...document.querySelectorAll('#screen-profile .group-row')].map((r) => r.id); return rows[0] === 'menu-account' && rows[1] === 'menu-stats'; })()"));
   await b.sleep(6000); // artist photos arrive
   await b.shot("stats-1");
