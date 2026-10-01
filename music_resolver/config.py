@@ -89,8 +89,6 @@ class Settings:
     itunes_proxy: str | None
     ytmusic_proxy: str | None
     ytmusic_location: str | None
-    spotify_client_id: str | None
-    spotify_client_secret: str | None
 
 
 def load_settings() -> Settings:
@@ -103,7 +101,7 @@ def load_settings() -> Settings:
         cache_ttl=_get_int("CACHE_TTL", 300),
         resolve_cache_ttl=_get_int("RESOLVE_CACHE_TTL", 1800),
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
-        search_limit=_get_int("SEARCH_LIMIT", 10),
+        search_limit=_get_int("SEARCH_LIMIT", 25),
         provider_order=_get_list("PROVIDER_ORDER", ["youtube_music", "soundcloud", "youtube_web"]),
         disabled_providers=_get_list("DISABLED_PROVIDERS", []),
         stream_response_mode=stream_mode,
@@ -133,6 +131,4 @@ def load_settings() -> Settings:
         # search results consistent regardless of which exit node a given
         # proxy happens to use. See ytmusicapi's `location` parameter.
         ytmusic_location=os.getenv("YTMUSIC_LOCATION") or None,
-        spotify_client_id=os.getenv("SPOTIFY_CLIENT_ID") or None,
-        spotify_client_secret=os.getenv("SPOTIFY_CLIENT_SECRET") or None,
     )

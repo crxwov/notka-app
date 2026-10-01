@@ -11,9 +11,9 @@ from aiogram.filters import CommandStart
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    KeyboardButton,
+    MenuButtonWebApp,
     Message,
-    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
     WebAppInfo,
 )
 
@@ -31,17 +31,21 @@ def build_open_app_inline_keyboard(miniapp_url: str) -> InlineKeyboardMarkup:
     )
 
 
-def build_open_app_reply_keyboard(miniapp_url: str) -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="🔥 Открыть Нотку", web_app=WebAppInfo(url=miniapp_url))]],
-        resize_keyboard=True,
-    )
-
-
 async def main() -> None:
     config = load_config()
     bot = Bot(token=config.bot_token)
     dp = Dispatcher()
+
+    # The Mini App's address changes with every launch (free tunnel). The
+    # menu button next to the message field is set once for everyone and
+    # always opens the current address — unlike a keyboard button, which
+    # keeps the address it was sent with.
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="Нотка", web_app=WebAppInfo(url=config.miniapp_url))
+        )
+    except Exception:
+        logger.exception("Could not set the menu button")
 
     @dp.message(CommandStart())
     async def handle_start(message: Message) -> None:
@@ -69,9 +73,10 @@ async def main() -> None:
             "Жми на кнопку ниже, чтобы найти и включить трек.",
             reply_markup=build_open_app_inline_keyboard(config.miniapp_url),
         )
+        # also clears the old keyboard button, which may hold a dead address
         await message.answer(
-            "Кнопка снизу тоже всегда под рукой.",
-            reply_markup=build_open_app_reply_keyboard(config.miniapp_url),
+            "Кнопка «Нотка» слева от поля ввода тоже всегда под рукой.",
+            reply_markup=ReplyKeyboardRemove(),
         )
 
     @dp.message()

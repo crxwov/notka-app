@@ -86,6 +86,8 @@ class ProviderManager:
                 duration_ms = int((time.perf_counter() - start) * 1000)
                 errors.append(f"{provider.name}: {exc.code.value}")
                 log_provider_result("RESOLVE", provider.name, duration_ms, False, fallback_used, error=exc.code.value)
+                if len(providers) == 1:
+                    raise  # keep the real reason (e.g. TRACK_NOT_FOUND) for the app's message
             except Exception as exc:
                 duration_ms = int((time.perf_counter() - start) * 1000)
                 errors.append(f"{provider.name}: error")
@@ -95,11 +97,16 @@ class ProviderManager:
 
     def _resolve_order(self, source: str | None, id_or_url: str) -> list[MusicProvider]:
         ordered: list[MusicProvider] = []
+        looks_like_url = "://" in id_or_url
         if source:
             provider = self.get(source)
             if provider:
+                # A bare id only means something to the source it came from:
+                # iTunes and SoundCloud ids are both plain numbers, so trying
+                # the others would play an unrelated track under this title.
+                if not looks_like_url:
+                    return [provider]
                 ordered.append(provider)
-        looks_like_url = "://" in id_or_url
         for provider in self.providers:
             if provider in ordered:
                 continue

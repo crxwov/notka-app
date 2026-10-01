@@ -29,6 +29,8 @@ call venv\Scripts\activate.bat
 echo Installing required libraries...
 python -m pip install --upgrade pip >nul
 pip install -r requirements.txt
+rem YouTube changes often; an old yt-dlp is the usual reason nothing plays
+pip install --upgrade yt-dlp ytmusicapi >nul
 
 if errorlevel 1 (
     echo.

@@ -1,7 +1,10 @@
+import logging
 from enum import Enum
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorCode(str, Enum):
@@ -51,7 +54,8 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content=payload)
 
 
-async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
+async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled error on %s", request.url.path, exc_info=exc)
     return JSONResponse(
         status_code=500,
         content={"error": {"code": "INTERNAL_ERROR", "message": "Internal server error"}},

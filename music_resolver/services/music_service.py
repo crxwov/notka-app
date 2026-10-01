@@ -26,7 +26,7 @@ class MusicService:
         if cached:
             return cached
         results = await self.manager.search(query, limit)
-        response = SearchResponse(results=results)
+        response = SearchResponse(results=results[:limit])  # a provider may hand back more than asked
         self.search_cache.set(key, response)
         return response
 

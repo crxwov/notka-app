@@ -17,6 +17,12 @@ ROOT = Path(__file__).resolve().parent
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
+# A track title the console can't display (emoji, rare letters) must not
+# turn a log line into a failed request.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="replace")
+
 from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(ROOT / ".env")

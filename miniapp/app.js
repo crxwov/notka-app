@@ -115,11 +115,35 @@
     }
   }
   const state = loadState();
+  // Only what a row needs to be shown and played again.
+  function slimTrack(t) {
+    return { id: t.id, source: t.source, sourceId: t.sourceId, title: t.title, artist: t.artist, duration: t.duration, artwork: t.artwork, album: t.album, albumId: t.albumId, artistId: t.artistId };
+  }
+  // Listening stats are the one part of the state that grows on its own;
+  // keep the most-played tracks and let the long tail go.
+  function trimListens(keep) {
+    const entries = Object.entries(state.listens.tracks);
+    if (entries.length <= keep) return;
+    entries.sort((a, b) => b[1].plays - a[1].plays || b[1].seconds - a[1].seconds);
+    state.listens.tracks = Object.fromEntries(entries.slice(0, keep));
+  }
+  let storageFullWarned = false;
   function persist() {
+    trimListens(300);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
-      console.warn("Could not persist state", e);
+      // most likely the storage quota: drop what is cheapest to lose and retry
+      trimListens(40);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e2) {
+        console.warn("Could not persist state", e2);
+        if (!storageFullWarned) {
+          storageFullWarned = true;
+          showToast("Память Нотки на этом устройстве заполнена — новые изменения не сохранятся");
+        }
+      }
     }
   }
 
@@ -141,6 +165,11 @@
     deletePlaylist(id) {
       const idx = state.playlists.findIndex((p) => p.id === id);
       if (idx >= 0) state.playlists.splice(idx, 1);
+      persist();
+    },
+    restorePlaylist(playlist, index) {
+      if (state.playlists.some((p) => p.id === playlist.id)) return;
+      state.playlists.splice(Math.min(index, state.playlists.length), 0, playlist);
       persist();
     },
     addTrackToPlaylist(playlistId, track) {
@@ -168,6 +197,7 @@
       const playlist = state.playlists.find((p) => p.id === playlistId);
       if (!playlist) return;
       playlist.trackIds = playlist.trackIds.filter((id) => id !== trackId);
+      if (playlist.tracksCache) delete playlist.tracksCache[trackId];
       persist();
     },
     renamePlaylist(id, name) {
@@ -305,12 +335,26 @@
     }
   }
 
-  function showToast(text) {
+  // opts.action / opts.onAction add a button to the toast (an undo)
+  function showToast(text, opts) {
+    opts = opts || {};
     const toast = $("toast");
     toast.textContent = text;
+    toast.classList.toggle("has-action", !!opts.action);
+    if (opts.action) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "toast-action";
+      btn.textContent = opts.action;
+      btn.addEventListener("click", () => {
+        toast.classList.remove("show");
+        if (opts.onAction) opts.onAction();
+      });
+      toast.appendChild(btn);
+    }
     toast.classList.add("show");
     clearTimeout(toast._hideTimer);
-    toast._hideTimer = setTimeout(() => toast.classList.remove("show"), 2400);
+    toast._hideTimer = setTimeout(() => toast.classList.remove("show"), opts.action ? 6000 : 2400);
   }
 
   function pluralTracks(n) {
@@ -592,7 +636,6 @@
     editPlaylist: $("screen-edit-playlist"),
     account: $("screen-account"),
     sound: $("screen-sound"),
-    notifications: $("screen-notifications"),
     about: $("screen-about"),
     stats: $("screen-stats"),
   };
@@ -601,8 +644,16 @@
   const TAB_SCREENS = new Set(["home", "search", "library"]);
   const NO_MINI_SCREENS = new Set(["player", "onboarding", "splash"]);
 
-  let navStack = ["home"];
+  // Each step is { name, params }. Artist and album screens are single
+  // DOM nodes reused for every artist/album, so going back has to know
+  // which one that step was showing and bring it back.
+  let navStack = [{ name: "home", params: null }];
   let currentScreen = "home";
+  const shownParams = {};
+  const REOPENERS = {
+    artist: (p) => openArtistScreen(p.artistName, p.contextTracks, p.meta, true),
+    album: (p) => (p.track ? openAlbumScreen(p.track, true) : openAlbumById(p.source, p.albumId, p.title, p.artist, true)),
+  };
 
   function updateDock() {
     const showTabs = TAB_SCREENS.has(currentScreen);
@@ -629,7 +680,6 @@
     if (name === "profile") renderProfile();
     if (name === "account") renderAccountScreen();
     if (name === "sound") renderSoundScreen();
-    if (name === "notifications") renderNotificationsScreen();
     if (name === "stats") renderStatsScreen();
     if (name === "playlist" && currentPlaylistId && opts.replace) openPlaylist(currentPlaylistId, true);
     if (TAB_SCREENS.has(name)) {
@@ -638,10 +688,11 @@
         b.classList.toggle("active", on);
         if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
       });
-      navStack = [name];
+      navStack = [{ name, params: null }];
     } else if (!opts.replace) {
-      navStack.push(name);
+      navStack.push({ name, params: opts.params || null });
     }
+    if (opts.params) shownParams[name] = opts.params;
     const activeEl = screens[name];
     if (activeEl) {
       activeEl.classList.remove("screen-anim");
@@ -656,8 +707,13 @@
 
   function goBack() {
     navStack.pop();
-    const prev = navStack[navStack.length - 1] || "home";
-    showScreen(prev, { replace: true });
+    const prev = navStack[navStack.length - 1] || { name: "home", params: null };
+    if (prev.params && REOPENERS[prev.name] && shownParams[prev.name] !== prev.params) {
+      shownParams[prev.name] = prev.params;
+      REOPENERS[prev.name](prev.params);
+      return;
+    }
+    showScreen(prev.name, { replace: true });
   }
 
   document.querySelectorAll(".tab").forEach((btn) => {
@@ -997,6 +1053,7 @@
         currentQueue.push(...more);
         originalQueue.push(...more);
         renderQueueSheet();
+        prepareNextTrack();
       }
     } finally { mixExtending = false; }
   }
@@ -1417,10 +1474,20 @@
     const playlist = state.playlists.find((p) => p.id === currentPlaylistId);
     closeOverlay("playlist-menu-sheet");
     if (!playlist) return;
+    const index = state.playlists.indexOf(playlist);
     Store.deletePlaylist(currentPlaylistId);
     renderLibrary();
-    showToast(`Плейлист «${playlist.name}» удалён`);
+    haptic("warning");
     goBack();
+    showToast(`Плейлист «${playlist.name}» удалён`, {
+      action: "Вернуть",
+      onAction: () => {
+        Store.restorePlaylist(playlist, index);
+        refreshCurrentScreen();
+        haptic("success");
+        showToast(`Плейлист «${playlist.name}» на месте`);
+      },
+    });
   });
   // ---------- sharing ----------
   // t.me/<bot>?start=t_<src>_<id> opens the bot, which answers with a
@@ -1653,54 +1720,28 @@
     $("profile-name").textContent = displayName();
     $("profile-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : "Вход через Telegram";
     renderAvatarInto("profile-avatar-btn", "profile-initial");
-    updateNotifBadge();
   }
   $("profile-back-btn").addEventListener("click", goBack);
   $("menu-account").addEventListener("click", () => showScreen("account"));
   $("menu-sound").addEventListener("click", () => showScreen("sound"));
-  $("menu-notifications").addEventListener("click", () => showScreen("notifications"));
   $("menu-about").addEventListener("click", () => showScreen("about"));
-  $("menu-logout").addEventListener("click", () => showToast("Выход недоступен — вход через Telegram выполняется автоматически"));
-
-  function updateNotifBadge() {
-    const badge = $("profile-notif-badge");
-    if (state.notifUnread > 0) { badge.hidden = false; badge.textContent = String(state.notifUnread); }
-    else badge.hidden = true;
-  }
-  updateNotifBadge();
 
   // ============================================================
-  // ACCOUNT (real: name/avatar from Telegram. Premium, sessions and
-  // stats are UI-only placeholders — no billing/backend wired yet.)
+  // ACCOUNT (name/avatar from Telegram, local listening stats)
   // ============================================================
-  const PLAN_BENEFITS = ["Без рекламы между треками", "Оффлайн-скачивание треков", "Качество звука до 320 kbps", "Безлимитные пропуски треков"];
   function renderAccountScreen() {
     $("account-name").textContent = displayName();
     renderAvatarInto("account-avatar", "account-initial");
-    $("account-plan-benefits").innerHTML = PLAN_BENEFITS.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
     const platforms = { ios: "iPhone", android: "Android", android_x: "Android", tdesktop: "Telegram Desktop", macos: "Mac", weba: "Telegram Web", webk: "Telegram Web" };
     $("account-sessions-count").textContent = (tg && platforms[tg.platform]) || "Браузер";
-    setSwitch("toggle-activity", Store.getSetting("activityVisible"));
-    setSwitch("toggle-public-playlists", Store.getSetting("publicPlaylists"));
   }
   function setSwitch(id, on) {
     const el = $(id);
     if (el) el.setAttribute("aria-checked", on ? "true" : "false");
   }
-  function bindSwitch(id, key) {
-    $(id).addEventListener("click", () => {
-      const on = !Store.getSetting(key);
-      Store.setSetting(key, on);
-      setSwitch(id, on);
-      haptic("select");
-    });
-  }
   $("account-back-btn").addEventListener("click", goBack);
-  $("account-upgrade-btn").addEventListener("click", () => showToast("Оформление Premium скоро появится"));
   $("account-invite-btn").addEventListener("click", shareInvite);
   $("account-stats-row").addEventListener("click", () => showScreen("stats"));
-  bindSwitch("toggle-activity", "activityVisible");
-  bindSwitch("toggle-public-playlists", "publicPlaylists");
   $("account-name-row").addEventListener("click", () => {
     $("account-name-input").value = displayName();
     openOverlay("account-name-modal");
@@ -1718,11 +1759,9 @@
   });
 
   // ============================================================
-  // SOUND & DOWNLOADS (quality switching / real downloads are
-  // UI-only placeholders — no backend audio-quality selection yet)
+  // SOUND & DOWNLOADS
   // ============================================================
   function renderSoundScreen() {
-    setSwitch("toggle-normalize", Store.getSetting("normalize"));
     const crossfade = Store.getSetting("crossfade") || 0;
     $("crossfade-slider").value = crossfade;
     $("crossfade-value").textContent = crossfade === 0 ? "Выключен" : `${crossfade} сек`;
@@ -1731,48 +1770,11 @@
       : "На этом устройстве Telegram не даёт менять громкость — переход не сработает.";
   }
   $("sound-back-btn").addEventListener("click", goBack);
-  bindSwitch("toggle-normalize", "normalize");
   $("crossfade-slider").addEventListener("input", (e) => {
     const val = parseInt(e.target.value, 10) || 0;
     Store.setSetting("crossfade", val);
     $("crossfade-value").textContent = val === 0 ? "Выключен" : `${val} сек`;
   });
-
-  // ============================================================
-  // NOTIFICATIONS (local + cosmetic — no push backend yet)
-  // ============================================================
-  const NOTIF_ITEMS = [
-    { title: "Добро пожаловать в Нотку!", sub: "Ищи треки и собирай свои плейлисты" },
-    { title: "Совет: отмечай треки сердцем", sub: "Любимые треки появятся на главном экране" },
-  ];
-  const NOTIF_SETTINGS = [
-    { key: "notifNews", label: "Новости Нотки" },
-    { key: "notifNewMusic", label: "Новинки от любимых исполнителей" },
-    { key: "notifPlaylistUpdates", label: "Обновления плейлистов" },
-  ];
-  function renderNotificationsScreen() {
-    $("notif-list").innerHTML = NOTIF_ITEMS.map((n) => `
-      <div class="notif-item"><span class="notif-dot" aria-hidden="true"></span>
-        <div><p class="notif-title">${escapeHtml(n.title)}</p><p class="notif-sub">${escapeHtml(n.sub)}</p></div>
-      </div>`).join("");
-    $("notif-settings-list").innerHTML = NOTIF_SETTINGS.map((s) => `
-      <div class="group-row"><span class="group-label">${escapeHtml(s.label)}</span>
-        <button class="switch" type="button" role="switch" aria-checked="${Store.getSetting(s.key) ? "true" : "false"}" aria-label="${escapeHtml(s.label)}" data-key="${s.key}"><span></span></button>
-      </div>`).join("");
-    document.querySelectorAll("#notif-settings-list .switch").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const key = btn.dataset.key;
-        const on = !Store.getSetting(key);
-        Store.setSetting(key, on);
-        btn.setAttribute("aria-checked", on ? "true" : "false");
-        haptic("select");
-      });
-    });
-    state.notifUnread = 0;
-    persist();
-    updateNotifBadge();
-  }
-  $("notifications-back-btn").addEventListener("click", goBack);
 
   // ============================================================
   // ABOUT
@@ -1785,6 +1787,12 @@
   function minutesWord(n) {
     const m10 = n % 10, m100 = n % 100;
     if (m10 === 1 && m100 !== 11) return "минуту";
+    if ([2, 3, 4].includes(m10) && ![12, 13, 14].includes(m100)) return "минуты";
+    return "минут";
+  }
+  function minutesWordNom(n) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return "минута";
     if ([2, 3, 4].includes(m10) && ![12, 13, 14].includes(m100)) return "минуты";
     return "минут";
   }
@@ -1804,7 +1812,7 @@
       $("stats-lede").textContent = "Послушай пару треков — и здесь появится твоя статистика.";
       return;
     }
-    $("stats-lede").innerHTML = `Ты провёл в Нотке <b>${minutes} ${minutesWord(minutes)}</b>: ${L.plays} ${playsWord(L.plays)}, ${pluralTracks(tracks.length)}.`;
+    $("stats-lede").innerHTML = `Твоё время в Нотке — <b>${minutes} ${minutesWordNom(minutes)}</b>: ${L.plays} ${playsWord(L.plays)}, ${pluralTracks(tracks.length)}.`;
     const topA = artists.slice(0, 5);
     const maxA = topA.length ? topA[0][1].seconds || 1 : 1;
     $("stats-top-artists").innerHTML = topA.map(([name, a], i) => {
@@ -1830,6 +1838,7 @@
   let mymixActive = false;
   let currentContextLabel = "Нотка";
   let isLoading = false;
+  let isStarting = false; // between a tap and the first sound of that track
   let playToken = 0;
   let resolveAbort = null;
   let failStreak = 0;
@@ -1990,6 +1999,7 @@
     audio.pause();
     setPlaying(false);
     setLoading(true);
+    isStarting = true;
     setMiniPlayerFor(track);
     setFullPlayerFor(track);
     setMediaSession(track);
@@ -2001,14 +2011,12 @@
     haptic("light");
 
     try {
-      const url = `${API_BASE_URL}/resolve?source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}`;
-      const res = await fetch(url, resolveAbort ? { signal: resolveAbort.signal } : undefined);
+      // The backend downloads the track (or finds it already on disk) and
+      // only then says "ready" — so a track that can't be played comes
+      // back as an error with a reason, not as a silent player.
+      const res = await fetch(`${API_BASE_URL}/prepare?${trackQuery(track)}`, resolveAbort ? { signal: resolveAbort.signal } : undefined);
       if (token !== playToken) return;
       if (!res.ok) {
-        // Surface the backend's error code (e.g. TRACK_NOT_FOUND when the
-        // track genuinely isn't in the official catalog, vs a generic
-        // playback failure) so the toast below can be honest about which
-        // one happened instead of always saying the same vague thing.
         let code = null;
         try {
           const body = await res.json();
@@ -2018,25 +2026,21 @@
         err.code = code;
         throw err;
       }
-      const data = await res.json();
-      if (token !== playToken) return;
-      if (!data.playback || data.playback.type !== "url" || !data.playback.url) {
-        throw new Error("Playback not available");
-      }
-      // Play through our own backend instead of the raw resolved URL:
-      // YouTube's direct links are tied to the IP that resolved them
-      // (this computer), so a phone hitting them straight over the
-      // internet gets cut off mid-stream. Proxying keeps every byte
-      // request coming from the same computer/IP that resolved it.
-      audio.src = `${API_BASE_URL}/stream?source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}`;
+      // Played through our own backend, not the source's direct link:
+      // those links are tied to the IP that resolved them (this computer),
+      // so a phone hitting them over the internet gets cut off mid-stream.
+      audio.src = `${API_BASE_URL}/stream?${trackQuery(track)}`;
       await audio.play();
       if (token !== playToken) return;
       failStreak = 0;
+      isStarting = false;
       setLoading(false);
       setPlaying(true);
+      prepareNextTrack();
     } catch (err) {
       if (token !== playToken || (err && err.name === "AbortError")) return;
       console.error(err);
+      isStarting = false;
       setLoading(false);
       setPlaying(false);
       haptic("error");
@@ -2054,13 +2058,27 @@
     }
   }
 
+  function trackQuery(track) {
+    return `source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}`;
+  }
+
+  // While a track plays, the backend gets the next one ready, so the
+  // switch between tracks doesn't wait for a download.
+  let preparedId = null;
+  function prepareNextTrack() {
+    const next = currentQueue[currentQueueIndex + 1];
+    if (!next || next.id === preparedId) return;
+    preparedId = next.id;
+    fetch(`${API_BASE_URL}/prepare?${trackQuery(next)}`).catch(() => {});
+  }
+
   function withShuffledTail(queue, current) {
     const rest = queue.filter((t) => t.id !== current.id);
     return [current, ...shuffled(rest)];
   }
 
   function togglePlayPause() {
-    if (!audio.src) {
+    if (!audio.getAttribute("src")) {
       if (currentTrack && !isLoading) playTrack(currentTrack, currentQueue, { keepQueue: true });
       return;
     }
@@ -2086,6 +2104,33 @@
   audio.addEventListener("pause", () => setPlaying(false));
   audio.addEventListener("waiting", () => { if (!audio.paused) setLoading(true); });
   audio.addEventListener("playing", () => setLoading(false));
+
+  // The stream broke mid-track (the network changed, the connection
+  // dropped). Reconnect once from the same second; if that fails too, say
+  // so instead of sitting silent. Failures at the start of a track are
+  // playTrack's own business.
+  let streamRetryAt = 0;
+  audio.addEventListener("error", () => {
+    if (!currentTrack || isStarting || !audio.getAttribute("src")) return;
+    const giveUp = () => {
+      setLoading(false);
+      setPlaying(false);
+      haptic("error");
+      showToast("Связь прервалась. Нажми ▶, когда интернет вернётся");
+    };
+    if (Date.now() - streamRetryAt < 20000) { giveUp(); return; }
+    streamRetryAt = Date.now();
+    const token = playToken;
+    const position = audio.currentTime || 0;
+    const stream = audio.getAttribute("src");
+    setLoading(true);
+    setTimeout(() => {
+      if (token !== playToken) return;
+      audio.src = stream;
+      audio.addEventListener("loadedmetadata", () => { try { audio.currentTime = position; } catch (e) { /* starts over */ } }, { once: true });
+      audio.play().then(() => setLoading(false)).catch(() => { if (token === playToken) giveUp(); });
+    }, 1500);
+  });
 
   $("mp-play-btn").addEventListener("click", (e) => { e.stopPropagation(); togglePlayPause(); });
   $("mini-open-btn").addEventListener("click", () => { if (currentTrack) showScreen("player"); });
@@ -2153,7 +2198,7 @@
     return new URL(`${API_BASE_URL}/download?source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}`, location.href).href;
   }
   function fileNameFor(track) {
-    return `${(track.artist || "").trim()} - ${(track.title || "track").trim()}`.replace(/^ - /, "").replace(/[\\/:*?"<>|]+/g, " ").slice(0, 120) + ".m4a";
+    return `${(track.artist || "").trim()} - ${(track.title || "track").trim()}`.replace(/^ - /, "").replace(/[\\/:*?"<>|]+/g, " ").slice(0, 120) + (track.source === "soundcloud" ? ".mp3" : ".m4a");
   }
   function downloadTracks(tracks) {
     const list = tracks.slice();
@@ -2313,7 +2358,7 @@
   }
   function syncFollow(name) {
     const on = Store.isArtistFollowed(name);
-    $("artist-follow-label").textContent = on ? "Ты подписан" : "Подписаться";
+    $("artist-follow-label").textContent = on ? "В подписках" : "Подписаться";
     $("artist-follow-btn").setAttribute("aria-pressed", on ? "true" : "false");
   }
 
@@ -2375,12 +2420,14 @@
   }
 
   let currentArtistMeta = {};
-  async function openArtistScreen(artistName, contextTracks, meta) {
+  let artistToken = 0;
+  async function openArtistScreen(artistName, contextTracks, meta, isBack) {
     if (!artistName) return;
     meta = meta || {};
+    const token = ++artistToken;
     currentArtistMeta = { artistId: meta.artistId || null, source: meta.source || null, photo: null };
     renderArtistShell(artistName);
-    showScreen("artist");
+    showScreen("artist", isBack ? { replace: true } : { params: { artistName, contextTracks, meta } });
 
     if (meta.artistId && meta.source) {
       try {
@@ -2388,17 +2435,22 @@
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const artist = await res.json();
+        if (token !== artistToken) return; // another artist was opened meanwhile
         currentArtistTracks = artist.topTracks || [];
         currentArtistMeta.photo = artist.photo || null;
+        // an iTunes artist comes back as its fuller YouTube Music page
+        if (artist.id && artist.source) { currentArtistMeta.artistId = artist.id; currentArtistMeta.source = artist.source; }
         $("artist-name").textContent = artist.name || artistName;
         setCoverEl($("artist-avatar"), artist.photo, artistName);
         $("artist-listeners").textContent = artist.subscribers || `${pluralTracks(currentArtistTracks.length)} в Нотке`;
         const list = $("artist-tracks");
         list.innerHTML = "";
         currentArtistTracks.slice(0, 8).forEach((t) => list.appendChild(buildTrackRow(t, { queue: currentArtistTracks, context: artist.name || artistName })));
-        renderArtistAlbumsRow(artist.albums || [], meta.source);
+        renderArtistAlbumsRow(artist.albums || [], artist.source || meta.source);
+        updateSourceButtons();
         return;
       } catch (e) {
+        if (token !== artistToken) return;
         console.error(e);
         showToast("Не удалось загрузить исполнителя");
         // fall through to the grouped client-side fallback below
@@ -2414,6 +2466,7 @@
         if (extra.length) tracks = extra;
       } catch (e) { /* ignore — fall back to whatever we had */ }
     }
+    if (token !== artistToken) return;
     renderArtistFallbackTracks(artistName, tracks);
   }
   $("artist-back-btn").addEventListener("click", goBack);
@@ -2431,7 +2484,7 @@
     syncFollow(name);
     renderLibrary();
     haptic(on ? "success" : "light");
-    showToast(on ? `Ты подписан на ${name}` : `Отписка от ${name}`);
+    showToast(on ? `${name} теперь в подписках` : `${name} больше не в подписках`);
   });
 
   let currentAlbumTracks = [];
@@ -2447,38 +2500,45 @@
   // Single-track pseudo-album view, used when a track carries no real
   // albumId (soundcloud / youtube_web fallback) — honest simplification
   // (see README).
-  function openAlbumScreen(track) {
+  function openAlbumScreen(track, isBack) {
+    albumToken++;
     currentAlbumMeta = { artist: track.artist || "", artistId: track.artistId || null, source: track.source || null };
     $("album-title").textContent = track.title || "";
     $("album-artist-link").textContent = track.artist || "";
     $("album-meta").textContent = "Сингл · 1 трек";
     setCoverEl($("album-cover"), track.artwork, track.id);
     renderAlbumTrackList([track], track.title || "");
-    showScreen("album");
+    showScreen("album", isBack ? { replace: true } : { params: { track } });
+    updateSourceButtons();
   }
 
   // Real album view, loaded from the backend for youtube_music tracks.
-  async function openAlbumById(source, albumId, fallbackTitle, fallbackArtist) {
+  let albumToken = 0;
+  async function openAlbumById(source, albumId, fallbackTitle, fallbackArtist, isBack) {
     if (!source || !albumId) return;
+    const token = ++albumToken;
     currentAlbumMeta = { artist: fallbackArtist || "", artistId: null, source };
     $("album-title").textContent = fallbackTitle || "Альбом";
     $("album-artist-link").textContent = fallbackArtist || "";
     $("album-meta").textContent = "Загрузка…";
     setCoverEl($("album-cover"), null, albumId);
     renderAlbumTrackList([], fallbackTitle || "Альбом");
-    showScreen("album");
+    showScreen("album", isBack ? { replace: true } : { params: { source, albumId, title: fallbackTitle, artist: fallbackArtist } });
     try {
       const url = `${API_BASE_URL}/album?source=${encodeURIComponent(source)}&id=${encodeURIComponent(albumId)}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const album = await res.json();
+      if (token !== albumToken) return; // another album was opened meanwhile
       currentAlbumMeta = { artist: album.artist || "", artistId: album.artistId || null, source: album.source || source };
       $("album-title").textContent = album.title || fallbackTitle || "Альбом";
       $("album-artist-link").textContent = album.artist || fallbackArtist || "";
       $("album-meta").textContent = `Альбом${album.year ? " · " + album.year : ""} · ${pluralTracks((album.tracks || []).length)}`;
       setCoverEl($("album-cover"), album.cover, albumId);
       renderAlbumTrackList(album.tracks || [], album.title || fallbackTitle || "Альбом");
+      updateSourceButtons();
     } catch (e) {
+      if (token !== albumToken) return;
       console.error(e);
       showToast("Не удалось загрузить альбом");
       $("album-meta").textContent = "Альбом";
@@ -2519,12 +2579,20 @@
   // (track.duration, in seconds), so trust that over the browser's guess
   // — and if both are known, trust whichever is *shorter*, since real
   // content can only ever be that long.
+  // True when the WebView's own duration is the doubled one described
+  // above. A small difference is not that bug: the audio behind a catalog
+  // track can honestly run a few seconds longer than its listed length,
+  // and cutting it at the listed length would clip the ending.
+  function nativeDurationIsWrong() {
+    const meta = currentTrack && currentTrack.duration;
+    const native = audio.duration;
+    return !!(meta && native && isFinite(native) && native > meta * 1.5);
+  }
   function effectiveDuration() {
     const meta = currentTrack && currentTrack.duration;
     const native = audio.duration;
-    if (meta && native && isFinite(native)) return Math.min(meta, native);
-    if (meta) return meta;
-    return isFinite(native) ? native : 0;
+    if (native && isFinite(native) && !nativeDurationIsWrong()) return native;
+    return meta || 0;
   }
 
   function renderProgress(pct, seconds) {
@@ -2551,8 +2619,10 @@
       return;
     }
     const hasNext = currentQueueIndex >= 0 && currentQueueIndex < currentQueue.length - 1;
-    if (hasNext || (repeatMode === "all" && currentQueue.length)) playAdjacent(1, { auto: true });
-    else updateMymixCardUI();
+    if (hasNext || (repeatMode === "all" && currentQueue.length)) { playAdjacent(1, { auto: true }); return; }
+    // The queue is over: rewind, so ▶ plays this track again from the top.
+    try { audio.currentTime = 0; } catch (e) { /* not seekable yet */ }
+    updateMymixCardUI();
   }
 
   // listening stats: seconds actually heard, a "play" after 30s (or half a short track)
@@ -2571,7 +2641,7 @@
         const key = currentTrack.artist || "Неизвестный исполнитель";
         const a = L.artists[key] || (L.artists[key] = { seconds: 0, plays: 0 });
         a.seconds += d;
-        const tr = L.tracks[currentTrack.id] || (L.tracks[currentTrack.id] = { track: currentTrack, plays: 0, seconds: 0 });
+        const tr = L.tracks[currentTrack.id] || (L.tracks[currentTrack.id] = { track: slimTrack(currentTrack), plays: 0, seconds: 0 });
         tr.seconds += d;
         const need = Math.min(30, (effectiveDuration() || 60) / 2);
         if (!statCounted && statHeard >= need) { statCounted = true; L.plays += 1; tr.plays += 1; a.plays += 1; }
@@ -2598,10 +2668,10 @@
     const dur = effectiveDuration();
     if (!dur || isScrubbing) return;
     applyFade(audio.currentTime, dur);
-    if (audio.currentTime >= dur - 0.35) {
-      // Real content has ended even though the browser's own duration
-      // estimate (if wrong) hasn't been reached yet — stop here instead
-      // of leaving the track "playing" silently.
+    if (nativeDurationIsWrong() && audio.currentTime >= dur - 0.35) {
+      // Real content has ended even though the browser's own (doubled)
+      // duration hasn't been reached — stop here instead of leaving the
+      // track "playing" silently. Otherwise the "ended" event does this.
       finishCurrentTrack();
       return;
     }
@@ -2684,11 +2754,16 @@
   // never shorter than the entrance animation, never longer than 2.6s.
   // links from the bot: ?t=<src>_<id> (a track) or ?p=<id> (a playlist);
   // also Telegram's own start_param (t_… / p_…) when opened via a direct link
-  async function openDeepLink() {
+  function deepLinkTarget() {
     const q = new URLSearchParams(location.search);
     const start = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
-    const t = q.get("t") || (start.startsWith("t_") ? start.slice(2) : "");
-    const p = q.get("p") || (start.startsWith("p_") ? start.slice(2) : "");
+    return {
+      t: q.get("t") || (start.startsWith("t_") ? start.slice(2) : ""),
+      p: q.get("p") || (start.startsWith("p_") ? start.slice(2) : ""),
+    };
+  }
+  async function openDeepLink() {
+    const { t, p } = deepLinkTarget();
     if (t) {
       const m = t.match(/^([a-z]{2})_(.+)$/);
       const source = m && CODE_SOURCES[m[1]];
@@ -2721,7 +2796,9 @@
 
   function boot() {
     showScreen("splash", { replace: true });
-    const minDelay = new Promise((r) => setTimeout(r, 1700));
+    const link = deepLinkTarget();
+    const viaLink = !!(link.t || link.p);
+    const minDelay = new Promise((r) => setTimeout(r, viaLink ? 500 : 1700));
     const fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
     const cap = new Promise((r) => setTimeout(r, 2800));
     Promise.race([Promise.all([minDelay, fonts]), cap]).then(() => {
@@ -2729,6 +2806,7 @@
       splash.classList.add("is-leaving");
       setTimeout(() => {
         splash.classList.remove("is-leaving");
+        if (viaLink) Store.markOnboardingSeen();
         if (Store.isOnboardingSeen()) showScreen("home", { replace: true });
         else showScreen("onboarding", { replace: true });
         openDeepLink();

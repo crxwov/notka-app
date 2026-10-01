@@ -25,6 +25,7 @@ import asyncio
 import json
 import re
 import time
+from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -38,11 +39,12 @@ from music_resolver.models import (
     ArtistInfo,
     ResolvedTrack,
     TrackCandidate,
-    TrackInfo,
+    candidate_to_track,
     public_track_id,
 )
 from difflib import SequenceMatcher
 
+from music_resolver.providers.youtube_music import OFFICIAL_VIDEO_TYPES
 from music_resolver.services.matcher import PENALTY_TERMS, normalize_text, rank_candidates, tokens
 
 SOURCE_NAME = "itunes"
@@ -233,7 +235,43 @@ def _looks_unofficial(candidate_title: str, candidate_artist: str, query_title: 
     if _UNOFFICIAL_PHRASE_RE.search(haystack) and not _UNOFFICIAL_PHRASE_RE.search(query_title or ""):
         return True
     single_word_hits = set(PENALTY_TERMS) & tokens(haystack)
-    return bool(single_word_hits - query_tok)
+    if single_word_hits - query_tok:
+        return True
+    # …and the other way round: a track that IS a remix / live cut / sped-up
+    # version must not be matched to the plain original.
+    return bool((set(PENALTY_TERMS) & query_tok) - tokens(haystack))
+
+
+# How far a video's length may be from the iTunes track's own length and
+# still count as the same recording. An artist-credited video can carry a
+# short intro; a user upload gets almost no slack, because its length is the
+# only real evidence that it is the original audio and not an edit.
+_OFFICIAL_VIDEO_TOLERANCE = 15
+_USER_UPLOAD_TOLERANCE = 5
+
+# What a user upload's title may say besides the artist and the song name.
+_UPLOAD_FILLER = {
+    "lyric", "ft", "feat", "featuring", "with", "prod", "by", "x", "and", "4k", "explicit", "visualizer",
+    "перевод", "текст", "слова", "клип", "с", "c", "русскими", "субтитрами", "субтитры",
+}
+
+
+def _user_upload_title_matches(query_title: str, artist: str, primary_artist: str, candidate_title: str) -> bool:
+    """A user upload passes only when its title is the artist plus the song
+    name and nothing else of substance: "Kendrick Lamar Not like us Lyrics
+    Video" does, "Eminem ft. Kendrick Lamar - Not Like Us [2024]" does not."""
+    required = tokens(_strip_title_extras(query_title)) | tokens(primary_artist)
+    allowed = tokens(query_title) | tokens(artist) | _UPLOAD_FILLER
+    have = {tok for tok in tokens(candidate_title) if any(ch.isalnum() for ch in tok)}
+    if not required or not required <= have:
+        return False
+    return len(have - allowed) <= 1
+
+
+def _duration_close(expected: int | None, actual: int | None, tolerance: int, required: bool) -> bool:
+    if not expected or not actual:
+        return not required
+    return abs(expected - actual) <= tolerance
 
 
 class ITunesCatalogProvider:
@@ -258,9 +296,9 @@ class ITunesCatalogProvider:
         # (called right after resolve() in the /stream flow) doesn't have
         # to redo the search-and-match work.
         self._match_cache: dict[str, str] = {}
-        # track id -> (title, artist), filled in by get_album/resolve so a
-        # later download_to_file call doesn't need another API round trip.
-        self._track_info_cache: dict[str, tuple[str, str]] = {}
+        # track id -> its catalog entry, filled in by search/get_album/resolve
+        # so a later resolve or download_to_file needs no API round trip.
+        self._track_info_cache: dict[str, TrackCandidate] = {}
         self._artist_id_cache: dict[str, str | None] = {}
         self._albums_cache: dict[str, list[dict]] = {}
         self._album_cache: dict[str, tuple[float, AlbumInfo]] = {}
@@ -357,22 +395,27 @@ class ITunesCatalogProvider:
             self._artist_id_cache[cache_key] = str(artist_id)
             self._save_disk_cache()
 
-    async def _lookup_track_info(self, track_id: str) -> tuple[str, str]:
-        """(title, artist) for an iTunes track id, cached in memory. Shared
+    async def _lookup_track_info(self, track_id: str) -> TrackCandidate:
+        """The catalog entry for an iTunes track id, cached in memory. Shared
         by resolve() and download_to_file() so they don't each duplicate
-        the lookup-and-cache dance — also the single place that opportunis-
-        tically feeds the artist-id cache (see _remember_artist_id)."""
+        the lookup-and-cache dance."""
         cached = self._track_info_cache.get(track_id)
         if cached is not None:
             return cached
         data = await self._get(_LOOKUP_URL, {"id": track_id})
         items = data.get("results") or []
-        item = items[0] if items else {}
-        title = item.get("trackName") or "Unknown"
-        artist = item.get("artistName") or ""
-        self._track_info_cache[track_id] = (title, artist)
-        self._remember_artist_id(artist, item.get("artistId"))
-        return title, artist
+        candidate = self._map_track(items[0]) if items else None
+        if candidate is None:
+            raise AppError(ErrorCode.TRACK_NOT_FOUND, "No such track in the catalog")
+        return candidate
+
+    async def _matched_video(self, track_id: str) -> str:
+        video_id = self._match_cache.get(track_id)
+        if not video_id:
+            info = await self._lookup_track_info(track_id)
+            video_id = await self._match_on_youtube(info.title, info.artist, info.duration)
+            self._match_cache[track_id] = video_id
+        return video_id
 
     # ---------------- MusicProvider surface ----------------
 
@@ -390,37 +433,14 @@ class ITunesCatalogProvider:
         if not track_id:
             raise AppError(ErrorCode.INVALID_SOURCE_URL, "Unsupported or invalid iTunes URL")
 
-        title, artist = await self._lookup_track_info(track_id)
-
-        video_id = self._match_cache.get(track_id)
-        if not video_id:
-            video_id = await self._match_on_youtube(title, artist)
-            self._match_cache[track_id] = video_id
-
+        info = await self._lookup_track_info(track_id)
+        video_id = await self._matched_video(track_id)
         yt_resolved = await self.youtube_provider.resolve(video_id)
-
-        track = TrackInfo(
-            id=public_track_id(SOURCE_NAME, track_id),
-            source=SOURCE_NAME,
-            source_id=track_id,
-            title=title,
-            artist=artist,
-            duration=None,
-            artwork=None,
-            source_url=None,
-            album=None,
-            album_id=None,
-            artist_id=None,
-        )
-        return ResolvedTrack(track=track, playback=yt_resolved.playback)
+        return ResolvedTrack(track=candidate_to_track(info), playback=yt_resolved.playback)
 
     async def download_to_file(self, id_or_url: str, dest_dir: Path, dest_stem: str):
         track_id = self._extract_track_id(id_or_url) or id_or_url
-        video_id = self._match_cache.get(track_id)
-        if not video_id:
-            title, artist = await self._lookup_track_info(track_id)
-            video_id = await self._match_on_youtube(title, artist)
-            self._match_cache[track_id] = video_id
+        video_id = await self._matched_video(track_id)
         return await self.youtube_provider.download_to_file(video_id, dest_dir, dest_stem)
 
     def can_handle_url(self, url: str) -> bool:
@@ -455,32 +475,27 @@ class ITunesCatalogProvider:
         match = re.search(r"[?&]i=(\d+)", value) or re.search(r"/id(\d+)", value)
         return match.group(1) if match else None
 
-    async def _match_on_youtube(self, title: str, artist: str) -> str:
-        """Find the best-matching YouTube video for an iTunes track — but
-        ONLY among results from YouTube Music's own catalog search
-        (filter="songs"), never from a raw/plain-YouTube video search.
+    async def _match_on_youtube(self, title: str, artist: str, duration: int | None = None) -> str:
+        """Find the YouTube video that carries this iTunes track's audio.
 
-        There used to be a second pass here: when the catalog search came up
-        empty, fall back to a plain-YouTube search (youtube_fallback_provider)
-        and accept its best text-similarity match. That fallback is now
-        disabled by design, not by accident — it was matching fan edits,
-        alternate-beat remakes, and other unofficial uploads that format
-        their titles to *look* official ("Yeat - Purpose General (but the
-        beat has every Yeat era)" by an uploader called "diamondz!", accepted
-        as if it were the real "Purpose General"). No text heuristic can
-        reliably tell that apart from a genuine plain-YouTube upload, because
-        uploaders who make these routinely copy the same "Artist - Title"
-        naming convention on purpose, specifically so text search finds them.
-        A raw video search has no reliable signal for "this is actually the
-        artist's own official audio" — only YouTube Music's catalog search
-        does (it's matched against real releases, not just text).
+        Three passes, most trustworthy first:
 
-        So the trade-off is now: fewer tracks resolve (anything not in
-        YouTube Music's own catalog — e.g. "DUMBO" by Travis Scott, "MM3" by
-        SoFaygo, or genuine leaks/unreleased tracks that were never
-        officially released at all) — but everything that DOES resolve is
-        the real thing, and everything else fails honestly instead of
-        playing the wrong audio.
+        1. YouTube Music's own catalog ("songs") — matched against real
+           releases, so a title+artist hit there is the official audio.
+        2. Videos YouTube Music itself credits to the artist. From a
+           Russian IP the catalog has no major-label releases after 2022
+           (search returns only covers and karaoke for them), while these
+           videos are still there.
+        3. A user upload, and only when it passes all of: its title is the
+           artist plus the song name and nothing else of substance, no
+           cover/remix/live marker, and its length is within a few seconds
+           of the iTunes track's. Text alone can't tell a fan edit from the
+           original ("Yeat - Purpose General (but the beat has every Yeat
+           era)" was once accepted that way) — the length check is what
+           keeps those out, so without a known length this pass is skipped.
+
+        Anything that passes none of them fails honestly instead of playing
+        the wrong audio.
         """
         # Lead with just the primary artist — a full multi-artist credit
         # string ("Travis Scott, Quavo, Offset") stuffed into the query
@@ -490,17 +505,58 @@ class ITunesCatalogProvider:
         query = f"{title} {primary_artist}".strip()
 
         accepted, ranked = await self._search_and_match(self.youtube_provider, query, title, primary_artist)
+        via = "catalog"
+        if accepted is None:
+            accepted, via = await self._match_among_videos(query, title, artist, primary_artist, duration)
 
         print(
-            f"[itunes match] query={query!r} via youtube_music (catalog only) -> "
-            + (f"accepted={accepted.title!r} by {accepted.artist!r} confidence={accepted.confidence}" if accepted else "NOT FOUND — no catalog candidate passed title+artist check")
-            + " (top search results: "
+            f"[itunes match] query={query!r} -> "
+            + (f"accepted via {via}: {accepted.title!r} by {accepted.artist!r} ({accepted.source_id})" if accepted else "NOT FOUND")
+            + " (top catalog results: "
             + ", ".join(f"{c.title!r}/{c.artist!r}/{c.confidence}" for c in ranked[:5])
             + ")"
         )
         if accepted is None:
             raise AppError(ErrorCode.TRACK_NOT_FOUND, "Track not found in the official catalog")
         return accepted.source_id
+
+    async def _match_among_videos(
+        self, query: str, title: str, artist: str, primary_artist: str, duration: int | None
+    ) -> tuple[TrackCandidate | None, str]:
+        search_videos = getattr(self.youtube_provider, "search_videos", None)
+        if search_videos is None:
+            return None, ""
+        try:
+            videos = await search_videos(query, 12)
+        except Exception as exc:
+            print(f"[itunes match] video search failed: {exc}")
+            return None, ""
+
+        def closest(candidates: list[TrackCandidate]) -> TrackCandidate | None:
+            if not candidates:
+                return None
+            return min(candidates, key=lambda c: abs((c.duration or 0) - duration) if duration and c.duration else 0)
+
+        official, uploads = [], []
+        for candidate, video_type in videos:
+            if _looks_unofficial(candidate.title, candidate.artist, title):
+                continue
+            if video_type in OFFICIAL_VIDEO_TYPES:
+                if (
+                    _title_matches(title, candidate.title, primary_artist)
+                    and _artist_matches(primary_artist, candidate.title, candidate.artist)
+                    and _duration_close(duration, candidate.duration, _OFFICIAL_VIDEO_TOLERANCE, required=False)
+                ):
+                    official.append(candidate)
+            elif _user_upload_title_matches(title, artist, primary_artist, candidate.title) and _duration_close(
+                duration, candidate.duration, _USER_UPLOAD_TOLERANCE, required=True
+            ):
+                uploads.append(candidate)
+        if official:
+            return closest(official), "artist-credited video"
+        if uploads:
+            return closest(uploads), "user upload (title + length check)"
+        return None, ""
 
     @staticmethod
     async def _search_and_match(
@@ -510,7 +566,7 @@ class ITunesCatalogProvider:
         check. Returns (accepted_or_None, ranked_candidates) — ranked is
         returned even on no-match so callers can log it."""
         try:
-            yt_candidates = await provider.search(query, 8)
+            yt_candidates = await getattr(provider, "search_songs", provider.search)(query, 8)
         except Exception as exc:
             print(f"[itunes match] search via {getattr(provider, 'name', provider)} failed: {exc}")
             return None, []
@@ -549,7 +605,7 @@ class ITunesCatalogProvider:
             return None
         track_id = str(track_id)
         self._remember_artist_id(item.get("artistName"), item.get("artistId"))
-        return TrackCandidate(
+        candidate = TrackCandidate(
             id=public_track_id(SOURCE_NAME, track_id),
             source=SOURCE_NAME,
             source_id=track_id,
@@ -562,6 +618,8 @@ class ITunesCatalogProvider:
             album_id=str(item.get("collectionId")) if item.get("collectionId") else album_id,
             artist_id=str(item.get("artistId")) if item.get("artistId") else None,
         )
+        self._track_info_cache[track_id] = candidate
+        return candidate
 
     # ---------------- catalog browsing ----------------
 
@@ -637,14 +695,41 @@ class ITunesCatalogProvider:
     async def get_artist(self, artist_id: str) -> ArtistInfo:
         raw_albums = await self._fetch_all_albums(artist_id)
         albums = self._dedupe_albums(raw_albums)
-        name = raw_albums[0].get("artistName") if raw_albums else "Unknown artist"
+        # the name most of the albums carry — a single entry can be a joint release
+        names = Counter(a.get("artistName") for a in raw_albums if a.get("artistName"))
+        name = names.most_common(1)[0][0] if names else "Unknown artist"
+
+        # iTunes has no photo and no "popular tracks" for an artist, so the
+        # page would open empty. YouTube Music's page for the same name has
+        # both (and takes its album shelf from this catalog anyway).
+        find_artist_id = getattr(self.youtube_provider, "find_artist_id", None)
+        if find_artist_id is not None and raw_albums:
+            try:
+                yt_artist_id = await asyncio.wait_for(find_artist_id(name), timeout=8.0)
+                if yt_artist_id:
+                    return await self.youtube_provider.get_artist(yt_artist_id)
+            except Exception as exc:
+                print(f"[itunes] no YouTube Music page for artist {name!r}: {exc}")
+
+        # No such page (a joint credit like "JACKBOYS & Travis Scott", a
+        # name spelled differently there): the catalog's own top songs.
+        top_tracks: list[TrackCandidate] = []
+        try:
+            data = await self._get(_LOOKUP_URL, {"id": artist_id, "entity": "song", "limit": 50})
+            for item in data.get("results") or []:
+                candidate = self._map_track(item) if item.get("wrapperType") == "track" else None
+                if candidate:
+                    top_tracks.append(candidate)
+        except AppError as exc:
+            print(f"[itunes] top songs for artist {artist_id} failed: {exc}")
+
         return ArtistInfo(
             id=artist_id,
             source=SOURCE_NAME,
             name=name or "Unknown artist",
             photo=None,
             subscribers=None,
-            top_tracks=[],
+            top_tracks=top_tracks,
             albums=albums,
         )
 
@@ -714,7 +799,7 @@ class ITunesCatalogProvider:
             if candidate:
                 if not candidate.artwork:
                     candidate = candidate.model_copy(update={"artwork": cover})
-                self._track_info_cache[candidate.source_id] = (candidate.title, candidate.artist)
+                self._track_info_cache[candidate.source_id] = candidate
                 tracks.append(candidate)
         # The lookup response already returns tracks in album order — no
         # re-sort needed (sorting the public "source:id" strings would

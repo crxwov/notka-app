@@ -3,6 +3,7 @@ import json
 import os
 import re
 import secrets
+import time
 import uuid
 from pathlib import Path
 from urllib.parse import quote
@@ -40,6 +41,46 @@ _CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "cache" / "audio_v2
 _CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _download_locks: dict[str, asyncio.Lock] = {}
 
+# The cache is trimmed back under this size after each new download, least
+# recently played tracks first. Override with AUDIO_CACHE_MAX_MB in .env.
+_CACHE_MAX_BYTES = int(os.environ.get("AUDIO_CACHE_MAX_MB") or 2048) * 1024 * 1024
+
+
+def _prune_cache() -> None:
+    now = time.time()
+    entries = []
+    for path in _CACHE_DIR.iterdir():
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        if ".part-" in path.name:
+            # leftovers of a download that was cut off; a live one is younger
+            if now - stat.st_mtime > 3600:
+                path.unlink(missing_ok=True)
+        elif path.suffix == ".bin":
+            entries.append((stat.st_mtime, stat.st_size, path))
+    total = sum(size for _, size, _ in entries)
+    for _, size, path in sorted(entries):
+        if total <= _CACHE_MAX_BYTES:
+            break
+        path.unlink(missing_ok=True)
+        path.with_suffix(".mime").unlink(missing_ok=True)
+        total -= size
+
+
+def _cached_file(key: str) -> tuple[Path, str] | None:
+    meta_path = _CACHE_DIR / f"{key}.mime"
+    data_path = _CACHE_DIR / f"{key}.bin"
+    try:
+        if data_path.stat().st_size > 0:
+            mime = meta_path.read_text().strip()
+            os.utime(data_path)  # "played just now" — what _prune_cache sorts by
+            return data_path, mime
+    except OSError:
+        pass
+    return None
+
 
 def _cache_key(source: str, source_id: str, match_suffix: str | None = None) -> str:
     # match_suffix (e.g. the YouTube video id a catalog-only source like
@@ -76,15 +117,17 @@ async def _ensure_cached(
     meta_path = _CACHE_DIR / f"{key}.mime"
     data_path = _CACHE_DIR / f"{key}.bin"
 
-    if data_path.exists() and meta_path.exists() and data_path.stat().st_size > 0:
-        return data_path, meta_path.read_text().strip()
+    cached = _cached_file(key)
+    if cached:
+        return cached
 
     lock = _download_locks.setdefault(key, asyncio.Lock())
     async with lock:
         # Re-check now that we hold the lock: another request for the same
         # track may have finished downloading while we were waiting.
-        if data_path.exists() and meta_path.exists() and data_path.stat().st_size > 0:
-            return data_path, meta_path.read_text().strip()
+        cached = _cached_file(key)
+        if cached:
+            return cached
 
         download_to_file = getattr(provider, "download_to_file", None)
         if download_to_file is not None:
@@ -102,6 +145,7 @@ async def _ensure_cached(
                 raise
             except Exception as exc:
                 raise AppError(ErrorCode.RESOLVE_FAILED, "Could not download playback source") from exc
+            await asyncio.to_thread(_prune_cache)
             return data_path, mime
 
         # Fallback for providers with no yt-dlp downloader hook (e.g.
@@ -123,6 +167,7 @@ async def _ensure_cached(
                             fh.write(chunk)
             tmp_path.replace(data_path)
             meta_path.write_text(mime)
+            await asyncio.to_thread(_prune_cache)
         except httpx.HTTPError as exc:
             tmp_path.unlink(missing_ok=True)
             raise AppError(ErrorCode.RESOLVE_FAILED, "Could not reach playback source") from exc
@@ -132,22 +177,51 @@ async def _ensure_cached(
         return data_path, mime
 
 
-def _parse_range(range_header: str, total: int) -> tuple[int, int]:
-    try:
-        _, _, rng = range_header.partition("=")
-        start_s, _, end_s = rng.partition("-")
-        start = int(start_s) if start_s.strip() else 0
-        end = int(end_s) if end_s.strip() else total - 1
-        end = min(end, total - 1)
-        if start < 0 or start > end:
-            return 0, total - 1
-        return start, end
-    except (ValueError, IndexError):
-        return 0, total - 1
-
-
 def create_router(service: MusicService, settings: Settings) -> APIRouter:
     router = APIRouter()
+
+    def match_suffix_for(provider, source_id: str) -> str | None:
+        # For a catalog-only source (currently just itunes) whose track id
+        # never changes but whose *matched YouTube video* can (see
+        # matched_video_id's docstring), fold that match into the cache key
+        # so a corrected match isn't shadowed by an old cached download.
+        matched_video_id = getattr(provider, "matched_video_id", None)
+        return matched_video_id(source_id) if matched_video_id else None
+
+    async def audio_for_resolved(response: ResolveResponse) -> tuple[Path, str]:
+        provider = service.manager.get(response.track.source)
+        return await _ensure_cached(
+            provider,
+            response.track.source,
+            response.track.source_id,
+            response.playback.url,
+            response.playback.mime_type,
+            match_suffix=match_suffix_for(provider, response.track.source_id),
+        )
+
+    async def audio_file(source: str, source_id: str) -> tuple[Path, str]:
+        """The track's audio on disk, downloading it first if needed. A track
+        that is already cached is found without asking the source anything —
+        resolving it again would cost seconds for a file we already hold."""
+        provider = service.manager.get(source)
+        if provider is not None:
+            needs_match = hasattr(provider, "matched_video_id")
+            suffix = match_suffix_for(provider, source_id)
+            if suffix or not needs_match:
+                cached = _cached_file(_cache_key(source, source_id, suffix))
+                if cached:
+                    return cached
+        response = await service.resolve(source=source, id=source_id, url=None)
+        if response.playback.type != "url" or not response.playback.url:
+            raise AppError(ErrorCode.RESOLVE_FAILED, "Resolved playback cannot be played")
+        return await audio_for_resolved(response)
+
+    def audio_response(data_path: Path, mime: str) -> FileResponse:
+        # FileResponse answers Range requests itself, reading only the bytes
+        # asked for. no-store: the same /stream URL can point at a corrected
+        # file after a backend update, so the WebView must not replay its own
+        # old copy.
+        return FileResponse(data_path, media_type=mime, headers={"cache-control": "no-store"})
 
     @router.get("/health")
     async def health() -> dict[str, str]:
@@ -192,8 +266,11 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         url: str | None = Query(default=None),
         mode: str | None = Query(default=None, pattern="^(redirect|json|proxy)$"),
     ):
-        response = await service.resolve(source=source, id=id, url=url)
         stream_mode = mode or settings.stream_response_mode
+        if stream_mode == "proxy" and source and id and not url:
+            data_path, mime = await audio_file(source, id)
+            return audio_response(data_path, mime)
+        response = await service.resolve(source=source, id=id, url=url)
         if stream_mode == "json":
             return response
         if response.playback.type != "url" or not response.playback.url:
@@ -201,41 +278,8 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         if stream_mode == "redirect":
             return RedirectResponse(response.playback.url, status_code=307)
 
-        provider = service.manager.get(response.track.source)
-        # For a catalog-only source (currently just itunes) whose track id
-        # never changes but whose *matched YouTube video* can (see
-        # matched_video_id's docstring), fold that match into the cache key
-        # so a corrected match isn't shadowed by an old cached download.
-        matched_video_id = getattr(provider, "matched_video_id", None)
-        match_suffix = matched_video_id(response.track.source_id) if matched_video_id else None
-        data_path, mime = await _ensure_cached(
-            provider,
-            response.track.source,
-            response.track.source_id,
-            response.playback.url,
-            response.playback.mime_type,
-            match_suffix=match_suffix,
-        )
-        file_bytes = await asyncio.to_thread(data_path.read_bytes)
-        total = len(file_bytes)
-        range_header = request.headers.get("range")
-        if range_header:
-            start, end = _parse_range(range_header, total)
-            chunk = file_bytes[start : end + 1]
-            headers = {
-                "content-range": f"bytes {start}-{end}/{total}",
-                "accept-ranges": "bytes",
-                "content-length": str(len(chunk)),
-                # The same /stream?source=&id= URL can end up pointing at a
-                # fixed (previously broken) file after a backend update —
-                # make sure Telegram's WebView always re-checks with us
-                # instead of replaying whatever it cached the first time.
-                "cache-control": "no-store",
-            }
-            return Response(content=chunk, status_code=206, media_type=mime, headers=headers)
-
-        headers = {"accept-ranges": "bytes", "content-length": str(total), "cache-control": "no-store"}
-        return Response(content=file_bytes, status_code=200, media_type=mime, headers=headers)
+        data_path, mime = await audio_for_resolved(response)
+        return audio_response(data_path, mime)
 
     # ---- «Мой микс»: what YouTube Music's radio would play after a track ----
     @router.get("/radio", response_model=SearchResponse)
@@ -257,23 +301,21 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             raise AppError(ErrorCode.PROVIDER_UNAVAILABLE, "Radio is unavailable") from exc
         return SearchResponse(results=tracks)
 
+    # ---- gets a track ready to play: the app calls this before pointing
+    # its player at /stream (so a failure comes back as a readable error),
+    # and ahead of time for the next track in the queue ----
+    @router.get("/prepare")
+    async def prepare(source: str = Query(..., min_length=1), id: str = Query(..., min_length=1)) -> dict[str, bool]:
+        await audio_file(source, id)
+        return {"ready": True}
+
     # ---- «Скачать»: the cached audio as a named file ----
     @router.get("/download")
     async def download(source: str = Query(...), id: str = Query(..., min_length=1)):
         response = await service.resolve(source=source, id=id, url=None)
         if response.playback.type != "url" or not response.playback.url:
             raise AppError(ErrorCode.RESOLVE_FAILED, "Nothing to download")
-        provider = service.manager.get(response.track.source)
-        matched_video_id = getattr(provider, "matched_video_id", None)
-        match_suffix = matched_video_id(response.track.source_id) if matched_video_id else None
-        data_path, mime = await _ensure_cached(
-            provider,
-            response.track.source,
-            response.track.source_id,
-            response.playback.url,
-            response.playback.mime_type,
-            match_suffix=match_suffix,
-        )
+        data_path, mime = await audio_for_resolved(response)
         name = f"{response.track.artist} - {response.track.title}".strip(" -") or "track"
         name = re.sub(r'[\\/:*?"<>|]+', " ", name)[:120].strip()
         filename = f"{name}.{_extension_for_mime(mime)}"

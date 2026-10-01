@@ -12,6 +12,8 @@ from music_resolver.providers.youtube_common import (
 )
 
 SOURCE_NAME = "youtube_music"
+# videoType values YouTube Music gives to uploads it credits to the artist
+OFFICIAL_VIDEO_TYPES = {"MUSIC_VIDEO_TYPE_OMV", "MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC"}
 
 
 def _best_thumbnail_url(thumbnails: list[dict] | None) -> str | None:
@@ -303,7 +305,48 @@ class YoutubeMusicProvider:
         self._catalog_provider = catalog_provider
 
     async def search(self, query: str, limit: int) -> list[TrackCandidate]:
+        # From a Russian IP the "songs" catalog simply has no major-label
+        # releases after 2022 — only covers and karaoke come back for them.
+        # The same tracks do exist as videos YouTube Music itself credits to
+        # the real artist, so those are searched alongside and merged in.
+        songs, videos = await asyncio.gather(
+            self.search_songs(query, limit),
+            self.search_videos(query, 10),
+            return_exceptions=True,
+        )
+        if isinstance(songs, BaseException):
+            raise songs
+        if isinstance(videos, BaseException):
+            videos = []
+        seen_ids = {c.source_id for c in songs}
+        seen_names = {(c.title.strip().lower(), c.artist.strip().lower()) for c in songs}
+        merged = list(songs)
+        for candidate, video_type in videos:
+            name = (candidate.title.strip().lower(), candidate.artist.strip().lower())
+            if video_type not in OFFICIAL_VIDEO_TYPES or candidate.source_id in seen_ids or name in seen_names:
+                continue
+            seen_ids.add(candidate.source_id)
+            seen_names.add(name)
+            merged.append(candidate)
+        return merged
+
+    async def search_songs(self, query: str, limit: int) -> list[TrackCandidate]:
+        """The catalog proper ("songs" only) — what track matching trusts first."""
         return await asyncio.to_thread(self._search_sync, query, limit)
+
+    async def search_videos(self, query: str, limit: int) -> list[tuple[TrackCandidate, str]]:
+        """Video results with YouTube Music's own type for each: an official
+        upload (OFFICIAL_VIDEO_TYPES) or a user upload (…_UGC)."""
+        return await asyncio.to_thread(self._search_videos_sync, query, limit)
+
+    def _search_videos_sync(self, query: str, limit: int) -> list[tuple[TrackCandidate, str]]:
+        raw = self._client().search(query, filter="videos", limit=limit)
+        results: list[tuple[TrackCandidate, str]] = []
+        for item in raw or []:
+            candidate = map_search_item(item)
+            if candidate:
+                results.append((candidate, item.get("videoType") or ""))
+        return results
 
     async def resolve(self, id_or_url: str):
         return await self._resolver.resolve(id_or_url)
@@ -330,6 +373,17 @@ class YoutubeMusicProvider:
             except Exception as exc:
                 print(f"[artist:{artist_id}] catalog discography lookup failed, keeping YouTube data: {exc}")
         return info
+
+    async def find_artist_id(self, name: str) -> str | None:
+        """The channel id of the artist with exactly this name, if there is one."""
+        return await asyncio.to_thread(self._find_artist_id_sync, name)
+
+    def _find_artist_id_sync(self, name: str) -> str | None:
+        wanted = name.strip().lower()
+        for item in self._client().search(name, filter="artists", limit=5) or []:
+            if (item.get("artist") or "").strip().lower() == wanted and item.get("browseId"):
+                return item["browseId"]
+        return None
 
     async def radio(self, video_id: str, limit: int) -> list[TrackCandidate]:
         """Tracks YouTube Music's own radio would play after this one —
