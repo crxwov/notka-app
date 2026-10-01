@@ -18,6 +18,7 @@ from music_resolver.errors import AppError, ErrorCode
 from music_resolver.models import AlbumResponse, ArtistResponse, ResolveResponse, SearchResponse
 from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
+from music_resolver.services.playlist_import import read_playlist
 from music_resolver.utils.remux import defragment, defragment_all
 
 # Some CDNs (incl. googlevideo.com) reject requests with no/odd User-Agent.
@@ -258,6 +259,12 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         except Exception:
             found = []
         return {"results": found}
+
+    # ---- «Перенести плейлист»: the name and the track list behind a
+    # Spotify / Yandex Music / Apple Music / YouTube link ----
+    @router.get("/import")
+    async def import_playlist(url: str = Query(..., min_length=8, max_length=600)) -> dict:
+        return await read_playlist(url, youtube_music_provider=service.manager.get("youtube_music"))
 
     @router.get("/resolve", response_model=ResolveResponse)
     async def resolve(

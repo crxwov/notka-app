@@ -13,7 +13,7 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=43" />
+<link rel="stylesheet" href="styles.css?v=45" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -65,6 +65,7 @@
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.3 6.3 0 0 0 10.1 10.1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="i-cast" viewBox="0 0 24 24"><path d="M4 15.5V6.8A1.8 1.8 0 0 1 5.8 5h12.4A1.8 1.8 0 0 1 20 6.8v8.4a1.8 1.8 0 0 1-1.8 1.8H16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 19.5h.01M4 16.7a2.8 2.8 0 0 1 2.8 2.8M4 13.8a5.7 5.7 0 0 1 5.7 5.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-6.5M12 20V4.5M19 20v-10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3.5v10M8 9.8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 14.5v3a2.5 2.5 0 0 0 2.5 2.5h10a2.5 2.5 0 0 0 2.5-2.5v-3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.1-3.6 3.8-5.6 7-5.6s5.9 2 7 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 3.8a5.3 5.3 0 0 0-5.3 5.3v3.1c0 .7-.2 1.3-.6 1.8L5 15.6h14l-1.1-1.6c-.4-.5-.6-1.1-.6-1.8V9.1A5.3 5.3 0 0 0 12 3.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 18.6a2.1 2.1 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
@@ -229,6 +230,14 @@
           <svg width="18" height="18" aria-hidden="true"><use href="#i-plus"/></svg>Создать
         </button>
       </div>
+      <button class="import-card" id="import-open-btn" type="button">
+        <span class="import-card-ic" aria-hidden="true"><svg width="24" height="24"><use href="#i-import"/></svg></span>
+        <span class="row-meta">
+          <span class="row-title">Перенести плейлист</span>
+          <span class="row-sub">Из Spotify, Яндекс Музыки, Apple Music, YouTube</span>
+        </span>
+        <svg class="row-chevron" width="20" height="20" aria-hidden="true"><use href="#i-chevron"/></svg>
+      </button>
       <div class="empty-inline" id="playlists-empty-msg" hidden>
         <p class="empty-note">Плейлистов пока нет. Собери первый из поиска или прямо здесь.</p>
         <button class="pill-btn pill-primary" id="create-playlist-empty-btn" type="button">Создать плейлист</button>
@@ -715,6 +724,41 @@
     </div>
   </div>
 
+  <div id="import-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="import-title">
+    <div class="modal import-modal">
+      <p class="sheet-title" id="import-title">Перенести плейлист</p>
+
+      <div id="import-step-link">
+        <p class="sheet-note">Вставь ссылку на плейлист или альбом из Spotify, Яндекс Музыки, Apple Music или YouTube Music. Он должен быть открыт для всех, у кого есть ссылка.</p>
+        <input id="import-input" class="modal-input" type="url" inputmode="url" placeholder="https://…" maxlength="600" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Ссылка на плейлист" />
+        <p class="import-error" id="import-error" role="alert" hidden></p>
+        <div class="modal-actions">
+          <button class="pill-btn pill-quiet" id="import-cancel" type="button">Отмена</button>
+          <button class="pill-btn pill-primary" id="import-confirm" type="button"><span class="import-go-label">Перенести</span><span class="spinner" aria-hidden="true"></span></button>
+        </div>
+      </div>
+
+      <div id="import-step-work" hidden>
+        <p class="import-name" id="import-name"></p>
+        <p class="import-count" role="status"><b id="import-done">0</b> из <span id="import-total">0</span></p>
+        <div class="import-bar" aria-hidden="true"><i id="import-bar-fill"></i></div>
+        <p class="import-now" id="import-now"></p>
+        <div class="modal-actions">
+          <button class="pill-btn pill-quiet" id="import-stop" type="button">Остановить</button>
+        </div>
+      </div>
+
+      <div id="import-step-done" hidden>
+        <p class="import-name" id="import-result-title"></p>
+        <p class="sheet-note" id="import-result-note"></p>
+        <ul class="import-missed" id="import-missed"></ul>
+        <div class="modal-actions">
+          <button class="pill-btn pill-primary" id="import-open-playlist" type="button">Открыть плейлист</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="details-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="details-title">
     <div class="modal">
       <p class="sheet-title" id="details-title">Название и описание</p>
@@ -759,6 +803,6 @@
 <script src="config.js"></script>
 <script src="prism.js?v=2"></script>
 <script src="shredder.js?v=4"></script>
-<script src="app.js?v=39"></script>
+<script src="app.js?v=41"></script>
 </body>
 </html>
