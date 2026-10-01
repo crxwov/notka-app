@@ -1,0 +1,17 @@
+# Бэкенд (поиск и плеер)
+fastapi>=0.141,<1.0
+uvicorn[standard]>=0.53,<1.0
+httpx>=0.28,<1.0
+pydantic>=2.12,<3.0
+yt-dlp>=2026.8.19
+ytmusicapi>=1.12,<2.0
+
+# Бот
+aiogram>=3.15,<4.0
+python-dotenv>=1.0,<2.0
+
+# Публичная https-ссылка на этот компьютер (бесплатный туннель Cloudflare)
+pycloudflared>=0.2.0
+
+# Нужно на Windows, чтобы читать куки Chrome (обход "18+, войдите в аккаунт")
+pywin32>=306; sys_platform == "win32"

@@ -1,0 +1,13 @@
+# секреты — никогда не попадают в историю
+.env
+env_setup.txt
+
+# то, что ставится и скачивается само
+venv/
+cache/
+__pycache__/
+*.pyc
+
+# скриншоты проверок дизайна (десятки мегабайт)
+.impeccable/review/
+.impeccable/hook.cache.json

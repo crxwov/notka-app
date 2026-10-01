@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Нотка</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<!-- Telegram's embedded webview (especially Telegram Desktop) caches
+     the Mini App's static files very aggressively and often keeps
+     serving an old styles.css/app.js even after the server files
+     change and the app is closed and reopened — the "?v=" query
+     string forces it to fetch the real, current file. Bump this
+     number (or just change it) every time styles.css or app.js is
+     edited, otherwise Telegram may keep showing the old version. -->
+<link rel="stylesheet" href="styles.css?v=8" />
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<div class="bg-fixed" aria-hidden="true">
+  <div class="blob1"></div>
+  <div class="blob2"></div>
+  <div class="blob3"></div>
+  <div class="vignette-1"></div>
+  <div class="vignette-2"></div>
+  <svg width="0" height="0" style="position:absolute;">
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2126 0.7152 0.0722 0 0"/></filter>
+  </svg>
+  <div class="grain" style="filter:url(#grain);"></div>
+</div>
+
+<div class="app">
+
+  <!-- ============ SPLASH ============ -->
+  <main class="screen" id="screen-splash">
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div class="logo-blob"></div>
+      <div class="splash-brand">Нотка</div>
+      <div class="splash-drops">
+        <div class="load-drop d1"></div>
+        <div class="load-drop d2"></div>
+        <div class="load-drop d3"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ ONBOARDING ============ -->
+  <main class="screen" id="screen-onboarding" hidden style="position:relative;">
+    <button class="tap onb-skip" id="onb-skip-btn" style="background:none;border:none;">Пропустить</button>
+    <div class="onb-content" id="onb-content">
+      <div class="onb-icon" id="onb-icon">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M9 18V5l10-2v13" stroke="#2B1B14" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.8" stroke="#2B1B14" stroke-width="1.6"/><circle cx="16.5" cy="16" r="2.8" stroke="#2B1B14" stroke-width="1.6"/></svg>
+      </div>
+      <div class="onb-title" id="onb-title">Слушай без границ</div>
+      <div class="onb-text" id="onb-text">Миллионы треков без лицензионных ограничений — прямо в Telegram, без установки отдельного приложения.</div>
+    </div>
+    <div class="onb-footer">
+      <div class="onb-dots" id="onb-dots">
+        <div class="onb-dot active"></div>
+        <div class="onb-dot"></div>
+        <div class="onb-dot"></div>
+      </div>
+      <button class="tap onb-next-btn" id="onb-next-btn">Далее</button>
+    </div>
+  </main>
+
+  <!-- ============ HOME ============ -->
+  <main class="screen" id="screen-home" hidden>
+    <div class="home-topbar">
+      <div class="home-brand">
+        <svg width="14" height="23" viewBox="0 0 1074 1730" fill="none"><path d="M577.6 536.4L577.2 1072.8L574.133 1080.4C570.267 1090 560.8 1100.53 552 1105.2C546 1108.4 543.733 1108.8 532.4 1108.8C520.4 1108.8 519.2 1108.53 509.067 1103.6C500.4 1099.33 495.867 1095.73 483.733 1083.6C448.933 1048.93 410.933 987.333 381.067 917.067C360 867.6 338.267 836.667 317.2 826.133C310.133 822.667 307.733 822.133 297.867 822.133C287.6 822.133 285.6 822.533 277.333 826.667C261.6 834.4 242.133 854.933 222.267 884.8C196.267 923.867 122.4 1046.13 96.9333 1092.13C53.4667 1170.8 24.8 1237.07 10.5333 1291.2C2.4 1322.53 0 1340 0 1370.13C0 1392.8 0.4 1398.93 3.06667 1410.8C10.6667 1446.13 23.4667 1464.8 65.4667 1502.27C111.6 1543.2 123.2 1559.47 147.867 1618.8C166.8 1664.4 176.8 1679.87 198.267 1696.67C228.933 1720.67 264.4 1730.8 311.2 1728.93C364.4 1726.93 413.867 1712.93 477.2 1682.13C530.133 1656.27 573.6 1626 607.2 1591.33C650.533 1546.8 671.6 1503.07 676.667 1447.33C679.867 1412.4 675.333 1386.67 655.867 1326.53C642.8 1286.8 635.467 1259.6 631.6 1236.8C629.467 1224.4 629.2 1194.67 628.933 822.4L628.533 421.333L640.133 431.2C670.667 456.933 703.867 475.333 767.2 501.6C841.2 532.4 886 560 925.6 599.2C981.467 654.4 1006.27 713.467 1006.4 791.467C1006.53 827.467 1002.4 855.2 991.733 890.267C989.2 898.8 987.2 907.067 987.467 908.533C987.733 910.133 989.467 912.267 991.467 913.333C994.667 915.2 995.2 915.2 997.867 912.8C1001.87 909.2 1013.87 888.667 1025.33 865.467C1084 748 1089.73 626.133 1041.33 528.8C1025.2 496.267 1007.6 471.733 979.867 442.933C948.8 410.667 924.8 391.467 849.2 338.133C806.4 307.867 781.333 288 753.333 261.733C678.667 191.867 629.067 107.067 606.267 10.8L603.867 0.80004L590.933 0.40004L577.867 4.00261e-05L577.6 536.4Z" fill="#FF7A2E"/></svg>
+        <span>Нотка</span>
+      </div>
+      <div class="bell-wrap">
+        <button class="glass bell-btn" id="bell-btn" aria-label="Уведомления">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3a5 5 0 0 0-5 5v3.2c0 .6-.2 1.2-.6 1.7L5 15h14l-1.4-2.1c-.4-.5-.6-1.1-.6-1.7V8a5 5 0 0 0-5-5Z" stroke="#FFF7F0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 18a2 2 0 0 0 4 0" stroke="#FFF7F0" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="greeting-block">
+      <div class="greeting-title" id="home-greeting">Привет!</div>
+      <div class="greeting-sub">Что послушаем сегодня?</div>
+    </div>
+
+    <button class="glass mymix-card tap" id="mymix-card">
+      <div class="mymix-card-blob-a"></div>
+      <div class="mymix-card-blob-b"></div>
+      <div class="mymix-card-top">
+        <div class="mymix-pulse" id="mymix-pulse">
+          <span id="mymix-play-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 5v14l11-7z" fill="#2B1B14"/></svg></span>
+        </div>
+        <div class="mymix-bars" id="mymix-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="mymix-card-bottom">
+        <div class="mymix-card-title">Мой микс</div>
+        <div class="mymix-card-sub" id="mymix-sub">На основе твоих любимых треков</div>
+      </div>
+    </button>
+
+    <div class="section-label-row">
+      <span class="section-label" style="padding:0;">Топ треков</span>
+      <button class="see-all" id="home-see-all-favorites">Все</button>
+    </div>
+    <div class="home-tracklist" id="home-favorites-list"></div>
+    <div class="empty-inline" id="home-favorites-empty" style="padding-left:20px;">Пока нет любимых треков — жми ♡ у трека в поиске.</div>
+
+    <div class="section-label">Подборки для тебя</div>
+    <div class="picks-scroll">
+      <button class="glass mix-card tap" id="pick-top" data-pick="top">
+        <div class="mix-card-glow" style="background:radial-gradient(circle, rgba(255,122,46,0.35) 0%, transparent 70%);"></div>
+        <div class="mix-card-icon" style="border-radius:58% 42% 45% 55% / 52% 45% 55% 48%;background:linear-gradient(140deg,#8A4A2E,#FF7A2E);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" fill="#2B1B14" fill-opacity="0.55"/></svg>
+        </div>
+        <div class="mix-card-title">Топ</div>
+        <div class="mix-card-sub">Популярное</div>
+      </button>
+      <button class="glass mix-card tap" id="pick-new" data-pick="new">
+        <div class="mix-card-glow" style="background:radial-gradient(circle, rgba(255,201,96,0.35) 0%, transparent 70%);"></div>
+        <div class="mix-card-icon" style="border-radius:42% 58% 55% 45% / 48% 55% 45% 52%;background:linear-gradient(140deg,#FF7A2E,#FFC960);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="7.5" stroke="#2B1B14" stroke-opacity="0.6" stroke-width="1.6"/><circle cx="12" cy="12" r="2.6" fill="#2B1B14" fill-opacity="0.6"/></svg>
+        </div>
+        <div class="mix-card-title">Новинки</div>
+        <div class="mix-card-sub">Свежее</div>
+      </button>
+      <button class="glass mix-card tap" id="pick-playlists" data-pick="playlists">
+        <div class="mix-card-glow" style="background:radial-gradient(circle, rgba(255,184,107,0.35) 0%, transparent 70%);"></div>
+        <div class="mix-card-icon" style="border-radius:50% 50% 42% 58% / 55% 42% 58% 45%;background:linear-gradient(140deg,#FFB86B,#FF7A2E);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="4.2" rx="1.4" stroke="#2B1B14" stroke-opacity="0.6" stroke-width="1.6"/><rect x="4" y="10.5" width="16" height="4.2" rx="1.4" stroke="#2B1B14" stroke-opacity="0.6" stroke-width="1.6"/><rect x="4" y="17" width="10" height="4.2" rx="1.4" stroke="#2B1B14" stroke-opacity="0.6" stroke-width="1.6"/></svg>
+        </div>
+        <div class="mix-card-title">Плейлисты</div>
+        <div class="mix-card-sub">Твоя библиотека</div>
+      </button>
+      <button class="glass mix-card tap" id="pick-favorites" data-pick="favorites">
+        <div class="mix-card-glow" style="background:radial-gradient(circle, rgba(255,122,46,0.35) 0%, transparent 70%);"></div>
+        <div class="mix-card-icon" style="border-radius:55% 45% 50% 50% / 45% 55% 45% 55%;background:linear-gradient(140deg,#FF7A2E,#8A4A2E);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#2B1B14" fill-opacity="0.55"><path d="M12 20s-7-4.35-9.5-8.8C.8 7.4 2.6 4 6 4c2 0 3.4 1.1 4 2.2C10.6 5.1 12 4 14 4c3.4 0 5.2 3.4 3.5 7.2C15 15.65 12 20 12 20Z"/></svg>
+        </div>
+        <div class="mix-card-title">Любимое</div>
+        <div class="mix-card-sub" id="pick-favorites-sub">0 треков</div>
+      </button>
+    </div>
+
+    <div style="flex:1;"></div>
+  </main>
+
+  <!-- ============ SEARCH ============ -->
+  <main class="screen" id="screen-search" hidden>
+    <div class="screen-title">Поиск</div>
+
+    <div class="glass search-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="#F7F0EB" stroke-opacity="0.6" stroke-width="1.8"/><path d="M20 20l-4.3-4.3" stroke="#F7F0EB" stroke-opacity="0.6" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input id="search-input" type="text" inputmode="search" placeholder="Название трека или исполнитель" autocomplete="off" />
+      <button id="search-clear" class="search-clear-btn" hidden>✕</button>
+    </div>
+
+    <div class="chip-row" id="search-tabs">
+      <div class="chip active tap" data-tab="all">Все</div>
+      <div class="glass chip tap" data-tab="tracks">Треки</div>
+      <div class="glass chip tap" data-tab="artists">Исполнители</div>
+      <div class="glass chip tap" data-tab="albums">Альбомы</div>
+    </div>
+
+    <div id="search-status" class="status-line" hidden></div>
+
+    <div class="scroll-area" style="padding-top:4px;">
+      <!-- state 1: idle / no query yet -->
+      <div id="search-state-empty" class="search-empty-state">
+        <div class="search-empty-badge">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="#FF7A2E" stroke-width="1.8"/><path d="M20 20l-4.3-4.3" stroke="#FF7A2E" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <div class="search-empty-title">Ищи что угодно</div>
+        <div class="search-empty-sub">Треки, исполнители или альбомы — всё в одном месте</div>
+      </div>
+
+      <!-- state 2: loading -->
+      <div id="search-state-loading" class="search-loading" style="display:none;">
+        <div class="load-drop d1"></div>
+        <div class="load-drop d2"></div>
+        <div class="load-drop d3"></div>
+      </div>
+
+      <!-- state 3: no results for this query -->
+      <div id="search-state-empty-results" class="search-empty-state" style="display:none;">
+        <div class="search-empty-badge">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M9 9l6 6M15 9l-6 6" stroke="#FF7A2E" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="#FF7A2E" stroke-width="1.6"/></svg>
+        </div>
+        <div class="search-empty-title">Ничего не нашлось</div>
+        <div class="search-empty-sub">Попробуй другой запрос или проверь написание</div>
+      </div>
+
+      <!-- state 4: results -->
+      <ul id="search-state-results" style="display:none;list-style:none;margin:0;padding:0;flex-direction:column;"></ul>
+    </div>
+  </main>
+
+  <!-- ============ LIBRARY ============ -->
+  <main class="screen" id="screen-library" hidden>
+    <div class="screen-title">Библиотека</div>
+
+    <div class="scroll-area">
+      <button class="glass library-fav-row" id="open-favorites-btn">
+        <div class="library-fav-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#2B1B14"><path d="M12 20s-7-4.35-9.5-8.8C.8 7.4 2.6 4 6 4c2 0 3.4 1.1 4 2.2C10.6 5.1 12 4 14 4c3.4 0 5.2 3.4 3.5 7.2C15 15.65 12 20 12 20Z"/></svg>
+        </div>
+        <div class="library-fav-text">
+          <div class="library-fav-title">Любимые треки</div>
+          <div class="library-fav-count" id="library-fav-count">0 треков</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#F7F0EB" stroke-opacity="0.45" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <div class="library-section-head">
+        <span>Мои плейлисты</span>
+        <button class="glass icon-square-btn" id="create-playlist-btn" aria-label="Новый плейлист">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#FFF7F0" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div id="playlists-empty-msg" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px 20px 8px 20px;" hidden>
+        <div style="font-size:13.5px;color:var(--text-dim);line-height:1.4;">У тебя пока нет плейлистов — создай первый</div>
+      </div>
+
+      <div class="playlists-grid" id="playlists-grid">
+        <button class="playlist-card" id="new-playlist-card">
+          <div class="glass playlist-cover new">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#F7F0EB" stroke-opacity="0.5" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </div>
+          <div class="playlist-name" style="color:var(--text-dim);">Новый плейлист</div>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ FAVORITES (as a sub-screen) ============ -->
+  <main class="screen" id="screen-favorites" hidden>
+    <div class="subscreen-header" style="padding-bottom:16px;">
+      <button class="glass round-glass-btn" id="favorites-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="subscreen-header-center">
+        <div class="subscreen-header-label">Библиотека</div>
+        <div class="subscreen-header-value">Любимые треки</div>
+      </div>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="scroll-area" style="padding-top:6px;">
+      <ul id="favorites-list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;"></ul>
+      <div id="favorites-empty" class="empty-block">
+        <div class="emoji">🤍</div>
+        <p>Пока пусто. Жми ♡ у трека в поиске, чтобы добавить его сюда.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ PLAYLIST DETAIL ============ -->
+  <main class="screen" id="screen-playlist" hidden>
+    <div class="subscreen-header">
+      <button class="glass round-glass-btn" id="playlist-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="glass round-glass-btn tap" id="playlist-menu-btn" aria-label="Ещё">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="#FFF7F0"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
+      </button>
+    </div>
+
+    <div class="scroll-area" style="padding-top:0;">
+      <div class="playlist-hero">
+        <div style="position:relative;">
+          <div class="playlist-hero-cover" id="playlist-cover"></div>
+          <button class="glass cover-edit-btn tap" id="playlist-cover-edit-btn" aria-label="Изменить обложку">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4 10-10 3 3-10 10-4 1Z" stroke="#F7F0EB" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="playlist-hero-title" id="playlist-title">Плейлист</div>
+        <div class="playlist-hero-sub" id="playlist-sub">0 треков</div>
+      </div>
+
+      <div class="playlist-actions">
+        <button class="play-pill tap" id="playlist-play-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#2B1B14"><path d="M8 5v14l11-7z"/></svg>
+          <span>Слушать</span>
+        </button>
+        <button class="glass square-glass-btn tap" id="playlist-shuffle-btn" aria-label="Перемешать">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M3 7h3.2c1.4 0 2.2.5 3 1.7L15 18h3" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M15 6h3M3 17h3.2c1.4 0 2.2-.5 3-1.7L10 12" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="glass square-glass-btn tap" id="playlist-heart-btn" aria-label="В избранные плейлисты">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.35-9.5-8.8C.8 7.4 2.6 4 6 4c2 0 3.4 1.1 4 2.2C10.6 5.1 12 4 14 4c3.4 0 5.2 3.4 3.5 7.2C15 15.65 12 20 12 20Z" stroke="#F7F0EB" stroke-opacity="0.6" stroke-width="1.6"/></svg>
+        </button>
+      </div>
+
+      <ul id="playlist-tracks-list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;"></ul>
+      <div id="playlist-empty" class="empty-block">
+        <div class="emoji">🎶</div>
+        <p>В этом плейлисте пока нет треков. Добавляй их через ＋ у трека в поиске.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ PROFILE ============ -->
+  <main class="screen" id="screen-profile" hidden>
+    <div class="screen-title">Профиль</div>
+    <div class="scroll-area">
+      <div class="profile-head">
+        <div class="profile-avatar" id="profile-avatar-btn"><span id="profile-initial">Н</span></div>
+        <div class="profile-name" id="profile-name">Гость</div>
+        <div class="profile-sub">Участник Нотки</div>
+      </div>
+
+      <div class="glass menu-list">
+        <button class="menu-row" id="menu-account">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.4" stroke="#FF7A2E" stroke-width="1.8"/><path d="M5 20c1-3.5 4-5.5 7-5.5s6 2 7 5.5" stroke="#FF7A2E" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>Аккаунт</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#F7F0EB" stroke-opacity="0.4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="menu-row" id="menu-sound">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M9 18V5l10-2v13" stroke="#FF7A2E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" stroke="#FF7A2E" stroke-width="1.7"/><circle cx="16.5" cy="16" r="2.5" stroke="#FF7A2E" stroke-width="1.7"/></svg>
+          <span>Звук и загрузки</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#F7F0EB" stroke-opacity="0.4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="menu-row" id="menu-notifications">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 3a5 5 0 0 0-5 5v3.2c0 .6-.2 1.2-.6 1.7L5 15h14l-1.4-2.1c-.4-.5-.6-1.1-.6-1.7V8a5 5 0 0 0-5-5Z" stroke="#FF7A2E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 18a2 2 0 0 0 4 0" stroke="#FF7A2E" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span>Уведомления</span>
+          <span id="profile-notif-badge" style="min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--accent);display:none;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--ink);margin-right:2px;"></span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#F7F0EB" stroke-opacity="0.4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="menu-row" id="menu-about">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#FF7A2E" stroke-width="1.7"/><path d="M12 11v5.5M12 8v.5" stroke="#FF7A2E" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>О Нотке</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#F7F0EB" stroke-opacity="0.4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <button class="glass logout-row" id="menu-logout">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="#F7F0EB" stroke-opacity="0.65" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="#F7F0EB" stroke-opacity="0.65" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Выйти</span>
+      </button>
+    </div>
+  </main>
+
+  <!-- ============ FULL-SCREEN PLAYER ============ -->
+  <main class="screen" id="screen-player" hidden>
+    <div class="subscreen-header">
+      <button class="glass round-glass-btn" id="player-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="subscreen-header-center">
+        <div class="subscreen-header-label">Сейчас играет</div>
+        <div class="subscreen-header-value" id="player-context">Нотка</div>
+      </div>
+      <button class="glass round-glass-btn tap" aria-label="Ещё" id="player-more-btn">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="#FFF7F0"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
+      </button>
+    </div>
+
+    <div class="player-screen">
+      <div class="player-art-wrap">
+        <div class="player-glow"></div>
+        <div class="player-art" id="player-art">
+          <svg width="70" height="70" viewBox="0 0 24 24" fill="none" opacity="0.3"><path d="M9 18V5l10-2v13" stroke="#2B1B14" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.6" stroke="#2B1B14" stroke-width="1.4"/><circle cx="16.5" cy="16" r="2.6" stroke="#2B1B14" stroke-width="1.4"/></svg>
+        </div>
+      </div>
+
+      <div class="player-meta-row">
+        <div style="min-width:0;">
+          <div class="player-title" id="player-title">—</div>
+          <div class="player-artist" id="player-artist">—</div>
+        </div>
+        <button class="player-fav-btn" id="player-fav-btn" aria-label="В избранное">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" id="player-fav-icon"><path d="M12 20s-7-4.35-9.5-8.8C.8 7.4 2.6 4 6 4c2 0 3.4 1.1 4 2.2C10.6 5.1 12 4 14 4c3.4 0 5.2 3.4 3.5 7.2C15 15.65 12 20 12 20Z" stroke="#FF7A2E" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <div class="player-progress-wrap">
+        <div class="player-progress-track" id="player-progress-track">
+          <div class="liquid-fill" id="player-progress-fill" style="width:0%;"></div>
+          <div class="player-progress-thumb" id="player-progress-thumb" style="left:0%;"></div>
+        </div>
+        <div class="player-times">
+          <span id="player-time-current">0:00</span><span id="player-time-total">0:00</span>
+        </div>
+      </div>
+
+      <div class="player-controls">
+        <button class="ctrl-sm" aria-label="Перемешать">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <path d="M3 7h3.2c1.4 0 2.2.5 3 1.7L15 18h3" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M15 6h3M3 17h3.2c1.4 0 2.2-.5 3-1.7L10 12" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M16 4.5 18.5 6 16 7.5M16 19.5 18.5 18 16 16.5" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <button class="glass ctrl-md" id="player-prev-btn" aria-label="Предыдущий">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFF7F0"><rect x="4" y="5" width="2.3" height="14" rx="1"/><path d="M19 5v14L8 12 19 5Z"/></svg>
+        </button>
+
+        <button class="ctrl-play" id="player-play-btn" aria-label="Пуск/пауза">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#2B1B14" id="player-play-icon"><rect x="6" y="5" width="4" height="14" rx="1.3"/><rect x="14" y="5" width="4" height="14" rx="1.3"/></svg>
+        </button>
+
+        <button class="glass ctrl-md" id="player-next-btn" aria-label="Следующий">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFF7F0"><rect x="17.7" y="5" width="2.3" height="14" rx="1"/><path d="M5 5v14l11-7L5 5Z"/></svg>
+        </button>
+
+        <button class="ctrl-sm" aria-label="Повтор">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <path d="M17 3l3 3-3 3" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 6H8a5 5 0 0 0-5 5v1" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M7 21l-3-3 3-3" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 18h12a5 5 0 0 0 5-5v-1" stroke="#F7F0EB" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="glass player-bottom-bar">
+      <button aria-label="Очередь" id="player-queue-btn" class="tap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h12M4 12h12M4 18h8" stroke="#F7F0EB" stroke-opacity="0.65" stroke-width="1.6" stroke-linecap="round"/><path d="M18 10l4 2-4 2v-4Z" fill="#F7F0EB" fill-opacity="0.65"/></svg></button>
+      <button aria-label="Устройства воспроизведения" id="player-cast-btn" class="tap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="12" rx="2" stroke="#F7F0EB" stroke-opacity="0.65" stroke-width="1.6"/><path d="M9 21l3-4 3 4H9Z" fill="#F7F0EB" fill-opacity="0.65"/></svg></button>
+      <button aria-label="Таймер сна" id="player-sleep-btn" class="tap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F7F0EB" stroke-opacity="0.65" stroke-width="1.6"/><path d="M12 8v8M8 12h8" stroke="#F7F0EB" stroke-opacity="0.65" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    </div>
+  </main>
+
+  <div id="sleep-timer-sheet" class="sheet-anim">
+    <div class="glass">
+      <div class="sheet-title">Таймер сна <span class="placeholder-tag">скоро</span></div>
+      <button class="sheet-row tap" data-min="15">Через 15 минут</button>
+      <button class="sheet-row tap" data-min="30">Через 30 минут</button>
+      <button class="sheet-row tap" data-min="60">Через 1 час</button>
+      <button class="sheet-row tap" id="sleep-timer-close">Отмена</button>
+    </div>
+  </div>
+
+  <div id="cast-sheet" class="sheet-anim">
+    <div class="glass">
+      <div class="sheet-title">Устройства <span class="placeholder-tag">скоро</span></div>
+      <div style="font-size:13px;color:var(--text-dim);padding:6px 4px 14px 4px;">Воспроизведение на других устройствах пока не подключено.</div>
+      <button class="sheet-row tap" id="cast-sheet-close">Закрыть</button>
+    </div>
+  </div>
+
+  <div id="queue-sheet" class="sheet-anim">
+    <div class="glass">
+      <div class="sheet-title">Очередь</div>
+      <ul id="queue-list" style="list-style:none;margin:0;padding:0;max-height:50vh;overflow-y:auto;"></ul>
+      <button class="sheet-row tap" id="queue-sheet-close">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- ============ ALBUM (real metadata + cover art via /album for youtube_music tracks; single-track fallback for other sources) ============ -->
+  <main class="screen" id="screen-album" hidden>
+    <div class="subscreen-header">
+      <button class="glass round-glass-btn tap" id="album-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="scroll-area" style="padding-top:0;">
+      <div class="album-hero">
+        <div class="playlist-hero-cover" id="album-cover" style="width:180px;height:180px;"></div>
+        <div class="playlist-hero-title" id="album-title">Альбом</div>
+        <div id="album-artist-link" class="tap" style="font-size:13.5px;color:var(--accent);font-weight:700;margin-top:8px;">Исполнитель</div>
+        <div class="playlist-hero-sub" id="album-meta">Альбом</div>
+      </div>
+      <div class="playlist-actions">
+        <button class="play-pill tap" id="album-play-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#2B1B14"><path d="M8 5v14l11-7z"/></svg>
+          <span>Слушать</span>
+        </button>
+      </div>
+      <ul id="album-tracks" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;"></ul>
+    </div>
+  </main>
+
+  <!-- ============ ARTIST (real metadata + photo + albums via /artist for youtube_music tracks; grouped fallback for other sources) ============ -->
+  <main class="screen" id="screen-artist" hidden>
+    <div class="subscreen-header">
+      <button class="glass round-glass-btn tap" id="artist-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="scroll-area" style="padding-top:0;">
+      <div class="artist-hero">
+        <div class="artist-avatar-lg" id="artist-avatar"></div>
+        <div class="playlist-hero-title" id="artist-name">Исполнитель</div>
+        <div class="playlist-hero-sub" id="artist-listeners">в Нотке</div>
+        <button class="glass artist-follow-btn tap" id="artist-follow-btn"><span id="artist-follow-label">Подписаться</span></button>
+      </div>
+      <div class="playlist-actions">
+        <button class="play-pill tap" id="artist-play-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#2B1B14"><path d="M8 5v14l11-7z"/></svg>
+          <span>Слушать</span>
+        </button>
+      </div>
+      <div class="section-label" style="padding-left:4px;">Популярное</div>
+      <ul id="artist-tracks" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;"></ul>
+      <div class="section-label" style="padding-left:4px;margin-top:10px;" id="artist-albums-label">Альбомы</div>
+      <div class="artist-albums-scroll" id="artist-albums"></div>
+      <div class="section-label" style="padding-left:4px;margin-top:10px;" id="artist-singles-label" hidden>Синглы и EP</div>
+      <div class="artist-albums-scroll" id="artist-singles" hidden></div>
+    </div>
+  </main>
+
+  <!-- ============ ADD TRACKS (search-to-add flow, backed by real backend search) ============ -->
+  <main class="screen" id="screen-add-tracks" hidden>
+    <div class="subscreen-header" style="padding-bottom:12px;">
+      <button class="glass round-glass-btn tap" id="add-tracks-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="subscreen-header-center"><div class="subscreen-header-value">Добавить треки</div></div>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="glass search-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="#F7F0EB" stroke-opacity="0.6" stroke-width="1.8"/><path d="M20 20l-4.3-4.3" stroke="#F7F0EB" stroke-opacity="0.6" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input id="add-tracks-search" type="text" inputmode="search" placeholder="Название трека или исполнитель" autocomplete="off" />
+    </div>
+    <div class="scroll-area">
+      <ul id="add-tracks-list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;"></ul>
+    </div>
+  </main>
+
+  <!-- ============ EDIT PLAYLIST ============ -->
+  <main class="screen" id="screen-edit-playlist" hidden>
+    <div class="subscreen-header" style="padding-bottom:12px;">
+      <button class="glass round-glass-btn tap" id="edit-playlist-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="subscreen-header-center"><div class="subscreen-header-value">Редактировать</div></div>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="scroll-area">
+      <div style="font-size:12.5px;color:var(--text-faint);padding:0 4px 10px 4px;">Нажми на трек, чтобы убрать его из плейлиста</div>
+      <ul id="edit-playlist-list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;"></ul>
+    </div>
+  </main>
+
+  <!-- ============ ACCOUNT ============ -->
+  <main class="screen" id="screen-account" hidden>
+    <div class="subscreen-header" style="padding-bottom:12px;">
+      <button class="glass round-glass-btn tap" id="account-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="subscreen-header-center"><div class="subscreen-header-value">Аккаунт</div></div>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="scroll-area">
+      <div class="profile-head" style="padding:6px 0 20px 0;">
+        <div style="position:relative;">
+          <div class="profile-avatar" id="account-avatar"><span id="account-initial">Н</span></div>
+          <button class="glass cover-edit-btn tap" id="account-avatar-edit-btn" aria-label="Изменить фото">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4 10-10 3 3-10 10-4 1Z" stroke="#F7F0EB" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="profile-name tap" id="account-name-row" style="display:flex;align-items:center;gap:8px;">
+          <span id="account-name">Гость</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4 10-10 3 3-10 10-4 1Z" stroke="#F7F0EB" stroke-opacity="0.6" stroke-width="1.5"/></svg>
+        </div>
+      </div>
+
+      <div class="glass" style="border-radius:18px;padding:16px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-family:'Unbounded',sans-serif;font-weight:700;font-size:14.5px;">Подписка</div>
+          <span id="account-plan-badge" style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:8px;background:rgba(247,240,235,0.12);color:var(--text);">Бесплатно</span>
+        </div>
+        <ul id="account-plan-benefits" style="margin:10px 0 0 0;padding-left:18px;font-size:12.5px;color:var(--text-dim);line-height:1.7;"></ul>
+        <button class="tap" id="account-upgrade-btn" style="margin-top:12px;width:100%;background:var(--accent);border:none;border-radius:12px;padding:11px 0;font-weight:700;font-size:13.5px;color:var(--ink);">Оформить Premium <span class="placeholder-tag">скоро</span></button>
+      </div>
+
+      <div class="glass menu-list" style="margin-bottom:16px;">
+        <button class="menu-row"><span>Статистика прослушивания</span><span class="placeholder-tag">скоро</span></button>
+        <button class="menu-row" id="account-sessions-row"><span>Активные сессии</span><span style="color:var(--text-dim);font-size:12.5px;" id="account-sessions-count">1</span></button>
+      </div>
+
+      <div class="glass menu-list" style="margin-bottom:16px;">
+        <div class="settings-row"><div class="settings-label">Показывать активность друзьям<div class="settings-sub">Кто вы, что слушаете</div></div><button class="switch-track tap" id="toggle-activity"><span class="switch-thumb"></span></button></div>
+        <div class="settings-row"><div class="settings-label">Публичные плейлисты<div class="settings-sub">Другие смогут находить их</div></div><button class="switch-track tap" id="toggle-public-playlists"><span class="switch-thumb"></span></button></div>
+      </div>
+
+      <button class="glass tap" id="account-invite-btn" style="width:100%;border-radius:16px;padding:14px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:13.5px;color:var(--accent);border:none;">Пригласить друзей</button>
+    </div>
+  </main>
+
+  <!-- ============ SOUND & DOWNLOADS ============ -->
+  <main class="screen" id="screen-sound" hidden>
+    <div class="subscreen-header" style="padding-bottom:12px;">
+      <button class="glass round-glass-btn tap" id="sound-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="subscreen-header-center"><div class="subscreen-header-value">Звук и загрузки</div></div>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="scroll-area">
+      <div class="section-label" style="padding-left:4px;">Качество звука <span class="placeholder-tag">переключение — скоро</span></div>
+      <div class="glass menu-list" style="margin-bottom:16px;">
+        <div class="settings-row"><div class="settings-label">Мобильная сеть<div class="settings-sub">Стандартное (128 kbps)</div></div></div>
+        <div class="settings-row"><div class="settings-label">Wi‑Fi<div class="settings-sub">Высокое (320 kbps)</div></div></div>
+      </div>
+      <div class="glass menu-list" style="margin-bottom:16px;">
+        <div class="settings-row"><div class="settings-label">Нормализация громкости</div><button class="switch-track tap" id="toggle-normalize"><span class="switch-thumb"></span></button></div>
+        <div class="settings-row"><div class="settings-label">Кроссфейд<div class="settings-sub" id="crossfade-value">0 сек</div></div></div>
+        <div style="padding:0 4px 14px 4px;"><input type="range" id="crossfade-slider" min="0" max="12" value="0" style="width:100%;accent-color:var(--accent);" /></div>
+        <div class="settings-row"><div class="settings-label">Загружать только по Wi‑Fi</div><button class="switch-track tap" id="toggle-wifi-only"><span class="switch-thumb"></span></button></div>
+      </div>
+      <div class="section-label" style="padding-left:4px;">Загрузки <span class="placeholder-tag">скоро</span></div>
+      <div class="glass" style="border-radius:16px;padding:14px;margin-bottom:16px;font-size:13px;color:var(--text-dim);">Занято 0 МБ · оффлайн-скачивание пока не подключено к реальному бэкенду.</div>
+    </div>
+  </main>
+
+  <!-- ============ NOTIFICATIONS (local, cosmetic — no real push backend yet) ============ -->
+  <main class="screen" id="screen-notifications" hidden>
+    <div class="subscreen-header" style="padding-bottom:12px;">
+      <button class="glass round-glass-btn tap" id="notifications-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="subscreen-header-center"><div class="subscreen-header-value">Уведомления</div></div>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="scroll-area">
+      <div id="notif-list"></div>
+      <div class="section-label" style="padding-left:4px;margin-top:6px;">Настройки</div>
+      <div class="glass menu-list" id="notif-settings-list"></div>
+    </div>
+  </main>
+
+  <!-- ============ ABOUT ============ -->
+  <main class="screen" id="screen-about" hidden>
+    <div class="subscreen-header" style="padding-bottom:12px;">
+      <button class="glass round-glass-btn tap" id="about-back-btn" aria-label="Назад">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#FFF7F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="scroll-area" style="text-align:center;">
+      <div class="logo-blob about-logo"></div>
+      <div style="font-family:'Unbounded',sans-serif;font-weight:700;font-size:18px;">Нотка</div>
+      <div style="font-size:12.5px;color:var(--text-faint);margin-top:4px;">Версия 1.0.0</div>
+      <p style="font-size:13.5px;color:var(--text-dim);line-height:1.6;margin-top:16px;text-align:left;">Нотка — музыкальный сервис прямо в Telegram, без лицензионных ограничений. Дизайн приложения был перенесён напрямую из финального прототипа, созданного в Claude.</p>
+      <div style="text-align:left;margin-top:10px;">
+        <div class="about-link-row"><span>Поддержка</span><span style="color:var(--accent);">@notka_support</span></div>
+        <div class="about-link-row"><span>Условия использования</span><span style="color:var(--accent);">→</span></div>
+        <div class="about-link-row"><span>Политика конфиденциальности</span><span style="color:var(--accent);">→</span></div>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-faint);margin-top:24px;padding-bottom:16px;">© Нотка</div>
+    </div>
+  </main>
+
+  <!-- ============ MODALS / SHEETS ============ -->
+  <div id="create-playlist-modal" class="modal-anim">
+    <div class="glass">
+      <div class="sheet-title">Новый плейлист</div>
+      <input id="create-playlist-input" class="modal-input" type="text" placeholder="Название плейлиста" maxlength="60" />
+      <div class="modal-btn-row">
+        <button class="modal-btn ghost tap" id="create-playlist-cancel">Отмена</button>
+        <button class="modal-btn primary tap" id="create-playlist-confirm">Создать</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="details-modal" class="modal-anim">
+    <div class="glass">
+      <div class="sheet-title">Название и описание</div>
+      <input id="details-name-input" class="modal-input" type="text" placeholder="Название" maxlength="60" style="margin-bottom:10px;" />
+      <input id="details-desc-input" class="modal-input" type="text" placeholder="Описание (необязательно)" maxlength="120" />
+      <div class="modal-btn-row">
+        <button class="modal-btn ghost tap" id="details-cancel">Отмена</button>
+        <button class="modal-btn primary tap" id="details-save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="account-name-modal" class="modal-anim">
+    <div class="glass">
+      <div class="sheet-title">Имя профиля</div>
+      <input id="account-name-input" class="modal-input" type="text" placeholder="Имя" maxlength="40" />
+      <div class="modal-btn-row">
+        <button class="modal-btn ghost tap" id="account-name-cancel">Отмена</button>
+        <button class="modal-btn primary tap" id="account-name-save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="share-modal" class="modal-anim">
+    <div class="glass" style="text-align:center;">
+      <div class="sheet-title" id="share-title" style="margin-bottom:14px;">Поделиться</div>
+      <button class="modal-btn ghost tap" id="share-copy-link" style="margin-bottom:10px;">Скопировать ссылку</button>
+      <button class="modal-btn ghost tap" id="share-close">Закрыть</button>
+    </div>
+  </div>
+
+  <div id="playlist-menu-sheet" class="sheet-anim">
+    <div class="glass">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div id="menu-playlist-cover" style="width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-soft));flex-shrink:0;"></div>
+        <div id="menu-playlist-title" style="font-weight:700;font-size:14.5px;">Плейлист</div>
+      </div>
+      <button class="sheet-row tap" id="menu-share">Поделиться</button>
+      <button class="sheet-row tap" id="menu-download"><span id="menu-download-label">Скачать</span><span class="placeholder-tag">скоро</span></button>
+      <button class="sheet-row tap" id="menu-addtracks">Добавить треки</button>
+      <button class="sheet-row tap" id="menu-editlist">Редактировать</button>
+      <button class="sheet-row tap" id="menu-details">Название и описание</button>
+      <button class="sheet-row danger tap" id="menu-delete">Удалить плейлист</button>
+    </div>
+  </div>
+
+  <div id="track-menu-sheet" class="sheet-anim">
+    <div class="glass">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div id="menu-track-cover" style="width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-soft));flex-shrink:0;"></div>
+        <div>
+          <div id="menu-track-title" style="font-weight:700;font-size:14.5px;">Трек</div>
+          <div id="menu-track-artist" style="font-size:12.5px;color:var(--text-dim);">Исполнитель</div>
+        </div>
+      </div>
+      <button class="sheet-row tap" id="menu-track-share">Поделиться</button>
+      <button class="sheet-row tap" id="menu-track-addplaylist">Добавить в плейлист</button>
+      <button class="sheet-row tap" id="menu-track-album-link">Перейти к альбому</button>
+      <button class="sheet-row tap" id="menu-track-artist-link">Перейти к исполнителю</button>
+    </div>
+  </div>
+
+  <div id="add-to-playlist-sheet" class="sheet-anim">
+    <div class="glass">
+      <div class="sheet-title">Добавить в плейлист</div>
+      <div id="add-to-playlist-list"></div>
+      <button class="sheet-row tap" id="add-to-playlist-new" style="color:var(--accent);font-weight:700;">＋ Новый плейлист</button>
+    </div>
+  </div>
+
+  <!-- ============ persistent mini player + bottom nav ============ -->
+  <button class="glass mini-player" id="mini-player" hidden>
+    <div class="mini-player-art" id="mp-art"></div>
+    <div class="mini-player-meta">
+      <div class="mini-player-title" id="mp-title">—</div>
+      <div class="mini-player-artist" id="mp-artist">—</div>
+    </div>
+    <div class="play-drop" id="mp-play-btn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="#2B1B14" id="mp-play-icon"><path d="M8 5v14l11-7z"/></svg>
+    </div>
+  </button>
+
+  <nav class="glass bottom-nav" id="bottom-nav">
+    <button class="nav-item active" data-tab="home">
+      <span class="glass-active nav-pill"></span>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M4 11.5 12 4l8 7.5" stroke="#FF7A2E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke="#FF7A2E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Главная</span>
+    </button>
+    <button class="nav-item" data-tab="search">
+      <span class="glass-active nav-pill"></span>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="#F7F0EB" stroke-opacity="0.5" stroke-width="1.8"/><path d="M20 20l-4.3-4.3" stroke="#F7F0EB" stroke-opacity="0.5" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>Поиск</span>
+    </button>
+    <button class="nav-item" data-tab="library">
+      <span class="glass-active nav-pill"></span>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="4.2" rx="1.4" stroke="#F7F0EB" stroke-opacity="0.5" stroke-width="1.6"/><rect x="4" y="10.5" width="16" height="4.2" rx="1.4" stroke="#F7F0EB" stroke-opacity="0.5" stroke-width="1.6"/><rect x="4" y="17" width="10" height="4.2" rx="1.4" stroke="#F7F0EB" stroke-opacity="0.5" stroke-width="1.6"/></svg>
+      <span>Библиотека</span>
+    </button>
+    <button class="nav-item" data-tab="profile">
+      <span class="glass-active nav-pill"></span>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.4" stroke="#F7F0EB" stroke-opacity="0.5" stroke-width="1.8"/><path d="M5 20c1-3.5 4-5.5 7-5.5s6 2 7 5.5" stroke="#F7F0EB" stroke-opacity="0.5" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>Профиль</span>
+    </button>
+  </nav>
+
+</div>
+
+<audio id="audio" preload="none"></audio>
+<input type="file" accept="image/*" id="avatar-file-input" style="display:none;">
+
+<script src="config.js"></script>
+<script src="app.js?v=8"></script>
+</body>
+</html>

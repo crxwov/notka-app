@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0C0A12" />
+<title>Нотка</title>
+<link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
+<!-- Telegram's embedded webview (especially Telegram Desktop) caches
+     the Mini App's static files very aggressively and often keeps
+     serving an old styles.css/app.js even after the server files
+     change and the app is closed and reopened — the "?v=" query
+     string forces it to fetch the real, current file. Bump this
+     number (or just change it) every time styles.css or app.js is
+     edited, otherwise Telegram may keep showing the old version. -->
+<link rel="stylesheet" href="styles.css?v=33" />
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body data-screen="splash">
+
+<!-- ============ icon sprite ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="g-orb" cx="50%" cy="50%" r="50%">
+      <stop offset="0" style="stop-color: var(--c-core)"/>
+      <stop offset="0.3" style="stop-color: var(--c-warm)"/>
+      <stop offset="0.68" style="stop-color: var(--c-mid)"/>
+      <stop offset="1" style="stop-color: var(--c-deep)"/>
+    </radialGradient>
+    <radialGradient id="g-halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" style="stop-color: var(--c-warm); stop-opacity: 0.55"/>
+      <stop offset="0.55" style="stop-color: var(--c-mid); stop-opacity: 0.22"/>
+      <stop offset="1" style="stop-color: var(--c-deep); stop-opacity: 0"/>
+    </radialGradient>
+  </defs>
+  <symbol id="logo-note" viewBox="0 0 24 24">
+    <circle cx="9" cy="16.6" r="7.4" fill="url(#g-halo)"/>
+    <circle cx="9" cy="16.6" r="4.6" fill="url(#g-orb)"/>
+    <path d="M13.6 16.6V3.4c2.6.5 5.2 2.2 5.9 5.6" fill="none" stroke="#F4EFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.6 12 4l8 6.6V19a1 1 0 0 1-1 1h-4.2v-5.4H9.2V20H5a1 1 0 0 1-1-1v-8.4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m20 20-4.2-4.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-library" viewBox="0 0 24 24"><rect x="4" y="4" width="4.2" height="16" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="10.4" y="4" width="4.2" height="16" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m17.2 5.2 3.1 14.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5.5 8.5 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M5.5 9 12 15.5 18.5 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18.5" cy="12" r="1.7" fill="currentColor"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.2s-7.6-4.5-9.6-9.3C1 7.6 3 4.4 6.4 4.4c2.1 0 3.6 1.2 4.4 2.6h2.4c.8-1.4 2.3-2.6 4.4-2.6 3.4 0 5.4 3.2 4 6.5-2 4.8-9.6 9.3-9.6 9.3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-heart-fill" viewBox="0 0 24 24"><path d="M12 20.2s-7.6-4.5-9.6-9.3C1 7.6 3 4.4 6.4 4.4c2.1 0 3.6 1.2 4.4 2.6h2.4c.8-1.4 2.3-2.6 4.4-2.6 3.4 0 5.4 3.2 4 6.5-2 4.8-9.6 9.3-9.6 9.3Z" fill="currentColor"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.6v12.8c0 .8.9 1.3 1.6.9l10-6.4a1.05 1.05 0 0 0 0-1.8l-10-6.4c-.7-.4-1.6.1-1.6.9Z" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.2" y="5" width="4" height="14" rx="1.3" fill="currentColor"/><rect x="13.8" y="5" width="4" height="14" rx="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><rect x="4.5" y="5" width="2.4" height="14" rx="1.1" fill="currentColor"/><path d="M19.5 6.3v11.4c0 .8-.9 1.3-1.6.8l-8.7-5.7a1 1 0 0 1 0-1.6l8.7-5.7c.7-.5 1.6 0 1.6.8Z" fill="currentColor"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><rect x="17.1" y="5" width="2.4" height="14" rx="1.1" fill="currentColor"/><path d="M4.5 6.3v11.4c0 .8.9 1.3 1.6.8l8.7-5.7a1 1 0 0 0 0-1.6L6.1 5.5c-.7-.5-1.6 0-1.6.8Z" fill="currentColor"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 6.5h11M4 12h11M4 17.5h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17.5 13.5v5.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="19.3" r="1.9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M17.5 13.5c1.3 0 2.5.6 2.5 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M3.5 7h3c1.5 0 2.4.6 3.2 1.8l4.6 6.4c.8 1.2 1.7 1.8 3.2 1.8h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3.5 17h3c1.5 0 2.4-.6 3.2-1.8M14.3 8.8c.8-1.2 1.7-1.8 3.2-1.8h3M18 4.5 20.5 7 18 9.5M18 14.5l2.5 2.5-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 3.5 19.5 6 17 8.5M19.5 6H8a4.5 4.5 0 0 0-4.5 4.5v.5M7 20.5 4.5 18 7 15.5M4.5 18H16a4.5 4.5 0 0 0 4.5-4.5V13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 14.5V4M8 7.5l4-3.8 4 3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 11H6.3A1.8 1.8 0 0 0 4.5 12.8v5.4A1.8 1.8 0 0 0 6.3 20h11.4a1.8 1.8 0 0 0 1.8-1.8v-5.4a1.8 1.8 0 0 0-1.8-1.8h-1.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-playlist-add" viewBox="0 0 24 24"><path d="M4 6.5h12M4 12h12M4 17.5h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M18 14v7M14.5 17.5h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.1-3.6 3.8-5.6 7-5.6s5.9 2 7 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.3 6.3 0 0 0 10.1 10.1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cast" viewBox="0 0 24 24"><path d="M4 15.5V6.8A1.8 1.8 0 0 1 5.8 5h12.4A1.8 1.8 0 0 1 20 6.8v8.4a1.8 1.8 0 0 1-1.8 1.8H16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 19.5h.01M4 16.7a2.8 2.8 0 0 1 2.8 2.8M4 13.8a5.7 5.7 0 0 1 5.7 5.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.1-3.6 3.8-5.6 7-5.6s5.9 2 7 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 3.8a5.3 5.3 0 0 0-5.3 5.3v3.1c0 .7-.2 1.3-.6 1.8L5 15.6h14l-1.1-1.6c-.4-.5-.6-1.1-.6-1.8V9.1A5.3 5.3 0 0 0 12 3.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 18.6a2.1 2.1 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v5.4M12 7.8v.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 20.5H6a1.8 1.8 0 0 1-1.8-1.8V5.3A1.8 1.8 0 0 1 6 3.5h3.5M15.5 16.5 20 12l-4.5-4.5M20 12H9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4.5 19.5 1-4.2L15.7 5.1a1.9 1.9 0 0 1 2.7 0l.5.5a1.9 1.9 0 0 1 0 2.7L8.7 18.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 6.5h15M9.5 6.5V4.8c0-.5.4-.8.8-.8h3.4c.4 0 .8.3.8.8v1.7M6.5 6.5l.9 12.2c.1.9.8 1.6 1.7 1.6h5.8c.9 0 1.6-.7 1.7-1.6l.9-12.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.8 12 15.3l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<!-- ============ the light: one living orb behind every screen ============ -->
+<div class="light" id="light" aria-hidden="true">
+  <div class="light-art" id="light-art"></div>
+  <div class="light-group">
+    <div class="orb orb-violet"></div>
+    <div class="orb orb-magenta"></div>
+    <div class="orb orb-orange"></div>
+    <div class="orb orb-rim"></div>
+    <div class="orb orb-rim-b"></div>
+    <div class="orb orb-core"></div>
+  </div>
+  <div class="light-spill"></div>
+  <div class="light-grain"></div>
+</div>
+
+<div class="app" id="app">
+
+  <!-- ============ SPLASH ============ -->
+  <main class="screen screen-splash" id="screen-splash" aria-label="Нотка загружается">
+    <div class="splash-center">
+      <span class="splash-mark glass-note" aria-hidden="true"><i class="gn-body"></i><i class="gn-shine"></i><svg class="gn-rim" viewBox="0 0 24 24"><defs><linearGradient id="gn-rim-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset="0.45" stop-color="#fff" stop-opacity="0.25"/><stop offset="0.8" stop-color="#fff" stop-opacity="0.15"/><stop offset="1" stop-color="#fff" stop-opacity="0.7"/></linearGradient><mask id="gn-rim-m" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><circle cx="8.8" cy="16.4" r="5" fill="#fff"/><path d="M13.8 16.4V3.3c2.7.5 5.3 2.3 6 5.8" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8.8" cy="16.4" r="4.55" fill="#000"/><path d="M13.8 16.4V3.3c2.7.5 5.3 2.3 6 5.8" fill="none" stroke="#000" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><rect width="24" height="24" fill="url(#gn-rim-g)" mask="url(#gn-rim-m)"/></svg></span>
+      <p class="splash-word">Нотка</p>
+    </div>
+  </main>
+
+  <!-- ============ ONBOARDING ============ -->
+  <main class="screen screen-onboarding" id="screen-onboarding" hidden>
+    <div class="onb-stage"></div>
+    <div class="onb-body">
+      <svg class="onb-mark" width="56" height="56" aria-hidden="true"><use href="#logo-note"/></svg>
+      <h1 class="onb-title">Слушай без границ</h1>
+      <p class="onb-text">Музыка прямо в Telegram, без отдельного приложения. Отмечай треки сердцем и собирай плейлисты. Всё хранится на этом устройстве.</p>
+      <button class="pill-btn pill-primary onb-start" id="onb-start-btn" type="button">Начать</button>
+    </div>
+  </main>
+
+  <!-- ============ HOME ============ -->
+  <main class="screen tab-screen" id="screen-home" hidden>
+    <header class="home-top">
+      <div class="brand">
+        <svg width="34" height="34" aria-hidden="true"><use href="#logo-note"/></svg>
+        <span>Нотка</span>
+      </div>
+      <button class="avatar-btn" id="home-avatar-btn" type="button" aria-label="Профиль">
+        <span class="avatar avatar-sm" id="home-avatar"><span id="home-initial">Н</span></span>
+      </button>
+    </header>
+
+    <p class="home-greet" id="home-greeting">Привет!</p>
+
+    <section class="mix-hero" id="mymix-card">
+      <button class="mix-play-xl" id="mymix-play-btn" type="button" aria-label="Включить «Мой микс»">
+        <span class="mix-ring" aria-hidden="true"></span>
+        <span class="mix-ring mix-ring-2" aria-hidden="true"></span>
+        <svg class="ic-play" width="38" height="38" aria-hidden="true"><use href="#i-play"/></svg>
+        <svg class="ic-pause" width="36" height="36" aria-hidden="true"><use href="#i-pause"/></svg>
+      </button>
+      <button class="mix-title-btn" id="mymix-open-btn" type="button">
+        <h1 class="mix-title">Мой микс</h1>
+        <span class="mix-sub" id="mymix-sub">Из твоих любимых треков</span>
+      </button>
+    </section>
+
+    <button class="field field-btn" id="home-search-btn" type="button">
+      <svg width="20" height="20" aria-hidden="true"><use href="#i-search"/></svg>
+      <span>Трек, исполнитель или альбом</span>
+    </button>
+
+    <section class="block">
+      <div class="block-head">
+        <h2 class="h2">Любимые треки</h2>
+        <button class="text-btn" id="home-see-all-favorites" type="button">Все</button>
+      </div>
+      <ul class="track-list" id="home-favorites-list"></ul>
+      <p class="empty-note" id="home-favorites-empty">Здесь появятся треки, которые ты отметишь сердцем. Начни с поиска.</p>
+    </section>
+  </main>
+
+  <!-- ============ SEARCH ============ -->
+  <main class="screen tab-screen" id="screen-search" hidden>
+    <div class="search-head">
+      <h1 class="display">Поиск</h1>
+      <label class="field">
+        <svg width="20" height="20" aria-hidden="true"><use href="#i-search"/></svg>
+        <input id="search-input" type="search" inputmode="search" enterkeyhint="search" placeholder="Трек, исполнитель или альбом" autocomplete="off" aria-label="Поиск" />
+        <button id="search-clear" class="icon-btn icon-btn-sm field-clear" type="button" aria-label="Очистить" hidden>
+          <svg width="18" height="18" aria-hidden="true"><use href="#i-close"/></svg>
+        </button>
+      </label>
+      <div class="chips" id="search-tabs" role="tablist" aria-label="Что искать">
+        <button class="chip active" type="button" role="tab" aria-selected="true" data-tab="all">Все</button>
+        <button class="chip" type="button" role="tab" aria-selected="false" data-tab="tracks">Треки</button>
+        <button class="chip" type="button" role="tab" aria-selected="false" data-tab="artists">Исполнители</button>
+        <button class="chip" type="button" role="tab" aria-selected="false" data-tab="albums">Альбомы</button>
+      </div>
+    </div>
+
+    <div class="search-body">
+      <div id="search-state-empty" class="state">
+        <span class="state-orb" aria-hidden="true"></span>
+        <p class="state-title">Ищи что угодно</p>
+        <p class="state-sub">Треки, исполнители и альбомы в одном поле</p>
+      </div>
+
+      <div id="search-state-loading" class="state state-loading" hidden>
+        <span class="pulse-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <p class="state-sub">Ищем…</p>
+      </div>
+
+      <div id="search-state-empty-results" class="state" hidden>
+        <p class="state-title">Ничего не нашлось</p>
+        <p class="state-sub">Попробуй другой запрос или проверь написание</p>
+      </div>
+
+      <div id="search-state-error" class="state" hidden>
+        <p class="state-title">Поиск не ответил</p>
+        <p class="state-sub">Похоже, нет связи с Ноткой. Проверь интернет и попробуй ещё раз.</p>
+        <button class="pill-btn pill-quiet" id="search-retry-btn" type="button">Повторить</button>
+      </div>
+
+      <div id="search-state-results" hidden></div>
+    </div>
+  </main>
+
+  <!-- ============ LIBRARY («Моё») ============ -->
+  <main class="screen tab-screen" id="screen-library" hidden>
+    <h1 class="display page-title">Моё</h1>
+
+    <button class="list-row list-row-lg" id="open-favorites-btn" type="button">
+      <span class="cover cover-md cover-fav" aria-hidden="true"><svg width="26" height="26"><use href="#i-heart-fill"/></svg></span>
+      <span class="row-meta">
+        <span class="row-title">Любимые треки</span>
+        <span class="row-sub" id="library-fav-count">0 треков</span>
+      </span>
+      <svg class="row-chevron" width="20" height="20" aria-hidden="true"><use href="#i-chevron"/></svg>
+    </button>
+
+    <section class="block">
+      <div class="block-head">
+        <h2 class="h2">Плейлисты</h2>
+        <button class="text-btn text-btn-icon" id="create-playlist-btn" type="button">
+          <svg width="18" height="18" aria-hidden="true"><use href="#i-plus"/></svg>Создать
+        </button>
+      </div>
+      <div class="empty-inline" id="playlists-empty-msg" hidden>
+        <p class="empty-note">Плейлистов пока нет. Собери первый из поиска или прямо здесь.</p>
+        <button class="pill-btn pill-primary" id="create-playlist-empty-btn" type="button">Создать плейлист</button>
+      </div>
+      <div class="playlist-grid" id="playlists-grid"></div>
+    </section>
+
+    <section class="block" id="follows-block" hidden>
+      <div class="block-head"><h2 class="h2">Подписки</h2></div>
+      <div class="shelf shelf-artists" id="follows-shelf"></div>
+    </section>
+  </main>
+
+  <!-- ============ FAVORITES ============ -->
+  <main class="screen" id="screen-favorites" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="favorites-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+    <div class="hero">
+      <span class="cover cover-lg cover-fav" aria-hidden="true"><svg width="64" height="64"><use href="#i-heart-fill"/></svg></span>
+      <h1 class="hero-title">Любимые треки</h1>
+      <p class="hero-sub" id="favorites-count">0 треков</p>
+      <div class="hero-actions">
+        <button class="pill-btn pill-primary play-src" id="favorites-play-btn" type="button"><svg class="ic-play" width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic-pause" width="18" height="18" aria-hidden="true"><use href="#i-pause"/></svg><span class="pill-label">Слушать</span></button>
+        <button class="pill-btn pill-quiet" id="favorites-shuffle-btn" type="button" aria-pressed="false"><svg width="18" height="18" aria-hidden="true"><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
+      </div>
+    </div>
+    <ul class="track-list" id="favorites-list"></ul>
+    <p class="empty-note empty-center" id="favorites-empty">Пока пусто. Нажми «…» у трека и выбери «В любимое», и он появится здесь.</p>
+  </main>
+
+  <!-- ============ PLAYLIST ============ -->
+  <main class="screen" id="screen-playlist" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="playlist-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <div class="bar-end">
+        <button class="round-btn round-glass" id="playlist-heart-btn" type="button" aria-label="В избранные плейлисты" aria-pressed="false">
+          <svg class="ic-off" width="20" height="20" aria-hidden="true"><use href="#i-heart"/></svg>
+          <svg class="ic-on" width="20" height="20" aria-hidden="true"><use href="#i-heart-fill"/></svg>
+        </button>
+        <button class="round-btn round-glass" id="playlist-menu-btn" type="button" aria-label="Действия с плейлистом"><svg width="22" height="22" aria-hidden="true"><use href="#i-more"/></svg></button>
+      </div>
+    </header>
+    <div class="hero">
+      <div class="cover-edit-wrap">
+        <span class="cover cover-lg" id="playlist-cover"></span>
+        <button class="round-btn round-glass cover-edit" id="playlist-cover-edit-btn" type="button" aria-label="Изменить обложку"><svg width="18" height="18" aria-hidden="true"><use href="#i-edit"/></svg></button>
+      </div>
+      <h1 class="hero-title" id="playlist-title">Плейлист</h1>
+      <p class="hero-sub" id="playlist-sub">0 треков</p>
+      <div class="hero-actions">
+        <button class="pill-btn pill-primary play-src" id="playlist-play-btn" type="button"><svg class="ic-play" width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic-pause" width="18" height="18" aria-hidden="true"><use href="#i-pause"/></svg><span class="pill-label">Слушать</span></button>
+        <button class="pill-btn pill-quiet" id="playlist-shuffle-btn" type="button" aria-pressed="false"><svg width="18" height="18" aria-hidden="true"><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
+      </div>
+    </div>
+    <ul class="track-list" id="playlist-tracks-list"></ul>
+    <div class="empty-inline empty-center" id="playlist-empty">
+      <p class="empty-note">В плейлисте пока нет треков.</p>
+      <button class="pill-btn pill-quiet" id="playlist-empty-add-btn" type="button">Добавить треки</button>
+    </div>
+  </main>
+
+  <!-- ============ ALBUM ============ -->
+  <main class="screen" id="screen-album" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="album-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+    <div class="hero">
+      <span class="cover cover-lg" id="album-cover"></span>
+      <h1 class="hero-title" id="album-title">Альбом</h1>
+      <button class="text-btn hero-link" id="album-artist-link" type="button">Исполнитель</button>
+      <p class="hero-sub" id="album-meta">Альбом</p>
+      <div class="hero-actions">
+        <button class="pill-btn pill-primary play-src" id="album-play-btn" type="button"><svg class="ic-play" width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic-pause" width="18" height="18" aria-hidden="true"><use href="#i-pause"/></svg><span class="pill-label">Слушать</span></button>
+      </div>
+    </div>
+    <ul class="track-list" id="album-tracks"></ul>
+  </main>
+
+  <!-- ============ ARTIST ============ -->
+  <main class="screen" id="screen-artist" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="artist-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+    <div class="hero">
+      <span class="cover cover-lg cover-round" id="artist-avatar"></span>
+      <h1 class="hero-title" id="artist-name">Исполнитель</h1>
+      <p class="hero-sub" id="artist-listeners">в Нотке</p>
+      <div class="hero-actions">
+        <button class="pill-btn pill-primary play-src" id="artist-play-btn" type="button"><svg class="ic-play" width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic-pause" width="18" height="18" aria-hidden="true"><use href="#i-pause"/></svg><span class="pill-label">Слушать</span></button>
+        <button class="pill-btn pill-quiet" id="artist-follow-btn" type="button" aria-pressed="false"><span id="artist-follow-label">Подписаться</span></button>
+      </div>
+    </div>
+    <section class="block">
+      <h2 class="h2 block-title">Популярное</h2>
+      <ul class="track-list" id="artist-tracks"></ul>
+    </section>
+    <section class="block">
+      <h2 class="h2 block-title" id="artist-albums-label">Альбомы</h2>
+      <div class="shelf" id="artist-albums"></div>
+    </section>
+    <section class="block">
+      <h2 class="h2 block-title" id="artist-singles-label" hidden>Синглы и EP</h2>
+      <div class="shelf" id="artist-singles" hidden></div>
+    </section>
+  </main>
+
+  <!-- ============ ADD TRACKS ============ -->
+  <main class="screen" id="screen-add-tracks" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="add-tracks-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <div class="bar-title">Добавить треки</div>
+      <span class="bar-spacer"></span>
+    </header>
+    <label class="field">
+      <svg width="20" height="20" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="add-tracks-search" type="search" inputmode="search" enterkeyhint="search" placeholder="Трек или исполнитель" autocomplete="off" aria-label="Найти трек для плейлиста" />
+    </label>
+    <ul class="track-list" id="add-tracks-list"></ul>
+  </main>
+
+  <!-- ============ EDIT PLAYLIST ============ -->
+  <main class="screen" id="screen-edit-playlist" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="edit-playlist-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <div class="bar-title">Редактировать</div>
+      <span class="bar-spacer"></span>
+    </header>
+    <p class="hint">Удерживай трек и опусти его в щель внизу — он исчезнет из плейлиста. Вверх или вниз — поменять порядок.</p>
+    <div class="edit-shredder" id="edit-playlist-list"></div>
+    <p class="empty-note empty-center" id="edit-playlist-empty" hidden>В плейлисте пока нет треков</p>
+  </main>
+
+  <!-- ============ PROFILE ============ -->
+  <main class="screen" id="screen-profile" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="profile-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+    <div class="hero hero-profile">
+      <span class="avatar avatar-lg" id="profile-avatar-btn"><span id="profile-initial">Н</span></span>
+      <h1 class="hero-title" id="profile-name">Гость</h1>
+      <p class="hero-sub" id="profile-sub">Вход через Telegram</p>
+    </div>
+    <div class="group">
+      <button class="group-row" id="menu-account" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-user"/></svg><span class="group-label">Аккаунт</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-sound" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-sound"/></svg><span class="group-label">Звук и загрузки</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-notifications" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-bell"/></svg><span class="group-label">Уведомления</span><span class="count-badge" id="profile-notif-badge" hidden></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-about" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg><span class="group-label">О Нотке</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+    </div>
+    <div class="group">
+      <button class="group-row group-row-quiet" id="menu-logout" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-logout"/></svg><span class="group-label">Выйти</span></button>
+    </div>
+  </main>
+
+  <!-- ============ ACCOUNT ============ -->
+  <main class="screen" id="screen-account" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="account-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <div class="bar-title">Аккаунт</div>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="hero hero-profile">
+      <div class="cover-edit-wrap">
+        <span class="avatar avatar-lg" id="account-avatar"><span id="account-initial">Н</span></span>
+        <button class="round-btn round-glass cover-edit" id="account-avatar-edit-btn" type="button" aria-label="Изменить фото"><svg width="18" height="18" aria-hidden="true"><use href="#i-edit"/></svg></button>
+      </div>
+      <button class="text-btn hero-name-btn" id="account-name-row" type="button">
+        <span id="account-name">Гость</span>
+        <svg width="18" height="18" aria-hidden="true"><use href="#i-edit"/></svg>
+      </button>
+    </div>
+
+    <div class="group plan">
+      <div class="plan-head">
+        <span class="plan-title">Подписка</span>
+        <span class="tag" id="account-plan-badge">Бесплатно</span>
+      </div>
+      <ul class="plan-list" id="account-plan-benefits"></ul>
+      <button class="pill-btn pill-quiet pill-block" id="account-upgrade-btn" type="button">Оформить Premium <span class="tag tag-soon">скоро</span></button>
+    </div>
+
+    <div class="group">
+      <button class="group-row" id="account-stats-row" type="button"><span class="group-label">Статистика прослушивания</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <div class="group-row" id="account-sessions-row"><span class="group-label">Где открыта Нотка<span class="group-sub">Любимое и плейлисты хранятся на этом устройстве</span></span><span class="group-value" id="account-sessions-count">—</span></div>
+    </div>
+
+    <div class="group">
+      <div class="group-row">
+        <span class="group-label">Показывать активность друзьям <span class="tag tag-soon">скоро</span><span class="group-sub">Что ты сейчас слушаешь</span></span>
+        <button class="switch" id="toggle-activity" type="button" role="switch" aria-checked="false" aria-label="Показывать активность друзьям" disabled><span></span></button>
+      </div>
+      <div class="group-row">
+        <span class="group-label">Публичные плейлисты <span class="tag tag-soon">скоро</span><span class="group-sub">Другие смогут находить их</span></span>
+        <button class="switch" id="toggle-public-playlists" type="button" role="switch" aria-checked="false" aria-label="Публичные плейлисты" disabled><span></span></button>
+      </div>
+    </div>
+
+    <button class="pill-btn pill-quiet pill-block" id="account-invite-btn" type="button">Пригласить друзей</button>
+  </main>
+
+  <!-- ============ STATISTICS ============ -->
+  <main class="screen" id="screen-stats" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="stats-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <div class="bar-title">Статистика</div>
+      <span class="bar-spacer"></span>
+    </header>
+    <p class="stats-lede" id="stats-lede">Послушай пару треков — и здесь появится твоя статистика.</p>
+    <div id="stats-body" hidden>
+      <h2 class="group-caption">Кого ты слушаешь</h2>
+      <div class="group" id="stats-top-artists"></div>
+      <h2 class="group-caption">Чаще всего</h2>
+      <ul class="track-list" id="stats-top-tracks"></ul>
+    </div>
+    <p class="fineprint">Считается на этом устройстве</p>
+  </main>
+
+  <!-- ============ SOUND ============ -->
+  <main class="screen" id="screen-sound" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="sound-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <div class="bar-title">Звук и загрузки</div>
+      <span class="bar-spacer"></span>
+    </header>
+    <h2 class="group-caption">Качество звука <span class="tag tag-soon">переключение — скоро</span></h2>
+    <div class="group">
+      <div class="group-row"><span class="group-label">Мобильная сеть<span class="group-sub">Стандартное (128 kbps)</span></span></div>
+      <div class="group-row"><span class="group-label">Wi‑Fi<span class="group-sub">Высокое (320 kbps)</span></span></div>
+    </div>
+    <div class="group">
+      <div class="group-row">
+        <span class="group-label">Нормализация громкости <span class="tag tag-soon">скоро</span></span>
+        <button class="switch" id="toggle-normalize" type="button" role="switch" aria-checked="false" aria-label="Нормализация громкости" disabled><span></span></button>
+      </div>
+      <div class="group-row group-row-stack">
+        <span class="group-label">Плавный переход<span class="group-sub" id="crossfade-value">Выключен</span></span>
+        <input type="range" class="range" id="crossfade-slider" min="0" max="12" value="0" aria-label="Плавный переход, секунды" />
+        <span class="group-sub" id="crossfade-note">Трек мягко затухает в конце и появляется в начале.</span>
+      </div>
+    </div>
+    <h2 class="group-caption">Загрузки</h2>
+    <div class="group"><p class="group-note">Чтобы сохранить трек на устройство, нажми «…» у трека → «Скачать». Плейлист целиком — «…» в плейлисте → «Скачать все треки». Файлы попадают в загрузки телефона.</p></div>
+  </main>
+
+  <!-- ============ NOTIFICATIONS ============ -->
+  <main class="screen" id="screen-notifications" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="notifications-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <div class="bar-title">Уведомления</div>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="group" id="notif-list"></div>
+    <h2 class="group-caption">Сообщения от бота <span class="tag tag-soon">скоро</span></h2>
+    <div class="group" id="notif-settings-list"></div>
+  </main>
+
+  <!-- ============ ABOUT ============ -->
+  <main class="screen" id="screen-about" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="about-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+    <div class="hero">
+      <span class="about-mark" aria-hidden="true"><svg width="72" height="72"><use href="#logo-note"/></svg></span>
+      <h1 class="hero-title">Нотка</h1>
+      <p class="hero-sub">Версия 1.0.0</p>
+    </div>
+    <p class="about-text">Нотка — музыкальный сервис прямо в Telegram, без лицензионных ограничений. Дизайн приложения был перенесён напрямую из финального прототипа, созданного в Claude.</p>
+    <div class="group">
+      <div class="group-row"><span class="group-label">Поддержка</span><span class="group-value group-value-accent">@notka_support</span></div>
+      <div class="group-row"><span class="group-label">Условия использования</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></div>
+      <div class="group-row"><span class="group-label">Политика конфиденциальности</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></div>
+    </div>
+    <p class="fineprint">© Нотка</p>
+  </main>
+
+  <!-- ============ FULL-SCREEN PLAYER ============ -->
+  <main class="screen screen-player" id="screen-player" hidden>
+    <canvas class="player-prism" id="player-prism" aria-hidden="true"></canvas>
+    <header class="player-bar">
+      <button class="round-btn round-glass" id="player-back-btn" type="button" aria-label="Свернуть плеер"><svg width="22" height="22" aria-hidden="true"><use href="#i-down"/></svg></button>
+      <div class="player-context">
+        <span class="player-context-value" id="player-context">Нотка</span>
+      </div>
+      <button class="round-btn round-glass" id="player-more-btn" type="button" aria-label="Действия с треком"><svg width="22" height="22" aria-hidden="true"><use href="#i-more"/></svg></button>
+    </header>
+
+    <div class="player-art-wrap">
+      <span class="cover player-art" id="player-art"></span>
+    </div>
+
+    <div class="player-meta">
+      <div class="player-meta-text">
+        <h1 class="player-title" id="player-title">—</h1>
+        <p class="player-artist" id="player-artist">—</p>
+      </div>
+      <button class="icon-btn fav-btn" id="player-fav-btn" type="button" aria-label="В любимое" aria-pressed="false">
+        <svg class="ic-off" width="26" height="26" aria-hidden="true"><use href="#i-heart"/></svg>
+        <svg class="ic-on" width="26" height="26" aria-hidden="true"><use href="#i-heart-fill"/></svg>
+      </button>
+    </div>
+
+    <div class="scrub" id="player-progress-track" role="slider" aria-label="Позиция в треке" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+      <div class="scrub-rail">
+        <div class="scrub-fill" id="player-progress-fill" style="width:0%"></div>
+      </div>
+      <div class="scrub-thumb" id="player-progress-thumb" style="left:0%"></div>
+    </div>
+    <div class="scrub-times">
+      <span id="player-time-current">0:00</span><span id="player-time-total">0:00</span>
+    </div>
+
+    <div class="player-controls">
+      <button class="round-btn round-glass ctrl" id="player-prev-btn" type="button" aria-label="Предыдущий трек"><svg width="26" height="26" aria-hidden="true"><use href="#i-prev"/></svg></button>
+      <button class="round-btn round-light ctrl-play" id="player-play-btn" type="button" aria-label="Включить">
+        <svg class="ic-play" width="32" height="32" aria-hidden="true"><use href="#i-play"/></svg>
+        <svg class="ic-pause" width="32" height="32" aria-hidden="true"><use href="#i-pause"/></svg>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+      <button class="round-btn round-glass ctrl" id="player-next-btn" type="button" aria-label="Следующий трек"><svg width="26" height="26" aria-hidden="true"><use href="#i-next"/></svg></button>
+    </div>
+
+    <div class="player-foot">
+      <button class="text-btn text-btn-icon player-queue-btn" id="player-queue-btn" type="button">
+        <svg width="20" height="20" aria-hidden="true"><use href="#i-queue"/></svg>Очередь
+      </button>
+    </div>
+  </main>
+
+  <!-- ============ mini player + tab bar ============ -->
+  <div class="mini-player glass" id="mini-player" hidden>
+    <button class="mini-main" id="mini-open-btn" type="button" aria-label="Открыть плеер">
+      <span class="cover cover-xs" id="mp-art"></span>
+      <span class="mini-meta">
+        <span class="mini-title" id="mp-title">—</span>
+        <span class="mini-artist" id="mp-artist">—</span>
+      </span>
+    </button>
+    <button class="round-btn round-light mini-play" id="mp-play-btn" type="button" aria-label="Включить">
+      <svg class="ic-play" width="20" height="20" aria-hidden="true"><use href="#i-play"/></svg>
+      <svg class="ic-pause" width="20" height="20" aria-hidden="true"><use href="#i-pause"/></svg>
+      <span class="spinner" aria-hidden="true"></span>
+    </button>
+    <span class="mini-progress" aria-hidden="true"><span id="mp-progress"></span></span>
+  </div>
+
+  <nav class="tabbar glass" id="bottom-nav" aria-label="Разделы">
+    <button class="tab active" type="button" data-tab="home" aria-current="page"><svg width="24" height="24" aria-hidden="true"><use href="#i-home"/></svg><span>Главная</span></button>
+    <button class="tab" type="button" data-tab="search"><svg width="24" height="24" aria-hidden="true"><use href="#i-search"/></svg><span>Поиск</span></button>
+    <button class="tab" type="button" data-tab="library"><svg width="24" height="24" aria-hidden="true"><use href="#i-library"/></svg><span>Моё</span></button>
+  </nav>
+
+  <!-- ============ SHEETS / MODALS ============ -->
+  <div id="track-menu-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="menu-track-title">
+    <div class="sheet">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <div class="sheet-head">
+        <span class="cover cover-sm" id="menu-track-cover"></span>
+        <span class="row-meta">
+          <span class="row-title" id="menu-track-title">Трек</span>
+          <span class="row-sub" id="menu-track-artist">Исполнитель</span>
+        </span>
+      </div>
+      <button class="sheet-row" id="menu-track-fav" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-heart"/></svg><span id="menu-track-fav-label">В любимое</span></button>
+      <button class="sheet-row" id="menu-track-addplaylist" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-playlist-add"/></svg><span>Добавить в плейлист</span></button>
+      <button class="sheet-row" id="menu-track-share" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-share"/></svg><span>Поделиться</span></button>
+      <button class="sheet-row" id="menu-track-download" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-download"/></svg><span>Скачать</span></button>
+      <button class="sheet-row" id="menu-track-album-link" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-disc"/></svg><span>Перейти к альбому</span></button>
+      <button class="sheet-row" id="menu-track-artist-link" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-mic"/></svg><span>Перейти к исполнителю</span></button>
+      <div class="player-only" id="menu-player-extras">
+        <button class="sheet-row" id="player-sleep-btn" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-moon"/></svg><span>Таймер сна</span><span class="tag" id="sleep-row-status" hidden></span></button>
+      </div>
+      <button class="sheet-row sheet-cancel" id="track-menu-close" type="button">Отмена</button>
+    </div>
+  </div>
+
+  <div id="sleep-timer-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-label="Таймер сна">
+    <div class="sheet">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <p class="sheet-title">Таймер сна</p>
+      <p class="sheet-note" id="sleep-status">Музыка сама остановится, когда выйдет время.</p>
+      <button class="sheet-row" type="button" data-min="15"><svg width="22" height="22" aria-hidden="true"><use href="#i-moon"/></svg><span>Через 15 минут</span></button>
+      <button class="sheet-row" type="button" data-min="30"><svg width="22" height="22" aria-hidden="true"><use href="#i-moon"/></svg><span>Через 30 минут</span></button>
+      <button class="sheet-row" type="button" data-min="60"><svg width="22" height="22" aria-hidden="true"><use href="#i-moon"/></svg><span>Через 1 час</span></button>
+      <button class="sheet-row" type="button" data-min="track"><svg width="22" height="22" aria-hidden="true"><use href="#i-moon"/></svg><span>Когда закончится трек</span></button>
+      <button class="sheet-row sheet-danger" id="sleep-off" type="button" hidden><svg width="22" height="22" aria-hidden="true"><use href="#i-close"/></svg><span>Выключить таймер</span></button>
+      <button class="sheet-row sheet-cancel" id="sleep-timer-close" type="button">Закрыть</button>
+    </div>
+  </div>
+
+
+  <div id="queue-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="queue-title">
+    <div class="sheet sheet-tall">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <div class="queue-head">
+        <p class="sheet-title" id="queue-title">Очередь</p>
+        <div class="queue-modes">
+          <button class="round-btn round-quiet mode-btn" id="queue-shuffle-btn" type="button" aria-label="Перемешать очередь" aria-pressed="false"><svg width="20" height="20" aria-hidden="true"><use href="#i-shuffle"/></svg></button>
+          <button class="round-btn round-quiet mode-btn" id="queue-repeat-btn" type="button" aria-label="Повтор: выключен" aria-pressed="false"><svg width="20" height="20" aria-hidden="true"><use href="#i-repeat"/></svg><span class="mode-one" aria-hidden="true">1</span></button>
+        </div>
+      </div>
+      <ul class="track-list queue-list" id="queue-list"></ul>
+      <button class="sheet-row sheet-cancel" id="queue-sheet-close" type="button">Закрыть</button>
+    </div>
+  </div>
+
+  <div id="playlist-menu-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="menu-playlist-title">
+    <div class="sheet">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <div class="sheet-head">
+        <span class="cover cover-sm" id="menu-playlist-cover"></span>
+        <span class="row-meta"><span class="row-title" id="menu-playlist-title">Плейлист</span></span>
+      </div>
+      <button class="sheet-row" id="menu-addtracks" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-plus"/></svg><span>Добавить треки</span></button>
+      <button class="sheet-row" id="menu-editlist" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-edit"/></svg><span>Редактировать</span></button>
+      <button class="sheet-row" id="menu-details" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg><span>Название и описание</span></button>
+      <button class="sheet-row" id="menu-share" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-share"/></svg><span>Поделиться</span></button>
+      <button class="sheet-row" id="menu-download" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-download"/></svg><span id="menu-download-label">Скачать все треки</span></button>
+      <button class="sheet-row sheet-danger" id="menu-delete" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-trash"/></svg><span>Удалить плейлист</span></button>
+      <button class="sheet-row sheet-cancel" id="playlist-menu-close" type="button">Отмена</button>
+    </div>
+  </div>
+
+  <div id="add-to-playlist-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="add-to-playlist-title">
+    <div class="sheet sheet-tall">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <p class="sheet-title" id="add-to-playlist-title">Добавить в плейлист</p>
+      <button class="sheet-row sheet-accent" id="add-to-playlist-new" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-plus"/></svg><span>Новый плейлист</span></button>
+      <div id="add-to-playlist-list" class="sheet-scroll"></div>
+      <button class="sheet-row sheet-cancel" id="add-to-playlist-close" type="button">Готово</button>
+    </div>
+  </div>
+
+  <div id="create-playlist-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="create-playlist-title">
+    <div class="modal">
+      <p class="sheet-title" id="create-playlist-title">Новый плейлист</p>
+      <input id="create-playlist-input" class="modal-input" type="text" placeholder="Название плейлиста" maxlength="60" aria-label="Название плейлиста" />
+      <div class="modal-actions">
+        <button class="pill-btn pill-quiet" id="create-playlist-cancel" type="button">Отмена</button>
+        <button class="pill-btn pill-primary" id="create-playlist-confirm" type="button">Создать</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="details-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="details-title">
+    <div class="modal">
+      <p class="sheet-title" id="details-title">Название и описание</p>
+      <input id="details-name-input" class="modal-input" type="text" placeholder="Название" maxlength="60" aria-label="Название" />
+      <input id="details-desc-input" class="modal-input" type="text" placeholder="Описание (необязательно)" maxlength="120" aria-label="Описание" />
+      <div class="modal-actions">
+        <button class="pill-btn pill-quiet" id="details-cancel" type="button">Отмена</button>
+        <button class="pill-btn pill-primary" id="details-save" type="button">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="account-name-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="account-name-title">
+    <div class="modal">
+      <p class="sheet-title" id="account-name-title">Имя профиля</p>
+      <input id="account-name-input" class="modal-input" type="text" placeholder="Имя" maxlength="40" aria-label="Имя" />
+      <div class="modal-actions">
+        <button class="pill-btn pill-quiet" id="account-name-cancel" type="button">Отмена</button>
+        <button class="pill-btn pill-primary" id="account-name-save" type="button">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="share-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="share-title">
+    <div class="modal">
+      <p class="sheet-title" id="share-title">Поделиться</p>
+      <p class="share-link" id="share-link"></p>
+      <div class="modal-actions modal-actions-stack">
+        <button class="pill-btn pill-primary" id="share-send" type="button"><svg width="18" height="18" aria-hidden="true"><use href="#i-share"/></svg>Отправить в чат</button>
+        <button class="pill-btn pill-quiet" id="share-copy-link" type="button">Скопировать ссылку</button>
+        <button class="pill-btn pill-quiet" id="share-close" type="button">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<audio id="audio" preload="none"></audio>
+<input type="file" accept="image/*" id="avatar-file-input" hidden>
+
+<script src="config.js"></script>
+<script src="prism.js?v=2"></script>
+<script src="shredder.js?v=4"></script>
+<script src="app.js?v=28"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "radial-halo",
+        "value": "*",
+        "files": [
+          "miniapp/index.html"
+        ],
+        "createdAt": "2026-09-30T17:49:02.101Z",
+        "reason": "user chose the «Живой свет» light-orb direction on the decision page (seed 016e80ca); the halo is the product's signature light"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "miniapp/index.html"
+        ],
+        "createdAt": "2026-09-30T17:49:02.413Z",
+        "reason": "model triage: .pulse-dots is the search loading indicator, shown only while a request is in flight"
+      },
+      {
+        "rule": "clipped-overflow-container",
+        "value": "*",
+        "files": [
+          "miniapp/index.html"
+        ],
+        "createdAt": "2026-09-30T17:49:41.569Z",
+        "reason": "model triage: body/.app overflow:hidden is the full-height Telegram WebView shell; sheets, toast and dock are position:fixed or siblings, nothing needs to escape"
+      },
+      {
+        "rule": "buried-raster",
+        "value": "*",
+        "files": [
+          "miniapp/index.html"
+        ],
+        "createdAt": "2026-09-30T17:49:41.867Z",
+        "reason": "model triage: .light-grain is an intentional SVG-noise overlay (mix-blend overlay, 9%) giving the light a soft grain like the user's references 23b5/6b89; subtle by design"
+      },
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "miniapp/styles.css"
+        ],
+        "createdAt": "2026-09-30T21:16:22.349Z",
+        "reason": "user confirmed: asked for the splash wordmark «Нотка» in the same glass as the note (translucent white text fill)"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.2, 1.15, 0.3, 1)",
+        "createdAt": "2026-09-30T21:16:22.710Z",
+        "reason": "model triage: slight spring overshoot on sheets/rows/play button, added after the user called the flat menus 'деревянные' and asked for interactive liquid glass"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.2, 1.3, 0.3, 1)",
+        "createdAt": "2026-09-30T21:16:23.070Z",
+        "reason": "model triage: slight spring overshoot on sheets/rows/play button, added after the user called the flat menus 'деревянные' and asked for interactive liquid glass"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.2, 1.4, 0.3, 1)",
+        "createdAt": "2026-09-30T21:16:23.358Z",
+        "reason": "model triage: slight spring overshoot on sheets/rows/play button, added after the user called the flat menus 'деревянные' and asked for interactive liquid glass"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "miniapp/index.html"
+        ],
+        "createdAt": "2026-09-30T21:16:23.740Z",
+        "reason": "user confirmed direction «Живой свет»: glowing light is the product's signature (splash halo, mix button ring)"
+      }
+    ]
+  }
+}
