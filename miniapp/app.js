@@ -3086,8 +3086,9 @@
       if (!res.ok) return;
       eventsCfg = (await res.json()).events || [];
       try { localStorage.setItem(EVENTS_CACHE, JSON.stringify(eventsCfg)); } catch (e) { /* the list is fetched again */ }
-      eventsCfg.forEach((ev) => mergeMine(ev, ev.mine, true));
+      // today's visit first, so that a day the server already knows is not counted twice
       eventNote("visit", dayKey(Date.now()));
+      eventsCfg.forEach((ev) => mergeMine(ev, ev.mine, true));
       reconcileEvents(true);
       syncEvents();
     } catch (e) { /* the cached list stays */ }
@@ -3223,6 +3224,7 @@
     }
     edition.hidden = !limitTier || !edition.innerHTML;
 
+    $("event-debug").hidden = !plusPreview();
     $("event-tasks").innerHTML = ev.tasks.map((t, i) => {
       const v = taskValue(ev.id, t), done = v >= t.target, go = TASK_GO[t.kind];
       const canGo = !done && go && go.run;
@@ -3232,6 +3234,52 @@
   $("event-tasks").addEventListener("click", (e) => {
     const li = e.target.closest(".event-task[data-go]");
     if (li && TASK_GO[li.dataset.go].run) { haptic("light"); TASK_GO[li.dataset.go].run(); }
+  });
+  // ---- checking an event without doing its tasks (preview mode) ----
+  function completeTask(ev, t) {
+    const p = state.events.progress[ev.id] || (state.events.progress[ev.id] = {});
+    if (t.unique) p[t.id] = Array.from({ length: t.target }, (_, i) => (p[t.id] && p[t.id][i]) || `test${i}`);
+    else p[t.id] = t.target;
+  }
+  function finishChecking(ev) {
+    reconcileEvents(true);
+    persist();
+    syncEvents();
+    renderEventScreen();
+  }
+  $("evd-next").addEventListener("click", () => {
+    const ev = eventById(currentEventId);
+    const t = ev && nextTask(ev);
+    if (!t) { showToast("Все задания уже выполнены"); return; }
+    haptic("light");
+    completeTask(ev, t);
+    finishChecking(ev);
+  });
+  $("evd-all").addEventListener("click", () => {
+    const ev = eventById(currentEventId);
+    if (!ev) return;
+    haptic("light");
+    ev.tasks.forEach((t) => completeTask(ev, t));
+    finishChecking(ev);
+  });
+  $("evd-reset").addEventListener("click", async () => {
+    const ev = eventById(currentEventId);
+    if (!ev) return;
+    haptic("light");
+    try { await fetch(`${API_BASE_URL}/events/reset`, { method: "POST", headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitData }, body: JSON.stringify({ event: ev.id }) }); } catch (e) { /* only the phone is reset then */ }
+    delete state.events.progress[ev.id];
+    delete state.events.editions[ev.id];
+    const mine = new Set(ev.tiers.map((t) => t.item));
+    state.events.items = state.events.items.filter((it) => !mine.has(it));
+    ev.editionLeft = undefined;
+    persist();
+    eventLitShown = -1;
+    eventScreenFresh = true;
+    eventNote("visit", dayKey(Date.now()));
+    renderEventUI();
+    applyLook();
+    refreshEvents();
+    showToast("Событие сброшено");
   });
   function openEvent(id) {
     currentEventId = id;

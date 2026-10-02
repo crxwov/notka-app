@@ -15,7 +15,7 @@
      edited, otherwise Telegram may keep showing the old version. -->
 <link rel="stylesheet" href="styles.css?v=65" />
 <link rel="stylesheet" href="atmosphere.css?v=7" />
-<link rel="stylesheet" href="events.css?v=7" />
+<link rel="stylesheet" href="events.css?v=8" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -201,6 +201,13 @@
     <p class="event-edition" id="event-edition" hidden></p>
     <h2 class="event-h">Задания</h2>
     <ul class="event-tasks" id="event-tasks"></ul>
+    <section class="event-debug" id="event-debug" hidden>
+      <h2 class="event-h">Проверка</h2>
+      <p class="event-debug-note">Видно только в режиме предпросмотра. Позволяет проверить событие, не выполняя задания по-настоящему.</p>
+      <button class="pill-btn pill-quiet pill-block" id="evd-next" type="button">Выполнить следующее задание</button>
+      <button class="pill-btn pill-quiet pill-block" id="evd-all" type="button">Выполнить все задания</button>
+      <button class="pill-btn pill-quiet pill-block" id="evd-reset" type="button">Сбросить всё и начать заново</button>
+    </section>
   </main>
 
   <!-- ============ SEARCH ============ -->

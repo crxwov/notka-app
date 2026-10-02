@@ -329,6 +329,20 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         except (ValueError, AttributeError):
             return JSONResponse({"error": {"code": "BAD_REQUEST"}}, status_code=400)
 
+    @router.post("/events/reset")
+    async def events_reset(request: Request, x_telegram_init_data: str = Header(default=""), x_notka_test_user: str = Header(default="")):
+        user_id = event_user(x_telegram_init_data, x_notka_test_user)
+        if user_id is None:
+            return JSONResponse({"error": {"code": "NOT_IN_TELEGRAM"}}, status_code=401)
+        try:
+            body = await request.json()
+            events_store.reset(user_id, str(body.get("event") or ""))
+            return {"ok": True}
+        except PermissionError:
+            return JSONResponse({"error": {"code": "NOT_A_PREVIEW"}}, status_code=403)
+        except (KeyError, ValueError, AttributeError):
+            return JSONResponse({"error": {"code": "BAD_REQUEST"}}, status_code=400)
+
     @router.get("/resolve", response_model=ResolveResponse)
     async def resolve(
         source: str | None = Query(default=None),

@@ -15,11 +15,15 @@ const state = (progress) => ({ favorites: [], playlists: [], recent: [], onboard
 
 const b = await launch({ dir });
 let listener = 1000 + Math.floor(Math.random() * 900000);
+let headerScript = null;
 const load = async (progress, fresh = true) => {
   if (fresh) listener += 1;
   // every load is a listener of its own: the page asks the server with a test header
-  await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => { const f = window.fetch; window.fetch = (u, o) => { o = Object.assign({}, o); o.headers = Object.assign({}, o.headers, { "X-Notka-Test-User": "${listener}" }); return f(u, o); }; })();` });
-  await b.goto(`${BASE}/app/`);
+  if (headerScript) await b.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: headerScript });
+  const added = await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => { const f = window.fetch; window.fetch = (u, o) => { o = Object.assign({}, o); o.headers = Object.assign({}, o.headers, { "X-Notka-Test-User": "${listener}" }); return f(u, o); }; })();` });
+  headerScript = added && added.identifier;
+  // the state is put in place on a page that is not the app, so nothing of the last scenario is sent under the new listener
+  await b.goto(`${BASE}/health`);
   await b.eval(`localStorage.clear(); localStorage.setItem("notka_state_v2", ${JSON.stringify(JSON.stringify(state(progress)))}); true`);
   await b.goto(`${BASE}/app/`);
   await b.waitFor("document.body.dataset.screen !== 'splash'", 8000, "leave splash");
@@ -89,6 +93,34 @@ try {
   await b.click('#atmo-opts .chip[data-setting="light"][data-v="gold"]');
   await b.sleep(500);
   await b.shot("event-gold-light");
+
+  // ---- the check section: finish tasks without doing them, and start over ----
+  await load({});
+  await b.click("#home-event");
+  await b.sleep(1500);
+  check("the check section is there in preview mode", await b.eval("!document.getElementById('event-debug').hidden"));
+  const press = async (id) => { await b.eval(`document.getElementById("${id}").click(); true`); await b.sleep(900); };
+  const closePop = async () => { await b.eval("(() => { const o = document.getElementById('reward-pop'); if (o && !o.hidden) document.getElementById('rp-ok').click(); return true; })()"); await b.sleep(500); };
+  await press("evd-next");
+  const c1 = await b.eval("document.getElementById('event-count').textContent");
+  check("«next task» finishes one", c1 === "1", `got ${c1}: ${JSON.stringify((await mine()).progress)}`);
+  await press("evd-next");
+  await closePop();
+  const c2 = await b.eval("document.getElementById('event-count').textContent");
+  check("the second one opens the frame", (await mine()).items.includes("frame_pumpkin") && c2 === "2", `got ${c2}: ${JSON.stringify(await mine())}`);
+  await press("evd-all");
+  await b.waitFor("JSON.parse(localStorage.getItem('notka_state_v2')).events.editions.halloween > 0", 12000, "the number");
+  await closePop();
+  await closePop();
+  await closePop();
+  check("«all» finishes everything and the server numbers the edition", (await b.eval("document.getElementById('event-count').textContent")) === "6" && (await mine()).items.includes("edition_halloween"));
+  await b.eval("document.getElementById('screen-event').scrollTo(0, 99999); true");
+  await b.sleep(300);
+  await b.shot("event-debug");
+  await press("evd-reset");
+  check("«start over» clears the phone", (await b.eval("document.getElementById('event-count').textContent")) === "0" && (await mine()).items.length === 0 && !(await mine()).editions.halloween);
+  await b.sleep(1500);
+  check("and the server forgot too: the edition is free again", await b.eval("/осталось [0-9]+ из 100/.test(document.getElementById('event-edition').textContent)") && !(await mine()).editions.halloween);
 
   // ---- catching bats ----
   await load({});

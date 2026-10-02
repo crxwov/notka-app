@@ -168,3 +168,23 @@ def sync(user_id: int, event_id: str, progress: dict) -> dict:
     limit = _tier_limit(event)
     result["editionLeft"] = None if limit is None else max(0, limit - len(data["editions"].get(event_id, [])))
     return result
+
+
+def reset(user_id: int, event_id: str) -> None:
+    """For trying an event out: forget what this listener did in it, and give their number back.
+
+    Only while a made-up today is set (``NOTKA_FAKE_NOW``), which is how an
+    event is previewed. A real launch has no such line, so this refuses.
+    """
+    if not os.environ.get("NOTKA_FAKE_NOW", "").strip():
+        raise PermissionError("not a preview")
+    if event_id not in EVENTS:
+        raise KeyError(event_id)
+    with _lock:
+        data = _load()
+        events = (data["users"].get(str(user_id)) or {}).get("events") or {}
+        events.pop(event_id, None)
+        claimed = data["editions"].get(event_id, [])
+        if user_id in claimed:
+            claimed.remove(user_id)
+        _save(data)
