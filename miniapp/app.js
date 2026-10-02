@@ -245,6 +245,17 @@
       const playlist = state.playlists.find((p) => p.id === id);
       if (!playlist) return;
       playlist.cover = dataUrl;
+      delete playlist.look; // a photo and a styled cover don't share one place
+      persist();
+    },
+    getPlaylistLook(id) {
+      const playlist = state.playlists.find((p) => p.id === id);
+      return playlist ? playlist.look || null : null;
+    },
+    setPlaylistLook(id, look) {
+      const playlist = state.playlists.find((p) => p.id === id);
+      if (!playlist) return;
+      if (look) { playlist.look = look; playlist.cover = null; } else delete playlist.look;
       persist();
     },
     markOnboardingSeen() { state.onboardingSeen = true; state.onboardingSeenV2 = true; persist(); },
@@ -1101,8 +1112,59 @@
   let addToPlaylistTrack = null;
   function playlistCoverUrl(playlist) {
     if (playlist.cover) return playlist.cover;
+    // a styled cover is a Плюс thing: without Плюс the playlist wears its usual one again
+    if (playlist.look && hasPlus()) { const styled = styledCover(playlist.look); if (styled) return styled; }
     const first = Store.getPlaylistTracks(playlist.id).find((t) => t.artwork);
     return first ? first.artwork : null;
+  }
+  // ---- Плюс: a playlist cover drawn in a style and a color (a small vector
+  // picture made here, so it needs no files and is sharp at any size) ----
+  const COVER_PATTERNS = [["aurora", "Сияние"], ["prism", "Призма"], ["rings", "Кольца"], ["spark", "Искры"], ["calm", "Покой"], ["vinyl", "Винил"]];
+  const COVER_HUES = [24, 4, 342, 300, 262, 232, 190, 150, 100, 46];
+  const coverCache = new Map();
+  function styledCover(look) {
+    if (coverCache.has(look)) return coverCache.get(look);
+    const [pattern, hueText] = String(look).split(":");
+    const h = +hueText;
+    if (!COVER_PATTERNS.some((p) => p[0] === pattern) || !Number.isFinite(h)) return null;
+    const hsl = (hue, s, l, a) => `hsl(${(hue + 360) % 360} ${s}% ${l}%${a === undefined ? "" : " / " + a})`;
+    let seed = Math.round(h) * 31 + pattern.length * 7;
+    const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const glow = (id, hue, l) => `<radialGradient id="${id}"><stop offset="0" stop-color="${hsl(hue, 100, l)}" stop-opacity=".95"/><stop offset="1" stop-color="${hsl(hue, 100, l)}" stop-opacity="0"/></radialGradient>`;
+    const back = `<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${hsl(h, 62, 13)}"/><stop offset="1" stop-color="${hsl(h + 24, 70, 26)}"/></linearGradient>`;
+    let defs = back, body = '<rect width="200" height="200" fill="url(#bg)"/>';
+    if (pattern === "aurora") {
+      defs += glow("a", h + 20, 62) + glow("b", h - 30, 56) + glow("c", h + 50, 66);
+      body += '<circle cx="60" cy="70" r="95" fill="url(#a)"/><circle cx="152" cy="132" r="105" fill="url(#b)" opacity=".85"/><circle cx="118" cy="26" r="62" fill="url(#c)" opacity=".7"/>';
+    } else if (pattern === "prism") {
+      defs += glow("a", h + 30, 70);
+      for (let i = 0; i < 12; i++) {
+        const a1 = ((i * 30 + 4) * Math.PI) / 180, a2 = ((i * 30 + 15) * Math.PI) / 180;
+        body += `<polygon points="100,104 ${(100 + 260 * Math.cos(a1)).toFixed(1)},${(104 + 260 * Math.sin(a1)).toFixed(1)} ${(100 + 260 * Math.cos(a2)).toFixed(1)},${(104 + 260 * Math.sin(a2)).toFixed(1)}" fill="${hsl(h + (i % 3) * 22, 92, 62)}" opacity="${(0.16 + (i % 2) * 0.14).toFixed(2)}"/>`;
+      }
+      body += '<circle cx="100" cy="104" r="70" fill="url(#a)" opacity=".8"/>';
+    } else if (pattern === "rings") {
+      defs += glow("a", h + 20, 66);
+      body += '<circle cx="100" cy="98" r="40" fill="url(#a)"/>';
+      for (let i = 0; i < 6; i++) body += `<circle cx="100" cy="98" r="${20 + i * 17}" fill="none" stroke="${hsl(h + 20, 100, 72)}" stroke-width="1.6" opacity="${(0.8 - i * 0.12).toFixed(2)}"/>`;
+      body += `<circle cx="100" cy="98" r="7" fill="${hsl(h + 20, 100, 85)}"/>`;
+    } else if (pattern === "spark") {
+      defs += glow("a", h + 30, 60);
+      body += '<circle cx="100" cy="100" r="92" fill="url(#a)" opacity=".7"/>';
+      for (let i = 0; i < 30; i++) body += `<circle cx="${(rnd() * 200).toFixed(1)}" cy="${(rnd() * 200).toFixed(1)}" r="${(0.7 + rnd() * 1.6).toFixed(1)}" fill="${hsl(h + 40, 100, 88)}" opacity="${(0.4 + rnd() * 0.6).toFixed(2)}"/>`;
+      [[58, 62, 11], [142, 118, 15], [96, 160, 8]].forEach(([x, y, s]) => { body += `<path d="M${x} ${y - s}Q${x} ${y} ${x + s} ${y}Q${x} ${y} ${x} ${y + s}Q${x} ${y} ${x - s} ${y}Q${x} ${y} ${x} ${y - s}Z" fill="${hsl(h + 40, 100, 90)}"/>`; });
+    } else if (pattern === "calm") {
+      [[96, 0.2, 14], [126, 0.28, 8], [158, 0.4, 0]].forEach(([y, o, d], i) => { body += `<path d="M0 ${y}C60 ${y - 22 + d} 140 ${y + 22 - d} 200 ${y}V200H0Z" fill="${hsl(h + i * 16, 80, 62)}" opacity="${o}"/>`; });
+      body += `<circle cx="146" cy="50" r="17" fill="${hsl(h + 40, 100, 86)}" opacity=".85"/>`;
+    } else {
+      body = `<rect width="200" height="200" fill="${hsl(h, 22, 9)}"/><circle cx="100" cy="100" r="94" fill="#0c0c0e"/>`;
+      for (let r = 34; r < 92; r += 6) body += `<circle cx="100" cy="100" r="${r}" fill="none" stroke="#fff" stroke-opacity=".06"/>`;
+      body += '<path d="M100 100L36 34A94 94 0 0 1 164 34Z" fill="#fff" opacity=".06"/><path d="M100 100L164 166A94 94 0 0 1 36 166Z" fill="#fff" opacity=".06"/>';
+      body += `<circle cx="100" cy="100" r="31" fill="${hsl(h, 80, 55)}"/><circle cx="100" cy="100" r="22" fill="none" stroke="#fff" stroke-opacity=".25"/><circle cx="100" cy="100" r="4" fill="#0c0c0e"/>`;
+    }
+    const url = "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs>${defs}</defs>${body}</svg>`);
+    coverCache.set(look, url);
+    return url;
   }
   function renderAddToPlaylistSheet() {
     const list = $("add-to-playlist-list");
@@ -1995,6 +2057,55 @@
     const playlist = state.playlists.find((p) => p.id === currentPlaylistId);
     if (playlist) sharePlaylist(playlist);
   });
+  // ---- «Стиль обложки» (Плюс): pick a drawing and a color; without Плюс it can be tried, not kept ----
+  let coverDraft = null;
+  function paintCoverSheet() {
+    const look = `${coverDraft.pattern}:${coverDraft.hue}`;
+    setCoverEl($("cover-look-preview"), styledCover(look), "x");
+    $("cover-look-patterns").querySelectorAll(".cover-look-opt").forEach((b) => {
+      b.classList.toggle("is-on", b.dataset.pattern === coverDraft.pattern);
+      b.firstElementChild.src = styledCover(`${b.dataset.pattern}:${coverDraft.hue}`);
+    });
+    $("cover-look-hues").querySelectorAll(".cover-look-hue").forEach((b) => b.classList.toggle("is-on", +b.dataset.hue === coverDraft.hue));
+    const on = hasPlus();
+    $("cover-look-apply").textContent = on ? "Применить" : "Применить с Плюсом";
+    $("cover-look-note").textContent = on ? "Фото на обложке заменится этим рисунком." : "Подобрать можно сейчас, а поставить — с Нотка Плюс.";
+  }
+  $("cover-look-patterns").innerHTML = COVER_PATTERNS.map(([key, name]) => `<button class="cover-look-opt" type="button" data-pattern="${key}"><img alt=""><span>${name}</span></button>`).join("");
+  $("cover-look-hues").innerHTML = COVER_HUES.map((hue) => `<button class="cover-look-hue" type="button" data-hue="${hue}" aria-label="Цвет" style="--h:${hue}"></button>`).join("");
+  $("cover-look-patterns").addEventListener("click", (e) => {
+    const b = e.target.closest(".cover-look-opt");
+    if (!b) return;
+    haptic("light"); coverDraft.pattern = b.dataset.pattern; paintCoverSheet();
+  });
+  $("cover-look-hues").addEventListener("click", (e) => {
+    const b = e.target.closest(".cover-look-hue");
+    if (!b) return;
+    haptic("light"); coverDraft.hue = +b.dataset.hue; paintCoverSheet();
+  });
+  $("menu-coverlook").addEventListener("click", () => {
+    closeOverlay("playlist-menu-sheet");
+    const [pattern, hue] = String(Store.getPlaylistLook(currentPlaylistId) || "").split(":");
+    coverDraft = { pattern: COVER_PATTERNS.some((p) => p[0] === pattern) ? pattern : "aurora", hue: COVER_HUES.includes(+hue) ? +hue : COVER_HUES[Math.floor(Math.random() * COVER_HUES.length)] };
+    $("cover-look-reset").hidden = !Store.getPlaylistLook(currentPlaylistId);
+    paintCoverSheet();
+    openOverlay("cover-look-sheet");
+  });
+  $("cover-look-apply").addEventListener("click", () => {
+    closeOverlay("cover-look-sheet");
+    if (!hasPlus()) { showScreen("plus"); return; }
+    Store.setPlaylistLook(currentPlaylistId, `${coverDraft.pattern}:${coverDraft.hue}`);
+    haptic("success");
+    openPlaylist(currentPlaylistId, true);
+    renderLibrary();
+  });
+  $("cover-look-reset").addEventListener("click", () => {
+    closeOverlay("cover-look-sheet");
+    Store.setPlaylistLook(currentPlaylistId, null);
+    openPlaylist(currentPlaylistId, true);
+    renderLibrary();
+  });
+  $("cover-look-close").addEventListener("click", () => closeOverlay("cover-look-sheet"));
   $("menu-download").addEventListener("click", () => {
     closeOverlay("playlist-menu-sheet");
     const tracks = Store.getPlaylistTracks(currentPlaylistId);
