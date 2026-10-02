@@ -22,20 +22,20 @@ def check(name, ok, extra=""):
     print("PASS" if ok else "FAIL", name, extra)
 
 
-FULL = {"listen": 15, "bats": 3, "mood": 1, "share": 1}
+FULL = {"listen": 30, "moods": 3, "days": 5, "playlist": 5, "share": 1, "bats": 3}
 public = ev.public(None)[0]
 check("the event is active with days left", public["status"] == "active" and public["days"] > 0, str(public["days"]))
 check("the edition has a limit of 100", public["editionLeft"] == 100)
 check("a stranger gets no «mine»", "mine" not in public)
 
-r = ev.sync(1, "halloween", {"listen": 15, "bats": 3})
+r = ev.sync(1, "halloween", {"listen": 30, "moods": 3})
 check("two tasks open the frame", r["points"] == 2 and r["items"] == ["frame_pumpkin"], str(r))
-r = ev.sync(1, "halloween", {"mood": 1})
-check("three open the theme", r["points"] == 3 and "atmo_halloween" in r["items"] and r["edition"] is None)
-r = ev.sync(1, "halloween", {"listen": 0, "bats": 0})
-check("progress never goes back", r["points"] == 3)
+r = ev.sync(1, "halloween", {"days": 5, "playlist": 5})
+check("four open the theme", r["points"] == 4 and "atmo_halloween" in r["items"] and r["edition"] is None)
+r = ev.sync(1, "halloween", {"listen": 0, "moods": 0})
+check("progress never goes back", r["points"] == 4)
 r = ev.sync(1, "halloween", {"share": 1, "bats": 99})
-check("four open the edition, and it is number 1", r["points"] == 4 and r["edition"] == 1 and "edition_halloween" in r["items"], str(r))
+check("six open the edition, and it is number 1", r["points"] == 6 and r["edition"] == 1 and "edition_halloween" in r["items"], str(r))
 check("a task is capped at its target", r["progress"]["bats"] == 3)
 r2 = ev.sync(1, "halloween", FULL)
 check("asking again changes nothing", r2["edition"] == 1 and r2["items"].count("edition_halloween") == 1)

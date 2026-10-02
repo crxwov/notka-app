@@ -36,14 +36,14 @@ try {
   await load({});
   check("the banner shows on Home, with the day count", await b.eval("document.getElementById('event-banner-title').textContent === 'Хэллоуин' && document.getElementById('event-banner-kicker').textContent.startsWith('Ещё ')"));
   const m0 = await mine();
-  check("it starts at 0 of 4", await b.eval("document.getElementById('event-banner-count').textContent === '0/4'"), JSON.stringify(m0.progress));
+  check("it starts at 0 of 6, and today's visit already counts", (await b.eval("document.getElementById('event-banner-count').textContent === '0/6'")) && (m0.progress.halloween.days || []).includes(day(0)), JSON.stringify(m0.progress));
   await b.eval("document.getElementById('home-event').scrollIntoView({ block: 'center' }); true");
   await b.sleep(500);
   await b.shot("event-banner");
   await b.click("#home-event");
   await b.sleep(1800);
   check("the page opens in the atmosphere of the event", (await b.eval("document.body.dataset.screen")) === "event" && (await b.eval("document.body.dataset.atmo")) === "halloween");
-  check("it shows four tasks and three rewards", await b.eval("document.querySelectorAll('#event-tasks .event-task').length === 4 && document.querySelectorAll('#event-rewards .event-reward').length === 3"));
+  check("it shows six tasks and three rewards", await b.eval("document.querySelectorAll('#event-tasks .event-task').length === 6 && document.querySelectorAll('#event-rewards .event-reward').length === 3"));
   check("the numbered one tells how many are left", await b.eval("/осталось [0-9]+ из 100/.test(document.getElementById('event-edition').textContent)"));
   await b.shot("event-page");
   await b.eval("document.getElementById('screen-event').scrollTo(0, 99999); true");
@@ -54,14 +54,14 @@ try {
   check("leaving gives the usual look back", (await b.eval("document.body.dataset.atmo")) === "none");
 
   // ---- two tasks: the frame ----
-  await load({ listen: 15, bats: 3 });
+  await load({ listen: 30, moods: ["a", "b", "c"] });
   check("two tasks open the frame at once", (await mine()).items.includes("frame_pumpkin") && await b.eval("document.getElementById('home-avatar').dataset.frame === 'pumpkin'"));
-  check("and the banner says 2 of 4", await b.eval("document.getElementById('event-banner-count').textContent === '2/4'"));
+  check("and the banner says 2 of 6", await b.eval("document.getElementById('event-banner-count').textContent === '2/6'"));
 
-  // ---- three: the theme, which can then be put on in «Оформление» ----
-  await load({ listen: 15, bats: 3, mood: ["a"] });
+  // ---- four: the theme, which can then be put on in «Оформление» ----
+  await load({ listen: 30, moods: ["a", "b", "c"], days: [day(1), day(2), day(3), day(4)], playlist: 5 });
   const items = (await mine()).items;
-  check("three open the theme", items.includes("atmo_halloween"), items.join(","));
+  check("four open the theme", items.includes("atmo_halloween"), items.join(","));
   await b.eval(`document.getElementById("menu-look").click(); true`);
   await b.sleep(900);
   await b.click('#atmo-stage .atmo-card[data-atmo="halloween"]');
@@ -69,11 +69,11 @@ try {
   check("it is put on for good — no try, no banner", (await b.eval("document.body.dataset.atmo")) === "halloween" && await b.eval("document.getElementById('look-try').hidden"));
   check("the golden light is not there yet", await b.eval("![...document.querySelectorAll('#atmo-opts .chip[data-setting=light]')].some((c) => c.textContent === 'Золотая паутина')"));
 
-  // ---- four: the server numbers the edition ----
-  await load({ listen: 15, bats: 3, mood: ["a"], share: 1 });
+  // ---- six: the server numbers the edition ----
+  await load({ listen: 30, moods: ["a", "b", "c"], days: [day(1), day(2), day(3), day(4)], playlist: 5, share: 1, bats: 3 });
   await b.waitFor("JSON.parse(localStorage.getItem('notka_state_v2')).events.editions.halloween > 0", 12000, "the server's number");
   const ev = await mine();
-  check("four open the numbered edition, and the server gave it a number", ev.editions.halloween > 0 && ev.items.includes("edition_halloween"), JSON.stringify(ev.editions));
+  check("six open the numbered edition, and the server gave it a number", ev.editions.halloween > 0 && ev.items.includes("edition_halloween"), JSON.stringify(ev.editions));
   await b.eval("document.getElementById('rp-ok') && document.getElementById('rp-ok').click(); true");
   await b.sleep(500);
   await b.click("#home-event");
@@ -113,7 +113,7 @@ try {
   await closePop();
   await closePop();
   await closePop();
-  check("«all» finishes everything and the server numbers the edition", (await b.eval("document.getElementById('event-count').textContent")) === "4" && (await mine()).items.includes("edition_halloween"));
+  check("«all» finishes everything and the server numbers the edition", (await b.eval("document.getElementById('event-count').textContent")) === "6" && (await mine()).items.includes("edition_halloween"));
   await b.eval("document.getElementById('screen-event').scrollTo(0, 99999); true");
   await b.sleep(300);
   await b.shot("event-debug");
