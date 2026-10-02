@@ -2993,10 +2993,53 @@
     });
     renderEventUI();
   }
+  // a reward is won: a moment of its own, one after another
+  const rewardQueue = [];
   function announceReward(tier) {
     haptic("success");
-    showToast(`Награда: ${tier.title}`);
+    rewardQueue.push(tier);
+    if ($("reward-pop").hidden) setTimeout(showNextReward, 350);
   }
+  function showNextReward() {
+    const tier = rewardQueue.shift();
+    if (!tier) return;
+    const pop = $("reward-pop");
+    $("rp-img").src = eventIcon(tier.item);
+    $("rp-title").textContent = tier.title;
+    $("rp-text").textContent = tier.text;
+    const ev = eventsCfg.find((e) => e.tiers.some((t) => t.item === tier.item));
+    const number = tier.limit && ev ? state.events.editions[ev.id] : 0;
+    const num = $("rp-number");
+    num.hidden = !number;
+    if (number) {
+      // the number counts up to itself
+      const t0 = performance.now();
+      const tick = (now) => {
+        const k = Math.min(1, (now - t0) / 900);
+        num.textContent = `№ ${Math.max(1, Math.round(number * (1 - Math.pow(1 - k, 3))))}`;
+        if (k < 1 && !pop.hidden) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+    const isTheme = tier.item.startsWith("atmo_");
+    $("rp-use").hidden = !isTheme;
+    $("rp-use").dataset.atmo = isTheme ? tier.item.slice(5) : "";
+    pop.hidden = false;
+    const sparks = $("rp-sparks");
+    const burstAt = (delay) => setTimeout(() => { if (!pop.hidden) PumpkinArt.burst(sparks, innerWidth / 2, innerHeight * 0.38, 26); }, delay);
+    burstAt(250); burstAt(650); burstAt(1100);
+  }
+  function closeReward() {
+    $("reward-pop").hidden = true;
+    renderEventUI();
+    if (rewardQueue.length) setTimeout(showNextReward, 300);
+  }
+  $("rp-ok").addEventListener("click", () => { haptic("light"); closeReward(); });
+  $("rp-use").addEventListener("click", () => {
+    const id = $("rp-use").dataset.atmo;
+    closeReward();
+    if (id) { setLook("atmo", id); showToast("Тема включена, выключить её можно в «Оформлении»"); }
+  });
   let eventSyncTimer = null;
   function scheduleEventSync() {
     clearTimeout(eventSyncTimer);
@@ -3004,6 +3047,7 @@
   }
   function mergeMine(ev, mine, quiet) {
     if (!mine) return;
+    if (mine.edition) state.events.editions[ev.id] = mine.edition;
     const had = new Set(state.events.items);
     (mine.items || []).forEach((item) => {
       if (had.has(item)) return;
@@ -3070,6 +3114,7 @@
 
   // ---- the banner on Home and the page of the event ----
   const daysWord = (n) => `${n} ${plural(n, "день", "дня", "дней")}`;
+  let bannerPumpkinFor = null;
   function renderEventUI() {
     const banner = $("home-event");
     const ev = activeEvents()[0];
@@ -3077,61 +3122,136 @@
     if (ev) {
       const points = eventPoints(ev), total = ev.tasks.length;
       $("event-banner-title").textContent = ev.title;
-      $("event-banner-sub").textContent = points >= total ? "Всё выполнено" : `Ещё ${daysWord(ev.days)}`;
+      $("event-banner-word").textContent = ev.title;
+      $("event-banner-kicker").textContent = points >= total ? "Всё горит" : `Ещё ${daysWord(ev.days)}`;
       $("event-banner-count").textContent = `${points}/${total}`;
-      banner.style.setProperty("--p", String(Math.round((points / total) * 100)));
-      banner.querySelector(".event-banner-art").style.backgroundImage = `url("${eventIcon(ev.tiers[0].item)}")`;
+      $("event-banner-bars").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${points > i ? "is-on" : ""}"></i>`).join("");
+      const holder = $("event-banner-pk");
+      if (bannerPumpkinFor !== ev.id) { holder.innerHTML = PumpkinArt.svg(); bannerPumpkinFor = ev.id; }
+      PumpkinArt.lightTo(holder, points);
     }
     if (currentScreen === "event") renderEventScreen();
     applyEventItems();
   }
+
+  // what to do about each kind of task, and where it leads
+  const TASK_GO = {
+    listen: { label: "Включить музыку", run: () => showScreen("home") },
+    mood: { label: "Выбрать настроение", run: () => showScreen("mood") },
+    playlist: { label: "Найти треки", run: () => showScreen("search") },
+    share: { label: "Выбрать плейлист", run: () => showScreen("library") },
+    bat: { label: "Лови мышей здесь", run: () => { haptic("light"); showToast("Нажми на летучую мышь, когда она пролетает"); } },
+    visit: { label: "Загляни завтра", run: null },
+  };
+  function nextTask(ev) {
+    const open = ev.tasks.filter((t) => taskValue(ev.id, t) < t.target);
+    const doable = open.filter((t) => t.kind !== "visit");
+    const pool = doable.length ? doable : open;
+    // the one that is nearest to done
+    return pool.sort((a, b) => taskValue(ev.id, b) / b.target - taskValue(ev.id, a) / a.target)[0] || null;
+  }
+  const taskLine = (ev, t) => {
+    const v = taskValue(ev.id, t);
+    return v >= t.target ? "Готово" : `${Math.floor(v)} из ${t.target}${t.unit ? " " + t.unit : ""}`;
+  };
+  let eventLitShown = -1;
+  let eventScreenFresh = false;
   function renderEventScreen() {
     const ev = eventById(currentEventId);
     if (!ev) return;
     const points = eventPoints(ev), total = ev.tasks.length;
-    $("event-kicker").textContent = ev.status === "active" ? `Событие · ещё ${daysWord(ev.days)}` : "Событие завершено";
-    $("event-title").textContent = ev.title;
+    $("event-days").textContent = ev.status === "active" ? `Ещё ${daysWord(ev.days)}` : "Завершено";
+    const title = $("event-title");
+    title.textContent = ev.title;
+    title.style.setProperty("--len", String(ev.title.length));
     $("event-count").textContent = String(points);
-    $("event-count-of").textContent = `из ${total} ${plural(total, "задания", "заданий", "заданий")}`;
-    const marks = new Set(ev.tiers.map((t) => t.points));
-    $("event-seg").innerHTML = Array.from({ length: total }, (_, i) => `<span class="event-cell${points > i ? " is-on" : ""}">${marks.has(i + 1) ? '<span class="event-mark"></span>' : ""}<i></i></span>`).join("");
+    $("event-count-of").innerHTML = `из ${total}<br>${plural(total, "огонька", "огоньков", "огоньков")} горит`;
+
+    // the pumpkin: built once, lit up part by part each time the page is opened
+    const stage = $("event-stage");
+    if (!stage.firstElementChild) {
+      stage.innerHTML = PumpkinArt.svg();
+      stage.addEventListener("click", (e) => {
+        const r = stage.getBoundingClientRect();
+        stage.classList.remove("is-boop"); void stage.offsetWidth; stage.classList.add("is-boop");
+        PumpkinArt.burst(stage, e.clientX - r.left, e.clientY - r.top, 14);
+        haptic("light");
+      });
+      const look = (e) => {
+        const r = stage.getBoundingClientRect();
+        const nx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 220));
+        const ny = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 260));
+        stage.style.setProperty("--px", `${(nx * 6).toFixed(1)}px`);
+        stage.style.setProperty("--py", `${(ny * 5).toFixed(1)}px`);
+      };
+      window.addEventListener("touchmove", (e) => { if (currentScreen === "event" && e.touches[0]) look(e.touches[0]); }, { passive: true });
+      window.addEventListener("mousemove", (e) => { if (currentScreen === "event") look(e); });
+    }
+    if (eventScreenFresh || eventLitShown < 0) {
+      eventScreenFresh = false;
+      PumpkinArt.lightTo(stage, points, { animate: true, delay: 600, onStep: (c) => { haptic("light"); const r = stage.getBoundingClientRect(); PumpkinArt.burst(stage, r.width / 2, r.height * 0.55, 8); } });
+    } else if (points !== eventLitShown) {
+      PumpkinArt.lightTo(stage, points, {});
+    }
+    eventLitShown = points;
+
+    // what to do next, in one card
+    const next = $("event-next");
+    const task = nextTask(ev);
+    if (!task) {
+      next.className = "event-next is-done";
+      next.innerHTML = `<span class="event-next-k">Готово</span><b class="event-next-t">Тыква горит ярче всех</b><span class="event-next-s">Все задания выполнены. Награды ждут в «Оформлении».</span>`;
+    } else {
+      const go = TASK_GO[task.kind];
+      next.className = "event-next";
+      next.innerHTML = `<span class="event-next-k">Следующий шаг</span><b class="event-next-t">${task.title}</b><span class="event-next-s">${taskLine(ev, task)}</span>${go && go.run ? `<br><button class="event-next-btn" type="button" id="event-next-btn">${go.label}<svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>` : ""}`;
+      const btn = $("event-next-btn");
+      if (btn) btn.addEventListener("click", () => { haptic("light"); go.run(); });
+    }
+
     $("event-rewards").innerHTML = ev.tiers.map((tier) => {
       const open = ownsItem(tier.item);
       const left = tier.points - points;
-      const sub = open ? (tier.limit && state.events.editions[ev.id] ? `№ ${state.events.editions[ev.id]}` : "Получено") : left > 0 ? `Ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : "Тираж разобран";
-      return `<li class="event-reward ${open ? "is-open" : "is-locked"}" data-item="${tier.item}"><span class="event-medal"><img alt="" src="${eventIcon(tier.item)}"></span><b>${tier.title}</b><em>${sub}</em></li>`;
+      const sub = open ? (tier.limit && state.events.editions[ev.id] ? `Твой номер ${state.events.editions[ev.id]}` : "Получено") : left > 0 ? `Ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : "Тираж разобран";
+      return `<li class="event-reward ${open ? "is-open" : "is-locked"}" data-item="${tier.item}"><span class="er-num">${String(tier.points).padStart(2, "0")}</span><span class="er-medal"><img alt="" src="${eventIcon(tier.item)}"></span><span><b>${tier.title}</b><em>${sub}</em></span></li>`;
     }).join("");
     const limitTier = ev.tiers.find((t) => t.limit);
     const edition = $("event-edition");
-    edition.hidden = !limitTier;
     if (limitTier) {
       const mine = state.events.editions[ev.id];
-      edition.textContent = mine ? `«${limitTier.title}»: твой номер ${mine} из ${limitTier.limit}` : typeof ev.editionLeft === "number" ? (ev.editionLeft > 0 ? `«${limitTier.title}»: осталось ${ev.editionLeft} из ${limitTier.limit}` : `«${limitTier.title}»: все ${limitTier.limit} уже разобраны`) : "";
-      edition.hidden = !edition.textContent;
+      edition.innerHTML = mine ? `«${limitTier.title}»: твой номер <b>${mine}</b> из ${limitTier.limit}` : typeof ev.editionLeft === "number" ? (ev.editionLeft > 0 ? `«${limitTier.title}»: осталось <b>${ev.editionLeft}</b> из ${limitTier.limit}` : `«${limitTier.title}»: все ${limitTier.limit} уже разобраны`) : "";
     }
-    $("event-tasks").innerHTML = ev.tasks.map((t) => {
-      const v = taskValue(ev.id, t), done = v >= t.target;
-      const line = done ? "Готово" : `${Math.floor(v)} из ${t.target}${t.unit ? " " + t.unit : ""}`;
-      return `<li class="event-task${done ? " is-done" : ""}"><span class="event-task-ring" style="--p:${Math.round(Math.min(1, v / t.target) * 100)}">${done ? '<svg width="20" height="20" aria-hidden="true"><use href="#i-check"/></svg>' : ""}</span><span class="event-task-text"><b>${t.title}</b><em>${line}</em></span></li>`;
+    edition.hidden = !limitTier || !edition.innerHTML;
+
+    $("event-tasks").innerHTML = ev.tasks.map((t, i) => {
+      const v = taskValue(ev.id, t), done = v >= t.target, go = TASK_GO[t.kind];
+      const canGo = !done && go && go.run;
+      return `<li class="event-task${done ? " is-done" : ""}"${canGo ? ` data-go="${t.kind}"` : ""}><span class="et-n">${String(i + 1).padStart(2, "0")}</span><span class="et-body"><b>${t.title}</b><span class="et-bar"><i style="width:${Math.round(Math.min(1, v / t.target) * 100)}%"></i></span><em>${taskLine(ev, t)}</em></span>${canGo ? '<span class="et-go"><svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></span>' : ""}</li>`;
     }).join("");
   }
+  $("event-tasks").addEventListener("click", (e) => {
+    const li = e.target.closest(".event-task[data-go]");
+    if (li && TASK_GO[li.dataset.go].run) { haptic("light"); TASK_GO[li.dataset.go].run(); }
+  });
   function openEvent(id) {
     currentEventId = id;
     haptic("light");
+    eventScreenFresh = true;
     showScreen("event");
     refreshEvents();
   }
   $("home-event").addEventListener("click", () => { const ev = activeEvents()[0]; if (ev) openEvent(ev.id); });
   $("event-back-btn").addEventListener("click", goBack);
-  // a reward is tapped: what it is, and for a theme — put it on
+  // a reward is tapped: shown again if it is won, or what is still needed
   $("event-rewards").addEventListener("click", (e) => {
     const li = e.target.closest(".event-reward");
     const ev = eventById(currentEventId);
     if (!li || !ev) return;
     const tier = ev.tiers.find((t) => t.item === li.dataset.item);
     haptic("light");
-    if (tier.item.startsWith("atmo_") && ownsItem(tier.item)) { setLook("atmo", tier.item.slice(5)); showToast("Тема включена, а выключить её можно в «Оформлении»"); return; }
-    showToast(`${tier.title}. ${tier.text}`);
+    if (ownsItem(tier.item)) { rewardQueue.push(tier); showNextReward(); return; }
+    const left = tier.points - eventPoints(ev);
+    showToast(left > 0 ? `${tier.title}: ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : "Тираж уже разобран");
   });
   renderEventUI();
   refreshEvents();

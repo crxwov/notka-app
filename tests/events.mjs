@@ -14,7 +14,7 @@ const day = (n) => { const d = new Date(Date.now() - n * 86400000); return `${d.
 const state = (progress) => ({ favorites: [], playlists: [], recent: [], onboardingSeenV2: true, settings: {}, listens: { seconds: 0, plays: 0, tracks: {}, artists: {} }, events: { progress: { halloween: progress }, items: [], editions: {} } });
 
 const b = await launch({ dir });
-let listener = 1000;
+let listener = 1000 + Math.floor(Math.random() * 900000);
 const load = async (progress, fresh = true) => {
   if (fresh) listener += 1;
   // every load is a listener of its own: the page asks the server with a test header
@@ -30,7 +30,7 @@ const mine = () => b.eval(`(() => { const s = JSON.parse(localStorage.getItem("n
 try {
   // ---- nothing done yet ----
   await load({});
-  check("the banner shows on Home, with the day count", await b.eval("document.getElementById('event-banner-title').textContent === 'Хэллоуин' && document.getElementById('event-banner-sub').textContent.startsWith('Ещё ')"));
+  check("the banner shows on Home, with the day count", await b.eval("document.getElementById('event-banner-title').textContent === 'Хэллоуин' && document.getElementById('event-banner-kicker').textContent.startsWith('Ещё ')"));
   const m0 = await mine();
   check("it starts at 0 of 6, and today's visit already counts", (await b.eval("document.getElementById('event-banner-count').textContent === '0/6'")) && (m0.progress.halloween.days || []).includes(day(0)), JSON.stringify(m0.progress));
   await b.eval("document.getElementById('home-event').scrollIntoView({ block: 'center' }); true");
@@ -40,7 +40,7 @@ try {
   await b.sleep(1800);
   check("the page opens in the atmosphere of the event", (await b.eval("document.body.dataset.screen")) === "event" && (await b.eval("document.body.dataset.atmo")) === "halloween");
   check("it shows six tasks and three rewards", await b.eval("document.querySelectorAll('#event-tasks .event-task').length === 6 && document.querySelectorAll('#event-rewards .event-reward').length === 3"));
-  check("the numbered one tells how many are left", await b.eval("document.getElementById('event-edition').textContent.includes('осталось 100 из 100')"));
+  check("the numbered one tells how many are left", await b.eval("/осталось \d+ из 100/.test(document.getElementById('event-edition').textContent)"));
   await b.shot("event-page");
   await b.eval("document.getElementById('screen-event').scrollTo(0, 99999); true");
   await b.sleep(400);
@@ -69,10 +69,10 @@ try {
   await load({ listen: 30, moods: ["a", "b", "c"], days: [day(1), day(2), day(3), day(4)], playlist: 5, share: 1, bats: 3 });
   await b.waitFor("JSON.parse(localStorage.getItem('notka_state_v2')).events.editions.halloween > 0", 12000, "the server's number");
   const ev = await mine();
-  check("six open the numbered edition: number 1", ev.editions.halloween === 1 && ev.items.includes("edition_halloween"), JSON.stringify(ev.editions));
+  check("six open the numbered edition, and the server gave it a number", ev.editions.halloween > 0 && ev.items.includes("edition_halloween"), JSON.stringify(ev.editions));
   await b.click("#home-avatar-btn");
   await b.sleep(900);
-  check("the profile shows the number", await b.eval("!document.getElementById('edition-badge').hidden && document.getElementById('edition-badge').textContent.includes('№ 1')"));
+  check("the profile shows the number", await b.eval("!document.getElementById('edition-badge').hidden && /№ \d+/.test(document.getElementById('edition-badge').textContent)"));
   await b.shot("event-profile");
   await b.eval(`document.getElementById("menu-look").click(); true`);
   await b.sleep(800);

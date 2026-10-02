@@ -15,7 +15,7 @@
      edited, otherwise Telegram may keep showing the old version. -->
 <link rel="stylesheet" href="styles.css?v=63" />
 <link rel="stylesheet" href="atmosphere.css?v=6" />
-<link rel="stylesheet" href="events.css?v=1" />
+<link rel="stylesheet" href="events.css?v=3" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -151,13 +151,12 @@
     </button>
 
     <button class="event-banner" id="home-event" type="button" hidden>
-      <span class="event-banner-art" aria-hidden="true"></span>
-      <span class="event-banner-text">
-        <span class="event-banner-kicker">Событие</span>
-        <span class="event-banner-title" id="event-banner-title">Хэллоуин</span>
-        <span class="event-banner-sub" id="event-banner-sub"></span>
-      </span>
-      <span class="event-ring" id="event-banner-ring" aria-hidden="true"><b id="event-banner-count">0/6</b></span>
+      <span class="eb-bg" aria-hidden="true"><span class="eb-word" id="event-banner-word">ХЭЛЛОУИН</span></span>
+      <span class="eb-pk" id="event-banner-pk" aria-hidden="true"></span>
+      <span class="eb-pill" id="event-banner-kicker">13 дней</span>
+      <span class="event-banner-title" id="event-banner-title">Хэллоуин</span>
+      <span class="event-banner-sub" id="event-banner-sub">Зажги тыкву · <b id="event-banner-count">0/6</b></span>
+      <span class="eb-bars" id="event-banner-bars" aria-hidden="true"></span>
     </button>
 
     <section class="block" id="home-recent-block" data-reveal hidden>
@@ -189,12 +188,13 @@
   <main class="screen" id="screen-event" hidden>
     <header class="bar">
       <button class="round-btn round-glass back-btn" id="event-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+      <span class="event-days" id="event-days"></span>
     </header>
-    <p class="event-kicker" id="event-kicker"></p>
     <h1 class="event-title" id="event-title"></h1>
-    <p class="event-lede">Задания считаются сами, награды открываются сами и остаются у тебя навсегда.</p>
-    <div class="event-count"><b id="event-count">0</b><span id="event-count-of"></span></div>
-    <div class="event-seg" id="event-seg"></div>
+    <div class="event-stage" id="event-stage"></div>
+    <div class="event-score"><b id="event-count">0</b><span id="event-count-of"></span></div>
+    <div class="event-next" id="event-next"></div>
+    <h2 class="event-h">Награды</h2>
     <ol class="event-rewards" id="event-rewards"></ol>
     <p class="event-edition" id="event-edition" hidden></p>
     <h2 class="event-h">Задания</h2>
@@ -980,6 +980,20 @@
     </div>
   </div>
 
+  <div class="reward-pop" id="reward-pop" role="dialog" aria-modal="true" aria-labelledby="rp-title" hidden>
+    <div class="rp-rays" aria-hidden="true"></div>
+    <div class="rp-sparks" id="rp-sparks" aria-hidden="true"></div>
+    <div class="rp-card">
+      <p class="rp-kicker">Награда открыта</p>
+      <div class="rp-medal"><img id="rp-img" alt=""></div>
+      <h2 class="rp-title" id="rp-title"></h2>
+      <p class="rp-text" id="rp-text"></p>
+      <b class="rp-number" id="rp-number" hidden></b>
+      <button class="rp-ok" id="rp-ok" type="button">Забрать</button>
+      <button class="rp-use" id="rp-use" type="button" hidden>Включить сейчас</button>
+    </div>
+  </div>
+
   <div id="time-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="time-sheet-title">
     <div class="sheet">
       <span class="sheet-handle" aria-hidden="true"></span>
@@ -1115,6 +1129,7 @@
 <script src="prism.js?v=2"></script>
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=3"></script>
+<script src="pumpkin.js?v=2"></script>
 <script src="app.js?v=54"></script>
 </body>
 </html>
