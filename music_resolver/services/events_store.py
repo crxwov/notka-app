@@ -3,13 +3,12 @@
 An event (Хэллоуин, Новый год…) runs for some days. Every day one new task
 opens; every finished task is a point; points open rewards by steps (tiers).
 A task that has opened stays open to the end of the event, so a missed day
-is not lost. A reward is a theme, days of Нотка Плюс, or a numbered edition.
+is not lost. A reward is a theme or days of Нотка Плюс.
 
 What the Mini App does is count the tasks (it sees the listening) and tell
 the server how far each one has got. The server decides which tasks are
 open today (so the clock of a phone can't open them early), keeps who has
-what, gives the days of Плюс, and numbers a limited edition («№ 37 из 100»):
-the first ones to reach it get it, and nobody else.
+what, and gives the days of Плюс.
 
 Kept in ``data/events.json``. A listener is known by their Telegram user id
 from the Mini App's signed ``initData`` (see ``plus_store.verify_init_data``).
@@ -53,7 +52,6 @@ EVENTS = {
             {"points": 3, "item": "atmo_halloween", "title": "Тема «Хэллоуин»", "text": "Луна, туман, летучие мыши и светлячки: твоя навсегда"},
             {"points": 5, "item": "plus_3", "plusDays": 3, "title": "3 дня Нотки Плюс", "text": "Все темы, настроения и «Машина времени»"},
             {"points": 10, "item": "plus_10", "plusDays": 10, "title": "10 дней Нотки Плюс", "text": "За все десять заданий"},
-            {"points": 10, "item": "edition_halloween", "title": "Золотая паутина", "text": "Золотой свет темы и твой номер. Только для первых 100", "limit": 100},
         ],
     },
 }
@@ -69,7 +67,6 @@ def _load() -> dict:
     except (OSError, ValueError):
         data = {}
     data.setdefault("users", {})
-    data.setdefault("editions", {})  # event -> [user ids in the order they got their number]
     return data
 
 
@@ -112,15 +109,11 @@ def _day_now(event: dict, now: float) -> int:
     return max(0, min(last, int((now - _day(event["start"])) // DAY) + 1))
 
 
-def _tier_limit(event: dict) -> int | None:
-    return next((t["limit"] for t in event["tiers"] if t.get("limit")), None)
-
-
 def _mine(user: dict | None, event_id: str, event: dict) -> dict:
     mine = ((user or {}).get("events") or {}).get(event_id) or {}
     progress = mine.get("progress") or {}
     done = sum(1 for t in event["tasks"] if (progress.get(t["id"]) or 0) >= t["target"])
-    return {"progress": progress, "points": done, "items": mine.get("items") or [], "edition": mine.get("edition"), "plusUntil": mine.get("plusUntil")}
+    return {"progress": progress, "points": done, "items": mine.get("items") or [], "plusUntil": mine.get("plusUntil")}
 
 
 def _task_view(task: dict, day_now: int) -> dict:
@@ -140,8 +133,6 @@ def public(user_id: int | None) -> list[dict]:
     for event_id, event in EVENTS.items():
         status, days = _status(event, now)
         day_now = _day_now(event, now) if status != "upcoming" else 0
-        limit = _tier_limit(event)
-        claimed = len(data["editions"].get(event_id, []))
         item = {
             "id": event_id,
             "title": event["title"],
@@ -152,7 +143,6 @@ def public(user_id: int | None) -> list[dict]:
             "start": event["start"],
             "tasks": [_task_view(t, day_now) for t in event["tasks"]],
             "tiers": event["tiers"],
-            "editionLeft": None if limit is None else max(0, limit - claimed),
         }
         if user_id is not None:
             item["mine"] = _mine(user, event_id, event)
@@ -174,7 +164,7 @@ def sync(user_id: int, event_id: str, progress: dict, grant: Callable[[int, int,
         status, _ = _status(event, now)
         day_now = _day_now(event, now) if status != "upcoming" else 0
         user = data["users"].setdefault(str(user_id), {})
-        mine = user.setdefault("events", {}).setdefault(event_id, {"progress": {}, "items": [], "edition": None})
+        mine = user.setdefault("events", {}).setdefault(event_id, {"progress": {}, "items": []})
         if status == "active":
             for task in event["tasks"]:
                 if task["day"] > day_now:
@@ -194,21 +184,9 @@ def sync(user_id: int, event_id: str, progress: dict, grant: Callable[[int, int,
                     if grant is None:
                         continue
                     mine["plusUntil"] = grant(user_id, tier["plusDays"], f"event:{event_id}:{tier['item']}")["until"]
-                if tier.get("limit"):
-                    claimed = data["editions"].setdefault(event_id, [])
-                    if user_id in claimed:
-                        mine["edition"] = claimed.index(user_id) + 1
-                    elif len(claimed) < tier["limit"]:
-                        claimed.append(user_id)
-                        mine["edition"] = len(claimed)
-                    else:
-                        continue  # all of them are taken
                 mine["items"].append(tier["item"])
             _save(data)
-        result = _mine(user, event_id, event)
-    limit = _tier_limit(event)
-    result["editionLeft"] = None if limit is None else max(0, limit - len(data["editions"].get(event_id, [])))
-    return result
+        return _mine(user, event_id, event)
 
 
 # ------------------------------------------------- for trying an event out
@@ -224,7 +202,7 @@ def advance_day() -> int:
 
 
 def reset(user_id: int, event_id: str) -> None:
-    """Forget what this listener did in the event, give their number back, and put the made-up today back.
+    """Forget what this listener did in the event, and put the made-up today back.
 
     Only while a made-up today is set (``NOTKA_FAKE_NOW``), which is how an
     event is previewed. A real launch has no such line, so this refuses.
@@ -237,8 +215,5 @@ def reset(user_id: int, event_id: str) -> None:
         data = _load()
         events = (data["users"].get(str(user_id)) or {}).get("events") or {}
         events.pop(event_id, None)
-        claimed = data["editions"].get(event_id, [])
-        if user_id in claimed:
-            claimed.remove(user_id)
         data["devDays"] = 0
         _save(data)

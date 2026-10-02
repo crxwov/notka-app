@@ -15,7 +15,7 @@
      edited, otherwise Telegram may keep showing the old version. -->
 <link rel="stylesheet" href="styles.css?v=65" />
 <link rel="stylesheet" href="atmosphere.css?v=7" />
-<link rel="stylesheet" href="events.css?v=9" />
+<link rel="stylesheet" href="events.css?v=10" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -199,7 +199,6 @@
     <div class="event-next" id="event-next"></div>
     <h2 class="event-h">Награды</h2>
     <ol class="event-rewards" id="event-rewards"></ol>
-    <p class="event-edition" id="event-edition" hidden></p>
     <h2 class="event-h">Задания</h2>
     <ul class="event-tasks" id="event-tasks"></ul>
     <section class="event-debug" id="event-debug" hidden>
@@ -429,7 +428,6 @@
       <h1 class="hero-title" id="profile-name">Гость</h1>
       <p class="hero-sub" id="profile-sub">Вход через Telegram</p>
       <button class="friend-badge" id="friend-badge" type="button" data-tier="new" hidden><svg width="14" height="14" aria-hidden="true"><use href="#i-heart-fill"/></svg><span>Друг Нотки</span></button>
-      <button class="friend-badge" id="edition-badge" type="button" data-tier="edition" hidden><svg width="14" height="14" aria-hidden="true"><use href="#i-disc"/></svg><span>Золотая паутина</span></button>
     </div>
     <button class="plus-card" id="menu-plus" type="button" hidden>
       <span class="plus-card-mark" aria-hidden="true"><svg width="22" height="22"><use href="#i-plus"/></svg></span>
@@ -999,7 +997,6 @@
       <div class="rp-medal"><img id="rp-img" alt=""></div>
       <h2 class="rp-title" id="rp-title"></h2>
       <p class="rp-text" id="rp-text"></p>
-      <b class="rp-number" id="rp-number" hidden></b>
       <button class="rp-ok" id="rp-ok" type="button">Забрать</button>
       <button class="rp-use" id="rp-use" type="button" hidden>Включить сейчас</button>
     </div>

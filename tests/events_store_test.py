@@ -32,7 +32,6 @@ FULL = {"t1": 10, "t2": 1, "t3": 1, "t4": 3, "t5": 1, "t6": 5, "t7": 3, "t8": 3,
 pub = ev.public(None)[0]
 check("the event is active, on day 1", pub["status"] == "active" and pub["dayNow"] == 1, str(pub["dayNow"]))
 check("only today's task is shown, the rest are days on a calendar", pub["tasks"][0].get("title") and all(t.get("locked") and "title" not in t for t in pub["tasks"][1:]))
-check("the edition has a limit of 100", pub["editionLeft"] == 100)
 check("a stranger gets no «mine»", "mine" not in pub)
 
 r = ev.sync(1, "halloween", FULL, grant)
@@ -57,20 +56,14 @@ for _ in range(5):
     ev.advance_day()
 check("on day 10 everything is open", ev.public(1)[0]["dayNow"] == 10 and not any(t.get("locked") for t in ev.public(1)[0]["tasks"]))
 r = ev.sync(1, "halloween", FULL, grant)
-check("ten points: ten more days of Плюс, and the edition number 1", r["points"] == 10 and "plus_10" in r["items"] and r["edition"] == 1 and (1, 10) in granted, str(r["items"]))
-check("«mine» shows in the list", ev.public(1)[0]["mine"]["edition"] == 1)
+check("ten points: ten more days of Плюс", r["points"] == 10 and "plus_10" in r["items"] and (1, 10) in granted, str(r["items"]))
+check("«mine» shows in the list", "plus_10" in ev.public(1)[0]["mine"]["items"])
 
-for uid in range(2, 101):
-    ev.sync(uid, "halloween", FULL, grant)
-check("a hundred editions are given", ev.public(None)[0]["editionLeft"] == 0)
-r = ev.sync(101, "halloween", FULL, grant)
-check("the hundred-and-first gets the days but no edition", "plus_10" in r["items"] and r["edition"] is None and "edition_halloween" not in r["items"], str(r["items"]))
-check("the numbers are in order", ev.sync(37, "halloween", {}, grant)["edition"] == 37)
 r = ev.sync(300, "halloween", FULL, None)
 check("without a way to give days, the days wait", "plus_3" not in r["items"] and "atmo_halloween" in r["items"])
 
 ev.reset(1, "halloween")
-check("a reset forgets the listener, frees the number and puts the day back", ev.public(1)[0]["mine"]["items"] == [] and ev.public(1)[0]["dayNow"] == 1 and ev.public(None)[0]["editionLeft"] == 1)
+check("a reset forgets the listener and puts the day back", ev.public(1)[0]["mine"]["items"] == [] and ev.public(1)[0]["dayNow"] == 1)
 
 os.environ["NOTKA_FAKE_NOW"] = "2026-11-05"
 r = ev.sync(500, "halloween", FULL, grant)

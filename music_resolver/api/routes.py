@@ -301,7 +301,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         except plus_store.PromoError as exc:
             return JSONResponse({"error": {"code": exc.reason}}, status_code=400)
 
-    # ---- «События»: tasks, rewards and numbered editions (see events_store) ----
+    # ---- «События»: a task a day, themes and days of Плюс as rewards (see events_store) ----
     def event_user(init_data: str, test_user: str = "") -> int | None:
         user_id = plus_store.verify_init_data(init_data)
         # for the local test server only: NOTKA_TEST_USER stands in for Telegram,

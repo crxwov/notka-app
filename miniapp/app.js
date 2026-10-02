@@ -108,7 +108,7 @@
         sharedImports: parsed.sharedImports || {},
         recent: parsed.recent || [], // the last tracks played, newest first
         fresh: parsed.fresh || null, // { key, at, items } — «Новое от любимых исполнителей»
-        events: parsed.events || null, // { progress, items, editions } — see «События»
+        events: parsed.events || null, // { progress, items } — see «События»
       };
     } catch (e) {
       return {
@@ -120,7 +120,7 @@
     }
   }
   const state = loadState();
-  state.events = state.events || { progress: {}, items: [], editions: {} };
+  state.events = state.events || { progress: {}, items: [] };
   function ownsItem(item) { return state.events.items.includes(item); }
   // Only what a row needs to be shown and played again.
   function slimTrack(t) {
@@ -2637,7 +2637,7 @@
     },
     halloween: {
       name: "Хэллоуин", loot: true,
-      lights: { candle: ["Свеча", { core: "#FFE0AE", warm: "#F58A2A", mid: "#7C3FC4", deep: "#220C3A" }], gold: ["Золотая паутина", { core: "#FFF3D0", warm: "#E9C46A", mid: "#6B3FA0", deep: "#1B0B33" }, "edition_halloween"], toxic: ["Зелье", { core: "#F0FFC8", warm: "#A4F04A", mid: "#1FB07A", deep: "#0A2A1C" }], blood: ["Багровый", { core: "#FFD8D2", warm: "#F04848", mid: "#B02860", deep: "#2A0A14" }] },
+      lights: { candle: ["Свеча", { core: "#FFE0AE", warm: "#F58A2A", mid: "#7C3FC4", deep: "#220C3A" }], toxic: ["Зелье", { core: "#F0FFC8", warm: "#A4F04A", mid: "#1FB07A", deep: "#0A2A1C" }], blood: ["Багровый", { core: "#FFD8D2", warm: "#F04848", mid: "#B02860", deep: "#2A0A14" }] },
       options: [["life", "Огоньки", [["flies", "Светлячки"], ["embers", "Искры"], ["both", "Оба"]], "flies"], ["amount", "Количество", AMOUNT_CHOICES, "low"], ["bats", "Летучие мыши", [["rare", "Редко"], ["often", "Часто"], ["off", "Нет"]], "rare"], ["fog", "Туман", ONOFF, "on"], ["moon", "Луна", ONOFF, "on"], ["webs", "Паутина", ONOFF, "on"]],
     },
     newyear: {
@@ -2938,9 +2938,7 @@
   // little pictures of the rewards
   const svgUri = (s) => "data:image/svg+xml," + encodeURIComponent(s);
   const EVENT_ICONS = {
-    frame_pumpkin: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><radialGradient id='a' cx='35%' cy='28%' r='80%'><stop offset='0' stop-color='#ffe7c4'/><stop offset='.5' stop-color='#ff9d5a'/><stop offset='1' stop-color='#cf2f78'/></radialGradient><linearGradient id='s' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#eaffb0'/><stop offset='1' stop-color='#6fc83a'/></linearGradient></defs><ellipse cx='15' cy='28' rx='11' ry='13' fill='url(#a)'/><ellipse cx='33' cy='28' rx='11' ry='13' fill='url(#a)'/><ellipse cx='24' cy='28' rx='9' ry='14' fill='url(#a)' stroke='#fff' stroke-opacity='.7' stroke-width='.8'/><path d='M22 16c-1-5 1-8 6-9-.5 3-1 5 0 9z' fill='url(#s)'/><path d='M19 22c1-3 4-5 7-5-3 1-5 3-5 7z' fill='#fff' opacity='.7'/></svg>"),
     atmo_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><radialGradient id='m' cx='32%' cy='28%' r='85%'><stop offset='0' stop-color='#fffbea'/><stop offset='.55' stop-color='#ffe0ae'/><stop offset='1' stop-color='#ffb066'/></radialGradient></defs><path d='M31 5a19 19 0 1 0 13 29A16 16 0 0 1 31 5z' fill='url(#m)' stroke='#fff' stroke-opacity='.7' stroke-width='.8'/><path d='M14 14c3-5 8-8 13-8-5 2-9 6-10 11z' fill='#fff' opacity='.7'/><circle cx='37' cy='13' r='1.8' fill='#ffd9a0'/><circle cx='42' cy='21' r='1.3' fill='#ffd9a0'/></svg>"),
-    edition_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#fff4c4'/><stop offset='1' stop-color='#e9b84a'/></linearGradient></defs><g fill='none' stroke='url(#g)' stroke-width='2' stroke-linecap='round'><path d='M24 3v42M6 12l36 24M6 36l36-24'/><circle cx='24' cy='24' r='7'/><circle cx='24' cy='24' r='14'/><circle cx='24' cy='24' r='20'/></g><circle cx='24' cy='24' r='3' fill='#fff4c4'/></svg>"),
   };
   EVENT_ICONS.plus_3 = svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='p' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#ffe7c4'/><stop offset='.55' stop-color='#ff9d5a'/><stop offset='1' stop-color='#ff5f86'/></linearGradient></defs><rect x='6' y='6' width='36' height='36' rx='11' fill='url(#p)' stroke='#fff' stroke-opacity='.7' stroke-width='.9'/><path d='M24 14v20M14 24h20' stroke='#fff' stroke-width='4.2' stroke-linecap='round'/><path d='M12 17c2-4 6-6 10-6-4 2-7 5-8 9z' fill='#fff' opacity='.55'/><text x='35' y='41' font-size='11' font-weight='800' fill='#fff' font-family='sans-serif' text-anchor='middle'>3</text></svg>");
   EVENT_ICONS.plus_10 = svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='p' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#fff1c9'/><stop offset='.5' stop-color='#ffb35c'/><stop offset='1' stop-color='#ff5f9a'/></linearGradient></defs><rect x='6' y='6' width='36' height='36' rx='11' fill='url(#p)' stroke='#fff' stroke-opacity='.8' stroke-width='.9'/><path d='M24 14v20M14 24h20' stroke='#fff' stroke-width='4.2' stroke-linecap='round'/><path d='M12 17c2-4 6-6 10-6-4 2-7 5-8 9z' fill='#fff' opacity='.55'/><text x='34' y='41' font-size='10' font-weight='800' fill='#fff' font-family='sans-serif' text-anchor='middle'>10</text></svg>");
@@ -2988,7 +2986,7 @@
     activeEvents().forEach((ev) => {
       const points = eventPoints(ev);
       ev.tiers.forEach((tier) => {
-        if (tier.limit || tier.plusDays || points < tier.points || ownsItem(tier.item)) return;
+        if (tier.plusDays || points < tier.points || ownsItem(tier.item)) return;
         state.events.items.push(tier.item);
         if (announce) announceReward(tier);
       });
@@ -3009,20 +3007,6 @@
     $("rp-img").src = eventIcon(tier.item);
     $("rp-title").textContent = tier.title;
     $("rp-text").textContent = tier.text;
-    const ev = eventsCfg.find((e) => e.tiers.some((t) => t.item === tier.item));
-    const number = tier.limit && ev ? state.events.editions[ev.id] : 0;
-    const num = $("rp-number");
-    num.hidden = !number;
-    if (number) {
-      // the number counts up to itself
-      const t0 = performance.now();
-      const tick = (now) => {
-        const k = Math.min(1, (now - t0) / 900);
-        num.textContent = `№ ${Math.max(1, Math.round(number * (1 - Math.pow(1 - k, 3))))}`;
-        if (k < 1 && !pop.hidden) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }
     const isTheme = tier.item.startsWith("atmo_");
     $("rp-use").hidden = !isTheme;
     $("rp-use").dataset.atmo = isTheme ? tier.item.slice(5) : "";
@@ -3049,7 +3033,6 @@
   }
   function mergeMine(ev, mine, quiet) {
     if (!mine) return;
-    if (mine.edition) state.events.editions[ev.id] = mine.edition;
     if (mine.plusUntil) rememberPlus(mine.plusUntil);
     const had = new Set(state.events.items);
     (mine.items || []).forEach((item) => {
@@ -3058,8 +3041,6 @@
       const tier = ev.tiers.find((t) => t.item === item);
       if (tier && !quiet) announceReward(tier);
     });
-    if (mine.edition) state.events.editions[ev.id] = mine.edition;
-    if (typeof mine.editionLeft === "number") ev.editionLeft = mine.editionLeft;
     // what the server knows from another phone is not lost
     const p = state.events.progress[ev.id] || (state.events.progress[ev.id] = {});
     ev.tasks.forEach((t) => {
@@ -3099,24 +3080,6 @@
   }
   window.Atmosphere && (Atmosphere.onCatch = (what) => { if (what === "bat") eventNote("bat", 1); });
 
-  // ---- what the rewards put into the app ----
-  function applyEventItems() {
-    const frame = ownsItem("frame_pumpkin") ? "pumpkin" : "";
-    ["home-avatar", "profile-avatar-btn", "account-avatar"].forEach((id) => {
-      const el = $(id);
-      if (!el) return;
-      if (frame) el.dataset.frame = frame; else delete el.dataset.frame;
-    });
-    const n = state.events.editions.halloween;
-    const badge = $("edition-badge");
-    badge.hidden = !(ownsItem("edition_halloween") && n);
-    if (n) badge.querySelector("span").textContent = `Золотая паутина № ${n}`;
-  }
-  $("edition-badge").addEventListener("click", () => {
-    haptic("success");
-    showToast(`Твой номер ${state.events.editions.halloween} из 100. Такого больше ни у кого нет`);
-  });
-
   // ---- the banner on Home and the page of the event ----
   const daysWord = (n) => `${n} ${plural(n, "день", "дня", "дней")}`;
   // the face of the pumpkin lights at 2, 3, 5 and 7 finished tasks; the whole of it at the last
@@ -3141,7 +3104,6 @@
       PumpkinArt.lightTo(holder, points, { total, steps: PUMPKIN_STEPS });
     }
     if (currentScreen === "event") renderEventScreen();
-    applyEventItems();
   }
 
   // what to do about each kind of task, and where it leads
@@ -3235,17 +3197,9 @@
     $("event-rewards").innerHTML = ev.tiers.map((tier) => {
       const open = ownsItem(tier.item) || (tier.plusDays && points >= tier.points && hasRealPlus());
       const left = tier.points - points;
-      const sub = open ? (tier.limit && state.events.editions[ev.id] ? `Твой номер ${state.events.editions[ev.id]}` : "Получено") : left > 0 ? `Ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : tier.limit ? "Тираж разобран" : "Скоро";
+      const sub = open ? "Получено" : left > 0 ? `Ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : "Скоро";
       return `<li class="event-reward glass ${open ? "is-open" : "is-locked"}" data-item="${tier.item}"><span class="er-medal"><img alt="" src="${eventIcon(tier.item)}"></span><span class="er-text"><b>${tier.title}</b><em>${sub}</em></span><span class="er-pts">${tier.points}</span></li>`;
     }).join("");
-    const limitTier = ev.tiers.find((t) => t.limit);
-    const edition = $("event-edition");
-    if (limitTier) {
-      const mine = state.events.editions[ev.id];
-      edition.innerHTML = mine ? `«${limitTier.title}»: твой номер <b>${mine}</b> из ${limitTier.limit}` : typeof ev.editionLeft === "number" ? (ev.editionLeft > 0 ? `«${limitTier.title}»: осталось <b>${ev.editionLeft}</b> из ${limitTier.limit}` : `«${limitTier.title}»: все ${limitTier.limit} уже разобраны`) : "";
-    }
-    edition.hidden = !limitTier || !edition.innerHTML;
-
     $("event-debug").hidden = !plusPreview();
     // the tasks that have opened, and the days that have not (only their date shows)
     $("event-tasks").innerHTML = ev.tasks.map((t) => {
@@ -3298,11 +3252,9 @@
     haptic("light");
     try { await fetch(`${API_BASE_URL}/events/reset`, { method: "POST", headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitData }, body: JSON.stringify({ event: ev.id }) }); } catch (e) { /* only the phone is reset then */ }
     delete state.events.progress[ev.id];
-    delete state.events.editions[ev.id];
     const mine = new Set(ev.tiers.map((t) => t.item));
     state.events.items = state.events.items.filter((it) => !mine.has(it));
     ev.dayNow = 0;
-    ev.editionLeft = undefined;
     persist();
     eventLitShown = -1;
     eventScreenFresh = true;

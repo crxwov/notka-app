@@ -62,8 +62,7 @@ try {
   check("the calendar has ten days, today is marked", await b.eval("document.querySelectorAll('#event-calendar .cal-day').length === 10 && document.querySelectorAll('#event-calendar .cal-day.is-today').length === 1 && document.querySelectorAll('#event-calendar .cal-day.is-closed').length === 9"));
   check("only today's task is shown, the others only wait for their date", await b.eval("document.querySelectorAll('#event-tasks .event-task:not(.is-closed)').length === 1 && document.querySelectorAll('#event-tasks .event-task.is-closed').length === 9"));
   check("the next-step card names today's task", await b.eval("document.getElementById('event-next').textContent.includes('Задание дня 1') && document.getElementById('event-next').textContent.includes('Послушай 10 минут')"));
-  check("four rewards are shown", await b.eval("document.querySelectorAll('#event-rewards .event-reward').length === 4"));
-  check("the numbered one tells how many are left", await b.eval("/осталось [0-9]+ из 100/.test(document.getElementById('event-edition').textContent)"));
+  check("three rewards are shown", await b.eval("document.querySelectorAll('#event-rewards .event-reward').length === 3"));
   await b.shot("event-page");
   await b.eval("document.getElementById('screen-event').scrollTo(0, 99999); true");
   await b.sleep(400);
@@ -86,7 +85,6 @@ try {
   await b.click('#atmo-stage .atmo-card[data-atmo="halloween"]');
   await b.sleep(600);
   check("the theme is put on for good — no try, no banner", (await b.eval("document.body.dataset.atmo")) === "halloween" && await b.eval("document.getElementById('look-try').hidden"));
-  check("the golden light is not there yet", await b.eval("![...document.querySelectorAll('#atmo-opts .chip[data-setting=light]')].some((c) => c.textContent === 'Золотая паутина')"));
 
   // ---- day 5: five done, three days of Плюс ----
   await load(done(5), 5);
@@ -94,12 +92,10 @@ try {
   check("five tasks give three days of Плюс, and the phone knows it", (await b.eval("+localStorage.getItem('notka_plus_until') * 1000 > Date.now() + 2.5 * 86400000")));
   await closePops();
 
-  // ---- day 10: ten done, ten days and the numbered edition ----
+  // ---- day 10: ten done, ten more days of Плюс ----
   await load(done(10), 10);
-  await b.waitFor("JSON.parse(localStorage.getItem('notka_state_v2')).events.editions.halloween > 0", 12000, "the number");
-  const ev10 = await mine();
-  check("ten tasks give ten more days and the numbered edition", ev10.items.includes("plus_10") && ev10.items.includes("edition_halloween") && ev10.editions.halloween > 0, JSON.stringify(ev10.editions));
-  check("the ten days of Плюс reach the phone", (await b.eval("+localStorage.getItem('notka_plus_until') * 1000 > Date.now() + 9.5 * 86400000")));
+  await b.waitFor("JSON.parse(localStorage.getItem('notka_state_v2')).events.items.includes('plus_10')", 12000, "the ten days");
+  check("ten tasks give ten more days of Плюс", (await mine()).items.includes("plus_10") && (await b.eval("+localStorage.getItem('notka_plus_until') * 1000 > Date.now() + 9.5 * 86400000")));
   await closePops();
   await b.click("#home-event");
   await b.sleep(4800);
@@ -107,18 +103,6 @@ try {
   check("the whole pumpkin shines when all are done", await b.eval("document.querySelector('#event-stage svg.pk').classList.contains('is-glow') && document.querySelector('#event-stage svg.pk').classList.contains('is-rays')"));
   await b.click("#event-back-btn");
   await b.sleep(500);
-  await b.click("#home-avatar-btn");
-  await b.sleep(900);
-  check("the profile shows the number", await b.eval("!document.getElementById('edition-badge').hidden && /№ [0-9]+/.test(document.getElementById('edition-badge').textContent)"));
-  await b.shot("event-profile");
-  await b.eval(`document.getElementById("menu-look").click(); true`);
-  await b.sleep(800);
-  await b.click('#atmo-stage .atmo-card[data-atmo="halloween"]');
-  await b.sleep(600);
-  check("and the golden light is offered", await b.eval("[...document.querySelectorAll('#atmo-opts .chip[data-setting=light]')].some((c) => c.textContent === 'Золотая паутина')"));
-  await b.click('#atmo-opts .chip[data-setting="light"][data-v="gold"]');
-  await b.sleep(500);
-  await b.shot("event-gold-light");
 
   // ---- the check section: open the next day, finish tasks, start over ----
   await load({}, 1);
@@ -139,16 +123,16 @@ try {
   check("three days of three tasks give the theme", (await text("event-count")) === "3" && (await mine()).items.includes("atmo_halloween"));
   for (let i = 0; i < 7; i++) await press("evd-day");
   await press("evd-all");
-  await b.waitFor("JSON.parse(localStorage.getItem('notka_state_v2')).events.editions.halloween > 0", 12000, "the number");
+  await b.waitFor("JSON.parse(localStorage.getItem('notka_state_v2')).events.items.includes('plus_10')", 12000, "the ten days");
   await closePops();
-  check("«all open tasks» on day 10 finishes everything", (await text("event-count")) === "10" && (await mine()).items.includes("edition_halloween"));
+  check("«all open tasks» on day 10 finishes everything", (await text("event-count")) === "10" && (await mine()).items.includes("plus_10"));
   await b.eval("document.getElementById('screen-event').scrollTo(0, 99999); true");
   await b.sleep(300);
   await b.shot("event-debug");
   await press("evd-reset");
   check("«start over» clears the phone and goes back to day 1", (await text("event-count")) === "0" && (await mine()).items.length === 0 && (await text("event-days")) === "День 1 из 10");
   await b.sleep(1500);
-  check("and the server forgot too: the edition is free again", await b.eval("/осталось [0-9]+ из 100/.test(document.getElementById('event-edition').textContent)") && !(await mine()).editions.halloween);
+  check("and the server forgot too", (await mine()).items.length === 0 && (await text("event-count")) === "0");
 
   // ---- a bat on its day ----
   await load({}, 2);
