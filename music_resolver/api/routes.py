@@ -222,6 +222,10 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
                 cached = _cached_file(_cache_key(source, source_id, suffix))
                 if cached:
                     return cached
+            if not needs_match and hasattr(provider, "download_to_file"):
+                # a YouTube track: the downloader looks it up itself, so a
+                # separate resolve first would only repeat that lookup
+                return await _ensure_cached(provider, source, source_id, "", None)
         response = await service.resolve(source=source, id=source_id, url=None)
         if response.playback.type != "url" or not response.playback.url:
             raise AppError(ErrorCode.RESOLVE_FAILED, "Resolved playback cannot be played")
