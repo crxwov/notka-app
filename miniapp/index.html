@@ -14,7 +14,7 @@
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
 <link rel="stylesheet" href="styles.css?v=62" />
-<link rel="stylesheet" href="atmosphere.css?v=4" />
+<link rel="stylesheet" href="atmosphere.css?v=5" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -605,13 +605,7 @@
     <section class="look-sec" data-reveal>
       <h2 class="look-h"><span class="look-n" aria-hidden="true">1</span>Атмосфера</h2>
       <div class="atmo-stage" id="atmo-stage"></div>
-      <div class="atmo-density" id="atmo-density">
-        <span class="atmo-density-t">Частицы</span>
-        <button class="chip" type="button" data-d="low">Меньше</button>
-        <button class="chip" type="button" data-d="mid">Обычно</button>
-        <button class="chip" type="button" data-d="high">Больше</button>
-        <button class="chip" type="button" data-d="off">Нет</button>
-      </div>
+      <div class="atmo-opts" id="atmo-opts"></div>
     </section>
 
     <section class="look-sec" data-reveal>
@@ -939,22 +933,10 @@
       <button class="sheet-row" id="menu-addtracks" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-plus"/></svg><span>Добавить треки</span></button>
       <button class="sheet-row" id="menu-editlist" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-edit"/></svg><span>Редактировать</span></button>
       <button class="sheet-row" id="menu-details" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg><span>Название и описание</span></button>
-      <button class="sheet-row" id="menu-theme" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-edit"/></svg><span>Тема плейлиста</span><span class="tag tag-plus">Плюс</span></button>
       <button class="sheet-row" id="menu-share" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-share"/></svg><span>Поделиться</span></button>
       <button class="sheet-row" id="menu-download" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-download"/></svg><span id="menu-download-label">Скачать все треки</span></button>
       <button class="sheet-row sheet-danger" id="menu-delete" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-trash"/></svg><span>Удалить плейлист</span></button>
       <button class="sheet-row sheet-cancel" id="playlist-menu-close" type="button">Отмена</button>
-    </div>
-  </div>
-
-  <div id="pl-theme-sheet" class="sheet-anim sheet-clear" role="dialog" aria-modal="true" aria-label="Тема плейлиста">
-    <div class="sheet">
-      <span class="sheet-handle" aria-hidden="true"></span>
-      <p class="sheet-title">Тема плейлиста</p>
-      <div class="plt-row" id="plt-row"></div>
-      <p class="sheet-note" id="plt-note"></p>
-      <button class="pill-btn pill-primary pill-block" id="plt-keep" type="button">Оставить</button>
-      <button class="sheet-row sheet-cancel" id="plt-cancel" type="button">Отмена</button>
     </div>
   </div>
 
@@ -1081,7 +1063,7 @@
 <script src="config.js?v=2"></script>
 <script src="prism.js?v=2"></script>
 <script src="shredder.js?v=4"></script>
-<script src="atmosphere.js?v=1"></script>
+<script src="atmosphere.js?v=2"></script>
 <script src="app.js?v=54"></script>
 </body>
 </html>

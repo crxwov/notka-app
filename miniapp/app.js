@@ -247,16 +247,6 @@
       playlist.cover = dataUrl;
       persist();
     },
-    getPlaylistTheme(id) {
-      const playlist = state.playlists.find((p) => p.id === id);
-      return playlist ? playlist.theme || "" : "";
-    },
-    setPlaylistTheme(id, key) {
-      const playlist = state.playlists.find((p) => p.id === id);
-      if (!playlist) return;
-      if (key) playlist.theme = key; else delete playlist.theme;
-      persist();
-    },
     markOnboardingSeen() { state.onboardingSeen = true; state.onboardingSeenV2 = true; persist(); },
     isOnboardingSeen() { return state.onboardingSeen; },
   };
@@ -765,7 +755,6 @@
   // Sheets / modals
   // ============================================================
   const openOverlays = [];
-  const overlayCloseHooks = {}; // id -> what to do whenever that overlay closes, however it closes
   function openOverlay(id) {
     const el = $(id);
     if (!el) return;
@@ -782,7 +771,6 @@
     el.classList.remove("open");
     const idx = openOverlays.indexOf(id);
     if (idx >= 0) openOverlays.splice(idx, 1);
-    if (overlayCloseHooks[id]) overlayCloseHooks[id]();
     setTimeout(() => { if (!el.classList.contains("open")) el.style.display = "none"; }, 380);
     syncBackButton();
   }
@@ -1951,7 +1939,6 @@
       ? `${playlist.description} · ${pluralTracks(tracks.length)}`
       : pluralTracks(tracks.length);
     setCoverEl($("playlist-cover"), playlistCoverUrl(playlist), playlist.id);
-    applyPlaylistTheme(playlist, hasPlus() ? playlist.theme || "" : "");
     $("playlist-heart-btn").setAttribute("aria-pressed", Store.isPlaylistFavorited(playlistId) ? "true" : "false");
 
     const list = $("playlist-tracks-list");
@@ -2008,84 +1995,6 @@
     const playlist = state.playlists.find((p) => p.id === currentPlaylistId);
     if (playlist) sharePlaylist(playlist);
   });
-  // ---- «Тема плейлиста» (Плюс): the whole playlist screen takes another look ----
-  const PL_THEMES = [["", "Обычная"], ["pixel", "8-бит"], ["nyc", "Нью-Йорк"]];
-  const NYC_LINES = [["A", "#0039a6", "#fff"], ["B", "#ff6319", "#fff"], ["N", "#fccc0a", "#000"], ["L", "#a7a9ac", "#000"], ["G", "#6cbe45", "#000"], ["J", "#996633", "#fff"], ["1", "#ee352e", "#fff"], ["4", "#00933c", "#fff"], ["7", "#b933ad", "#fff"]];
-  // 8-bit: the cover is drawn small and shown large with hard edges
-  function pixelateCover() {
-    const host = $("playlist-cover");
-    host.querySelectorAll("canvas").forEach((c) => c.remove());
-    if ($("screen-playlist").dataset.plTheme !== "pixel") return;
-    const img = host.querySelector("img");
-    if (!img) return;
-    const paint = () => {
-      const w = img.naturalWidth, h = img.naturalHeight;
-      if (!w || !h) return;
-      const c = document.createElement("canvas");
-      c.width = c.height = 28;
-      const side = Math.min(w, h);
-      const ctx = c.getContext("2d");
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, (w - side) / 2, (h - side) / 2, side, side, 0, 0, 28, 28);
-      host.querySelector("canvas") || host.appendChild(c);
-    };
-    if (img.complete && img.naturalWidth) paint(); else img.addEventListener("load", paint, { once: true });
-  }
-  function applyPlaylistTheme(playlist, key) {
-    const screen = $("screen-playlist");
-    if (key) screen.dataset.plTheme = key; else delete screen.dataset.plTheme;
-    if (playlist) {
-      // the subway sign wears a line bullet of its own, the same every time for one playlist
-      let n = 0;
-      for (const ch of String(playlist.id)) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
-      const line = NYC_LINES[n % NYC_LINES.length];
-      $("playlist-title").dataset.bullet = line[0];
-      screen.style.setProperty("--bullet", line[1]);
-      screen.style.setProperty("--bullet-ink", line[2]);
-    }
-    pixelateCover();
-  }
-  let pltDraft = "", pltKept = false, pltPlaylist = null;
-  function paintThemeSheet() {
-    $("plt-row").querySelectorAll(".plt-card").forEach((b) => b.classList.toggle("is-on", b.dataset.t === pltDraft));
-    const on = hasPlus();
-    $("plt-keep").textContent = !pltDraft || on ? "Оставить" : "Оставить с Плюсом";
-    $("plt-note").textContent = !pltDraft ? "Так плейлист выглядит у всех." : on ? "Тема видна только тебе. Плейлист, которым делишься, остаётся обычным." : "Так выглядит твой плейлист. Оставить тему можно с Нотка Плюс.";
-  }
-  $("plt-row").innerHTML = PL_THEMES.map(([key, name]) => `<button class="plt-card" type="button" data-t="${key}"><span class="plt-sample" data-t="${key}">Aa${key ? '<span class="tag tag-plus">Плюс</span>' : ""}</span><span>${name}</span></button>`).join("");
-  $("plt-row").addEventListener("click", (e) => {
-    const b = e.target.closest(".plt-card");
-    if (!b || !pltPlaylist) return;
-    haptic("light");
-    pltDraft = b.dataset.t;
-    applyPlaylistTheme(pltPlaylist, pltDraft);
-    paintThemeSheet();
-  });
-  $("menu-theme").addEventListener("click", () => {
-    closeOverlay("playlist-menu-sheet");
-    pltPlaylist = state.playlists.find((p) => p.id === currentPlaylistId) || null;
-    if (!pltPlaylist) return;
-    pltDraft = hasPlus() ? pltPlaylist.theme || "" : "";
-    pltKept = false;
-    $("screen-playlist").scrollTo(0, 0);
-    paintThemeSheet();
-    openOverlay("pl-theme-sheet");
-  });
-  // however the sheet closes, the playlist goes back to what is kept unless it was just kept
-  overlayCloseHooks["pl-theme-sheet"] = () => {
-    if (!pltPlaylist) return;
-    if (!pltKept) applyPlaylistTheme(pltPlaylist, hasPlus() ? pltPlaylist.theme || "" : "");
-    pltPlaylist = null;
-  };
-  $("plt-keep").addEventListener("click", () => {
-    if (!pltPlaylist) return;
-    if (pltDraft && !hasPlus()) { closeOverlay("pl-theme-sheet"); showScreen("plus"); return; }
-    pltKept = true;
-    Store.setPlaylistTheme(pltPlaylist.id, pltDraft);
-    haptic("success");
-    closeOverlay("pl-theme-sheet");
-  });
-  $("plt-cancel").addEventListener("click", () => closeOverlay("pl-theme-sheet"));
   $("menu-download").addEventListener("click", () => {
     closeOverlay("playlist-menu-sheet");
     const tracks = Store.getPlaylistTracks(currentPlaylistId);
@@ -2594,17 +2503,64 @@
   const LOOK_DEFAULTS = { playerTheme: "standard", light: "track", bgPattern: "light", atmo: "none" };
   // «Атмосфера»: seasons and nature. Plus ones come with Нотка Плюс; the
   // collectible ones (loot: true) are given for tasks, and until that is
-  // built they can be tried, or switched on in preview mode.
+  // built they can be tried, or switched on in preview mode. Each has its
+  // own lights (palettes) and its own settings: the first value of every
+  // setting is its default.
+  const AMOUNT_CHOICES = [["low", "Мало"], ["mid", "Обычно"], ["high", "Много"], ["none", "Нет"]];
+  const ONOFF = [["on", "Есть"], ["off", "Нет"]];
   const ATMOS = {
-    autumn: { name: "Осень", palette: { core: "#FFE2B0", warm: "#FF8A2B", mid: "#D4501E", deep: "#5A2412" } },
-    winter: { name: "Зима", palette: { core: "#EAF6FF", warm: "#7CC4FF", mid: "#5B8CFF", deep: "#1D3A78" } },
-    spring: { name: "Весна", palette: { core: "#FFF0F5", warm: "#FF9DBF", mid: "#F06DA8", deep: "#5A2A66" } },
-    rain: { name: "Дождь", palette: { core: "#DCE8F5", warm: "#6FA3D6", mid: "#4F6FA8", deep: "#1E2B4A" } },
-    night: { name: "Звёздная ночь", palette: { core: "#E4EEFF", warm: "#7DA2FF", mid: "#8A6BFF", deep: "#1C1F66" } },
-    halloween: { name: "Хэллоуин", loot: true, palette: { core: "#FFD9A0", warm: "#FF7A18", mid: "#8E2DE2", deep: "#2A0B45" } },
-    newyear: { name: "Новый год", loot: true, palette: { core: "#FFF1C9", warm: "#F2C14E", mid: "#E04F5F", deep: "#0E2A5C" } },
+    autumn: {
+      name: "Осень",
+      lights: { sunset: ["Закат", { core: "#FFE2B0", warm: "#FF8A2B", mid: "#D4501E", deep: "#5A2412" }], morning: ["Утро", { core: "#FFF3DA", warm: "#FFC078", mid: "#E8847A", deep: "#4A2B33" }], dusk: ["Сумерки", { core: "#FFD8C2", warm: "#E5673C", mid: "#8E3B6E", deep: "#2A1030" }] },
+      options: [["amount", "Листья", AMOUNT_CHOICES, "low"], ["wind", "Ветер", [["soft", "Лёгкий"], ["calm", "Штиль"], ["gusty", "Порывы"]], "soft"], ["rays", "Лучи", ONOFF, "on"]],
+    },
+    winter: {
+      name: "Зима",
+      lights: { ice: ["Лёд", { core: "#EAF6FF", warm: "#7CC4FF", mid: "#5B8CFF", deep: "#1D3A78" }], dawn: ["Заря", { core: "#FFE9F2", warm: "#FF9EC4", mid: "#8E8CFF", deep: "#2A2F6E" }], deep: ["Ночь", { core: "#DCEBFF", warm: "#5E8CFF", mid: "#3D4FD6", deep: "#0F1A55" }] },
+      options: [["amount", "Снег", AMOUNT_CHOICES, "low"], ["aurora", "Сияние", ONOFF, "on"], ["frost", "Иней на панелях", ONOFF, "on"]],
+    },
+    spring: {
+      name: "Весна",
+      lights: { sakura: ["Сакура", { core: "#FFF0F5", warm: "#FF9DBF", mid: "#F06DA8", deep: "#5A2A66" }], mint: ["Мята", { core: "#EAFFF3", warm: "#7FE3B2", mid: "#38B6A6", deep: "#173F4A" }], sunrise: ["Рассвет", { core: "#FFF4D6", warm: "#FFC470", mid: "#FF8FA3", deep: "#4B2850" }] },
+      options: [["amount", "Лепестки", AMOUNT_CHOICES, "low"], ["petals", "Цвет лепестков", [["sakura", "Сакура"], ["white", "Белые"], ["mixed", "Вперемешку"]], "sakura"], ["pollen", "Пыльца", ONOFF, "on"]],
+    },
+    rain: {
+      name: "Дождь",
+      lights: { grey: ["Серый", { core: "#DCE8F5", warm: "#6FA3D6", mid: "#4F6FA8", deep: "#1E2B4A" }], dusk: ["Вечер", { core: "#E6DDF5", warm: "#9A86D6", mid: "#5B6BB5", deep: "#1F2150" }], green: ["Мокрый лес", { core: "#E3F3EA", warm: "#6FC3A0", mid: "#3E8A8A", deep: "#14343C" }] },
+      options: [["amount", "Дождь", [["rain", "Дождь"], ["drizzle", "Морось"], ["storm", "Ливень"], ["none", "Нет"]], "drizzle"], ["glass", "Капли на стекле", ONOFF, "on"], ["thunder", "Гроза", [["off", "Нет"], ["on", "Есть"]], "off"]],
+    },
+    night: {
+      name: "Звёздная ночь",
+      lights: { indigo: ["Индиго", { core: "#E4EEFF", warm: "#7DA2FF", mid: "#8A6BFF", deep: "#1C1F66" }], teal: ["Сияние", { core: "#DDFFF6", warm: "#4FE0C0", mid: "#5B8CFF", deep: "#10285A" }], violet: ["Фиолет", { core: "#F0E4FF", warm: "#B58CFF", mid: "#E05BD0", deep: "#2A1466" }] },
+      options: [["amount", "Звёзды", AMOUNT_CHOICES, "low"], ["cons", "Созвездия", ONOFF, "on"], ["meteors", "Падающие звёзды", [["rare", "Редко"], ["often", "Часто"], ["off", "Нет"]], "rare"], ["aurora", "Сияние", ONOFF, "on"]],
+    },
+    halloween: {
+      name: "Хэллоуин", loot: true,
+      lights: { candle: ["Свеча", { core: "#FFD9A0", warm: "#FF7A18", mid: "#8E2DE2", deep: "#2A0B45" }], toxic: ["Зелье", { core: "#EEFFC0", warm: "#8CFF3A", mid: "#00B36B", deep: "#06281A" }], blood: ["Багровый", { core: "#FFD0CC", warm: "#FF3B3B", mid: "#B01E5A", deep: "#2A0612" }] },
+      options: [["life", "Огоньки", [["flies", "Светлячки"], ["embers", "Искры"], ["both", "Оба"]], "flies"], ["amount", "Количество", AMOUNT_CHOICES, "low"], ["bats", "Летучие мыши", [["rare", "Редко"], ["often", "Часто"], ["off", "Нет"]], "rare"], ["fog", "Туман", ONOFF, "on"], ["moon", "Луна", ONOFF, "on"], ["webs", "Паутина", ONOFF, "on"]],
+    },
+    newyear: {
+      name: "Новый год", loot: true,
+      lights: { gold: ["Золото", { core: "#FFF1C9", warm: "#F2C14E", mid: "#E04F5F", deep: "#0E2A5C" }], silver: ["Серебро", { core: "#FFFFFF", warm: "#CFE0FF", mid: "#8FA8E8", deep: "#10204A" }], ruby: ["Рубин", { core: "#FFE3E3", warm: "#FF6B7A", mid: "#C2304F", deep: "#3A0A1E" }] },
+      options: [["garland", "Гирлянда", [["warm", "Тёплая"], ["color", "Цветная"], ["cold", "Холодная"], ["off", "Нет"]], "warm"], ["bokeh", "Огни вдали", ONOFF, "on"], ["glitter", "Блёстки", [["on", "Есть"], ["off", "Нет"]], "on"]],
+    },
   };
-  const ATMO_DENSITY = { low: 0.5, mid: 1, high: 1.6, off: 0 };
+  // the settings of one atmosphere: what is saved over what is the default
+  function atmoSettings(id) {
+    const a = ATMOS[id];
+    if (!a) return {};
+    const saved = (Store.getSetting("atmoOpts") || {})[id] || {};
+    const out = { light: Object.keys(a.lights)[0] };
+    a.options.forEach(([key, , choices, def]) => { out[key] = choices.some((c) => c[0] === saved[key]) ? saved[key] : def; });
+    if (a.lights[saved.light]) out.light = saved.light;
+    return out;
+  }
+  const atmoPalette = (id) => ATMOS[id].lights[atmoSettings(id).light][1];
+  function setAtmoSetting(id, key, value) {
+    const all = Object.assign({}, Store.getSetting("atmoOpts") || {});
+    all[id] = Object.assign({}, all[id] || {}, { [key]: value });
+    Store.setSetting("atmoOpts", all);
+  }
   function atmoOwned(id) {
     const a = ATMOS[id];
     if (!a) return false;
@@ -2636,7 +2592,7 @@
     if (mode.startsWith("preset:")) { palette = LIGHT_PRESETS[mode.slice(7)].palette; art = null; }
     else if (mode === "pinned" && pinnedLight()) { palette = pinnedLight().palette; art = pinnedLight().artwork; }
     const atmo = lookValue("atmo");
-    if (atmo !== "none") { palette = ATMOS[atmo].palette; art = null; } // the season's own light
+    if (atmo !== "none") { palette = atmoPalette(atmo); art = null; } // the season's own light
     showArtUnderLight(art || null);
     applyPalette(palette);
   }
@@ -2646,9 +2602,13 @@
     document.body.dataset.bg = lookValue("bgPattern");
     const atmo = lookValue("atmo");
     document.body.dataset.atmo = atmo;
-    if (window.Atmosphere) Atmosphere.set(atmo, ATMO_DENSITY[Store.getSetting("atmoDensity")] ?? 1);
+    const atmoSet = atmo === "none" ? {} : atmoSettings(atmo);
+    // every setting is also an attribute of the body, for the style sheet to answer
+    Object.keys(document.body.dataset).filter((k) => /^atmo[A-Z]/.test(k)).forEach((k) => delete document.body.dataset[k]);
+    Object.entries(atmoSet).forEach(([k, v]) => { document.body.dataset["atmo" + k[0].toUpperCase() + k.slice(1)] = v; });
+    if (window.Atmosphere) Atmosphere.set(atmo, atmoSet);
     document.querySelectorAll("#atmo-stage .atmo-card").forEach((c) => { c.classList.toggle("is-on", c.dataset.atmo === atmo); c.setAttribute("aria-pressed", c.dataset.atmo === atmo ? "true" : "false"); });
-    document.querySelectorAll("#atmo-density .chip").forEach((c) => c.classList.toggle("active", c.dataset.d === (Store.getSetting("atmoDensity") || "mid")));
+    renderAtmoOptions(atmo, atmoSet);
     paintLight();
     syncPrism();
     // every picker shows what is on now
@@ -2750,11 +2710,29 @@
     haptic("light");
     setLook("atmo", c.dataset.atmo);
   });
-  $("atmo-density").addEventListener("click", (e) => {
+  // the settings of the chosen atmosphere: one row for the light and one for each setting
+  let atmoOptsFor = null;
+  function renderAtmoOptions(atmo, current) {
+    const box = $("atmo-opts");
+    if (!box) return;
+    if (atmo === "none") {
+      atmoOptsFor = null;
+      box.innerHTML = '<p class="atmo-hint">Выбери атмосферу, и здесь появятся её настройки: свет, погода, детали.</p>';
+      return;
+    }
+    const key = atmo + JSON.stringify(current);
+    if (key === atmoOptsFor) return;
+    atmoOptsFor = key;
+    const a = ATMOS[atmo];
+    const row = (setting, title, choices, value) => `<div class="atmo-opt"><span class="atmo-opt-t">${title}</span><div class="atmo-opt-row">${choices.map(([v, name]) => `<button class="chip${v === value ? " active" : ""}" type="button" data-setting="${setting}" data-v="${v}">${name}</button>`).join("")}</div></div>`;
+    box.innerHTML = row("light", "Свет", Object.entries(a.lights).map(([v, l]) => [v, l[0]]), current.light) + a.options.map(([setting, title, choices]) => row(setting, title, choices, current[setting])).join("");
+  }
+  $("atmo-opts").addEventListener("click", (e) => {
     const c = e.target.closest(".chip");
-    if (!c) return;
+    const atmo = lookValue("atmo");
+    if (!c || atmo === "none") return;
     haptic("light");
-    Store.setSetting("atmoDensity", c.dataset.d);
+    setAtmoSetting(atmo, c.dataset.setting, c.dataset.v);
     applyLook();
   });
   function renderLookScreen() {
