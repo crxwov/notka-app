@@ -69,7 +69,7 @@ try {
   check("without Плюс it is a try for a minute", (await b.eval("document.body.dataset.atmo")) === "autumn" && await b.eval("!document.getElementById('look-try').hidden"));
   await b.click('#atmo-stage .atmo-card[data-atmo="halloween"]');
   await b.sleep(400);
-  check("a collectible one is a try, and says so", await b.eval("document.getElementById('look-try').textContent.includes('за задания') && document.getElementById('look-try-keep').hidden"));
+  check("a collectible one is a try, and leads to its tasks", await b.eval("document.getElementById('look-try').textContent.includes('На пробу') && document.getElementById('look-try-keep').textContent === 'К заданиям' && !document.getElementById('look-try-keep').hidden"));
   // the garland of New Year can be pulled
   await b.eval(`localStorage.setItem("notka_plus_local", "1"); localStorage.setItem("notka_state_v2", ${JSON.stringify(JSON.stringify(seedState({ atmo: "newyear" })))}); true`);
   await b.goto(`${BASE}/app/`);
