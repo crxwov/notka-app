@@ -707,7 +707,7 @@
     if (name === "about") revealIn("screen-about", true);
     if (name === "plus") openPlusScreen();
     if (name === "look") renderLookScreen();
-    if (name === "mood") { $("mood-note").hidden = hasPlus(); revealIn("screen-mood", true); requestAnimationFrame(startMoodPhysics); }
+    if (name === "mood") { $("mood-note").hidden = hasPlus(); document.body.classList.toggle("has-plus", hasPlus()); revealIn("screen-mood", true); requestAnimationFrame(startMoodPhysics); }
     if (name === "profile") $("menu-plus").hidden = !plusPreview();
     if (name === "playlist" && currentPlaylistId && opts.replace) openPlaylist(currentPlaylistId, true);
     if (TAB_SCREENS.has(name)) {
@@ -1399,11 +1399,15 @@
     playTrack(mix[0], mix, { mymix: true, source: "mix" });
     if (openPlayer) showScreen("player");
   }
-  // «Под настроение» (Нотка Плюс): the mix made from YouTube Music's own
-  // mood and genre playlists, shuffled anew every time. Without Плюс —
-  // three tracks to taste it.
+  // «Под настроение»: the mix grown from the listener's own music. Three
+  // moods and the genres are free; the other five are Нотка Плюс, and
+  // without it they give three tracks to taste.
   const MOODS = { energize: "Бодрое", chill: "Спокойное", focus: "Для работы", sad: "Грустное", party: "Вечеринка", sleep: "Для сна", workout: "Спорт", romance: "Романтика", ru_pop: "Русский поп", ru_rock: "Русский рок", ru_hiphop: "Русский хип-хоп" };
-  document.querySelectorAll("#mood-cloud .mood-orb").forEach((orb, n) => orb.style.setProperty("--n", n));
+  const FREE_MOODS = new Set(["energize", "chill", "focus", "ru_pop", "ru_rock", "ru_hiphop"]);
+  document.querySelectorAll("#mood-cloud .mood-orb").forEach((orb, n) => {
+    orb.style.setProperty("--n", n);
+    if (!FREE_MOODS.has(orb.dataset.mood)) orb.insertAdjacentHTML("beforeend", '<i class="orb-plus" aria-hidden="true">Плюс</i>');
+  });
 
   // What the mix should lean towards: the artists this listener has in
   // their favorites, playlists and listening history, and how much of
@@ -1463,13 +1467,13 @@
     if (!tracks.length) { haptic("error"); showToast("Не получилось собрать микс, попробуй ещё раз"); return; }
     shuffleOn = false;
     haptic("success");
-    if (hasPlus()) {
+    if (hasPlus() || FREE_MOODS.has(key)) {
       // from here on it goes on like «Мой микс»: more of the same is added as it plays
       playTrack(tracks[0], tracks, { mymix: true, source: "mix", context: `Мой микс · ${MOODS[key]}` });
     } else {
       const taste = tracks.slice(0, 3);
       playTrack(taste[0], taste, { source: "mood-taste", context: `${MOODS[key]} · проба` });
-      showToast("Три трека на пробу. Весь микс под настроение — в Нотке Плюс");
+      showToast("Три трека на пробу. Это настроение целиком — в Нотке Плюс");
     }
     if (currentScreen === "mood") goBack();
   }
@@ -2401,6 +2405,7 @@
   function syncPlusUI() {
     const on = hasPlus();
     const real = hasRealPlus();
+    document.body.classList.toggle("has-plus", on);
     $("plus-bar").classList.toggle("is-active", on);
     $("plus-bar").classList.toggle("is-real", real);
     $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";

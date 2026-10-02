@@ -809,6 +809,9 @@ body.is-playing .track-row.playing .eq i { animation: eq 1s var(--ease-in-out) i
   animation: mood-float var(--d) ease-in-out infinite alternate;
   transition: scale 0.5s var(--ease-out), opacity 0.4s var(--ease-out), filter 0.4s var(--ease-out);
 }
+/* the five moods that are Плюс wear a small mark until Плюс is on */
+.orb-plus { position: absolute; left: 50%; bottom: 17%; translate: -50% 0; height: 18px; padding: 0 7px; display: inline-flex; align-items: center; border-radius: 999px; font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: 0.01em; background: rgba(255, 255, 255, 0.9); color: #14110f; text-shadow: none; pointer-events: none; }
+.has-plus .orb-plus { display: none; }
 @keyframes mood-float { from { transform: translateY(-5px); } to { transform: translateY(6px); } }
 .mood-orb:active { scale: 0.94; }
 /* while the mix is being put together: the chosen light grows, a ring runs round it, the rest step back */
