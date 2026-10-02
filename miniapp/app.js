@@ -247,6 +247,16 @@
       playlist.cover = dataUrl;
       persist();
     },
+    getPlaylistTheme(id) {
+      const playlist = state.playlists.find((p) => p.id === id);
+      return playlist ? playlist.theme || "" : "";
+    },
+    setPlaylistTheme(id, key) {
+      const playlist = state.playlists.find((p) => p.id === id);
+      if (!playlist) return;
+      if (key) playlist.theme = key; else delete playlist.theme;
+      persist();
+    },
     markOnboardingSeen() { state.onboardingSeen = true; state.onboardingSeenV2 = true; persist(); },
     isOnboardingSeen() { return state.onboardingSeen; },
   };
@@ -755,6 +765,7 @@
   // Sheets / modals
   // ============================================================
   const openOverlays = [];
+  const overlayCloseHooks = {}; // id -> what to do whenever that overlay closes, however it closes
   function openOverlay(id) {
     const el = $(id);
     if (!el) return;
@@ -771,6 +782,7 @@
     el.classList.remove("open");
     const idx = openOverlays.indexOf(id);
     if (idx >= 0) openOverlays.splice(idx, 1);
+    if (overlayCloseHooks[id]) overlayCloseHooks[id]();
     setTimeout(() => { if (!el.classList.contains("open")) el.style.display = "none"; }, 380);
     syncBackButton();
   }
@@ -1939,6 +1951,7 @@
       ? `${playlist.description} · ${pluralTracks(tracks.length)}`
       : pluralTracks(tracks.length);
     setCoverEl($("playlist-cover"), playlistCoverUrl(playlist), playlist.id);
+    applyPlaylistTheme(playlist, hasPlus() ? playlist.theme || "" : "");
     $("playlist-heart-btn").setAttribute("aria-pressed", Store.isPlaylistFavorited(playlistId) ? "true" : "false");
 
     const list = $("playlist-tracks-list");
@@ -1995,6 +2008,84 @@
     const playlist = state.playlists.find((p) => p.id === currentPlaylistId);
     if (playlist) sharePlaylist(playlist);
   });
+  // ---- «Тема плейлиста» (Плюс): the whole playlist screen takes another look ----
+  const PL_THEMES = [["", "Обычная"], ["pixel", "8-бит"], ["nyc", "Нью-Йорк"], ["paper", "Газета"], ["notebook", "Тетрадь"], ["poster", "Постер"]];
+  const NYC_LINES = [["A", "#0039a6", "#fff"], ["B", "#ff6319", "#fff"], ["N", "#fccc0a", "#000"], ["L", "#a7a9ac", "#000"], ["G", "#6cbe45", "#000"], ["J", "#996633", "#fff"], ["1", "#ee352e", "#fff"], ["4", "#00933c", "#fff"], ["7", "#b933ad", "#fff"]];
+  // 8-bit: the cover is drawn small and shown large with hard edges
+  function pixelateCover() {
+    const host = $("playlist-cover");
+    host.querySelectorAll("canvas").forEach((c) => c.remove());
+    if ($("screen-playlist").dataset.plTheme !== "pixel") return;
+    const img = host.querySelector("img");
+    if (!img) return;
+    const paint = () => {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) return;
+      const c = document.createElement("canvas");
+      c.width = c.height = 28;
+      const side = Math.min(w, h);
+      const ctx = c.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, (w - side) / 2, (h - side) / 2, side, side, 0, 0, 28, 28);
+      host.querySelector("canvas") || host.appendChild(c);
+    };
+    if (img.complete && img.naturalWidth) paint(); else img.addEventListener("load", paint, { once: true });
+  }
+  function applyPlaylistTheme(playlist, key) {
+    const screen = $("screen-playlist");
+    if (key) screen.dataset.plTheme = key; else delete screen.dataset.plTheme;
+    if (playlist) {
+      // the subway sign wears a line bullet of its own, the same every time for one playlist
+      let n = 0;
+      for (const ch of String(playlist.id)) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+      const line = NYC_LINES[n % NYC_LINES.length];
+      $("playlist-title").dataset.bullet = line[0];
+      screen.style.setProperty("--bullet", line[1]);
+      screen.style.setProperty("--bullet-ink", line[2]);
+    }
+    pixelateCover();
+  }
+  let pltDraft = "", pltKept = false, pltPlaylist = null;
+  function paintThemeSheet() {
+    $("plt-row").querySelectorAll(".plt-card").forEach((b) => b.classList.toggle("is-on", b.dataset.t === pltDraft));
+    const on = hasPlus();
+    $("plt-keep").textContent = !pltDraft || on ? "Оставить" : "Оставить с Плюсом";
+    $("plt-note").textContent = !pltDraft ? "Так плейлист выглядит у всех." : on ? "Тема видна только тебе. Плейлист, которым делишься, остаётся обычным." : "Так выглядит твой плейлист. Оставить тему можно с Нотка Плюс.";
+  }
+  $("plt-row").innerHTML = PL_THEMES.map(([key, name]) => `<button class="plt-card" type="button" data-t="${key}"><span class="plt-sample" data-t="${key}">Aa${key ? '<span class="tag tag-plus">Плюс</span>' : ""}</span><span>${name}</span></button>`).join("");
+  $("plt-row").addEventListener("click", (e) => {
+    const b = e.target.closest(".plt-card");
+    if (!b || !pltPlaylist) return;
+    haptic("light");
+    pltDraft = b.dataset.t;
+    applyPlaylistTheme(pltPlaylist, pltDraft);
+    paintThemeSheet();
+  });
+  $("menu-theme").addEventListener("click", () => {
+    closeOverlay("playlist-menu-sheet");
+    pltPlaylist = state.playlists.find((p) => p.id === currentPlaylistId) || null;
+    if (!pltPlaylist) return;
+    pltDraft = hasPlus() ? pltPlaylist.theme || "" : "";
+    pltKept = false;
+    $("screen-playlist").scrollTo(0, 0);
+    paintThemeSheet();
+    openOverlay("pl-theme-sheet");
+  });
+  // however the sheet closes, the playlist goes back to what is kept unless it was just kept
+  overlayCloseHooks["pl-theme-sheet"] = () => {
+    if (!pltPlaylist) return;
+    if (!pltKept) applyPlaylistTheme(pltPlaylist, hasPlus() ? pltPlaylist.theme || "" : "");
+    pltPlaylist = null;
+  };
+  $("plt-keep").addEventListener("click", () => {
+    if (!pltPlaylist) return;
+    if (pltDraft && !hasPlus()) { closeOverlay("pl-theme-sheet"); showScreen("plus"); return; }
+    pltKept = true;
+    Store.setPlaylistTheme(pltPlaylist.id, pltDraft);
+    haptic("success");
+    closeOverlay("pl-theme-sheet");
+  });
+  $("plt-cancel").addEventListener("click", () => closeOverlay("pl-theme-sheet"));
   $("menu-download").addEventListener("click", () => {
     closeOverlay("playlist-menu-sheet");
     const tracks = Store.getPlaylistTracks(currentPlaylistId);
