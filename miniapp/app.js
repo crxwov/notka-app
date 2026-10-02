@@ -126,11 +126,21 @@
   // Listening stats are the one part of the state that grows on its own;
   // keep the most-played tracks and let the long tail go.
   function trimListens(keep) {
-    // per-day records are only needed for «Месяц»
+    // per-day records serve «Неделя», «Месяц» and the «Машина времени»: three months of them,
+    // and from the ninth day back only the most-played of each day is kept
     const days = state.listens.days;
     if (days) {
-      const oldest = new Date(Date.now() - 31 * 86400000).toISOString().slice(0, 10);
-      Object.keys(days).forEach((key) => { if (key < oldest) delete days[key]; });
+      const oldest = dayKey(Date.now() - 100 * 86400000);
+      const thin = dayKey(Date.now() - 9 * 86400000);
+      Object.keys(days).forEach((key) => {
+        if (key < oldest) { delete days[key]; return; }
+        if (key < thin) {
+          const day = days[key];
+          const top = (obj, n) => Object.fromEntries(Object.entries(obj || {}).sort((a, b) => b[1][1] - a[1][1]).slice(0, n));
+          if (Object.keys(day.t).length > 15) day.t = top(day.t, 15);
+          if (Object.keys(day.a).length > 8) day.a = top(day.a, 8);
+        }
+      });
     }
     const entries = Object.entries(state.listens.tracks);
     if (entries.length <= keep) return;
@@ -1171,6 +1181,7 @@
     favs.forEach((track) => list.appendChild(buildTrackRow(track, { queue: state.favorites, context: "Любимые треки" })));
     updateMymixCardUI();
     renderRecent();
+    renderTimeMachine();
     refreshFresh();
     revealIn("screen-home", false);
   }
@@ -1239,6 +1250,62 @@
     });
     shelf.scrollLeft = 0;
   }
+
+  // «Машина времени»: what was listened to a week, a month, three months ago.
+  // The day nearest to that distance that has enough in it is taken. Without
+  // Плюс the cards are shown veiled, and lead to the Плюс page.
+  const TIME_STEPS = [[7, "Неделю назад"], [14, "Две недели назад"], [30, "Месяц назад"], [90, "Три месяца назад"]];
+  function timeMachineDay(daysAgo) {
+    const days = state.listens.days || {};
+    for (const off of [0, 1, -1, 2, -2, 3, -3]) {
+      const key = dayKey(Date.now() - (daysAgo + off) * 86400000);
+      const day = days[key];
+      if (!day) continue;
+      const tracks = Object.entries(day.t || {})
+        .sort((a, b) => b[1][1] - a[1][1])
+        .map(([tid]) => (state.listens.tracks[tid] || {}).track)
+        .filter(Boolean);
+      if (tracks.length >= 3) return { key, tracks, seconds: day.s || 0, ms: Date.now() - (daysAgo + off) * 86400000 };
+    }
+    return null;
+  }
+  const longDay = (ms) => new Date(ms).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+  function renderTimeMachine() {
+    const shelf = $("home-time");
+    const found = TIME_STEPS.map(([n, label]) => ({ n, label, day: timeMachineDay(n) })).filter((x) => x.day);
+    $("home-time-block").hidden = found.length === 0;
+    shelf.innerHTML = "";
+    found.forEach((x, i) => {
+      const cover = x.day.tracks.find((t) => t.artwork);
+      const card = shelfCard(cover ? cover.artwork : null, x.label, x.label, `${new Date(x.day.ms).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} · ${pluralTracks(x.day.tracks.length)}`, () => {
+        haptic("light");
+        if (hasPlus()) openTimeSheet(x.label, x.day); else showScreen("plus");
+      });
+      card.classList.toggle("is-locked", !hasPlus());
+      card.style.setProperty("--i", Math.min(i, 6));
+      shelf.appendChild(card);
+    });
+    shelf.scrollLeft = 0;
+  }
+  let timeDay = null;
+  function openTimeSheet(label, day) {
+    timeDay = day;
+    $("time-sheet-title").textContent = label;
+    const minutes = Math.round(day.seconds / 60);
+    $("time-sheet-sub").textContent = `${longDay(day.ms)} · ${pluralTracks(day.tracks.length)}${minutes ? ` · ${minutes} ${plural(minutes, "минута", "минуты", "минут")}` : ""}`;
+    const list = $("time-list");
+    list.innerHTML = "";
+    day.tracks.forEach((t, i) => list.appendChild(buildTrackRow(t, { index: i + 1, queue: day.tracks, context: label })));
+    openOverlay("time-sheet");
+  }
+  $("time-play").addEventListener("click", () => {
+    if (!timeDay) return;
+    haptic("success");
+    shuffleOn = false;
+    playTrack(timeDay.tracks[0], timeDay.tracks, { context: $("time-sheet-title").textContent, source: "time" });
+    closeOverlay("time-sheet");
+  });
+  $("time-close").addEventListener("click", () => closeOverlay("time-sheet"));
 
   // «Новое от любимых исполнителей»: the latest release (this year or last)
   // of each artist you follow or listen to the most. Asking about every
@@ -2384,6 +2451,30 @@
     if (hasRealPlus()) return true;
     try { return localStorage.getItem("notka_plus_local") === "1"; } catch (e) { return false; }
   }
+  // «Друг Нотки»: the badge in the profile. It grows with the time with Плюс:
+  // the day Плюс was first seen here is kept, and that sets its tier.
+  const FRIEND_TIERS = [[180, "veteran", "Друг Нотки с первых дней"], [30, "gold", "Друг Нотки"], [0, "new", "Друг Нотки"]];
+  function plusSince() {
+    try { return +localStorage.getItem("notka_plus_since") || 0; } catch (e) { return 0; }
+  }
+  function renderFriendBadge() {
+    const badge = $("friend-badge");
+    if (!badge) return;
+    if (!hasPlus()) { badge.hidden = true; return; }
+    let since = plusSince();
+    if (!since) { since = Date.now(); try { localStorage.setItem("notka_plus_since", String(since)); } catch (e) { /* once more next time */ } }
+    const days = (Date.now() - since) / 86400000;
+    const tier = FRIEND_TIERS.find(([d]) => days >= d);
+    badge.dataset.tier = tier[1];
+    badge.querySelector("span").textContent = tier[2];
+    badge.dataset.since = since;
+    badge.hidden = false;
+  }
+  $("friend-badge").addEventListener("click", () => {
+    haptic("success");
+    const since = +$("friend-badge").dataset.since;
+    showToast(`С Плюсом с ${new Date(since).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}. Спасибо, что поддерживаешь Нотку`);
+  });
   function rememberPlus(until) {
     try { localStorage.setItem("notka_plus_until", String(until || 0)); } catch (e) { /* stays for this session */ }
     syncPlusUI();
@@ -2406,6 +2497,7 @@
     const on = hasPlus();
     const real = hasRealPlus();
     document.body.classList.toggle("has-plus", on);
+    renderFriendBadge();
     $("plus-bar").classList.toggle("is-active", on);
     $("plus-bar").classList.toggle("is-real", real);
     $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";

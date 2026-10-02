@@ -22,7 +22,7 @@ try {
   await b.click("#menu-plus");
   await b.sleep(1200);
   check("the screen opens", (await b.eval("document.body.dataset.screen")) === "plus");
-  check("the stage shows a theme and five scenes follow", await b.eval("document.getElementById('plus-stage').dataset.show === 'vinyl' && document.querySelectorAll('#screen-plus .scene').length === 5"));
+  check("the stage shows a theme and six scenes follow", await b.eval("document.getElementById('plus-stage').dataset.show === 'vinyl' && document.querySelectorAll('#screen-plus .scene').length === 6"));
   await b.sleep(4600);
   check("the themes take turns by themselves", await b.eval("document.getElementById('plus-stage').dataset.show === 'cassette'"));
   await b.click('#plus-stage-tabs [data-show="vinyl"]');

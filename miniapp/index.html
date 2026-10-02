@@ -13,7 +13,7 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=62" />
+<link rel="stylesheet" href="styles.css?v=63" />
 <link rel="stylesheet" href="atmosphere.css?v=6" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -152,6 +152,11 @@
     <section class="block" id="home-recent-block" data-reveal hidden>
       <div class="block-head"><h2 class="h2">Недавнее</h2></div>
       <div class="shelf shelf-compact" id="home-recent"></div>
+    </section>
+
+    <section class="block" id="home-time-block" data-reveal hidden>
+      <div class="block-head"><h2 class="h2">Машина времени</h2></div>
+      <div class="shelf" id="home-time"></div>
     </section>
 
     <section class="block" id="home-fresh-block" data-reveal hidden>
@@ -385,6 +390,7 @@
       <span class="avatar avatar-lg" id="profile-avatar-btn"><span id="profile-initial">Н</span></span>
       <h1 class="hero-title" id="profile-name">Гость</h1>
       <p class="hero-sub" id="profile-sub">Вход через Telegram</p>
+      <button class="friend-badge" id="friend-badge" type="button" data-tier="new" hidden><svg width="14" height="14" aria-hidden="true"><use href="#i-heart-fill"/></svg><span>Друг Нотки</span></button>
     </div>
     <button class="plus-card" id="menu-plus" type="button" hidden>
       <span class="plus-card-mark" aria-hidden="true"><svg width="22" height="22"><use href="#i-plus"/></svg></span>
@@ -703,6 +709,12 @@
     <button class="pill-btn pill-quiet plus-try" id="plus-try-btn" type="button" data-reveal>Примерить на своей музыке</button>
 
     <section class="scene" data-reveal>
+      <div class="scene-demo demo-moods" aria-hidden="true"><i>Неделю назад</i><i>Месяц назад</i><i>Три месяца назад</i></div>
+      <h2 class="scene-title">Машина времени</h2>
+      <p class="scene-text">Что ты слушал неделю, месяц, три месяца назад, и тот день можно включить целиком.</p>
+    </section>
+
+    <section class="scene" data-reveal>
       <div class="scene-demo demo-seasons" aria-hidden="true">
         <span class="atmo-card" data-atmo="autumn"><span class="atmo-view"><i></i><i></i><i></i></span></span>
         <span class="atmo-card" data-atmo="winter"><span class="atmo-view"><i></i><i></i><i></i></span></span>
@@ -737,8 +749,8 @@
       </section>
       <section class="scene" data-reveal style="--i:1">
         <div class="scene-demo demo-thanks" aria-hidden="true"><svg width="44" height="44"><use href="#i-heart-fill"/></svg></div>
-        <h2 class="scene-title">Спасибо от нас</h2>
-        <p class="scene-text">Твоё имя среди друзей Нотки и новые функции раньше всех.</p>
+        <h2 class="scene-title">Друг Нотки</h2>
+        <p class="scene-text">Значок в профиле, который растёт вместе с тобой: чем дольше с Плюсом, тем он ярче.</p>
       </section>
     </div>
 
@@ -937,6 +949,17 @@
       <button class="sheet-row" id="menu-download" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-download"/></svg><span id="menu-download-label">Скачать все треки</span></button>
       <button class="sheet-row sheet-danger" id="menu-delete" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-trash"/></svg><span>Удалить плейлист</span></button>
       <button class="sheet-row sheet-cancel" id="playlist-menu-close" type="button">Отмена</button>
+    </div>
+  </div>
+
+  <div id="time-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="time-sheet-title">
+    <div class="sheet">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <p class="sheet-title" id="time-sheet-title">Неделю назад</p>
+      <p class="sheet-note" id="time-sheet-sub"></p>
+      <button class="pill-btn pill-primary pill-block" id="time-play" type="button"><svg width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><span>Включить тот день</span></button>
+      <ul class="track-list time-list" id="time-list"></ul>
+      <button class="sheet-row sheet-cancel" id="time-close" type="button">Закрыть</button>
     </div>
   </div>
 

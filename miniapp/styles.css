@@ -2362,3 +2362,20 @@ body[data-screen="player"] .player-only { display: block; }
   .sheet-row { min-height: 48px; }
   .sheet-head { padding-bottom: 10px; }
 }
+
+/* ==========================================================
+   МАШИНА ВРЕМЕНИ + ДРУГ НОТКИ
+   ========================================================== */
+.shelf-card.is-locked .cover img { filter: blur(7px) saturate(0.8); transform: scale(1.12); }
+.shelf-card.is-locked .cover::after { content: "Плюс"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); height: 24px; padding: 0 12px; display: flex; align-items: center; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: #14110f; font-size: 12.5px; font-weight: 700; z-index: 3; }
+.time-list { margin: 8px 0 4px; max-height: 38vh; overflow-y: auto; scrollbar-width: none; }
+.time-list::-webkit-scrollbar { display: none; }
+#time-sheet .pill-btn { margin: 4px 0 6px; }
+
+.friend-badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 13px 0 10px; margin-top: 10px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: 0.01em; position: relative; overflow: hidden; }
+.friend-badge svg { color: currentColor; }
+.friend-badge[data-tier="new"] { color: #ffd9a0; background: rgba(255, 217, 160, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 217, 160, 0.4); }
+.friend-badge[data-tier="gold"] { color: #2a1a06; background: linear-gradient(120deg, #ffe7a8, #f2b950); box-shadow: 0 6px 18px -8px rgba(242, 185, 80, 0.7); }
+.friend-badge[data-tier="veteran"] { color: #2a1a06; background: linear-gradient(120deg, #fff1c4, #f5c451 55%, #ffb36b); box-shadow: 0 8px 24px -8px rgba(245, 196, 81, 0.85); }
+.friend-badge[data-tier="veteran"]::after { content: ""; position: absolute; top: 0; bottom: 0; width: 34%; left: -40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7), transparent); animation: friend-shine 3.8s ease-in-out infinite; }
+@keyframes friend-shine { 0%, 55% { left: -40%; } 100% { left: 130%; } }
