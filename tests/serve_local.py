@@ -23,7 +23,7 @@ import tempfile
 
 os.environ["NOTKA_EVENTS_DIR"] = tempfile.mkdtemp(prefix="notka-events-")
 os.environ["NOTKA_TEST_USER"] = "424242"
-os.environ["NOTKA_FAKE_NOW"] = "2026-10-20"
+os.environ["NOTKA_FAKE_NOW"] = "2026-10-22"
 
 import uvicorn
 from fastapi.staticfiles import StaticFiles

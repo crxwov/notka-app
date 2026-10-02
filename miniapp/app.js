@@ -175,7 +175,7 @@
     toggleFavorite(track) {
       const idx = state.favorites.findIndex((t) => t.id === track.id);
       if (idx >= 0) state.favorites.splice(idx, 1);
-      else state.favorites.unshift(track);
+      else { state.favorites.unshift(track); eventNote("fav", 1, true); }
       persist();
       return this.isFavorite(track.id);
     },
@@ -2942,6 +2942,8 @@
     atmo_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><radialGradient id='m' cx='32%' cy='28%' r='85%'><stop offset='0' stop-color='#fffbea'/><stop offset='.55' stop-color='#ffe0ae'/><stop offset='1' stop-color='#ffb066'/></radialGradient></defs><path d='M31 5a19 19 0 1 0 13 29A16 16 0 0 1 31 5z' fill='url(#m)' stroke='#fff' stroke-opacity='.7' stroke-width='.8'/><path d='M14 14c3-5 8-8 13-8-5 2-9 6-10 11z' fill='#fff' opacity='.7'/><circle cx='37' cy='13' r='1.8' fill='#ffd9a0'/><circle cx='42' cy='21' r='1.3' fill='#ffd9a0'/></svg>"),
     edition_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#fff4c4'/><stop offset='1' stop-color='#e9b84a'/></linearGradient></defs><g fill='none' stroke='url(#g)' stroke-width='2' stroke-linecap='round'><path d='M24 3v42M6 12l36 24M6 36l36-24'/><circle cx='24' cy='24' r='7'/><circle cx='24' cy='24' r='14'/><circle cx='24' cy='24' r='20'/></g><circle cx='24' cy='24' r='3' fill='#fff4c4'/></svg>"),
   };
+  EVENT_ICONS.plus_3 = svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='p' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#ffe7c4'/><stop offset='.55' stop-color='#ff9d5a'/><stop offset='1' stop-color='#ff5f86'/></linearGradient></defs><rect x='6' y='6' width='36' height='36' rx='11' fill='url(#p)' stroke='#fff' stroke-opacity='.7' stroke-width='.9'/><path d='M24 14v20M14 24h20' stroke='#fff' stroke-width='4.2' stroke-linecap='round'/><path d='M12 17c2-4 6-6 10-6-4 2-7 5-8 9z' fill='#fff' opacity='.55'/><text x='35' y='41' font-size='11' font-weight='800' fill='#fff' font-family='sans-serif' text-anchor='middle'>3</text></svg>");
+  EVENT_ICONS.plus_10 = svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='p' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#fff1c9'/><stop offset='.5' stop-color='#ffb35c'/><stop offset='1' stop-color='#ff5f9a'/></linearGradient></defs><rect x='6' y='6' width='36' height='36' rx='11' fill='url(#p)' stroke='#fff' stroke-opacity='.8' stroke-width='.9'/><path d='M24 14v20M14 24h20' stroke='#fff' stroke-width='4.2' stroke-linecap='round'/><path d='M12 17c2-4 6-6 10-6-4 2-7 5-8 9z' fill='#fff' opacity='.55'/><text x='34' y='41' font-size='10' font-weight='800' fill='#fff' font-family='sans-serif' text-anchor='middle'>10</text></svg>");
   const EVENT_ICON_FALLBACK = svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path d='M24 4l5.5 12.5 13.5 1.3-10.2 9 3 13.2L24 33l-11.8 7 3-13.2L5 17.8l13.5-1.3z' fill='#e9c46a'/></svg>");
   const eventIcon = (item) => EVENT_ICONS[item] || EVENT_ICON_FALLBACK;
 
@@ -2960,13 +2962,13 @@
     const v = (state.events.progress[eventId] || {})[task.id];
     return Array.isArray(v) ? v.length : +v || 0;
   }
-  function eventPoints(ev) { return ev.tasks.filter((t) => taskValue(ev.id, t) >= t.target).length; }
+  function eventPoints(ev) { return ev.tasks.filter((t) => !t.locked && taskValue(ev.id, t) >= t.target).length; }
 
   // something happened that a task may be waiting for
   function eventNote(kind, value, quiet) {
     let changed = false;
     activeEvents().forEach((ev) => ev.tasks.forEach((t) => {
-      if (t.kind !== kind) return;
+      if (t.kind !== kind || t.locked || t.day > (ev.dayNow || 0)) return;
       const p = state.events.progress[ev.id] || (state.events.progress[ev.id] = {});
       if (t.unique) {
         const set = Array.isArray(p[t.id]) ? p[t.id] : (p[t.id] = []);
@@ -2986,7 +2988,7 @@
     activeEvents().forEach((ev) => {
       const points = eventPoints(ev);
       ev.tiers.forEach((tier) => {
-        if (tier.limit || points < tier.points || ownsItem(tier.item)) return;
+        if (tier.limit || tier.plusDays || points < tier.points || ownsItem(tier.item)) return;
         state.events.items.push(tier.item);
         if (announce) announceReward(tier);
       });
@@ -3048,6 +3050,7 @@
   function mergeMine(ev, mine, quiet) {
     if (!mine) return;
     if (mine.edition) state.events.editions[ev.id] = mine.edition;
+    if (mine.plusUntil) rememberPlus(mine.plusUntil);
     const had = new Set(state.events.items);
     (mine.items || []).forEach((item) => {
       if (had.has(item)) return;
@@ -3060,6 +3063,7 @@
     // what the server knows from another phone is not lost
     const p = state.events.progress[ev.id] || (state.events.progress[ev.id] = {});
     ev.tasks.forEach((t) => {
+      if (t.locked) return;
       const server = Math.min(t.target, +((mine.progress || {})[t.id]) || 0);
       if (t.unique) {
         const set = Array.isArray(p[t.id]) ? p[t.id] : (p[t.id] = []);
@@ -3073,7 +3077,7 @@
   async function syncEvents() {
     for (const ev of activeEvents()) {
       const progress = {};
-      ev.tasks.forEach((t) => { progress[t.id] = taskValue(ev.id, t); });
+      ev.tasks.forEach((t) => { if (!t.locked) progress[t.id] = taskValue(ev.id, t); });
       try {
         const res = await fetch(`${API_BASE_URL}/events/sync`, { method: "POST", headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitData }, body: JSON.stringify({ event: ev.id, progress }) });
         if (res.ok) mergeMine(ev, await res.json(), false);
@@ -3115,6 +3119,9 @@
 
   // ---- the banner on Home and the page of the event ----
   const daysWord = (n) => `${n} ${plural(n, "день", "дня", "дней")}`;
+  // the face of the pumpkin lights at 2, 3, 5 and 7 finished tasks; the whole of it at the last
+  const PUMPKIN_STEPS = [2, 3, 5, 7];
+  const dateOfDay = (ev, day) => new Date(new Date(ev.start + "T12:00:00").getTime() + (day - 1) * 86400000).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
   let bannerPumpkinFor = null;
   function renderEventUI() {
     const banner = $("home-event");
@@ -3122,14 +3129,16 @@
     banner.hidden = !ev;
     if (ev) {
       const points = eventPoints(ev), total = ev.tasks.length;
+      const today = ev.tasks.find((t) => t.day === ev.dayNow && !t.locked);
+      const todayDone = today && taskValue(ev.id, today) >= today.target;
       $("event-banner-title").textContent = ev.title;
       $("event-banner-word").textContent = ev.title;
-      $("event-banner-kicker").textContent = points >= total ? "Всё горит" : `Ещё ${daysWord(ev.days)}`;
-      $("event-banner-count").textContent = `${points}/${total}`;
+      $("event-banner-kicker").textContent = points >= total ? "Всё горит" : ev.dayNow <= total ? `День ${ev.dayNow} из ${total}` : `Ещё ${daysWord(ev.days)}`;
+      $("event-banner-sub").innerHTML = points >= total ? "Все задания выполнены" : todayDone ? `Сегодня готово · <b id="event-banner-count">${points}/${total}</b>` : `Зажги тыкву · <b id="event-banner-count">${points}/${total}</b>`;
       $("event-banner-bars").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${points > i ? "is-on" : ""}"></i>`).join("");
       const holder = $("event-banner-pk");
       if (bannerPumpkinFor !== ev.id) { holder.innerHTML = PumpkinArt.svg(); bannerPumpkinFor = ev.id; }
-      PumpkinArt.lightTo(holder, points);
+      PumpkinArt.lightTo(holder, points, { total, steps: PUMPKIN_STEPS });
     }
     if (currentScreen === "event") renderEventScreen();
     applyEventItems();
@@ -3138,18 +3147,19 @@
   // what to do about each kind of task, and where it leads
   const TASK_GO = {
     listen: { label: "Включить музыку", run: () => showScreen("home") },
+    night: { label: "Включить музыку", run: () => showScreen("home") },
     mood: { label: "Выбрать настроение", run: () => showScreen("mood") },
+    fav: { label: "Найти треки", run: () => showScreen("search") },
     playlist: { label: "Найти треки", run: () => showScreen("search") },
     share: { label: "Выбрать плейлист", run: () => showScreen("library") },
     bat: { label: "Лови мышей здесь", run: () => { haptic("light"); showToast("Нажми на летучую мышь, когда она пролетает"); } },
-    visit: { label: "Загляни завтра", run: null },
   };
+  const isOpen = (ev, t) => !t.locked && t.day <= (ev.dayNow || 0);
+  const isDone = (ev, t) => isOpen(ev, t) && taskValue(ev.id, t) >= t.target;
+  // today's task first, then the ones that were missed (the oldest first)
   function nextTask(ev) {
-    const open = ev.tasks.filter((t) => taskValue(ev.id, t) < t.target);
-    const doable = open.filter((t) => t.kind !== "visit");
-    const pool = doable.length ? doable : open;
-    // the one that is nearest to done
-    return pool.sort((a, b) => taskValue(ev.id, b) / b.target - taskValue(ev.id, a) / a.target)[0] || null;
+    const open = ev.tasks.filter((t) => isOpen(ev, t) && !isDone(ev, t));
+    return open.find((t) => t.day === ev.dayNow) || open[0] || null;
   }
   const taskLine = (ev, t) => {
     const v = taskValue(ev.id, t);
@@ -3161,12 +3171,12 @@
     const ev = eventById(currentEventId);
     if (!ev) return;
     const points = eventPoints(ev), total = ev.tasks.length;
-    $("event-days").textContent = ev.status === "active" ? `Ещё ${daysWord(ev.days)}` : "Завершено";
+    $("event-days").textContent = ev.status === "active" ? (ev.dayNow <= total ? `День ${ev.dayNow} из ${total}` : `Ещё ${daysWord(ev.days)}`) : "Завершено";
     const title = $("event-title");
     title.textContent = ev.title;
     title.style.setProperty("--len", String(ev.title.length));
     $("event-count").textContent = String(points);
-    $("event-count-of").innerHTML = `из ${total}<br>${plural(total, "огонька", "огоньков", "огоньков")} горит`;
+    $("event-count-of").innerHTML = `из ${total}<br>заданий выполнено`;
 
     // the pumpkin: built once, lit up part by part each time the page is opened
     const stage = $("event-stage");
@@ -3188,32 +3198,44 @@
       window.addEventListener("touchmove", (e) => { if (currentScreen === "event" && e.touches[0]) look(e.touches[0]); }, { passive: true });
       window.addEventListener("mousemove", (e) => { if (currentScreen === "event") look(e); });
     }
+    const light = { total, steps: PUMPKIN_STEPS };
     if (eventScreenFresh || eventLitShown < 0) {
       eventScreenFresh = false;
-      PumpkinArt.lightTo(stage, points, { animate: true, delay: 600, onStep: (c) => { haptic("light"); const r = stage.getBoundingClientRect(); PumpkinArt.burst(stage, r.width / 2, r.height * 0.55, 8); } });
+      PumpkinArt.lightTo(stage, points, Object.assign({ animate: true, delay: 600, onStep: (c) => { haptic("light"); const r = stage.getBoundingClientRect(); PumpkinArt.burst(stage, r.width / 2, r.height * 0.55, 6); } }, light));
     } else if (points !== eventLitShown) {
-      PumpkinArt.lightTo(stage, points, {});
+      PumpkinArt.lightTo(stage, points, light);
     }
     eventLitShown = points;
+
+    // the days, as a calendar of ten small lights: done, today, missed, still closed
+    $("event-calendar").innerHTML = ev.tasks.map((t) => {
+      const done = isDone(ev, t), open = isOpen(ev, t);
+      const cls = done ? "is-done" : !open ? "is-closed" : t.day === ev.dayNow ? "is-today" : "is-missed";
+      return `<span class="cal-day ${cls}" title="${open ? "" : `Откроется ${dateOfDay(ev, t.day)}`}">${done ? '<svg width="14" height="14" aria-hidden="true"><use href="#i-check"/></svg>' : t.day}</span>`;
+    }).join("");
 
     // what to do next, in one card
     const next = $("event-next");
     const task = nextTask(ev);
-    if (!task) {
+    if (points >= total) {
       next.className = "event-next glass is-done";
-      next.innerHTML = `<span class="event-next-k">Готово</span><b class="event-next-t">Тыква горит ярче всех</b><span class="event-next-s">Все задания выполнены. Награды ждут в «Оформлении».</span>`;
+      next.innerHTML = `<span class="event-next-k">Готово</span><b class="event-next-t">Тыква горит ярче всех</b><span class="event-next-s">Все задания выполнены. Награды уже у тебя.</span>`;
+    } else if (!task) {
+      const tomorrow = ev.tasks.find((t) => t.day === (ev.dayNow || 0) + 1);
+      next.className = "event-next glass";
+      next.innerHTML = `<span class="event-next-k">Сегодня готово</span><b class="event-next-t">Новое задание завтра</b><span class="event-next-s">${tomorrow ? `Откроется ${dateOfDay(ev, tomorrow.day)}` : "Заходи завтра"}</span>`;
     } else {
       const go = TASK_GO[task.kind];
       next.className = "event-next glass";
-      next.innerHTML = `<span class="event-next-k">Следующий шаг</span><b class="event-next-t">${task.title}</b><span class="event-next-s">${taskLine(ev, task)}</span>${go && go.run ? `<br><button class="event-next-btn" type="button" id="event-next-btn">${go.label}<svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>` : ""}`;
+      next.innerHTML = `<span class="event-next-k">${task.day === ev.dayNow ? `Задание дня ${task.day}` : `Пропущено · день ${task.day}`}</span><b class="event-next-t">${task.title}</b><span class="event-next-s">${taskLine(ev, task)}</span>${go && go.run ? `<br><button class="event-next-btn" type="button" id="event-next-btn">${go.label}<svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>` : ""}`;
       const btn = $("event-next-btn");
       if (btn) btn.addEventListener("click", () => { haptic("light"); go.run(); });
     }
 
     $("event-rewards").innerHTML = ev.tiers.map((tier) => {
-      const open = ownsItem(tier.item);
+      const open = ownsItem(tier.item) || (tier.plusDays && points >= tier.points && hasRealPlus());
       const left = tier.points - points;
-      const sub = open ? (tier.limit && state.events.editions[ev.id] ? `Твой номер ${state.events.editions[ev.id]}` : "Получено") : left > 0 ? `Ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : "Тираж разобран";
+      const sub = open ? (tier.limit && state.events.editions[ev.id] ? `Твой номер ${state.events.editions[ev.id]}` : "Получено") : left > 0 ? `Ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : tier.limit ? "Тираж разобран" : "Скоро";
       return `<li class="event-reward glass ${open ? "is-open" : "is-locked"}" data-item="${tier.item}"><span class="er-medal"><img alt="" src="${eventIcon(tier.item)}"></span><span class="er-text"><b>${tier.title}</b><em>${sub}</em></span><span class="er-pts">${tier.points}</span></li>`;
     }).join("");
     const limitTier = ev.tiers.find((t) => t.limit);
@@ -3225,10 +3247,12 @@
     edition.hidden = !limitTier || !edition.innerHTML;
 
     $("event-debug").hidden = !plusPreview();
-    $("event-tasks").innerHTML = ev.tasks.map((t, i) => {
+    // the tasks that have opened, and the days that have not (only their date shows)
+    $("event-tasks").innerHTML = ev.tasks.map((t) => {
+      if (!isOpen(ev, t)) return `<li class="event-task glass is-closed"><span class="et-n">${t.day}</span><span class="et-body"><b>Задание дня ${t.day}</b><em>Откроется ${dateOfDay(ev, t.day)}</em></span></li>`;
       const v = taskValue(ev.id, t), done = v >= t.target, go = TASK_GO[t.kind];
       const canGo = !done && go && go.run;
-      return `<li class="event-task glass${done ? " is-done" : ""}"${canGo ? ` data-go="${t.kind}"` : ""}><span class="et-n">${done ? '<svg width="18" height="18" aria-hidden="true"><use href="#i-check"/></svg>' : i + 1}</span><span class="et-body"><b>${t.title}</b><span class="et-bar"><i style="--w:${Math.min(1, v / t.target).toFixed(3)}"></i></span><em>${taskLine(ev, t)}</em></span>${canGo ? '<span class="et-go"><svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></span>' : ""}</li>`;
+      return `<li class="event-task glass${done ? " is-done" : ""}"${canGo ? ` data-go="${t.kind}"` : ""}><span class="et-n">${done ? '<svg width="18" height="18" aria-hidden="true"><use href="#i-check"/></svg>' : t.day}</span><span class="et-body"><b>${t.title}</b><span class="et-bar"><i style="--w:${Math.min(1, v / t.target).toFixed(3)}"></i></span><em>${taskLine(ev, t)}</em></span>${canGo ? '<span class="et-go"><svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></span>' : ""}</li>`;
     }).join("");
   }
   $("event-tasks").addEventListener("click", (e) => {
@@ -3247,6 +3271,12 @@
     syncEvents();
     renderEventScreen();
   }
+  $("evd-day").addEventListener("click", async () => {
+    haptic("light");
+    try { await fetch(`${API_BASE_URL}/events/advance`, { method: "POST" }); } catch (e) { /* nothing then */ }
+    await refreshEvents();
+    showToast("Открыт следующий день");
+  });
   $("evd-next").addEventListener("click", () => {
     const ev = eventById(currentEventId);
     const t = ev && nextTask(ev);
@@ -3259,7 +3289,7 @@
     const ev = eventById(currentEventId);
     if (!ev) return;
     haptic("light");
-    ev.tasks.forEach((t) => completeTask(ev, t));
+    ev.tasks.forEach((t) => { if (isOpen(ev, t)) completeTask(ev, t); });
     finishChecking(ev);
   });
   $("evd-reset").addEventListener("click", async () => {
@@ -3271,6 +3301,7 @@
     delete state.events.editions[ev.id];
     const mine = new Set(ev.tiers.map((t) => t.item));
     state.events.items = state.events.items.filter((it) => !mine.has(it));
+    ev.dayNow = 0;
     ev.editionLeft = undefined;
     persist();
     eventLitShown = -1;
@@ -4612,6 +4643,8 @@
         L.seconds += d;
         statHeard += d;
         eventNote("listen", d / 60, true);
+        const hour = new Date().getHours();
+        if (hour >= 22 || hour < 5) eventNote("night", d / 60, true);
         const key = currentTrack.artist || "Неизвестный исполнитель";
         const a = L.artists[key] || (L.artists[key] = { seconds: 0, plays: 0 });
         a.seconds += d;

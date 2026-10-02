@@ -310,6 +310,12 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             return int(test_user) if test_user.isdigit() else int(os.environ["NOTKA_TEST_USER"])
         return user_id
 
+    def grant_plus(user_id: int, days: int, via: str) -> dict:
+        # the local test server (it has its own folder for events) gives nothing real
+        if os.environ.get("NOTKA_EVENTS_DIR"):
+            return {"plus": True, "until": int(time.time() + days * 86400)}
+        return plus_store.grant(user_id, days, via)
+
     @router.get("/events")
     async def events_list(x_telegram_init_data: str = Header(default=""), x_notka_test_user: str = Header(default="")) -> dict:
         user_id = event_user(x_telegram_init_data, x_notka_test_user)
@@ -323,11 +329,18 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         try:
             body = await request.json()
             progress = body.get("progress") if isinstance(body.get("progress"), dict) else {}
-            return events_store.sync(user_id, str(body.get("event") or ""), progress)
+            return events_store.sync(user_id, str(body.get("event") or ""), progress, grant=grant_plus)
         except KeyError:
             return JSONResponse({"error": {"code": "NO_SUCH_EVENT"}}, status_code=404)
         except (ValueError, AttributeError):
             return JSONResponse({"error": {"code": "BAD_REQUEST"}}, status_code=400)
+
+    @router.post("/events/advance")
+    async def events_advance() -> dict:
+        try:
+            return {"devDays": events_store.advance_day()}
+        except PermissionError:
+            return JSONResponse({"error": {"code": "NOT_A_PREVIEW"}}, status_code=403)
 
     @router.post("/events/reset")
     async def events_reset(request: Request, x_telegram_init_data: str = Header(default=""), x_notka_test_user: str = Header(default="")):

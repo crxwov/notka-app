@@ -2,13 +2,12 @@
  *
  * A pumpkin of liquid glass, like the rest of Нотка: three overlapping
  * translucent lobes, a bright rim, glints on top and a warm light inside.
- * Every finished task lights one part of the face, from the inside:
- *   1 left eye   2 right eye        (the frame)
- *   3 nose       4 mouth            (the theme)
- *   5 the whole pumpkin starts to shine
- *   6 soft rays come out behind it  (the numbered edition)
- * What is not lit yet is only etched with a dashed line, so it is plain
- * what is still to be done.
+ * The face lights from the inside as tasks are finished: the parts at the
+ * steps given in ``opts.steps`` (the number of finished tasks at which the
+ * left eye, the right eye, the nose and the mouth light up), and when all
+ * ``opts.total`` tasks are done the whole pumpkin shines and soft rays come
+ * out behind it. What is not lit yet is only etched with a dashed line, so
+ * it is plain what is still to be done.
  *
  *   PumpkinArt.svg()                 -> markup of one pumpkin
  *   PumpkinArt.lightTo(el, n, opts)  -> light n parts (opts.animate: one after another)
@@ -73,11 +72,13 @@ window.PumpkinArt = (function () {
     opts = opts || {};
     const el = root.querySelector("svg.pk");
     if (!el) return;
+    const total = opts.total || 6;
+    const steps = opts.steps || [1, 2, 3, 4];
     const apply = (count) => {
-      for (let i = 1; i <= 4; i++) el.querySelector(".pk-" + i).classList.toggle("is-lit", count >= i);
-      el.classList.toggle("is-glow", count >= 5);
-      el.classList.toggle("is-rays", count >= 6);
-      root.style.setProperty("--lit", String(Math.min(1, count / 6)));
+      for (let i = 1; i <= 4; i++) el.querySelector(".pk-" + i).classList.toggle("is-lit", count >= steps[i - 1]);
+      el.classList.toggle("is-glow", count >= total);
+      el.classList.toggle("is-rays", count >= total);
+      root.style.setProperty("--lit", String(Math.min(1, count / total)));
       root.dataset.lit = String(count);
     };
     if (!opts.animate || n === 0) { apply(n); return; }
