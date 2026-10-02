@@ -40,7 +40,7 @@ try {
   await b.sleep(1800);
   check("the page opens in the atmosphere of the event", (await b.eval("document.body.dataset.screen")) === "event" && (await b.eval("document.body.dataset.atmo")) === "halloween");
   check("it shows six tasks and three rewards", await b.eval("document.querySelectorAll('#event-tasks .event-task').length === 6 && document.querySelectorAll('#event-rewards .event-reward').length === 3"));
-  check("the numbered one tells how many are left", await b.eval("/осталось \d+ из 100/.test(document.getElementById('event-edition').textContent)"));
+  check("the numbered one tells how many are left", await b.eval("/осталось [0-9]+ из 100/.test(document.getElementById('event-edition').textContent)"));
   await b.shot("event-page");
   await b.eval("document.getElementById('screen-event').scrollTo(0, 99999); true");
   await b.sleep(400);
@@ -72,7 +72,7 @@ try {
   check("six open the numbered edition, and the server gave it a number", ev.editions.halloween > 0 && ev.items.includes("edition_halloween"), JSON.stringify(ev.editions));
   await b.click("#home-avatar-btn");
   await b.sleep(900);
-  check("the profile shows the number", await b.eval("!document.getElementById('edition-badge').hidden && /№ \d+/.test(document.getElementById('edition-badge').textContent)"));
+  check("the profile shows the number", await b.eval("!document.getElementById('edition-badge').hidden && /№ [0-9]+/.test(document.getElementById('edition-badge').textContent)"));
   await b.shot("event-profile");
   await b.eval(`document.getElementById("menu-look").click(); true`);
   await b.sleep(800);
