@@ -422,7 +422,7 @@
       return {
         ember: sprite(24, 24, glowDot("rgba(255,150,40,1)", 0.25)),
         emberHot: sprite(24, 24, glowDot("rgba(255,220,120,1)", 0.25)),
-        fly: sprite(28, 28, glowDot("rgba(190,255,120,1)", 0.2)),
+        fly: sprite(28, 28, glowDot("rgba(222,236,160,1)", 0.2)),
         fog: sprite(256, 256, glowDot("rgba(150,110,200,0.5)", 0.1)),
         fogOrange: sprite(256, 256, glowDot("rgba(255,120,40,0.4)", 0.1)),
       };

@@ -2511,37 +2511,37 @@
   const ATMOS = {
     autumn: {
       name: "Осень",
-      lights: { sunset: ["Закат", { core: "#FFE2B0", warm: "#FF8A2B", mid: "#D4501E", deep: "#5A2412" }], morning: ["Утро", { core: "#FFF3DA", warm: "#FFC078", mid: "#E8847A", deep: "#4A2B33" }], dusk: ["Сумерки", { core: "#FFD8C2", warm: "#E5673C", mid: "#8E3B6E", deep: "#2A1030" }] },
+      lights: { sunset: ["Закат", { core: "#FFE6C4", warm: "#F59B45", mid: "#C8683A", deep: "#4A2416" }], morning: ["Утро", { core: "#FFF1DC", warm: "#F4B779", mid: "#D98A7A", deep: "#46303A" }], dusk: ["Сумерки", { core: "#F6D5C4", warm: "#D9744A", mid: "#8C4A6E", deep: "#2A1830" }] },
       options: [["amount", "Листья", AMOUNT_CHOICES, "low"], ["wind", "Ветер", [["soft", "Лёгкий"], ["calm", "Штиль"], ["gusty", "Порывы"]], "soft"], ["rays", "Лучи", ONOFF, "on"]],
     },
     winter: {
       name: "Зима",
-      lights: { ice: ["Лёд", { core: "#EAF6FF", warm: "#7CC4FF", mid: "#5B8CFF", deep: "#1D3A78" }], dawn: ["Заря", { core: "#FFE9F2", warm: "#FF9EC4", mid: "#8E8CFF", deep: "#2A2F6E" }], deep: ["Ночь", { core: "#DCEBFF", warm: "#5E8CFF", mid: "#3D4FD6", deep: "#0F1A55" }] },
+      lights: { ice: ["Лёд", { core: "#EEF6FD", warm: "#8DC3EE", mid: "#6F9BDD", deep: "#1B3260" }], dawn: ["Заря", { core: "#FBEAF1", warm: "#EFA6C2", mid: "#9A9AE0", deep: "#2B3070" }], deep: ["Ночь", { core: "#E4EEFC", warm: "#6D95E8", mid: "#4C5BD0", deep: "#121C58" }] },
       options: [["amount", "Снег", AMOUNT_CHOICES, "low"], ["aurora", "Сияние", ONOFF, "on"], ["frost", "Иней на панелях", ONOFF, "on"]],
     },
     spring: {
       name: "Весна",
-      lights: { sakura: ["Сакура", { core: "#FFF0F5", warm: "#FF9DBF", mid: "#F06DA8", deep: "#5A2A66" }], mint: ["Мята", { core: "#EAFFF3", warm: "#7FE3B2", mid: "#38B6A6", deep: "#173F4A" }], sunrise: ["Рассвет", { core: "#FFF4D6", warm: "#FFC470", mid: "#FF8FA3", deep: "#4B2850" }] },
+      lights: { sakura: ["Сакура", { core: "#FFF4F7", warm: "#F4B6CC", mid: "#D890B4", deep: "#4C3354" }], mint: ["Мята", { core: "#EFFBF4", warm: "#8ED9B8", mid: "#52B0A6", deep: "#1E4048" }], sunrise: ["Рассвет", { core: "#FFF5DE", warm: "#F5C98A", mid: "#EDA0A8", deep: "#4B3052" }] },
       options: [["amount", "Лепестки", AMOUNT_CHOICES, "low"], ["petals", "Цвет лепестков", [["sakura", "Сакура"], ["white", "Белые"], ["mixed", "Вперемешку"]], "sakura"], ["pollen", "Пыльца", ONOFF, "on"]],
     },
     rain: {
       name: "Дождь",
-      lights: { grey: ["Серый", { core: "#DCE8F5", warm: "#6FA3D6", mid: "#4F6FA8", deep: "#1E2B4A" }], dusk: ["Вечер", { core: "#E6DDF5", warm: "#9A86D6", mid: "#5B6BB5", deep: "#1F2150" }], green: ["Мокрый лес", { core: "#E3F3EA", warm: "#6FC3A0", mid: "#3E8A8A", deep: "#14343C" }] },
+      lights: { grey: ["Серый", { core: "#E2EAF3", warm: "#7FA6CF", mid: "#5D78A8", deep: "#223049" }], dusk: ["Вечер", { core: "#E9E2F2", warm: "#A090D0", mid: "#6670B0", deep: "#242650" }], green: ["Мокрый лес", { core: "#E6F2EA", warm: "#7BBFA0", mid: "#4A8C8C", deep: "#183A40" }] },
       options: [["amount", "Дождь", [["rain", "Дождь"], ["drizzle", "Морось"], ["storm", "Ливень"], ["none", "Нет"]], "drizzle"], ["glass", "Капли на стекле", ONOFF, "on"], ["thunder", "Гроза", [["off", "Нет"], ["on", "Есть"]], "off"]],
     },
     night: {
       name: "Звёздная ночь",
-      lights: { indigo: ["Индиго", { core: "#E4EEFF", warm: "#7DA2FF", mid: "#8A6BFF", deep: "#1C1F66" }], teal: ["Сияние", { core: "#DDFFF6", warm: "#4FE0C0", mid: "#5B8CFF", deep: "#10285A" }], violet: ["Фиолет", { core: "#F0E4FF", warm: "#B58CFF", mid: "#E05BD0", deep: "#2A1466" }] },
+      lights: { indigo: ["Индиго", { core: "#E8EEFB", warm: "#84A0EE", mid: "#7068D4", deep: "#1A1D56" }], teal: ["Сияние", { core: "#E2FBF5", warm: "#5CDCC0", mid: "#5F8CE0", deep: "#12305C" }], violet: ["Фиолет", { core: "#F2E8FD", warm: "#B592F0", mid: "#B672D8", deep: "#2C1A66" }] },
       options: [["amount", "Звёзды", AMOUNT_CHOICES, "low"], ["cons", "Созвездия", ONOFF, "on"], ["meteors", "Падающие звёзды", [["rare", "Редко"], ["often", "Часто"], ["off", "Нет"]], "rare"], ["aurora", "Сияние", ONOFF, "on"]],
     },
     halloween: {
       name: "Хэллоуин", loot: true,
-      lights: { candle: ["Свеча", { core: "#FFD9A0", warm: "#FF7A18", mid: "#8E2DE2", deep: "#2A0B45" }], toxic: ["Зелье", { core: "#EEFFC0", warm: "#8CFF3A", mid: "#00B36B", deep: "#06281A" }], blood: ["Багровый", { core: "#FFD0CC", warm: "#FF3B3B", mid: "#B01E5A", deep: "#2A0612" }] },
+      lights: { candle: ["Свеча", { core: "#FFE0AE", warm: "#F58A2A", mid: "#7C3FC4", deep: "#220C3A" }], toxic: ["Зелье", { core: "#F0FFC8", warm: "#A4F04A", mid: "#1FB07A", deep: "#0A2A1C" }], blood: ["Багровый", { core: "#FFD8D2", warm: "#F04848", mid: "#B02860", deep: "#2A0A14" }] },
       options: [["life", "Огоньки", [["flies", "Светлячки"], ["embers", "Искры"], ["both", "Оба"]], "flies"], ["amount", "Количество", AMOUNT_CHOICES, "low"], ["bats", "Летучие мыши", [["rare", "Редко"], ["often", "Часто"], ["off", "Нет"]], "rare"], ["fog", "Туман", ONOFF, "on"], ["moon", "Луна", ONOFF, "on"], ["webs", "Паутина", ONOFF, "on"]],
     },
     newyear: {
       name: "Новый год", loot: true,
-      lights: { gold: ["Золото", { core: "#FFF1C9", warm: "#F2C14E", mid: "#E04F5F", deep: "#0E2A5C" }], silver: ["Серебро", { core: "#FFFFFF", warm: "#CFE0FF", mid: "#8FA8E8", deep: "#10204A" }], ruby: ["Рубин", { core: "#FFE3E3", warm: "#FF6B7A", mid: "#C2304F", deep: "#3A0A1E" }] },
+      lights: { gold: ["Золото", { core: "#FFF3D8", warm: "#EDC261", mid: "#5C76C8", deep: "#0C1C48" }], silver: ["Серебро", { core: "#FFFFFF", warm: "#D3E1FA", mid: "#93ABE4", deep: "#101F4C" }], ruby: ["Рубин", { core: "#FFE8E4", warm: "#F2796F", mid: "#B8365A", deep: "#3A0E22" }] },
       options: [["garland", "Гирлянда", [["warm", "Тёплая"], ["color", "Цветная"], ["cold", "Холодная"], ["off", "Нет"]], "warm"], ["bokeh", "Огни вдали", ONOFF, "on"], ["glitter", "Блёстки", [["on", "Есть"], ["off", "Нет"]], "on"]],
     },
   };

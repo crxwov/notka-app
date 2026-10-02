@@ -50,7 +50,7 @@ try {
   check("a setting is kept and the style sheet answers it", await b.eval("JSON.parse(localStorage.getItem('notka_state_v2')).settings.atmoOpts.winter.aurora === 'off' && document.body.dataset.atmoAurora === 'off'"));
   await b.click('#atmo-opts .chip[data-setting="light"][data-v="dawn"]');
   await b.sleep(500);
-  check("another light changes the palette", await b.eval("document.documentElement.style.getPropertyValue('--c-warm').trim().toLowerCase() === '#ff9ec4'"));
+  check("another light changes the palette", await b.eval("document.documentElement.style.getPropertyValue('--c-warm').trim().toLowerCase() === '#efa6c2'"));
   await b.click('#atmo-stage .atmo-card[data-atmo="halloween"]');
   await b.sleep(500);
   check("every atmosphere has settings of its own", await b.eval("document.querySelectorAll('#atmo-opts .atmo-opt').length === 7"));
