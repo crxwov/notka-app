@@ -70,6 +70,13 @@ try {
   await b.waitFor("JSON.parse(localStorage.getItem('notka_state_v2')).events.editions.halloween > 0", 12000, "the server's number");
   const ev = await mine();
   check("six open the numbered edition, and the server gave it a number", ev.editions.halloween > 0 && ev.items.includes("edition_halloween"), JSON.stringify(ev.editions));
+  await b.eval("document.getElementById('rp-ok') && document.getElementById('rp-ok').click(); true");
+  await b.sleep(500);
+  await b.click("#home-event");
+  await b.sleep(4600);
+  await b.shot("event-page-lit");
+  await b.click("#event-back-btn");
+  await b.sleep(500);
   await b.click("#home-avatar-btn");
   await b.sleep(900);
   check("the profile shows the number", await b.eval("!document.getElementById('edition-badge').hidden && /№ [0-9]+/.test(document.getElementById('edition-badge').textContent)"));

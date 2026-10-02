@@ -1,19 +1,18 @@
 /* The pumpkin of the Хэллоуин event: «Зажги тыкву».
  *
- * It is the Нотка orb — two circles that overlap, with a bright rim — made a
- * pumpkin: three overlapping lobes in an orange-to-magenta gradient, grain on
- * them, and a face cut out in black. Every finished task lights one part
- * of the face, in the acid yellow of the event:
+ * A pumpkin of liquid glass, like the rest of Нотка: three overlapping
+ * translucent lobes, a bright rim, glints on top and a warm light inside.
+ * Every finished task lights one part of the face, from the inside:
  *   1 left eye   2 right eye        (the frame)
  *   3 nose       4 mouth            (the theme)
  *   5 the whole pumpkin starts to shine
- *   6 the rays come out behind it   (the numbered edition)
- * Parts that are not lit yet are only drawn with a dashed line, so it is
- * plain what is still to be done.
+ *   6 soft rays come out behind it  (the numbered edition)
+ * What is not lit yet is only etched with a dashed line, so it is plain
+ * what is still to be done.
  *
  *   PumpkinArt.svg()                 -> markup of one pumpkin
  *   PumpkinArt.lightTo(el, n, opts)  -> light n parts (opts.animate: one after another)
- *   PumpkinArt.burst(host, x, y, n)  -> confetti from a point
+ *   PumpkinArt.burst(host, x, y, n)  -> a handful of sparks from a point
  */
 window.PumpkinArt = (function () {
   "use strict";
@@ -26,31 +25,40 @@ window.PumpkinArt = (function () {
     const nose = "M160 172 L145 198 L175 198 Z";
     const mouth = "M104 212 Q160 292 216 212 L206 222 L196 210 L186 228 L173 213 L160 232 L147 213 L134 228 L124 210 L114 222 Z";
     const rays = Array.from({ length: 14 }, (_, i) => {
-      const a = (i * 2 * Math.PI) / 14, w = 0.12;
+      const a = (i * 2 * Math.PI) / 14, w = 0.1;
       const p = (ang, r) => `${(160 + Math.cos(ang) * r).toFixed(1)},${(172 + Math.sin(ang) * r).toFixed(1)}`;
-      return `<polygon points="${p(a - w, 96)} ${p(a, 214)} ${p(a + w, 96)}"/>`;
+      return `<polygon points="${p(a - w, 90)} ${p(a, 210)} ${p(a + w, 90)}"/>`;
     }).join("");
-    const part = (n, d, extra) => `<g class="pk-cut pk-${n}"><path class="pk-glow" d="${d}"/><path class="pk-hole" d="${d}"/>${extra || ""}</g>`;
+    const part = (n, d, extra) => `<g class="pk-cut pk-${n}"><path class="pk-glow" d="${d}" fill="#ffb347" filter="url(#${k}g)"/><path class="pk-hole" d="${d}"/><path class="pk-lit" d="${d}" fill="url(#${k}l)"/>${extra || ""}</g>`;
     return `<svg class="pk" viewBox="0 0 320 300" aria-hidden="true">
   <defs>
-    <linearGradient id="${k}a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a1f"/><stop offset=".55" stop-color="#ff4d6d"/><stop offset="1" stop-color="#d12a9a"/></linearGradient>
-    <linearGradient id="${k}b" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb02e"/><stop offset=".5" stop-color="#ff5a3d"/><stop offset="1" stop-color="#b8239a"/></linearGradient>
-    <linearGradient id="${k}c" x1=".2" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="#ffd24a"/><stop offset=".5" stop-color="#ff8a2a"/><stop offset="1" stop-color="#ff3f7a"/></linearGradient>
-    <linearGradient id="${k}r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6dc"/><stop offset=".5" stop-color="#ffd9a0" stop-opacity=".55"/><stop offset="1" stop-color="#fff6dc" stop-opacity=".9"/></linearGradient>
-    <filter id="${k}n" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 .92  0 0 0 0 .8  0 0 0 .55 0"/></filter>
-    <filter id="${k}f" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="8"/></filter>
-    <clipPath id="${k}p"><ellipse cx="104" cy="172" rx="84" ry="98"/><ellipse cx="216" cy="172" rx="84" ry="98"/><ellipse cx="160" cy="172" rx="70" ry="106"/></clipPath>
+    <radialGradient id="${k}a" cx="36%" cy="28%" r="82%"><stop offset="0" stop-color="#ffe7c4" stop-opacity=".95"/><stop offset=".42" stop-color="#ff9d5a" stop-opacity=".8"/><stop offset="1" stop-color="#cf2f78" stop-opacity=".9"/></radialGradient>
+    <radialGradient id="${k}b" cx="64%" cy="28%" r="82%"><stop offset="0" stop-color="#ffe0b8" stop-opacity=".95"/><stop offset=".42" stop-color="#ff8f52" stop-opacity=".8"/><stop offset="1" stop-color="#b8286f" stop-opacity=".9"/></radialGradient>
+    <radialGradient id="${k}c" cx="50%" cy="24%" r="88%"><stop offset="0" stop-color="#fff3da" stop-opacity=".97"/><stop offset=".48" stop-color="#ffb26a" stop-opacity=".84"/><stop offset="1" stop-color="#ff5f86" stop-opacity=".9"/></radialGradient>
+    <linearGradient id="${k}r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".5" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity=".6"/></linearGradient>
+    <linearGradient id="${k}h" x1="0" y1="0" x2=".7" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="${k}i" cx="50%" cy="55%" r="55%"><stop offset="0" stop-color="#ffd27a" stop-opacity=".9"/><stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${k}l" cx="50%" cy="50%" r="65%"><stop offset="0" stop-color="#fffbe6"/><stop offset=".55" stop-color="#ffd36b"/><stop offset="1" stop-color="#ff9a3d"/></radialGradient>
+    <linearGradient id="${k}s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaffb0" stop-opacity=".95"/><stop offset="1" stop-color="#6fc83a" stop-opacity=".9"/></linearGradient>
+    <radialGradient id="${k}y"><stop offset="0" stop-color="#ffd9a0" stop-opacity=".7"/><stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${k}d"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <filter id="${k}g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7"/></filter>
+    <filter id="${k}t" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>
   </defs>
-  <g class="pk-rays" fill="#ffe94d">${rays}</g>
-  <ellipse class="pk-shadow" cx="160" cy="278" rx="118" ry="12" fill="#000" opacity=".5"/>
+  <g class="pk-rays" fill="url(#${k}y)" filter="url(#${k}t)">${rays}</g>
+  <ellipse class="pk-shadow" cx="160" cy="282" rx="124" ry="14" fill="url(#${k}d)"/>
   <g class="pk-body">
-    <ellipse cx="104" cy="172" rx="84" ry="98" fill="url(#${k}a)" stroke="url(#${k}r)" stroke-width="2.5"/>
-    <ellipse cx="216" cy="172" rx="84" ry="98" fill="url(#${k}b)" stroke="url(#${k}r)" stroke-width="2.5"/>
-    <ellipse cx="160" cy="172" rx="70" ry="106" fill="url(#${k}c)" stroke="url(#${k}r)" stroke-width="3"/>
-    <ellipse class="pk-sheen" cx="160" cy="150" rx="46" ry="70" fill="#fff4c4"/>
-    <rect x="0" y="0" width="320" height="300" filter="url(#${k}n)" clip-path="url(#${k}p)" opacity=".5" style="mix-blend-mode:overlay"/>
-    <path d="M144 76C136 48 154 26 188 24C184 44 176 58 178 80Z" fill="#c8ff3d"/>
-    <path d="M178 80C176 58 184 44 188 24C196 38 196 62 190 82Z" fill="#8fd01a"/>
+    <ellipse cx="104" cy="172" rx="84" ry="98" fill="url(#${k}a)" stroke="url(#${k}r)" stroke-width="1.6"/>
+    <ellipse cx="216" cy="172" rx="84" ry="98" fill="url(#${k}b)" stroke="url(#${k}r)" stroke-width="1.6"/>
+    <ellipse cx="160" cy="172" rx="70" ry="106" fill="url(#${k}c)" stroke="url(#${k}r)" stroke-width="2"/>
+    <ellipse class="pk-inner" cx="160" cy="178" rx="100" ry="94" fill="url(#${k}i)"/>
+    <path d="M44 152C46 112 70 86 104 82C78 100 62 124 60 160Z" fill="url(#${k}h)" opacity=".7"/>
+    <path d="M276 152C274 112 250 86 216 82C242 100 258 124 260 160Z" fill="url(#${k}h)" opacity=".4"/>
+    <path d="M122 96C136 76 178 74 198 92C174 88 146 92 134 114Z" fill="url(#${k}h)" opacity=".85"/>
+    <circle cx="124" cy="102" r="4.5" fill="#fff" opacity=".9"/>
+    <path d="M98 262Q160 292 222 262" stroke="#fff" stroke-opacity=".28" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M146 82C138 54 154 30 188 28C186 46 178 60 180 86Z" fill="url(#${k}s)" stroke="url(#${k}r)" stroke-width="1.2"/>
+    <path d="M154 70C152 56 160 44 172 38" stroke="#fff" stroke-opacity=".7" stroke-width="2.2" fill="none" stroke-linecap="round"/>
     <g class="pk-face">
       ${part(1, eyeL, '<circle class="pk-pupil pk-pl" cx="120" cy="140" r="6"/>')}
       ${part(2, eyeR, '<circle class="pk-pupil pk-pr" cx="200" cy="140" r="6"/>')}
@@ -86,14 +94,14 @@ window.PumpkinArt = (function () {
     setTimeout(step, opts.delay || 450);
   }
 
-  const COLORS = ["#ffe94d", "#ff4d9a", "#ff7a18", "#b46cff", "#ffffff"];
+  const COLORS = ["#ffd9a0", "#ff9a5c", "#ff6aa0", "#fff4dc", "#c79bff"];
   function burst(host, x, y, count) {
-    const n = count || 18;
+    const n = count || 16;
     for (let i = 0; i < n; i++) {
       const s = document.createElement("i");
       s.className = "pk-spark";
-      const a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 130;
-      s.style.cssText = `left:${x}px;top:${y}px;--dx:${(Math.cos(a) * d).toFixed(0)}px;--dy:${(Math.sin(a) * d - 40).toFixed(0)}px;--r:${(Math.random() * 540 - 270).toFixed(0)}deg;--s:${(0.7 + Math.random() * 1.1).toFixed(2)};--c:${COLORS[i % COLORS.length]}`;
+      const a = Math.random() * Math.PI * 2, d = 50 + Math.random() * 120;
+      s.style.cssText = `left:${x}px;top:${y}px;--dx:${(Math.cos(a) * d).toFixed(0)}px;--dy:${(Math.sin(a) * d - 40).toFixed(0)}px;--s:${(0.6 + Math.random() * 1).toFixed(2)};--c:${COLORS[i % COLORS.length]}`;
       host.appendChild(s);
       setTimeout(() => s.remove(), 1300);
     }

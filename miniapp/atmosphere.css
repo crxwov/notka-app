@@ -179,9 +179,6 @@ body[data-atmo="night"] .tabbar, body[data-atmo="night"] .mini-player, body[data
 body[data-atmo="autumn"] .tabbar, body[data-atmo="autumn"] .mini-player { box-shadow: inset 0 1px 0.5px rgba(255, 220, 170, 0.6), inset 0 0 0 0.5px rgba(255, 190, 120, 0.3), 0 12px 32px -8px rgba(40, 14, 4, 0.6); }
 body[data-atmo="spring"] .tabbar, body[data-atmo="spring"] .mini-player { box-shadow: inset 0 1px 0.5px rgba(255, 225, 238, 0.6), inset 0 0 0 0.5px rgba(255, 190, 215, 0.3), 0 12px 32px -8px rgba(40, 10, 24, 0.5); }
 
-/* headings: a gothic italic for the night of Halloween, an evening serif for the new year */
-body[data-atmo="halloween"] .hero-title, body[data-atmo="halloween"] .mood-title, body[data-atmo="halloween"] .look-title { font-family: "Playfair Display", Georgia, serif; font-style: italic; font-weight: 800; letter-spacing: -0.02em; }
-body[data-atmo="newyear"] .hero-title, body[data-atmo="newyear"] .mood-title, body[data-atmo="newyear"] .look-title { font-family: "Playfair Display", Georgia, serif; font-weight: 800; letter-spacing: -0.015em; }
 
 /* ==========================================================
    THE PICKER on the «Оформление» screen

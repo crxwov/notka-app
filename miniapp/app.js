@@ -2938,9 +2938,9 @@
   // little pictures of the rewards
   const svgUri = (s) => "data:image/svg+xml," + encodeURIComponent(s);
   const EVENT_ICONS = {
-    frame_pumpkin: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><ellipse cx='16' cy='28' rx='10' ry='12' fill='#f58a2a'/><ellipse cx='32' cy='28' rx='10' ry='12' fill='#f58a2a'/><ellipse cx='24' cy='28' rx='8' ry='13' fill='#ffab4d'/><path d='M24 15c0-4 2-6 5-7' stroke='#6a8a2a' stroke-width='3' stroke-linecap='round' fill='none'/></svg>"),
-    atmo_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path d='M31 5a19 19 0 1 0 13 29A16 16 0 0 1 31 5z' fill='#ffe0ae'/><circle cx='36' cy='14' r='2' fill='#f58a2a'/><circle cx='41' cy='22' r='1.4' fill='#f58a2a'/></svg>"),
-    edition_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><g fill='none' stroke='#e9c46a' stroke-width='1.8' stroke-linecap='round'><path d='M24 3v42M6 12l36 24M6 36l36-24'/><circle cx='24' cy='24' r='7'/><circle cx='24' cy='24' r='14'/><circle cx='24' cy='24' r='20'/></g></svg>"),
+    frame_pumpkin: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><radialGradient id='a' cx='35%' cy='28%' r='80%'><stop offset='0' stop-color='#ffe7c4'/><stop offset='.5' stop-color='#ff9d5a'/><stop offset='1' stop-color='#cf2f78'/></radialGradient><linearGradient id='s' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#eaffb0'/><stop offset='1' stop-color='#6fc83a'/></linearGradient></defs><ellipse cx='15' cy='28' rx='11' ry='13' fill='url(#a)'/><ellipse cx='33' cy='28' rx='11' ry='13' fill='url(#a)'/><ellipse cx='24' cy='28' rx='9' ry='14' fill='url(#a)' stroke='#fff' stroke-opacity='.7' stroke-width='.8'/><path d='M22 16c-1-5 1-8 6-9-.5 3-1 5 0 9z' fill='url(#s)'/><path d='M19 22c1-3 4-5 7-5-3 1-5 3-5 7z' fill='#fff' opacity='.7'/></svg>"),
+    atmo_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><radialGradient id='m' cx='32%' cy='28%' r='85%'><stop offset='0' stop-color='#fffbea'/><stop offset='.55' stop-color='#ffe0ae'/><stop offset='1' stop-color='#ffb066'/></radialGradient></defs><path d='M31 5a19 19 0 1 0 13 29A16 16 0 0 1 31 5z' fill='url(#m)' stroke='#fff' stroke-opacity='.7' stroke-width='.8'/><path d='M14 14c3-5 8-8 13-8-5 2-9 6-10 11z' fill='#fff' opacity='.7'/><circle cx='37' cy='13' r='1.8' fill='#ffd9a0'/><circle cx='42' cy='21' r='1.3' fill='#ffd9a0'/></svg>"),
+    edition_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#fff4c4'/><stop offset='1' stop-color='#e9b84a'/></linearGradient></defs><g fill='none' stroke='url(#g)' stroke-width='2' stroke-linecap='round'><path d='M24 3v42M6 12l36 24M6 36l36-24'/><circle cx='24' cy='24' r='7'/><circle cx='24' cy='24' r='14'/><circle cx='24' cy='24' r='20'/></g><circle cx='24' cy='24' r='3' fill='#fff4c4'/></svg>"),
   };
   const EVENT_ICON_FALLBACK = svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path d='M24 4l5.5 12.5 13.5 1.3-10.2 9 3 13.2L24 33l-11.8 7 3-13.2L5 17.8l13.5-1.3z' fill='#e9c46a'/></svg>");
   const eventIcon = (item) => EVENT_ICONS[item] || EVENT_ICON_FALLBACK;
@@ -3199,11 +3199,11 @@
     const next = $("event-next");
     const task = nextTask(ev);
     if (!task) {
-      next.className = "event-next is-done";
+      next.className = "event-next glass is-done";
       next.innerHTML = `<span class="event-next-k">Готово</span><b class="event-next-t">Тыква горит ярче всех</b><span class="event-next-s">Все задания выполнены. Награды ждут в «Оформлении».</span>`;
     } else {
       const go = TASK_GO[task.kind];
-      next.className = "event-next";
+      next.className = "event-next glass";
       next.innerHTML = `<span class="event-next-k">Следующий шаг</span><b class="event-next-t">${task.title}</b><span class="event-next-s">${taskLine(ev, task)}</span>${go && go.run ? `<br><button class="event-next-btn" type="button" id="event-next-btn">${go.label}<svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>` : ""}`;
       const btn = $("event-next-btn");
       if (btn) btn.addEventListener("click", () => { haptic("light"); go.run(); });
@@ -3213,7 +3213,7 @@
       const open = ownsItem(tier.item);
       const left = tier.points - points;
       const sub = open ? (tier.limit && state.events.editions[ev.id] ? `Твой номер ${state.events.editions[ev.id]}` : "Получено") : left > 0 ? `Ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : "Тираж разобран";
-      return `<li class="event-reward ${open ? "is-open" : "is-locked"}" data-item="${tier.item}"><span class="er-num">${String(tier.points).padStart(2, "0")}</span><span class="er-medal"><img alt="" src="${eventIcon(tier.item)}"></span><span><b>${tier.title}</b><em>${sub}</em></span></li>`;
+      return `<li class="event-reward glass ${open ? "is-open" : "is-locked"}" data-item="${tier.item}"><span class="er-medal"><img alt="" src="${eventIcon(tier.item)}"></span><span class="er-text"><b>${tier.title}</b><em>${sub}</em></span><span class="er-pts">${tier.points}</span></li>`;
     }).join("");
     const limitTier = ev.tiers.find((t) => t.limit);
     const edition = $("event-edition");
@@ -3226,7 +3226,7 @@
     $("event-tasks").innerHTML = ev.tasks.map((t, i) => {
       const v = taskValue(ev.id, t), done = v >= t.target, go = TASK_GO[t.kind];
       const canGo = !done && go && go.run;
-      return `<li class="event-task${done ? " is-done" : ""}"${canGo ? ` data-go="${t.kind}"` : ""}><span class="et-n">${String(i + 1).padStart(2, "0")}</span><span class="et-body"><b>${t.title}</b><span class="et-bar"><i style="--w:${Math.min(1, v / t.target).toFixed(3)}"></i></span><em>${taskLine(ev, t)}</em></span>${canGo ? '<span class="et-go"><svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></span>' : ""}</li>`;
+      return `<li class="event-task glass${done ? " is-done" : ""}"${canGo ? ` data-go="${t.kind}"` : ""}><span class="et-n">${done ? '<svg width="18" height="18" aria-hidden="true"><use href="#i-check"/></svg>' : i + 1}</span><span class="et-body"><b>${t.title}</b><span class="et-bar"><i style="--w:${Math.min(1, v / t.target).toFixed(3)}"></i></span><em>${taskLine(ev, t)}</em></span>${canGo ? '<span class="et-go"><svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></span>' : ""}</li>`;
     }).join("");
   }
   $("event-tasks").addEventListener("click", (e) => {
