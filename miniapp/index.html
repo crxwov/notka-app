@@ -13,7 +13,7 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=64" />
+<link rel="stylesheet" href="styles.css?v=63" />
 <link rel="stylesheet" href="atmosphere.css?v=6" />
 <link rel="stylesheet" href="events.css?v=4" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -129,25 +129,20 @@
       </button>
     </header>
 
-    <div class="home-head">
-      <span class="home-date" id="home-date"></span>
-      <h1 class="home-greet" id="home-greeting">Привет!</h1>
-    </div>
+    <p class="home-greet" id="home-greeting">Привет!</p>
 
     <section class="mix-hero" id="mymix-card">
-      <span class="mix-art" aria-hidden="true"><i></i><i></i></span>
-      <button class="mood-btn" id="mood-open-btn" type="button"><span class="mood-dot" aria-hidden="true"></span>Под настроение</button>
-      <button class="mix-title-btn" id="mymix-open-btn" type="button">
-        <span class="mix-kicker">Для тебя</span>
-        <h2 class="mix-title">Мой микс</h2>
-        <span class="mix-sub" id="mymix-sub">Из твоих любимых треков</span>
-      </button>
       <button class="mix-play-xl" id="mymix-play-btn" type="button" aria-label="Включить «Мой микс»">
         <span class="mix-ring" aria-hidden="true"></span>
         <span class="mix-ring mix-ring-2" aria-hidden="true"></span>
-        <svg class="ic-play" width="30" height="30" aria-hidden="true"><use href="#i-play"/></svg>
-        <svg class="ic-pause" width="28" height="28" aria-hidden="true"><use href="#i-pause"/></svg>
+        <svg class="ic-play" width="38" height="38" aria-hidden="true"><use href="#i-play"/></svg>
+        <svg class="ic-pause" width="36" height="36" aria-hidden="true"><use href="#i-pause"/></svg>
       </button>
+      <button class="mix-title-btn" id="mymix-open-btn" type="button">
+        <h1 class="mix-title">Мой микс</h1>
+        <span class="mix-sub" id="mymix-sub">Из твоих любимых треков</span>
+      </button>
+      <button class="mood-btn" id="mood-open-btn" type="button"><span class="mood-dot" aria-hidden="true"></span>Под настроение</button>
     </section>
 
     <button class="field field-btn" id="home-search-btn" type="button">
