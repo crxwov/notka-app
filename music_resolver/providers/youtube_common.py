@@ -159,10 +159,15 @@ def _selected_audio_format(info: dict) -> dict | None:
 
 
 _COOKIE_ERROR_MARKERS = ("cookie database", "could not copy", "could not decrypt cookie")
+# newer Chrome encrypts its cookies so that yt-dlp can't read them; the
+# message doesn't mention cookies at all
+_COOKIE_DECRYPT_MARKERS = ("failed to decrypt with dpapi",)
 
 
 def _is_cookie_error(exc: Exception) -> bool:
     text = str(exc).lower()
+    if any(marker in text for marker in _COOKIE_DECRYPT_MARKERS):
+        return True
     return "cookie" in text and any(marker in text for marker in _COOKIE_ERROR_MARKERS)
 
 
