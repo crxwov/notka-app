@@ -35,17 +35,15 @@ EVENTS = {
         "start": "2026-10-16",
         "end": "2026-11-02",  # the day after the last one
         "tasks": [
-            {"id": "listen", "kind": "listen", "title": "Послушай 30 минут музыки", "target": 30, "unit": "мин"},
-            {"id": "moods", "kind": "mood", "title": "Включи три разных настроения", "target": 3, "unique": True},
-            {"id": "days", "kind": "visit", "title": "Загляни в Нотку в 5 разных дней", "target": 5, "unique": True},
-            {"id": "playlist", "kind": "playlist", "title": "Добавь 5 треков в плейлисты", "target": 5},
-            {"id": "share", "kind": "share", "title": "Поделись плейлистом", "target": 1},
-            {"id": "bats", "kind": "bat", "title": "Поймай летучую мышь три раза", "target": 3},
+            {"id": "listen", "kind": "listen", "title": "Послушай 15 минут музыки", "target": 15, "unit": "мин"},
+            {"id": "bats", "kind": "bat", "title": "Поймай 3 летучие мыши", "target": 3},
+            {"id": "mood", "kind": "mood", "title": "Включи микс под настроение", "target": 1, "unique": True},
+            {"id": "share", "kind": "share", "title": "Поделись плейлистом с другом", "target": 1},
         ],
         "tiers": [
-            {"points": 2, "item": "frame_pumpkin", "title": "Рамка «Тыква»", "text": "Тыквенный ободок вокруг твоего фото"},
-            {"points": 4, "item": "atmo_halloween", "title": "Тема «Хэллоуин»", "text": "Луна, туман и светлячки: навсегда в «Оформлении»"},
-            {"points": 6, "item": "edition_halloween", "title": "Золотая паутина", "text": "Особый свет и твой номер. Только для первых 100", "limit": 100},
+            {"points": 2, "item": "frame_pumpkin", "title": "Рамка «Тыква»", "text": "Тыквенный ободок вокруг твоего фото в профиле"},
+            {"points": 3, "item": "atmo_halloween", "title": "Тема «Хэллоуин»", "text": "Луна, летучие мыши и светлячки в «Оформлении» навсегда"},
+            {"points": 4, "item": "edition_halloween", "title": "Золотая паутина", "text": "Золотой свет темы и твой номер. Только для первых 100", "limit": 100},
         ],
     },
 }

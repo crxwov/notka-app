@@ -3129,7 +3129,7 @@
       $("event-banner-bars").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${points > i ? "is-on" : ""}"></i>`).join("");
       const holder = $("event-banner-pk");
       if (bannerPumpkinFor !== ev.id) { holder.innerHTML = PumpkinArt.svg(); bannerPumpkinFor = ev.id; }
-      PumpkinArt.lightTo(holder, points);
+      PumpkinArt.lightTo(holder, points, { total });
     }
     if (currentScreen === "event") renderEventScreen();
     applyEventItems();
@@ -3166,7 +3166,7 @@
     title.textContent = ev.title;
     title.style.setProperty("--len", String(ev.title.length));
     $("event-count").textContent = String(points);
-    $("event-count-of").innerHTML = `из ${total}<br>${plural(total, "огонька", "огоньков", "огоньков")} горит`;
+    $("event-count-of").innerHTML = `из ${total}<br>${plural(total, "задания", "заданий", "заданий")} выполнено`;
 
     // the pumpkin: built once, lit up part by part each time the page is opened
     const stage = $("event-stage");
@@ -3190,9 +3190,9 @@
     }
     if (eventScreenFresh || eventLitShown < 0) {
       eventScreenFresh = false;
-      PumpkinArt.lightTo(stage, points, { animate: true, delay: 600, onStep: (c) => { haptic("light"); const r = stage.getBoundingClientRect(); PumpkinArt.burst(stage, r.width / 2, r.height * 0.55, 8); } });
+      PumpkinArt.lightTo(stage, points, { total, animate: true, delay: 600, onStep: (c) => { haptic("light"); const r = stage.getBoundingClientRect(); PumpkinArt.burst(stage, r.width / 2, r.height * 0.55, 8); } });
     } else if (points !== eventLitShown) {
-      PumpkinArt.lightTo(stage, points, {});
+      PumpkinArt.lightTo(stage, points, { total });
     }
     eventLitShown = points;
 
