@@ -1177,6 +1177,7 @@
   function renderHome() {
     const name = firstName();
     $("home-greeting").textContent = name ? `Привет, ${name}` : "Привет!";
+    $("home-date").textContent = new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
     renderAvatarInto("home-avatar", "home-initial");
 
     const list = $("home-favorites-list");
