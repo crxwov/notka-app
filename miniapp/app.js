@@ -2009,7 +2009,7 @@
     if (playlist) sharePlaylist(playlist);
   });
   // ---- «Тема плейлиста» (Плюс): the whole playlist screen takes another look ----
-  const PL_THEMES = [["", "Обычная"], ["pixel", "8-бит"], ["nyc", "Нью-Йорк"], ["paper", "Газета"], ["notebook", "Тетрадь"], ["poster", "Постер"]];
+  const PL_THEMES = [["", "Обычная"], ["pixel", "8-бит"], ["nyc", "Нью-Йорк"]];
   const NYC_LINES = [["A", "#0039a6", "#fff"], ["B", "#ff6319", "#fff"], ["N", "#fccc0a", "#000"], ["L", "#a7a9ac", "#000"], ["G", "#6cbe45", "#000"], ["J", "#996633", "#fff"], ["1", "#ee352e", "#fff"], ["4", "#00933c", "#fff"], ["7", "#b933ad", "#fff"]];
   // 8-bit: the cover is drawn small and shown large with hard edges
   function pixelateCover() {
@@ -2591,7 +2591,27 @@
   };
   const BG_PATTERNS = { light: "Свет", prism: "Призма", rings: "Кольца", stars: "Искры", calm: "Покой" };
   // light: "track" | "preset:<id>" | "pinned" (the palette and cover are in lightPinned)
-  const LOOK_DEFAULTS = { playerTheme: "standard", light: "track", bgPattern: "light" };
+  const LOOK_DEFAULTS = { playerTheme: "standard", light: "track", bgPattern: "light", atmo: "none" };
+  // «Атмосфера»: seasons and nature. Plus ones come with Нотка Плюс; the
+  // collectible ones (loot: true) are given for tasks, and until that is
+  // built they can be tried, or switched on in preview mode.
+  const ATMOS = {
+    autumn: { name: "Осень", palette: { core: "#FFE2B0", warm: "#FF8A2B", mid: "#D4501E", deep: "#5A2412" } },
+    winter: { name: "Зима", palette: { core: "#EAF6FF", warm: "#7CC4FF", mid: "#5B8CFF", deep: "#1D3A78" } },
+    spring: { name: "Весна", palette: { core: "#FFF0F5", warm: "#FF9DBF", mid: "#F06DA8", deep: "#5A2A66" } },
+    rain: { name: "Дождь", palette: { core: "#DCE8F5", warm: "#6FA3D6", mid: "#4F6FA8", deep: "#1E2B4A" } },
+    night: { name: "Звёздная ночь", palette: { core: "#E4EEFF", warm: "#7DA2FF", mid: "#8A6BFF", deep: "#1C1F66" } },
+    halloween: { name: "Хэллоуин", loot: true, palette: { core: "#FFD9A0", warm: "#FF7A18", mid: "#8E2DE2", deep: "#2A0B45" } },
+    newyear: { name: "Новый год", loot: true, palette: { core: "#FFF1C9", warm: "#F2C14E", mid: "#E04F5F", deep: "#0E2A5C" } },
+  };
+  const ATMO_DENSITY = { low: 0.5, mid: 1, high: 1.6, off: 0 };
+  function atmoOwned(id) {
+    const a = ATMOS[id];
+    if (!a) return false;
+    if (!a.loot) return hasPlus();
+    return (Store.getSetting("ownedAtmos") || []).includes(id) || (plusPreview() && hasPlus());
+  }
+  const lookAllowed = (key, value) => value === LOOK_DEFAULTS[key] || (key === "atmo" ? atmoOwned(value) : hasPlus());
   const LOOK_TRY_MS = 60000;
   let lookTried = {}; // what is switched on for a try, without Плюс
   let lookTryTimer = null;
@@ -2599,12 +2619,13 @@
   function lookKnown(key, value) {
     if (key === "playerTheme") return !!PLAYER_THEMES[value];
     if (key === "bgPattern") return !!BG_PATTERNS[value];
+    if (key === "atmo") return value === "none" || !!ATMOS[value];
     return value === "track" || value === "pinned" || (typeof value === "string" && value.startsWith("preset:") && !!LIGHT_PRESETS[value.slice(7)]);
   }
   function lookValue(key) {
     if (key in lookTried) return lookTried[key];
     const saved = Store.getSetting(key);
-    return lookKnown(key, saved) && (saved === LOOK_DEFAULTS[key] || hasPlus()) ? saved : LOOK_DEFAULTS[key];
+    return lookKnown(key, saved) && lookAllowed(key, saved) ? saved : LOOK_DEFAULTS[key];
   }
   function pinnedLight() {
     return lookTried.lightPinned || Store.getSetting("lightPinned") || null;
@@ -2614,6 +2635,8 @@
     let palette = trackLight.palette || DEFAULT_PALETTE, art = trackLight.art;
     if (mode.startsWith("preset:")) { palette = LIGHT_PRESETS[mode.slice(7)].palette; art = null; }
     else if (mode === "pinned" && pinnedLight()) { palette = pinnedLight().palette; art = pinnedLight().artwork; }
+    const atmo = lookValue("atmo");
+    if (atmo !== "none") { palette = ATMOS[atmo].palette; art = null; } // the season's own light
     showArtUnderLight(art || null);
     applyPalette(palette);
   }
@@ -2621,6 +2644,11 @@
     const theme = lookValue("playerTheme");
     document.body.dataset.playerTheme = theme;
     document.body.dataset.bg = lookValue("bgPattern");
+    const atmo = lookValue("atmo");
+    document.body.dataset.atmo = atmo;
+    if (window.Atmosphere) Atmosphere.set(atmo, ATMO_DENSITY[Store.getSetting("atmoDensity")] ?? 1);
+    document.querySelectorAll("#atmo-stage .atmo-card").forEach((c) => { c.classList.toggle("is-on", c.dataset.atmo === atmo); c.setAttribute("aria-pressed", c.dataset.atmo === atmo ? "true" : "false"); });
+    document.querySelectorAll("#atmo-density .chip").forEach((c) => c.classList.toggle("active", c.dataset.d === (Store.getSetting("atmoDensity") || "mid")));
     paintLight();
     syncPrism();
     // every picker shows what is on now
@@ -2634,6 +2662,9 @@
     document.querySelectorAll(".look-cover").forEach((opt) => mark(opt, !!pin && opt.dataset.art === pin.artwork));
     const trying = Object.keys(lookTried).length > 0;
     $("look-try").hidden = !trying;
+    const lootTried = "atmo" in lookTried && !!ATMOS[lookTried.atmo].loot;
+    $("look-try").querySelector("span").textContent = lootTried ? "На пробу, минута · выдаётся за задания" : "На пробу, минута";
+    $("look-try-keep").hidden = lootTried;
     $("look-note").hidden = hasPlus();
     $("theme-try").hidden = !("playerTheme" in lookTried);
     if ("playerTheme" in lookTried) $("theme-try-text").textContent = `«${PLAYER_THEMES[theme].name}» — тема Плюса`;
@@ -2644,7 +2675,7 @@
     lookTried = {};
   }
   function setLook(key, value, pinned) {
-    if (value === LOOK_DEFAULTS[key] || hasPlus()) {
+    if (lookAllowed(key, value)) {
       delete lookTried[key];
       if (key === "light") delete lookTried.lightPinned;
       if (pinned) Store.setSetting("lightPinned", pinned);
@@ -2654,11 +2685,12 @@
       // not a subscriber: it is on for a minute, then everything goes back
       lookTried[key] = value;
       if (pinned) lookTried.lightPinned = pinned;
+      const lootTried = "atmo" in lookTried && !!ATMOS[lookTried.atmo].loot;
       clearTimeout(lookTryTimer);
       lookTryTimer = setTimeout(() => {
         endLookTry();
         applyLook();
-        showToast("Это оформление остаётся с Ноткой Плюс");
+        showToast(lootTried ? "Эта тема выдаётся за задания" : "Это оформление остаётся с Ноткой Плюс");
       }, LOOK_TRY_MS);
     }
     applyLook();
@@ -2668,7 +2700,7 @@
     const tried = lookTried;
     endLookTry();
     if (tried.lightPinned) Store.setSetting("lightPinned", tried.lightPinned);
-    ["playerTheme", "light", "bgPattern"].forEach((key) => { if (key in tried) Store.setSetting(key, tried[key]); });
+    ["playerTheme", "light", "bgPattern", "atmo"].forEach((key) => { if (key in tried && lookAllowed(key, tried[key])) Store.setSetting(key, tried[key]); });
     applyLook();
   }
   const setPlayerTheme = (name) => setLook("playerTheme", name);
@@ -2685,7 +2717,48 @@
   $("look-try-keep").addEventListener("click", () => showScreen("plus"));
 
   // ---- the «Оформление» screen ----
+  function renderAtmoStage() {
+    const stage = $("atmo-stage");
+    if (stage.children.length) return;
+    const card = (id, name, tag) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "atmo-card" + (id === "none" ? " is-off" : "");
+      b.dataset.atmo = id;
+      const view = document.createElement("span");
+      view.className = "atmo-view";
+      if (id === "none") view.textContent = "Без атмосферы";
+      else for (let i = 0; i < 3; i++) {
+        const piece = document.createElement("i");
+        piece.style.cssText = `--x:${[18, 52, 84][i]}%;--d:${[5.2, 6.8, 8.4][i]}s;--w:${[-1.2, -3.4, -5.2][i]}s`;
+        view.appendChild(piece);
+      }
+      const label = document.createElement("span");
+      label.className = "atmo-name";
+      label.textContent = name;
+      if (tag) label.insertAdjacentHTML("beforeend", tag);
+      b.appendChild(view);
+      b.appendChild(label);
+      return b;
+    };
+    stage.appendChild(card("none", "Обычная", ""));
+    Object.entries(ATMOS).forEach(([id, a]) => stage.appendChild(card(id, a.name, a.loot ? '<span class="tag tag-loot">Коллекция</span>' : '<span class="tag tag-plus">Плюс</span>')));
+  }
+  $("atmo-stage").addEventListener("click", (e) => {
+    const c = e.target.closest(".atmo-card");
+    if (!c) return;
+    haptic("light");
+    setLook("atmo", c.dataset.atmo);
+  });
+  $("atmo-density").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip");
+    if (!c) return;
+    haptic("light");
+    Store.setSetting("atmoDensity", c.dataset.d);
+    applyLook();
+  });
   function renderLookScreen() {
+    renderAtmoStage();
     const colors = $("look-colors");
     if (!colors.children.length) {
       const swatch = (value, name, p) => {

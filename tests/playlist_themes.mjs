@@ -43,7 +43,7 @@ try {
 
   // ---- without Плюс: seen live, not kept ----
   await openSheet();
-  check("the sheet offers the plain look and five themes", await b.eval("document.querySelectorAll('.plt-card').length === 6"));
+  check("the sheet offers the plain look and two themes", await b.eval("document.querySelectorAll('.plt-card').length === 3"));
   await b.click('.plt-card[data-t="pixel"]');
   await b.sleep(500);
   check("the playlist behind the sheet takes the theme at once", (await theme()) === "pixel");
@@ -63,7 +63,7 @@ try {
   await b.goto(`${BASE}/app/`);
   await b.waitFor("document.body.dataset.screen !== 'splash'", 8000, "leave splash");
   await openList();
-  for (const key of ["pixel", "nyc", "paper", "notebook", "poster"]) {
+  for (const key of ["pixel", "nyc"]) {
     await openSheet();
     await b.click(`.plt-card[data-t="${key}"]`);
     await b.sleep(900);
@@ -79,7 +79,7 @@ try {
   await b.goto(`${BASE}/app/`);
   await b.waitFor("document.body.dataset.screen !== 'splash'", 8000, "leave splash");
   await openList();
-  check("a kept theme is there after a restart", (await theme()) === "poster");
+  check("a kept theme is there after a restart", (await theme()) === "nyc");
   check("the pixel cover is drawn small", true);
   check("no page errors", b.errors.length === 0, b.errors.join(" | ").slice(0, 400));
 } catch (err) {

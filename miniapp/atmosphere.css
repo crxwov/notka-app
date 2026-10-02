@@ -1,0 +1,279 @@
+/* ==========================================================
+   АТМОСФЕРА — seasonal and nature themes.
+   A theme is the palette of the light (set in app.js), weather
+   (atmosphere.js), a few layers of its own air, and small things
+   in the interface that are made of the theme's own materials.
+   It is switched on as body[data-atmo="…"].
+   ========================================================== */
+
+/* ---------- the two canvases ---------- */
+#atmo-back { position: absolute; inset: 0; width: 100%; height: 100%; }
+#atmo-front { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+body:not(.has-atmo-air) #atmo-back, body:not(.has-atmo-air) #atmo-front { display: none; }
+.light::before, .light::after { content: none; position: absolute; inset: 0; pointer-events: none; }
+body[data-atmo]:not([data-atmo="none"]) .light-art { opacity: 0 !important; }
+
+/* ---------- Осень: закатный свет, лучи сквозь листву, тёплая дымка ---------- */
+body[data-atmo="autumn"] { --bg: #150a05; --atmo-edge: rgba(255, 190, 120, 0.5); }
+body[data-atmo="autumn"] .light::before {
+  content: ""; z-index: 1;
+  background:
+    linear-gradient(118deg, rgba(255, 192, 112, 0.26) 0%, transparent 42%),
+    repeating-linear-gradient(118deg, transparent 0 52px, rgba(255, 205, 140, 0.06) 52px 92px);
+  mix-blend-mode: screen; animation: atmo-rays 15s ease-in-out infinite alternate;
+}
+body[data-atmo="autumn"] .light::after { content: ""; z-index: 1; background: linear-gradient(0deg, rgba(255, 150, 80, 0.2), transparent 36%); }
+@keyframes atmo-rays { from { opacity: 0.55; transform: translateX(-2%); } to { opacity: 1; transform: translateX(2%); } }
+
+/* ---------- Зима: полярное сияние, иней по краям ---------- */
+body[data-atmo="winter"] { --bg: #060b16; --atmo-edge: rgba(215, 238, 255, 0.55); }
+body[data-atmo="winter"] .light::before {
+  content: ""; z-index: 1;
+  background:
+    radial-gradient(60% 34% at 28% 0%, rgba(80, 232, 205, 0.3), transparent 72%),
+    radial-gradient(52% 30% at 76% 0%, rgba(150, 125, 255, 0.28), transparent 72%);
+  animation: atmo-aurora 18s ease-in-out infinite alternate;
+}
+body[data-atmo="winter"] .light::after { content: ""; z-index: 1; background: radial-gradient(130% 95% at 50% 50%, transparent 52%, rgba(205, 232, 255, 0.2) 100%); }
+@keyframes atmo-aurora { from { transform: translateX(-5%); opacity: 0.6; } to { transform: translateX(5%); opacity: 1; } }
+
+/* ---------- Весна: рассветный свет, зелень внизу ---------- */
+body[data-atmo="spring"] { --bg: #120a14; --atmo-edge: rgba(255, 190, 215, 0.5); }
+body[data-atmo="spring"] .light::before {
+  content: ""; z-index: 1;
+  background: linear-gradient(105deg, rgba(255, 224, 238, 0.2), transparent 46%), radial-gradient(90% 38% at 50% 112%, rgba(140, 224, 150, 0.26), transparent 72%);
+  mix-blend-mode: screen; animation: atmo-rays 16s ease-in-out infinite alternate;
+}
+
+/* ---------- Хэллоуин: луна, туман, свеча внизу ---------- */
+body[data-atmo="halloween"] { --bg: #07030b; --atmo-edge: rgba(255, 150, 60, 0.55); }
+body[data-atmo="halloween"] .light::before {
+  content: ""; z-index: 1;
+  background:
+    radial-gradient(circle at 83% 10%, #fff3d4 0 17px, rgba(255, 224, 160, 0.5) 19px, rgba(255, 170, 80, 0.2) 56px, transparent 150px),
+    radial-gradient(70% 28% at 50% 112%, rgba(255, 112, 20, 0.3), transparent 72%);
+  animation: atmo-moon 7s ease-in-out infinite alternate;
+}
+body[data-atmo="halloween"] .light::after { content: ""; z-index: 1; background: radial-gradient(120% 90% at 50% 40%, transparent 50%, rgba(5, 0, 12, 0.55) 100%); }
+@keyframes atmo-moon { from { opacity: 0.85; } to { opacity: 1; } }
+
+/* ---------- Новый год: тёплые огни, золото внизу, гирлянда сверху ---------- */
+body[data-atmo="newyear"] { --bg: #040916; --atmo-edge: rgba(255, 214, 120, 0.6); }
+body[data-atmo="newyear"] .light::before {
+  content: ""; z-index: 1;
+  background: radial-gradient(80% 34% at 50% 112%, rgba(245, 196, 81, 0.28), transparent 72%), radial-gradient(110% 80% at 50% 0%, rgba(40, 80, 170, 0.22), transparent 70%);
+}
+#atmo-garland { position: absolute; left: 0; top: var(--sat, 0px); width: 100%; height: 70px; z-index: 2; pointer-events: none; transform-origin: 50% 0; animation: atmo-sway 7s ease-in-out infinite alternate; }
+#atmo-garland .gb { animation: atmo-twinkle 2.4s ease-in-out infinite; }
+@keyframes atmo-sway { from { transform: rotate(-0.5deg); } to { transform: rotate(0.5deg); } }
+@keyframes atmo-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ---------- Дождь: серо-синий воздух, гроза ---------- */
+body[data-atmo="rain"] { --bg: #070b12; --atmo-edge: rgba(180, 210, 245, 0.45); }
+body[data-atmo="rain"] .light::before { content: ""; z-index: 1; background: linear-gradient(180deg, rgba(28, 44, 70, 0.5), transparent 62%); }
+#atmo-flash { position: fixed; inset: 0; z-index: 4; pointer-events: none; background: #dce9ff; opacity: 0; }
+#atmo-flash.go { animation: atmo-flash 1.2s ease-out; }
+@keyframes atmo-flash { 0% { opacity: 0; } 7% { opacity: 0.5; } 15% { opacity: 0.04; } 24% { opacity: 0.36; } 100% { opacity: 0; } }
+
+/* ---------- Звёздная ночь: сияние над горизонтом ---------- */
+body[data-atmo="night"] { --bg: #03050e; --atmo-edge: rgba(170, 200, 255, 0.5); }
+body[data-atmo="night"] .light::before {
+  content: ""; z-index: 1;
+  background:
+    radial-gradient(72% 22% at 30% 5%, rgba(60, 240, 180, 0.3), transparent 72%),
+    radial-gradient(62% 20% at 72% 3%, rgba(150, 112, 255, 0.3), transparent 72%);
+  animation: atmo-aurora 14s ease-in-out infinite alternate;
+}
+body[data-atmo="night"] .light::after { content: ""; z-index: 1; background: linear-gradient(0deg, rgba(60, 72, 170, 0.32), transparent 32%); }
+
+/* ==========================================================
+   THINGS IN THE INTERFACE, made of the theme's own materials
+   ========================================================== */
+
+/* the playback thumb is a thing of the theme */
+body[data-atmo]:not([data-atmo="none"]) .scrub-thumb { width: 30px; height: 30px; border-radius: 0; background-color: transparent; background-position: center; background-size: contain; background-repeat: no-repeat; box-shadow: none; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55)); }
+body[data-atmo="autumn"] .scrub-thumb { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ffd27a'/%3E%3Cstop offset='1' stop-color='%23e2552d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.5l2.2 4.3 3.4-1.2-.5 4.1 4.2.4-2.6 3.3 2.6 2.4-3.9 1.2.4 3.4-4.1-.9L12 22l-1.7-3.9-4.1.9.4-3.4-3.9-1.2 2.6-2.4-2.6-3.3 4.2-.4-.5-4.1 3.4 1.2z' fill='url(%23g)'/%3E%3Cpath d='M12 21V8M12 14l-3-3M12 14l3-3' stroke='%238f3b12' stroke-width='1.1' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"); }
+body[data-atmo="winter"] .scrub-thumb { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23eaf6ff' stroke-width='1.8' stroke-linecap='round' fill='none'%3E%3Cpath d='M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7'/%3E%3Cpath d='M12 5.5l-2 1.8M12 5.5l2 1.8M12 18.5l-2-1.8M12 18.5l2-1.8M5.4 8.9l2.7.1M5.4 8.9l1 2.5M18.6 15.1l-2.7-.1M18.6 15.1l-1-2.5M5.4 15.1l2.7-.1M5.4 15.1l1-2.5M18.6 8.9l-2.7.1M18.6 8.9l-1 2.5'/%3E%3C/g%3E%3C/svg%3E"); }
+body[data-atmo="spring"] .scrub-thumb { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23ffb3cd' stroke='%23f06da8' stroke-width='.6'%3E%3Cpath id='p' d='M12 12C9.2 9.8 8.6 5.6 10.4 3.2c.6-.8 1.2-1 1.6-.4.4-.6 1-.4 1.6.4 1.8 2.4 1.2 6.6-1.6 8.8z'/%3E%3Cuse href='%23p' transform='rotate(72 12 12)'/%3E%3Cuse href='%23p' transform='rotate(144 12 12)'/%3E%3Cuse href='%23p' transform='rotate(216 12 12)'/%3E%3Cuse href='%23p' transform='rotate(288 12 12)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23ffe27a'/%3E%3C/svg%3E"); }
+body[data-atmo="halloween"] .scrub-thumb { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0' stop-color='%23ff5a1f'/%3E%3Cstop offset='.6' stop-color='%23ffa530'/%3E%3Cstop offset='1' stop-color='%23ffe27a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.5c.9 4.2 6.2 6.3 6.2 12.2a6.2 6.2 0 0 1-12.4 0c0-3 1.6-4.4 3-6.7.9 1 1.4 2 1.7 3.1 1.6-2.3 1.7-5.2 1.5-8.6z' fill='url(%23g)'/%3E%3Cpath d='M12 22a3 3 0 0 1-3-3c0-2 1.6-2.7 3-5 1.4 2.3 3 3 3 5a3 3 0 0 1-3 3z' fill='%23fff3b8' opacity='.85'/%3E%3C/svg%3E"); animation: atmo-flicker 1.6s ease-in-out infinite; }
+body[data-atmo="newyear"] .scrub-thumb { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff1b0'/%3E%3Cstop offset='1' stop-color='%23e6a82e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.8l2.9 6.5 7.1.7-5.3 4.8 1.5 7-6.2-3.6-6.2 3.6 1.5-7L2 9l7.1-.7z' fill='url(%23g)'/%3E%3C/svg%3E"); }
+body[data-atmo="rain"] .scrub-thumb { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='g' cx='.35' cy='.35' r='.8'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='.5' stop-color='%239cc4f0'/%3E%3Cstop offset='1' stop-color='%233f6fb0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M12 1.8c4 5.2 7.2 8.6 7.2 12.4a7.2 7.2 0 0 1-14.4 0C4.8 10.4 8 7 12 1.8z' fill='url(%23g)'/%3E%3Cellipse cx='9' cy='13' rx='1.6' ry='2.6' fill='%23fff' opacity='.7' transform='rotate(18 9 13)'/%3E%3C/svg%3E"); }
+body[data-atmo="night"] .scrub-thumb { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23a9c4ff'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M12 1c.9 6.4 4.6 10.1 11 11-6.4.9-10.1 4.6-11 11-.9-6.4-4.6-10.1-11-11 6.4-.9 10.1-4.6 11-11z' fill='url(%23g)'/%3E%3C/svg%3E"); }
+@keyframes atmo-flicker { 0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 150, 40, 0.7)); } 50% { filter: drop-shadow(0 0 11px rgba(255, 190, 70, 0.95)); } }
+body[data-atmo]:not([data-atmo="none"]) .scrub.is-scrubbing .scrub-thumb, body[data-atmo]:not([data-atmo="none"]) .scrub:active .scrub-thumb { transform: translate(-50%, -50%) scale(1.25) rotate(14deg); }
+/* the fill of the rail catches the light of the theme */
+body[data-atmo="winter"] .scrub-fill { background: linear-gradient(90deg, #7cc4ff, #f2fbff); box-shadow: 0 0 10px rgba(180, 225, 255, 0.55); }
+body[data-atmo="newyear"] .scrub-fill { background: repeating-linear-gradient(90deg, #f5c451 0 9px, #fff0b8 9px 11px, #e04f5f 11px 20px, #fff0b8 20px 22px); }
+body[data-atmo="night"] .scrub-fill { background: linear-gradient(90deg, #6b8cff, #e6efff); box-shadow: 0 0 10px rgba(150, 180, 255, 0.6); }
+body[data-atmo="halloween"] .scrub-fill { background: linear-gradient(90deg, #8e2de2, #ff7a18, #ffd36a); }
+
+/* big covers: each theme frames them in its own way */
+body[data-atmo="autumn"] .cover-lg { box-shadow: 0 28px 54px -16px rgba(255, 120, 30, 0.5), 0 0 0 1px rgba(255, 200, 140, 0.18); }
+body[data-atmo="winter"] .cover-lg { box-shadow: 0 0 0 1px rgba(220, 240, 255, 0.55), 0 28px 54px -16px rgba(120, 190, 255, 0.5); }
+body[data-atmo="winter"] .cover-lg::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 20px 3px rgba(228, 246, 255, 0.6); pointer-events: none; }
+body[data-atmo="spring"] .cover-lg { box-shadow: 0 28px 54px -16px rgba(255, 130, 180, 0.5), 0 0 0 1px rgba(255, 200, 225, 0.2); }
+body[data-atmo="halloween"] .cover-lg { box-shadow: 0 28px 60px -14px rgba(140, 60, 220, 0.55), 0 0 0 1px rgba(255, 150, 60, 0.25); }
+body[data-atmo="halloween"] .cover-lg::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; background: linear-gradient(0deg, rgba(150, 100, 210, 0.45), transparent 46%); pointer-events: none; }
+body[data-atmo="newyear"] .cover-lg { box-shadow: 0 0 0 2px rgba(245, 196, 81, 0.85), 0 0 30px rgba(245, 196, 81, 0.35), 0 28px 54px -16px rgba(0, 0, 0, 0.6); }
+body[data-atmo="rain"] .cover-lg { box-shadow: 0 28px 54px -16px rgba(60, 100, 170, 0.55), 0 0 0 1px rgba(190, 215, 245, 0.2); }
+body[data-atmo="rain"] .cover-lg::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; background: linear-gradient(120deg, rgba(255, 255, 255, 0.18), transparent 36%); pointer-events: none; }
+body[data-atmo="night"] .cover-lg { box-shadow: 0 0 46px rgba(110, 140, 255, 0.42), 0 28px 54px -16px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(190, 210, 255, 0.2); }
+
+/* the primary buttons glow like their theme */
+body[data-atmo="halloween"] .pill-primary, body[data-atmo="halloween"] .ctrl-play { animation: atmo-candle 3.4s ease-in-out infinite; }
+@keyframes atmo-candle { 0%, 100% { box-shadow: 0 0 16px rgba(255, 140, 40, 0.3); } 40% { box-shadow: 0 0 30px rgba(255, 165, 60, 0.62); } 62% { box-shadow: 0 0 22px rgba(255, 150, 50, 0.4); } }
+body[data-atmo="newyear"] .pill-primary, body[data-atmo="newyear"] .ctrl-play { box-shadow: 0 0 0 1.5px rgba(255, 238, 180, 0.8), 0 0 22px rgba(245, 196, 81, 0.4); }
+body[data-atmo="winter"] .pill-primary, body[data-atmo="winter"] .ctrl-play { box-shadow: 0 0 0 1px rgba(235, 248, 255, 0.7), 0 0 20px rgba(150, 210, 255, 0.4); }
+
+/* ---- the panels: snow on their edge, webs in their corners, gold on their rim, stars in their glass ---- */
+/* the two layers a glass panel always has, and a sheet always has, repeated here under the new ones */
+body[data-atmo="winter"] .tabbar, body[data-atmo="winter"] .mini-player {
+  background:
+    radial-gradient(ellipse 10px 5px at 50% 0, #f6fbff 96%, transparent 100%) 0 0 / 34px 8px repeat-x,
+    radial-gradient(ellipse 6px 3.4px at 50% 0, #f6fbff 96%, transparent 100%) 11px 0 / 23px 6px repeat-x,
+    linear-gradient(#f6fbff, #f6fbff) 0 0 / 100% 3px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.07) 100%),
+    linear-gradient(125deg, color-mix(in srgb, var(--c-warm) 20%, transparent), color-mix(in srgb, var(--c-deep) 30%, transparent));
+}
+body[data-atmo="winter"] .sheet {
+  background:
+    radial-gradient(ellipse 12px 6px at 50% 0, #f6fbff 96%, transparent 100%) 0 0 / 40px 9px repeat-x,
+    radial-gradient(ellipse 7px 4px at 50% 0, #f6fbff 96%, transparent 100%) 14px 0 / 27px 7px repeat-x,
+    linear-gradient(#f6fbff, #f6fbff) 0 0 / 100% 4px no-repeat,
+    radial-gradient(60% 40% at 0% 100%, rgba(220, 240, 255, 0.2), transparent),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03) 40%),
+    linear-gradient(135deg, color-mix(in srgb, var(--c-warm) 14%, rgba(24, 19, 32, 0.78)), color-mix(in srgb, var(--c-deep) 22%, rgba(18, 14, 26, 0.86)));
+}
+body[data-atmo="halloween"] .tabbar, body[data-atmo="halloween"] .mini-player {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M0 0L100 0M0 0L97 33M0 0L80 62M0 0L58 88M0 0L30 98M0 0L0 100'/%3E%3Cpath d='M22 0Q20 18 0 22M46 0Q40 38 0 46M70 0Q58 58 0 70M94 0Q76 76 0 94'/%3E%3C/g%3E%3C/svg%3E") left 6px top 0 / 40px 40px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M100 0L0 0M100 0L3 33M100 0L20 62M100 0L42 88M100 0L70 98M100 0L100 100'/%3E%3Cpath d='M78 0Q80 18 100 22M54 0Q60 38 100 46M30 0Q42 58 100 70M6 0Q24 76 100 94'/%3E%3C/g%3E%3C/svg%3E") right 6px top 0 / 40px 40px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.07) 100%),
+    linear-gradient(125deg, color-mix(in srgb, var(--c-warm) 20%, transparent), color-mix(in srgb, var(--c-deep) 30%, transparent));
+}
+body[data-atmo="halloween"] .sheet {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M0 0L100 0M0 0L97 33M0 0L80 62M0 0L58 88M0 0L30 98M0 0L0 100'/%3E%3Cpath d='M22 0Q20 18 0 22M46 0Q40 38 0 46M70 0Q58 58 0 70M94 0Q76 76 0 94'/%3E%3C/g%3E%3C/svg%3E") left 0 top 0 / 72px 72px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M100 0L0 0M100 0L3 33M100 0L20 62M100 0L42 88M100 0L70 98M100 0L100 100'/%3E%3Cpath d='M78 0Q80 18 100 22M54 0Q60 38 100 46M30 0Q42 58 100 70M6 0Q24 76 100 94'/%3E%3C/g%3E%3C/svg%3E") right 0 top 0 / 72px 72px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03) 40%),
+    linear-gradient(135deg, color-mix(in srgb, var(--c-warm) 14%, rgba(24, 19, 32, 0.78)), color-mix(in srgb, var(--c-deep) 22%, rgba(18, 14, 26, 0.86)));
+}
+/* new year: a string of little lights along the top rim of the panels, and gold on the edge */
+body[data-atmo="newyear"] .tabbar, body[data-atmo="newyear"] .mini-player {
+  background:
+    radial-gradient(circle at 50% 50%, #ff5d6c 0 2.4px, rgba(255, 93, 108, 0.3) 3px, transparent 6px) 0 -1px / 51px 11px repeat-x,
+    radial-gradient(circle at 50% 50%, #ffd166 0 2.4px, rgba(255, 209, 102, 0.3) 3px, transparent 6px) 17px -1px / 51px 11px repeat-x,
+    radial-gradient(circle at 50% 50%, #55e6a5 0 2.4px, rgba(85, 230, 165, 0.3) 3px, transparent 6px) 34px -1px / 51px 11px repeat-x,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.07) 100%),
+    linear-gradient(125deg, color-mix(in srgb, var(--c-warm) 20%, transparent), color-mix(in srgb, var(--c-deep) 30%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 236, 170, 0.7), inset 0 0 0 1px rgba(245, 196, 81, 0.35), 0 12px 32px -8px rgba(4, 2, 10, 0.55);
+}
+body[data-atmo="newyear"] .sheet { box-shadow: inset 0 1px 0 rgba(255, 236, 170, 0.7), inset 0 0 0 1px rgba(245, 196, 81, 0.35), 0 30px 70px -20px rgba(0, 0, 0, 0.75); }
+/* night: a few stars have settled in the glass */
+body[data-atmo="night"] .tabbar, body[data-atmo="night"] .mini-player, body[data-atmo="night"] .sheet {
+  background:
+    radial-gradient(circle, #fff 0 0.9px, transparent 1.4px) 12% 28% / 5px 5px no-repeat,
+    radial-gradient(circle, #cfe0ff 0 1.1px, transparent 1.6px) 31% 72% / 5px 5px no-repeat,
+    radial-gradient(circle, #fff 0 0.8px, transparent 1.3px) 58% 24% / 5px 5px no-repeat,
+    radial-gradient(circle, #ffe9c8 0 1px, transparent 1.5px) 76% 68% / 5px 5px no-repeat,
+    radial-gradient(circle, #fff 0 0.9px, transparent 1.4px) 91% 30% / 5px 5px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03) 50%),
+    linear-gradient(135deg, color-mix(in srgb, var(--c-warm) 18%, rgba(10, 14, 40, 0.7)), color-mix(in srgb, var(--c-deep) 30%, rgba(8, 10, 34, 0.84)));
+}
+/* autumn and spring: the glass takes the warmth / the blush of the light on its rim */
+body[data-atmo="autumn"] .tabbar, body[data-atmo="autumn"] .mini-player { box-shadow: inset 0 1px 0.5px rgba(255, 220, 170, 0.6), inset 0 0 0 0.5px rgba(255, 190, 120, 0.3), 0 12px 32px -8px rgba(40, 14, 4, 0.6); }
+body[data-atmo="spring"] .tabbar, body[data-atmo="spring"] .mini-player { box-shadow: inset 0 1px 0.5px rgba(255, 225, 238, 0.6), inset 0 0 0 0.5px rgba(255, 190, 215, 0.3), 0 12px 32px -8px rgba(40, 10, 24, 0.5); }
+
+/* headings: a gothic italic for the night of Halloween, an evening serif for the new year */
+body[data-atmo="halloween"] .hero-title, body[data-atmo="halloween"] .mood-title, body[data-atmo="halloween"] .look-title { font-family: "Playfair Display", Georgia, serif; font-style: italic; font-weight: 800; letter-spacing: -0.02em; }
+body[data-atmo="newyear"] .hero-title, body[data-atmo="newyear"] .mood-title, body[data-atmo="newyear"] .look-title { font-family: "Playfair Display", Georgia, serif; font-weight: 800; letter-spacing: -0.015em; }
+
+/* ==========================================================
+   THE PICKER on the «Оформление» screen
+   ========================================================== */
+.atmo-stage { display: flex; gap: 12px; overflow-x: auto; padding: 4px 20px 14px; margin: 0 -20px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.atmo-stage::-webkit-scrollbar { display: none; }
+.atmo-card { flex: 0 0 auto; width: 118px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.atmo-view { position: relative; width: 118px; height: 156px; border-radius: 22px; overflow: hidden; background: var(--v-bg); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); outline: 2px solid transparent; outline-offset: 3px; transition: outline-color 0.2s, transform 0.3s var(--ease-out); }
+.atmo-card:active .atmo-view { transform: scale(0.97); }
+.atmo-card.is-on .atmo-view { outline-color: var(--text); }
+.atmo-view::before { content: ""; position: absolute; inset: 0; background: var(--v-glow); }
+.atmo-view i { position: absolute; width: 22px; height: 22px; background: var(--v-icon) center / contain no-repeat; left: var(--x); top: -26px; opacity: 0.9; animation: atmo-fall var(--d) linear infinite; animation-delay: var(--w); filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35)); }
+.atmo-view i:nth-child(2) { width: 15px; height: 15px; }
+.atmo-view i:nth-child(3) { width: 28px; height: 28px; opacity: 0.55; }
+@keyframes atmo-fall { from { transform: translate(0, 0) rotate(0); } to { transform: translate(22px, 200px) rotate(160deg); } }
+.atmo-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.atmo-name .tag { height: 18px; padding: 0 7px; font-size: 10.5px; }
+.atmo-card.is-off .atmo-view { background: linear-gradient(150deg, #2b2140, #17131f); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.atmo-card.is-off .atmo-view::before { display: none; }
+.atmo-density { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+.atmo-density-t { font-size: 14px; color: var(--text-2); margin-right: 2px; }
+.atmo-density .chip { height: 34px; padding: 0 14px; font-size: 14px; }
+.tag-loot { background: linear-gradient(120deg, #ffcf6b, #ff8a4c); color: #2a1206; font-weight: 700; }
+
+/* ==========================================================
+   MORE OF THE THEME IN WHAT IS ON EVERY SCREEN
+   ========================================================== */
+.atmo-stage { scroll-padding: 0 20px; }
+
+/* a small mark of the theme before every section heading */
+body[data-atmo]:not([data-atmo="none"]) .h2::before { content: ""; display: inline-block; width: 20px; height: 20px; margin: -3px 9px 0 0; vertical-align: middle; background-position: center; background-size: contain; background-repeat: no-repeat; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4)); }
+body[data-atmo="autumn"] .h2::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ffd27a'/%3E%3Cstop offset='1' stop-color='%23e2552d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.5l2.2 4.3 3.4-1.2-.5 4.1 4.2.4-2.6 3.3 2.6 2.4-3.9 1.2.4 3.4-4.1-.9L12 22l-1.7-3.9-4.1.9.4-3.4-3.9-1.2 2.6-2.4-2.6-3.3 4.2-.4-.5-4.1 3.4 1.2z' fill='url(%23g)'/%3E%3Cpath d='M12 21V8M12 14l-3-3M12 14l3-3' stroke='%238f3b12' stroke-width='1.1' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"); }
+body[data-atmo="winter"] .h2::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23eaf6ff' stroke-width='1.8' stroke-linecap='round' fill='none'%3E%3Cpath d='M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7'/%3E%3Cpath d='M12 5.5l-2 1.8M12 5.5l2 1.8M12 18.5l-2-1.8M12 18.5l2-1.8M5.4 8.9l2.7.1M5.4 8.9l1 2.5M18.6 15.1l-2.7-.1M18.6 15.1l-1-2.5M5.4 15.1l2.7-.1M5.4 15.1l1-2.5M18.6 8.9l-2.7.1M18.6 8.9l-1 2.5'/%3E%3C/g%3E%3C/svg%3E"); }
+body[data-atmo="spring"] .h2::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23ffb3cd' stroke='%23f06da8' stroke-width='.6'%3E%3Cpath id='p' d='M12 12C9.2 9.8 8.6 5.6 10.4 3.2c.6-.8 1.2-1 1.6-.4.4-.6 1-.4 1.6.4 1.8 2.4 1.2 6.6-1.6 8.8z'/%3E%3Cuse href='%23p' transform='rotate(72 12 12)'/%3E%3Cuse href='%23p' transform='rotate(144 12 12)'/%3E%3Cuse href='%23p' transform='rotate(216 12 12)'/%3E%3Cuse href='%23p' transform='rotate(288 12 12)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23ffe27a'/%3E%3C/svg%3E"); }
+body[data-atmo="halloween"] .h2::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0' stop-color='%23ff5a1f'/%3E%3Cstop offset='.6' stop-color='%23ffa530'/%3E%3Cstop offset='1' stop-color='%23ffe27a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.5c.9 4.2 6.2 6.3 6.2 12.2a6.2 6.2 0 0 1-12.4 0c0-3 1.6-4.4 3-6.7.9 1 1.4 2 1.7 3.1 1.6-2.3 1.7-5.2 1.5-8.6z' fill='url(%23g)'/%3E%3Cpath d='M12 22a3 3 0 0 1-3-3c0-2 1.6-2.7 3-5 1.4 2.3 3 3 3 5a3 3 0 0 1-3 3z' fill='%23fff3b8' opacity='.85'/%3E%3C/svg%3E"); }
+body[data-atmo="newyear"] .h2::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff1b0'/%3E%3Cstop offset='1' stop-color='%23e6a82e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.8l2.9 6.5 7.1.7-5.3 4.8 1.5 7-6.2-3.6-6.2 3.6 1.5-7L2 9l7.1-.7z' fill='url(%23g)'/%3E%3C/svg%3E"); }
+body[data-atmo="rain"] .h2::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='g' cx='.35' cy='.35' r='.8'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='.5' stop-color='%239cc4f0'/%3E%3Cstop offset='1' stop-color='%233f6fb0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M12 1.8c4 5.2 7.2 8.6 7.2 12.4a7.2 7.2 0 0 1-14.4 0C4.8 10.4 8 7 12 1.8z' fill='url(%23g)'/%3E%3Cellipse cx='9' cy='13' rx='1.6' ry='2.6' fill='%23fff' opacity='.7' transform='rotate(18 9 13)'/%3E%3C/svg%3E"); }
+body[data-atmo="night"] .h2::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23a9c4ff'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M12 1c.9 6.4 4.6 10.1 11 11-6.4.9-10.1 4.6-11 11-.9-6.4-4.6-10.1-11-11 6.4-.9 10.1-4.6 11-11z' fill='url(%23g)'/%3E%3C/svg%3E"); }
+
+/* covers carry the theme on them: snow on the top edge, a web in the corner, a leaf that has landed… */
+body[data-atmo]:not([data-atmo="none"]) .cover-lg::after,
+body[data-atmo]:not([data-atmo="none"]) .shelf-card .cover::after,
+body[data-atmo]:not([data-atmo="none"]) .playlist-card .cover::after { content: ""; position: absolute; z-index: 3; pointer-events: none; }
+body[data-atmo="winter"] .cover-lg::after, body[data-atmo="winter"] .shelf-card .cover::after, body[data-atmo="winter"] .playlist-card .cover::after {
+  inset: 0 0 auto 0; height: 12px;
+  background:
+    radial-gradient(ellipse 11px 6px at 50% 0, #f6fbff 96%, transparent 100%) 0 0 / 30px 10px repeat-x,
+    radial-gradient(ellipse 6px 4px at 50% 0, #f6fbff 96%, transparent 100%) 10px 0 / 21px 8px repeat-x,
+    linear-gradient(#f6fbff, #f6fbff) 0 0 / 100% 4px no-repeat;
+  filter: drop-shadow(0 1px 1px rgba(60, 100, 150, 0.35));
+}
+body[data-atmo="halloween"] .cover-lg::after, body[data-atmo="halloween"] .shelf-card .cover::after, body[data-atmo="halloween"] .playlist-card .cover::after { left: 0; top: 0; width: 46%; max-width: 64px; aspect-ratio: 1; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='1.1' stroke-linecap='round'%3E%3Cpath d='M0 0L100 0M0 0L97 33M0 0L80 62M0 0L58 88M0 0L30 98M0 0L0 100'/%3E%3Cpath d='M22 0Q20 18 0 22M46 0Q40 38 0 46M70 0Q58 58 0 70M94 0Q76 76 0 94'/%3E%3C/g%3E%3C/svg%3E") left top / contain no-repeat; }
+body[data-atmo="autumn"] .cover-lg::after, body[data-atmo="autumn"] .shelf-card .cover::after, body[data-atmo="autumn"] .playlist-card .cover::after { right: 4px; top: 4px; width: 30%; max-width: 40px; aspect-ratio: 1; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ffd27a'/%3E%3Cstop offset='1' stop-color='%23e2552d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.5l2.2 4.3 3.4-1.2-.5 4.1 4.2.4-2.6 3.3 2.6 2.4-3.9 1.2.4 3.4-4.1-.9L12 22l-1.7-3.9-4.1.9.4-3.4-3.9-1.2 2.6-2.4-2.6-3.3 4.2-.4-.5-4.1 3.4 1.2z' fill='url(%23g)'/%3E%3Cpath d='M12 21V8M12 14l-3-3M12 14l3-3' stroke='%238f3b12' stroke-width='1.1' stroke-linecap='round' fill='none'/%3E%3C/svg%3E") center / contain no-repeat; transform: rotate(28deg); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
+body[data-atmo="spring"] .cover-lg::after, body[data-atmo="spring"] .shelf-card .cover::after, body[data-atmo="spring"] .playlist-card .cover::after { left: 5px; top: 5px; width: 24%; max-width: 34px; aspect-ratio: 1; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23ffb3cd' stroke='%23f06da8' stroke-width='.6'%3E%3Cpath id='p' d='M12 12C9.2 9.8 8.6 5.6 10.4 3.2c.6-.8 1.2-1 1.6-.4.4-.6 1-.4 1.6.4 1.8 2.4 1.2 6.6-1.6 8.8z'/%3E%3Cuse href='%23p' transform='rotate(72 12 12)'/%3E%3Cuse href='%23p' transform='rotate(144 12 12)'/%3E%3Cuse href='%23p' transform='rotate(216 12 12)'/%3E%3Cuse href='%23p' transform='rotate(288 12 12)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23ffe27a'/%3E%3C/svg%3E") center / contain no-repeat; transform: rotate(-12deg); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35)); }
+body[data-atmo="newyear"] .cover-lg::after, body[data-atmo="newyear"] .shelf-card .cover::after, body[data-atmo="newyear"] .playlist-card .cover::after { right: 5px; top: 5px; width: 24%; max-width: 34px; aspect-ratio: 1; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff1b0'/%3E%3Cstop offset='1' stop-color='%23e6a82e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.8l2.9 6.5 7.1.7-5.3 4.8 1.5 7-6.2-3.6-6.2 3.6 1.5-7L2 9l7.1-.7z' fill='url(%23g)'/%3E%3C/svg%3E") center / contain no-repeat; filter: drop-shadow(0 0 6px rgba(255, 220, 130, 0.8)); }
+body[data-atmo="night"] .cover-lg::after, body[data-atmo="night"] .shelf-card .cover::after, body[data-atmo="night"] .playlist-card .cover::after { right: 5px; top: 5px; width: 22%; max-width: 30px; aspect-ratio: 1; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23a9c4ff'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M12 1c.9 6.4 4.6 10.1 11 11-6.4.9-10.1 4.6-11 11-.9-6.4-4.6-10.1-11-11 6.4-.9 10.1-4.6 11-11z' fill='url(%23g)'/%3E%3C/svg%3E") center / contain no-repeat; filter: drop-shadow(0 0 7px rgba(170, 200, 255, 0.9)); }
+body[data-atmo="rain"] .cover-lg::after, body[data-atmo="rain"] .shelf-card .cover::after, body[data-atmo="rain"] .playlist-card .cover::after {
+  inset: 0;
+  background:
+    radial-gradient(circle at 22% 26%, rgba(255, 255, 255, 0.85) 0 1.4px, rgba(120, 165, 215, 0.4) 2.4px 5px, rgba(10, 30, 60, 0.28) 5.6px, transparent 6.4px),
+    radial-gradient(circle at 68% 14%, rgba(255, 255, 255, 0.85) 0 1px, rgba(120, 165, 215, 0.4) 1.8px 3.6px, rgba(10, 30, 60, 0.28) 4.2px, transparent 4.8px),
+    radial-gradient(circle at 82% 52%, rgba(255, 255, 255, 0.85) 0 1.6px, rgba(120, 165, 215, 0.4) 2.8px 6px, rgba(10, 30, 60, 0.28) 6.6px, transparent 7.4px),
+    radial-gradient(circle at 40% 78%, rgba(255, 255, 255, 0.85) 0 1px, rgba(120, 165, 215, 0.4) 1.8px 3.8px, rgba(10, 30, 60, 0.28) 4.4px, transparent 5px);
+}
+
+/* buttons keep the line of their theme */
+body[data-atmo="autumn"] .pill-btn { border-radius: 28px 10px 28px 10px; }
+body[data-atmo="spring"] .pill-btn { border-radius: 28px 28px 28px 8px; }
+body[data-atmo="winter"] .pill-btn { border-radius: 0; clip-path: polygon(15px 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 calc(100% - 15px), 0 15px); }
+body[data-atmo="winter"] .pill-primary { box-shadow: none; }
+body[data-atmo="halloween"] .pill-btn { border-radius: 30px 30px 14px 14px; }
+body[data-atmo="newyear"] .pill-btn { border-radius: 14px; }
+body[data-atmo="night"] .pill-btn, body[data-atmo="rain"] .pill-btn { border-radius: 999px; }
+
+/* the little cards on the Нотка Плюс page */
+.demo-seasons { gap: 10px; min-height: 0; overflow: hidden; }
+.demo-seasons .atmo-card { width: auto; flex: 1 1 0; }
+.demo-seasons .atmo-view { width: 100%; height: 104px; border-radius: 18px; }
+.demo-seasons .atmo-view i:nth-child(1) { --x: 22%; --d: 5.2s; --w: -1.2s; }
+.demo-seasons .atmo-view i:nth-child(2) { --x: 56%; --d: 6.8s; --w: -3.4s; }
+.demo-seasons .atmo-view i:nth-child(3) { --x: 78%; --d: 8.4s; --w: -5.2s; }
+
+/* previews on the picker */
+.atmo-card[data-atmo="autumn"] .atmo-view { --v-bg: linear-gradient(160deg,#4a1d08,#150a05); --v-glow: radial-gradient(90% 60% at 82% 0%, rgba(255,160,70,.6), transparent 70%); --v-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ffd27a'/%3E%3Cstop offset='1' stop-color='%23e2552d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.5l2.2 4.3 3.4-1.2-.5 4.1 4.2.4-2.6 3.3 2.6 2.4-3.9 1.2.4 3.4-4.1-.9L12 22l-1.7-3.9-4.1.9.4-3.4-3.9-1.2 2.6-2.4-2.6-3.3 4.2-.4-.5-4.1 3.4 1.2z' fill='url(%23g)'/%3E%3Cpath d='M12 21V8M12 14l-3-3M12 14l3-3' stroke='%238f3b12' stroke-width='1.1' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"); }
+.atmo-card[data-atmo="winter"] .atmo-view { --v-bg: linear-gradient(160deg,#16305c,#060b16); --v-glow: radial-gradient(80% 50% at 25% 0%, rgba(90,235,210,.45), transparent 70%); --v-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23eaf6ff' stroke-width='1.8' stroke-linecap='round' fill='none'%3E%3Cpath d='M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7'/%3E%3Cpath d='M12 5.5l-2 1.8M12 5.5l2 1.8M12 18.5l-2-1.8M12 18.5l2-1.8M5.4 8.9l2.7.1M5.4 8.9l1 2.5M18.6 15.1l-2.7-.1M18.6 15.1l-1-2.5M5.4 15.1l2.7-.1M5.4 15.1l1-2.5M18.6 8.9l-2.7.1M18.6 8.9l-1 2.5'/%3E%3C/g%3E%3C/svg%3E"); }
+.atmo-card[data-atmo="spring"] .atmo-view { --v-bg: linear-gradient(160deg,#5a2a56,#120a14); --v-glow: radial-gradient(90% 60% at 20% 0%, rgba(255,190,215,.5), transparent 70%); --v-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23ffb3cd' stroke='%23f06da8' stroke-width='.6'%3E%3Cpath id='p' d='M12 12C9.2 9.8 8.6 5.6 10.4 3.2c.6-.8 1.2-1 1.6-.4.4-.6 1-.4 1.6.4 1.8 2.4 1.2 6.6-1.6 8.8z'/%3E%3Cuse href='%23p' transform='rotate(72 12 12)'/%3E%3Cuse href='%23p' transform='rotate(144 12 12)'/%3E%3Cuse href='%23p' transform='rotate(216 12 12)'/%3E%3Cuse href='%23p' transform='rotate(288 12 12)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23ffe27a'/%3E%3C/svg%3E"); }
+.atmo-card[data-atmo="halloween"] .atmo-view { --v-bg: linear-gradient(160deg,#2a0b45,#07030b); --v-glow: radial-gradient(50% 36% at 80% 14%, rgba(255,230,170,.85), rgba(255,160,70,.25) 55%, transparent 75%); --v-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0' stop-color='%23ff5a1f'/%3E%3Cstop offset='.6' stop-color='%23ffa530'/%3E%3Cstop offset='1' stop-color='%23ffe27a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.5c.9 4.2 6.2 6.3 6.2 12.2a6.2 6.2 0 0 1-12.4 0c0-3 1.6-4.4 3-6.7.9 1 1.4 2 1.7 3.1 1.6-2.3 1.7-5.2 1.5-8.6z' fill='url(%23g)'/%3E%3Cpath d='M12 22a3 3 0 0 1-3-3c0-2 1.6-2.7 3-5 1.4 2.3 3 3 3 5a3 3 0 0 1-3 3z' fill='%23fff3b8' opacity='.85'/%3E%3C/svg%3E"); }
+.atmo-card[data-atmo="newyear"] .atmo-view { --v-bg: linear-gradient(160deg,#10306a,#040916); --v-glow: radial-gradient(90% 50% at 50% 105%, rgba(245,196,81,.5), transparent 70%); --v-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff1b0'/%3E%3Cstop offset='1' stop-color='%23e6a82e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M12 1.8l2.9 6.5 7.1.7-5.3 4.8 1.5 7-6.2-3.6-6.2 3.6 1.5-7L2 9l7.1-.7z' fill='url(%23g)'/%3E%3C/svg%3E"); }
+.atmo-card[data-atmo="rain"] .atmo-view { --v-bg: linear-gradient(160deg,#25364f,#070b12); --v-glow: linear-gradient(180deg, rgba(150,180,220,.25), transparent 60%); --v-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='g' cx='.35' cy='.35' r='.8'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='.5' stop-color='%239cc4f0'/%3E%3Cstop offset='1' stop-color='%233f6fb0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M12 1.8c4 5.2 7.2 8.6 7.2 12.4a7.2 7.2 0 0 1-14.4 0C4.8 10.4 8 7 12 1.8z' fill='url(%23g)'/%3E%3Cellipse cx='9' cy='13' rx='1.6' ry='2.6' fill='%23fff' opacity='.7' transform='rotate(18 9 13)'/%3E%3C/svg%3E"); }
+.atmo-card[data-atmo="night"] .atmo-view { --v-bg: linear-gradient(160deg,#1d1f66,#03050e); --v-glow: radial-gradient(80% 30% at 30% 4%, rgba(60,240,180,.45), transparent 72%); --v-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23a9c4ff'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M12 1c.9 6.4 4.6 10.1 11 11-6.4.9-10.1 4.6-11 11-.9-6.4-4.6-10.1-11-11 6.4-.9 10.1-4.6 11-11z' fill='url(%23g)'/%3E%3C/svg%3E"); }

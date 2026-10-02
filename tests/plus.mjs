@@ -22,7 +22,7 @@ try {
   await b.click("#menu-plus");
   await b.sleep(1200);
   check("the screen opens", (await b.eval("document.body.dataset.screen")) === "plus");
-  check("the stage shows a theme and four scenes follow", await b.eval("document.getElementById('plus-stage').dataset.show === 'vinyl' && document.querySelectorAll('#screen-plus .scene').length === 4"));
+  check("the stage shows a theme and five scenes follow", await b.eval("document.getElementById('plus-stage').dataset.show === 'vinyl' && document.querySelectorAll('#screen-plus .scene').length === 5"));
   await b.sleep(4600);
   check("the themes take turns by themselves", await b.eval("document.getElementById('plus-stage').dataset.show === 'cassette'"));
   await b.click('#plus-stage-tabs [data-show="vinyl"]');
@@ -31,6 +31,7 @@ try {
   const bar = await b.eval("(() => { const r = document.getElementById('plus-bar').getBoundingClientRect(); return { bottom: Math.round(r.bottom), h: innerHeight }; })()");
   check("the price bar is on screen without scrolling", bar.bottom <= bar.h && bar.bottom > bar.h - 60, JSON.stringify(bar));
   await b.shot("plus-1");
+  for (let y = 300; y <= 3600; y += 300) { await b.eval(`document.getElementById('screen-plus').scrollTo(0, ${y}); true`); await b.sleep(180); }
   await b.eval("document.getElementById('screen-plus').scrollTo(0, 99999); true");
   await b.sleep(1500);
   await b.shot("plus-2");

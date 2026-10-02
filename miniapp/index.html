@@ -13,7 +13,8 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=60" />
+<link rel="stylesheet" href="styles.css?v=62" />
+<link rel="stylesheet" href="atmosphere.css?v=4" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -602,7 +603,19 @@
     <p class="look-note" id="look-note" data-reveal>Стандартное оформление — для всех. Остальное входит в Нотку Плюс; без Плюса его можно включить на минуту и посмотреть.</p>
 
     <section class="look-sec" data-reveal>
-      <h2 class="look-h"><span class="look-n" aria-hidden="true">1</span>Плеер</h2>
+      <h2 class="look-h"><span class="look-n" aria-hidden="true">1</span>Атмосфера</h2>
+      <div class="atmo-stage" id="atmo-stage"></div>
+      <div class="atmo-density" id="atmo-density">
+        <span class="atmo-density-t">Частицы</span>
+        <button class="chip" type="button" data-d="low">Меньше</button>
+        <button class="chip" type="button" data-d="mid">Обычно</button>
+        <button class="chip" type="button" data-d="high">Больше</button>
+        <button class="chip" type="button" data-d="off">Нет</button>
+      </div>
+    </section>
+
+    <section class="look-sec" data-reveal>
+      <h2 class="look-h"><span class="look-n" aria-hidden="true">2</span>Плеер</h2>
       <div class="look-stage" id="look-stage">
         <button class="look-slide" type="button" data-theme="standard">
           <span class="look-obj"><span class="look-std js-art"></span></span>
@@ -634,14 +647,14 @@
     </section>
 
     <section class="look-sec" data-reveal>
-      <h2 class="look-h"><span class="look-n" aria-hidden="true">2</span>Цвет света</h2>
+      <h2 class="look-h"><span class="look-n" aria-hidden="true">3</span>Цвет света</h2>
       <div class="shelf look-swatches" id="look-colors"></div>
       <p class="look-sub" id="look-covers-title">Или цвета одной обложки — свет останется таким для любой музыки</p>
       <div class="shelf look-covers" id="look-covers"></div>
     </section>
 
     <section class="look-sec" data-reveal>
-      <h2 class="look-h"><span class="look-n" aria-hidden="true">3</span>Узор света</h2>
+      <h2 class="look-h"><span class="look-n" aria-hidden="true">4</span>Узор света</h2>
       <div class="pattern-opts" id="look-patterns">
         <button class="pattern-opt" type="button" data-bg="light"><span class="pattern-thumb pt-light" aria-hidden="true"><i></i><i></i><i></i></span><span class="pattern-name">Свет</span></button>
         <button class="pattern-opt" type="button" data-bg="prism"><span class="pattern-thumb pt-prism" aria-hidden="true"><i></i><i></i><i></i></span><span class="pattern-name">Призма</span></button>
@@ -694,6 +707,17 @@
     <h1 class="plus-title" data-reveal>Нотка Плюс</h1>
     <p class="plus-promise" data-reveal>Нотка бесплатная.<br>Плюс&nbsp;— чтобы она стала твоей.</p>
     <button class="pill-btn pill-quiet plus-try" id="plus-try-btn" type="button" data-reveal>Примерить на своей музыке</button>
+
+    <section class="scene" data-reveal>
+      <div class="scene-demo demo-seasons" aria-hidden="true">
+        <span class="atmo-card" data-atmo="autumn"><span class="atmo-view"><i></i><i></i><i></i></span></span>
+        <span class="atmo-card" data-atmo="winter"><span class="atmo-view"><i></i><i></i><i></i></span></span>
+        <span class="atmo-card" data-atmo="rain"><span class="atmo-view"><i></i><i></i><i></i></span></span>
+        <span class="atmo-card" data-atmo="night"><span class="atmo-view"><i></i><i></i><i></i></span></span>
+      </div>
+      <h2 class="scene-title">Атмосфера</h2>
+      <p class="scene-text">Осень, зима, весна, дождь и звёздная ночь: свет, погода и детали по всей Нотке. А праздничные темы вроде Хэллоуина и Нового года можно получить за задания.</p>
+    </section>
 
     <section class="scene" data-reveal>
       <div class="scene-demo demo-moods" aria-hidden="true"><i>Бодрое</i><i>Спокойное</i><i>Для работы</i><i>Грустное</i><i>Вечеринка</i></div>
@@ -1057,6 +1081,7 @@
 <script src="config.js?v=2"></script>
 <script src="prism.js?v=2"></script>
 <script src="shredder.js?v=4"></script>
+<script src="atmosphere.js?v=1"></script>
 <script src="app.js?v=54"></script>
 </body>
 </html>
