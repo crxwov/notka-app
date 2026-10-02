@@ -18,6 +18,12 @@ from dotenv import load_dotenv
 
 load_dotenv(ROOT / ".env")
 os.environ.setdefault("YTDLP_COOKIES_FROM_BROWSER", "chrome")
+# the events of the test server live in a folder of their own, with a made-up listener and a made-up today
+import tempfile
+
+os.environ["NOTKA_EVENTS_DIR"] = tempfile.mkdtemp(prefix="notka-events-")
+os.environ["NOTKA_TEST_USER"] = "424242"
+os.environ["NOTKA_FAKE_NOW"] = "2026-10-20"
 
 import uvicorn
 from fastapi.staticfiles import StaticFiles

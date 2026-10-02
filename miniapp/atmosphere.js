@@ -435,13 +435,23 @@
       this.fog = [];
       if (isOn("fog")) for (let i = 0; i < 3; i++) this.fog.push({ x: rnd(W), y: H * rnd(0.6, 1), r: rnd(220, 380), vx: rnd(5, 12) * (Math.random() < 0.5 ? -1 : 1), orange: i === 1, a: rnd(0.3, 0.5) });
       this.bats = [];
-      this.nextBat = opts.bats === "often" ? rnd(6, 12) : rnd(14, 28);
+      this.puffs = [];
+      this.nextBat = opts.bats === "often" ? rnd(2, 4) : rnd(14, 28);
       this.batCool = 0;
     },
     spawnBat(x, y, dir) {
-      this.bats.push({ x, y, dir, spd: rnd(130, 190), size: rnd(18, 28), ph: rnd(TAU), bob: rnd(TAU) });
+      // slow enough to be caught with a finger
+      this.bats.push({ x, y, dir, spd: rnd(85, 125), size: rnd(20, 28), ph: rnd(TAU), bob: rnd(TAU) });
     },
     onTap(x, y) {
+      // a tap on a bat catches it (that is what the tasks of an event ask for)
+      const hit = this.bats.findIndex((b) => Math.hypot(b.x - x, b.y - y) < b.size * 1.6 + 26);
+      if (hit >= 0) {
+        this.puffs.push({ x: this.bats[hit].x, y: this.bats[hit].y, life: 1 });
+        this.bats.splice(hit, 1);
+        if (window.Atmosphere && window.Atmosphere.onCatch) window.Atmosphere.onCatch("bat");
+        return;
+      }
       if (opts.bats === "off" || this.batCool > 0) return;
       this.batCool = 7;
       this.spawnBat(x, y, x < W / 2 ? 1 : -1);
@@ -480,10 +490,14 @@
       bctx.globalCompositeOperation = "source-over";
       this.nextBat -= dt;
       if (this.nextBat <= 0 && opts.bats !== "off") {
-        this.nextBat = opts.bats === "often" ? rnd(12, 24) : rnd(30, 55);
+        this.nextBat = opts.bats === "often" ? rnd(7, 13) : rnd(30, 55);
         const dir = Math.random() < 0.5 ? 1 : -1;
-        this.spawnBat(dir > 0 ? -60 : W + 60, rnd(H * 0.12, H * 0.4), dir);
+        this.spawnBat(dir > 0 ? -60 : W + 60, rnd(H * 0.12, H * 0.45), dir);
       }
+      this.puffs = this.puffs.filter((p) => p.life > 0);
+      fctx.globalCompositeOperation = "lighter";
+      for (const p of this.puffs) { p.life -= dt * 1.6; put(fctx, sprites.ember, p.x, p.y, 70 * (2 - p.life), 0, Math.max(0, p.life)); }
+      fctx.globalCompositeOperation = "source-over";
       this.bats = this.bats.filter((b) => b.x > -140 && b.x < W + 140 && b.y > -80);
       for (const b of this.bats) {
         b.x += b.dir * b.spd * dt;

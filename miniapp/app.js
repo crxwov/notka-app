@@ -108,6 +108,7 @@
         sharedImports: parsed.sharedImports || {},
         recent: parsed.recent || [], // the last tracks played, newest first
         fresh: parsed.fresh || null, // { key, at, items } — «Новое от любимых исполнителей»
+        events: parsed.events || null, // { progress, items, editions } — see «События»
       };
     } catch (e) {
       return {
@@ -119,6 +120,8 @@
     }
   }
   const state = loadState();
+  state.events = state.events || { progress: {}, items: [], editions: {} };
+  function ownsItem(item) { return state.events.items.includes(item); }
   // Only what a row needs to be shown and played again.
   function slimTrack(t) {
     return { id: t.id, source: t.source, sourceId: t.sourceId, title: t.title, artist: t.artist, duration: t.duration, artwork: t.artwork, album: t.album, albumId: t.albumId, artistId: t.artistId };
@@ -193,6 +196,7 @@
       persist();
     },
     addTrackToPlaylist(playlistId, track) {
+      eventNote("playlist", 1);
       const playlist = state.playlists.find((p) => p.id === playlistId);
       if (!playlist) return;
       if (!playlist.trackIds.includes(track.id)) playlist.trackIds.push(track.id);
@@ -657,6 +661,7 @@
     search: $("screen-search"),
     library: $("screen-library"),
     favorites: $("screen-favorites"),
+    event: $("screen-event"),
     playlist: $("screen-playlist"),
     profile: $("screen-profile"),
     player: $("screen-player"),
@@ -717,6 +722,8 @@
     if (name === "about") revealIn("screen-about", true);
     if (name === "plus") openPlusScreen();
     if (name === "look") renderLookScreen();
+    if (name === "event") renderEventScreen();
+    if (name === "event" || prev === "event") applyLook(); // the page of an event wears its own atmosphere
     if (name === "mood") { $("mood-note").hidden = hasPlus(); document.body.classList.toggle("has-plus", hasPlus()); revealIn("screen-mood", true); requestAnimationFrame(startMoodPhysics); }
     if (name === "profile") $("menu-plus").hidden = !plusPreview();
     if (name === "playlist" && currentPlaylistId && opts.replace) openPlaylist(currentPlaylistId, true);
@@ -1534,6 +1541,7 @@
     if (!tracks.length) { haptic("error"); showToast("Не получилось собрать микс, попробуй ещё раз"); return; }
     shuffleOn = false;
     haptic("success");
+    if (!/^ru_/.test(key)) eventNote("mood", key);
     if (hasPlus() || FREE_MOODS.has(key)) {
       // from here on it goes on like «Мой микс»: more of the same is added as it plays
       playTrack(tracks[0], tracks, { mymix: true, source: "mix", context: `Мой микс · ${MOODS[key]}` });
@@ -2158,6 +2166,7 @@
       if (!res.ok) throw new Error("shared");
       const { id } = await res.json();
       openShare(`Поделиться «${playlist.name}»`, `https://t.me/${bot}?start=p_${id}`, `Плейлист «${playlist.name}» в Нотке`);
+      eventNote("share", 1);
     } catch (e) { showToast("Не получилось создать ссылку, попробуй ещё раз"); }
   }
   async function shareInvite() {
@@ -2628,7 +2637,7 @@
     },
     halloween: {
       name: "Хэллоуин", loot: true,
-      lights: { candle: ["Свеча", { core: "#FFE0AE", warm: "#F58A2A", mid: "#7C3FC4", deep: "#220C3A" }], toxic: ["Зелье", { core: "#F0FFC8", warm: "#A4F04A", mid: "#1FB07A", deep: "#0A2A1C" }], blood: ["Багровый", { core: "#FFD8D2", warm: "#F04848", mid: "#B02860", deep: "#2A0A14" }] },
+      lights: { candle: ["Свеча", { core: "#FFE0AE", warm: "#F58A2A", mid: "#7C3FC4", deep: "#220C3A" }], gold: ["Золотая паутина", { core: "#FFF3D0", warm: "#E9C46A", mid: "#6B3FA0", deep: "#1B0B33" }, "edition_halloween"], toxic: ["Зелье", { core: "#F0FFC8", warm: "#A4F04A", mid: "#1FB07A", deep: "#0A2A1C" }], blood: ["Багровый", { core: "#FFD8D2", warm: "#F04848", mid: "#B02860", deep: "#2A0A14" }] },
       options: [["life", "Огоньки", [["flies", "Светлячки"], ["embers", "Искры"], ["both", "Оба"]], "flies"], ["amount", "Количество", AMOUNT_CHOICES, "low"], ["bats", "Летучие мыши", [["rare", "Редко"], ["often", "Часто"], ["off", "Нет"]], "rare"], ["fog", "Туман", ONOFF, "on"], ["moon", "Луна", ONOFF, "on"], ["webs", "Паутина", ONOFF, "on"]],
     },
     newyear: {
@@ -2644,10 +2653,12 @@
     const saved = (Store.getSetting("atmoOpts") || {})[id] || {};
     const out = { light: Object.keys(a.lights)[0] };
     a.options.forEach(([key, , choices, def]) => { out[key] = choices.some((c) => c[0] === saved[key]) ? saved[key] : def; });
-    if (a.lights[saved.light]) out.light = saved.light;
+    if (a.lights[saved.light] && lightOpen(a.lights[saved.light])) out.light = saved.light;
     return out;
   }
   const atmoPalette = (id) => ATMOS[id].lights[atmoSettings(id).light][1];
+  // a light can be a reward of its own: it is shown once it is won
+  const lightOpen = (light) => !light[2] || ownsItem(light[2]);
   function setAtmoSetting(id, key, value) {
     const all = Object.assign({}, Store.getSetting("atmoOpts") || {});
     all[id] = Object.assign({}, all[id] || {}, { [key]: value });
@@ -2657,7 +2668,7 @@
     const a = ATMOS[id];
     if (!a) return false;
     if (!a.loot) return hasPlus();
-    return (Store.getSetting("ownedAtmos") || []).includes(id) || (plusPreview() && hasPlus());
+    return ownsItem("atmo_" + id) || (plusPreview() && hasPlus());
   }
   const lookAllowed = (key, value) => value === LOOK_DEFAULTS[key] || (key === "atmo" ? atmoOwned(value) : hasPlus());
   const LOOK_TRY_MS = 60000;
@@ -2671,6 +2682,7 @@
     return value === "track" || value === "pinned" || (typeof value === "string" && value.startsWith("preset:") && !!LIGHT_PRESETS[value.slice(7)]);
   }
   function lookValue(key) {
+    if (key === "atmo" && currentScreen === "event" && eventById(currentEventId)) return eventById(currentEventId).atmo;
     if (key in lookTried) return lookTried[key];
     const saved = Store.getSetting(key);
     return lookKnown(key, saved) && lookAllowed(key, saved) ? saved : LOOK_DEFAULTS[key];
@@ -2694,7 +2706,7 @@
     document.body.dataset.bg = lookValue("bgPattern");
     const atmo = lookValue("atmo");
     document.body.dataset.atmo = atmo;
-    const atmoSet = atmo === "none" ? {} : atmoSettings(atmo);
+    const atmoSet = atmo === "none" ? {} : Object.assign(atmoSettings(atmo), currentScreen === "event" ? { bats: "often", life: "both" } : {});
     // every setting is also an attribute of the body, for the style sheet to answer
     Object.keys(document.body.dataset).filter((k) => /^atmo[A-Z]/.test(k)).forEach((k) => delete document.body.dataset[k]);
     Object.entries(atmoSet).forEach(([k, v]) => { document.body.dataset["atmo" + k[0].toUpperCase() + k.slice(1)] = v; });
@@ -2716,7 +2728,10 @@
     $("look-try").hidden = !trying;
     const lootTried = "atmo" in lookTried && !!ATMOS[lookTried.atmo].loot;
     $("look-try").querySelector("span").textContent = lootTried ? "На пробу, минута · выдаётся за задания" : "На пробу, минута";
-    $("look-try-keep").hidden = lootTried;
+    const lootEvent = lootTried ? eventsCfg.find((e) => e.atmo === lookTried.atmo && e.status === "active") : null;
+    $("look-try-keep").hidden = lootTried && !lootEvent;
+    $("look-try-keep").textContent = lootTried ? "К заданиям" : "Оставить с Плюсом";
+    if (lootTried) $("look-try").querySelector("span").textContent = "На пробу, минута";
     $("look-note").hidden = hasPlus();
     $("theme-try").hidden = !("playerTheme" in lookTried);
     if ("playerTheme" in lookTried) $("theme-try-text").textContent = `«${PLAYER_THEMES[theme].name}» — тема Плюса`;
@@ -2766,7 +2781,11 @@
     setPlayerTheme(opt.dataset.theme);
   }));
   $("theme-try-keep").addEventListener("click", () => { closeOverlay("player-theme-sheet"); showScreen("plus"); });
-  $("look-try-keep").addEventListener("click", () => showScreen("plus"));
+  $("look-try-keep").addEventListener("click", () => {
+    const loot = lookTried.atmo && ATMOS[lookTried.atmo] && ATMOS[lookTried.atmo].loot;
+    const ev = loot ? eventsCfg.find((e) => e.atmo === lookTried.atmo && e.status === "active") : null;
+    if (ev) openEvent(ev.id); else showScreen("plus");
+  });
 
   // ---- the «Оформление» screen ----
   function renderAtmoStage() {
@@ -2817,7 +2836,7 @@
     atmoOptsFor = key;
     const a = ATMOS[atmo];
     const row = (setting, title, choices, value) => `<div class="atmo-opt"><span class="atmo-opt-t">${title}</span><div class="atmo-opt-row">${choices.map(([v, name]) => `<button class="chip${v === value ? " active" : ""}" type="button" data-setting="${setting}" data-v="${v}">${name}</button>`).join("")}</div></div>`;
-    box.innerHTML = row("light", "Свет", Object.entries(a.lights).map(([v, l]) => [v, l[0]]), current.light) + a.options.map(([setting, title, choices]) => row(setting, title, choices, current[setting])).join("");
+    box.innerHTML = row("light", "Свет", Object.entries(a.lights).filter(([, l]) => lightOpen(l)).map(([v, l]) => [v, l[0]]), current.light) + a.options.map(([setting, title, choices]) => row(setting, title, choices, current[setting])).join("");
   }
   $("atmo-opts").addEventListener("click", (e) => {
     const c = e.target.closest(".chip");
@@ -2914,6 +2933,208 @@
   syncPlusUI();
   refreshPlus();  syncPlusUI();
   refreshPlus();
+
+
+  // little pictures of the rewards
+  const svgUri = (s) => "data:image/svg+xml," + encodeURIComponent(s);
+  const EVENT_ICONS = {
+    frame_pumpkin: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><ellipse cx='16' cy='28' rx='10' ry='12' fill='#f58a2a'/><ellipse cx='32' cy='28' rx='10' ry='12' fill='#f58a2a'/><ellipse cx='24' cy='28' rx='8' ry='13' fill='#ffab4d'/><path d='M24 15c0-4 2-6 5-7' stroke='#6a8a2a' stroke-width='3' stroke-linecap='round' fill='none'/></svg>"),
+    atmo_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path d='M31 5a19 19 0 1 0 13 29A16 16 0 0 1 31 5z' fill='#ffe0ae'/><circle cx='36' cy='14' r='2' fill='#f58a2a'/><circle cx='41' cy='22' r='1.4' fill='#f58a2a'/></svg>"),
+    edition_halloween: svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><g fill='none' stroke='#e9c46a' stroke-width='1.8' stroke-linecap='round'><path d='M24 3v42M6 12l36 24M6 36l36-24'/><circle cx='24' cy='24' r='7'/><circle cx='24' cy='24' r='14'/><circle cx='24' cy='24' r='20'/></g></svg>"),
+  };
+  const EVENT_ICON_FALLBACK = svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path d='M24 4l5.5 12.5 13.5 1.3-10.2 9 3 13.2L24 33l-11.8 7 3-13.2L5 17.8l13.5-1.3z' fill='#e9c46a'/></svg>");
+  const eventIcon = (item) => EVENT_ICONS[item] || EVENT_ICON_FALLBACK;
+
+  // ============================================================
+  // СОБЫТИЯ: tasks that count themselves, rewards that open themselves
+  // ============================================================
+  // The server has the events (see events_store.py) and keeps who has what;
+  // the app counts the tasks, because it is the one that sees the listening.
+  const EVENTS_CACHE = "notka_events_cfg";
+  let eventsCfg = [];
+  try { eventsCfg = JSON.parse(localStorage.getItem(EVENTS_CACHE)) || []; } catch (e) { eventsCfg = []; }
+  let currentEventId = null;
+  function eventById(id) { return eventsCfg.find((e) => e.id === id) || null; }
+  function activeEvents() { return eventsCfg.filter((e) => e.status === "active"); }
+  function taskValue(eventId, task) {
+    const v = (state.events.progress[eventId] || {})[task.id];
+    return Array.isArray(v) ? v.length : +v || 0;
+  }
+  function eventPoints(ev) { return ev.tasks.filter((t) => taskValue(ev.id, t) >= t.target).length; }
+
+  // something happened that a task may be waiting for
+  function eventNote(kind, value, quiet) {
+    let changed = false;
+    activeEvents().forEach((ev) => ev.tasks.forEach((t) => {
+      if (t.kind !== kind) return;
+      const p = state.events.progress[ev.id] || (state.events.progress[ev.id] = {});
+      if (t.unique) {
+        const set = Array.isArray(p[t.id]) ? p[t.id] : (p[t.id] = []);
+        if (set.length < t.target && !set.includes(String(value))) { set.push(String(value)); changed = true; }
+      } else if (taskValue(ev.id, t) < t.target) {
+        p[t.id] = Math.min(t.target, (+p[t.id] || 0) + value);
+        changed = true;
+      }
+    }));
+    if (!changed) return;
+    reconcileEvents(true);
+    if (!quiet) persist();
+    scheduleEventSync();
+  }
+  // the rewards that need no number open here, at once; the numbered one waits for the server
+  function reconcileEvents(announce) {
+    activeEvents().forEach((ev) => {
+      const points = eventPoints(ev);
+      ev.tiers.forEach((tier) => {
+        if (tier.limit || points < tier.points || ownsItem(tier.item)) return;
+        state.events.items.push(tier.item);
+        if (announce) announceReward(tier);
+      });
+    });
+    renderEventUI();
+  }
+  function announceReward(tier) {
+    haptic("success");
+    showToast(`Награда: ${tier.title}`);
+  }
+  let eventSyncTimer = null;
+  function scheduleEventSync() {
+    clearTimeout(eventSyncTimer);
+    eventSyncTimer = setTimeout(syncEvents, 2500);
+  }
+  function mergeMine(ev, mine, quiet) {
+    if (!mine) return;
+    const had = new Set(state.events.items);
+    (mine.items || []).forEach((item) => {
+      if (had.has(item)) return;
+      state.events.items.push(item);
+      const tier = ev.tiers.find((t) => t.item === item);
+      if (tier && !quiet) announceReward(tier);
+    });
+    if (mine.edition) state.events.editions[ev.id] = mine.edition;
+    if (typeof mine.editionLeft === "number") ev.editionLeft = mine.editionLeft;
+    // what the server knows from another phone is not lost
+    const p = state.events.progress[ev.id] || (state.events.progress[ev.id] = {});
+    ev.tasks.forEach((t) => {
+      const server = Math.min(t.target, +((mine.progress || {})[t.id]) || 0);
+      if (t.unique) {
+        const set = Array.isArray(p[t.id]) ? p[t.id] : (p[t.id] = []);
+        while (set.length < server) set.push("~" + set.length);
+      } else if (server > (+p[t.id] || 0)) p[t.id] = server;
+    });
+    persist();
+    renderEventUI();
+    applyLook();
+  }
+  async function syncEvents() {
+    for (const ev of activeEvents()) {
+      const progress = {};
+      ev.tasks.forEach((t) => { progress[t.id] = taskValue(ev.id, t); });
+      try {
+        const res = await fetch(`${API_BASE_URL}/events/sync`, { method: "POST", headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitData }, body: JSON.stringify({ event: ev.id, progress }) });
+        if (res.ok) mergeMine(ev, await res.json(), false);
+      } catch (e) { /* the next change tries again */ }
+    }
+  }
+  async function refreshEvents() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/events`, { headers: { "X-Telegram-Init-Data": tgInitData } });
+      if (!res.ok) return;
+      eventsCfg = (await res.json()).events || [];
+      try { localStorage.setItem(EVENTS_CACHE, JSON.stringify(eventsCfg)); } catch (e) { /* the list is fetched again */ }
+      eventsCfg.forEach((ev) => mergeMine(ev, ev.mine, true));
+      eventNote("visit", dayKey(Date.now()));
+      reconcileEvents(true);
+      syncEvents();
+    } catch (e) { /* the cached list stays */ }
+  }
+  window.Atmosphere && (Atmosphere.onCatch = (what) => { if (what === "bat") eventNote("bat", 1); });
+
+  // ---- what the rewards put into the app ----
+  function applyEventItems() {
+    const frame = ownsItem("frame_pumpkin") ? "pumpkin" : "";
+    ["home-avatar", "profile-avatar-btn", "account-avatar"].forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      if (frame) el.dataset.frame = frame; else delete el.dataset.frame;
+    });
+    const n = state.events.editions.halloween;
+    const badge = $("edition-badge");
+    badge.hidden = !(ownsItem("edition_halloween") && n);
+    if (n) badge.querySelector("span").textContent = `Золотая паутина № ${n}`;
+  }
+  $("edition-badge").addEventListener("click", () => {
+    haptic("success");
+    showToast(`Твой номер ${state.events.editions.halloween} из 100. Такого больше ни у кого нет`);
+  });
+
+  // ---- the banner on Home and the page of the event ----
+  const daysWord = (n) => `${n} ${plural(n, "день", "дня", "дней")}`;
+  function renderEventUI() {
+    const banner = $("home-event");
+    const ev = activeEvents()[0];
+    banner.hidden = !ev;
+    if (ev) {
+      const points = eventPoints(ev), total = ev.tasks.length;
+      $("event-banner-title").textContent = ev.title;
+      $("event-banner-sub").textContent = points >= total ? "Всё выполнено" : `Ещё ${daysWord(ev.days)}`;
+      $("event-banner-count").textContent = `${points}/${total}`;
+      banner.style.setProperty("--p", String(Math.round((points / total) * 100)));
+      banner.querySelector(".event-banner-art").style.backgroundImage = `url("${eventIcon(ev.tiers[0].item)}")`;
+    }
+    if (currentScreen === "event") renderEventScreen();
+    applyEventItems();
+  }
+  function renderEventScreen() {
+    const ev = eventById(currentEventId);
+    if (!ev) return;
+    const points = eventPoints(ev), total = ev.tasks.length;
+    $("event-kicker").textContent = ev.status === "active" ? `Событие · ещё ${daysWord(ev.days)}` : "Событие завершено";
+    $("event-title").textContent = ev.title;
+    $("event-count").textContent = String(points);
+    $("event-count-of").textContent = `из ${total} ${plural(total, "задания", "заданий", "заданий")}`;
+    const marks = new Set(ev.tiers.map((t) => t.points));
+    $("event-seg").innerHTML = Array.from({ length: total }, (_, i) => `<span class="event-cell${points > i ? " is-on" : ""}">${marks.has(i + 1) ? '<span class="event-mark"></span>' : ""}<i></i></span>`).join("");
+    $("event-rewards").innerHTML = ev.tiers.map((tier) => {
+      const open = ownsItem(tier.item);
+      const left = tier.points - points;
+      const sub = open ? (tier.limit && state.events.editions[ev.id] ? `№ ${state.events.editions[ev.id]}` : "Получено") : left > 0 ? `Ещё ${left} ${plural(left, "задание", "задания", "заданий")}` : "Тираж разобран";
+      return `<li class="event-reward ${open ? "is-open" : "is-locked"}" data-item="${tier.item}"><span class="event-medal"><img alt="" src="${eventIcon(tier.item)}"></span><b>${tier.title}</b><em>${sub}</em></li>`;
+    }).join("");
+    const limitTier = ev.tiers.find((t) => t.limit);
+    const edition = $("event-edition");
+    edition.hidden = !limitTier;
+    if (limitTier) {
+      const mine = state.events.editions[ev.id];
+      edition.textContent = mine ? `«${limitTier.title}»: твой номер ${mine} из ${limitTier.limit}` : typeof ev.editionLeft === "number" ? (ev.editionLeft > 0 ? `«${limitTier.title}»: осталось ${ev.editionLeft} из ${limitTier.limit}` : `«${limitTier.title}»: все ${limitTier.limit} уже разобраны`) : "";
+      edition.hidden = !edition.textContent;
+    }
+    $("event-tasks").innerHTML = ev.tasks.map((t) => {
+      const v = taskValue(ev.id, t), done = v >= t.target;
+      const line = done ? "Готово" : `${Math.floor(v)} из ${t.target}${t.unit ? " " + t.unit : ""}`;
+      return `<li class="event-task${done ? " is-done" : ""}"><span class="event-task-ring" style="--p:${Math.round(Math.min(1, v / t.target) * 100)}">${done ? '<svg width="20" height="20" aria-hidden="true"><use href="#i-check"/></svg>' : ""}</span><span class="event-task-text"><b>${t.title}</b><em>${line}</em></span></li>`;
+    }).join("");
+  }
+  function openEvent(id) {
+    currentEventId = id;
+    haptic("light");
+    showScreen("event");
+    refreshEvents();
+  }
+  $("home-event").addEventListener("click", () => { const ev = activeEvents()[0]; if (ev) openEvent(ev.id); });
+  $("event-back-btn").addEventListener("click", goBack);
+  // a reward is tapped: what it is, and for a theme — put it on
+  $("event-rewards").addEventListener("click", (e) => {
+    const li = e.target.closest(".event-reward");
+    const ev = eventById(currentEventId);
+    if (!li || !ev) return;
+    const tier = ev.tiers.find((t) => t.item === li.dataset.item);
+    haptic("light");
+    if (tier.item.startsWith("atmo_") && ownsItem(tier.item)) { setLook("atmo", tier.item.slice(5)); showToast("Тема включена, а выключить её можно в «Оформлении»"); return; }
+    showToast(`${tier.title}. ${tier.text}`);
+  });
+  renderEventUI();
+  refreshEvents();
 
   // ---- promo code: typed in by hand, or brought by a link from an ad ----
   const promoInput = $("promo-input");
@@ -4222,6 +4443,7 @@
         const L = state.listens;
         L.seconds += d;
         statHeard += d;
+        eventNote("listen", d / 60, true);
         const key = currentTrack.artist || "Неизвестный исполнитель";
         const a = L.artists[key] || (L.artists[key] = { seconds: 0, plays: 0 });
         a.seconds += d;

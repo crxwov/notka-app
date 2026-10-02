@@ -15,6 +15,7 @@
      edited, otherwise Telegram may keep showing the old version. -->
 <link rel="stylesheet" href="styles.css?v=63" />
 <link rel="stylesheet" href="atmosphere.css?v=6" />
+<link rel="stylesheet" href="events.css?v=1" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -149,6 +150,16 @@
       <span>Трек, исполнитель или альбом</span>
     </button>
 
+    <button class="event-banner" id="home-event" type="button" hidden>
+      <span class="event-banner-art" aria-hidden="true"></span>
+      <span class="event-banner-text">
+        <span class="event-banner-kicker">Событие</span>
+        <span class="event-banner-title" id="event-banner-title">Хэллоуин</span>
+        <span class="event-banner-sub" id="event-banner-sub"></span>
+      </span>
+      <span class="event-ring" id="event-banner-ring" aria-hidden="true"><b id="event-banner-count">0/6</b></span>
+    </button>
+
     <section class="block" id="home-recent-block" data-reveal hidden>
       <div class="block-head"><h2 class="h2">Недавнее</h2></div>
       <div class="shelf shelf-compact" id="home-recent"></div>
@@ -172,6 +183,22 @@
       <ul class="track-list" id="home-favorites-list"></ul>
       <p class="empty-note" id="home-favorites-empty">Здесь появятся треки, которые ты отметишь сердцем. Начни с поиска.</p>
     </section>
+  </main>
+
+  <!-- ============ СОБЫТИЕ ============ -->
+  <main class="screen" id="screen-event" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="event-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+    <p class="event-kicker" id="event-kicker"></p>
+    <h1 class="event-title" id="event-title"></h1>
+    <p class="event-lede">Задания считаются сами, награды открываются сами и остаются у тебя навсегда.</p>
+    <div class="event-count"><b id="event-count">0</b><span id="event-count-of"></span></div>
+    <div class="event-seg" id="event-seg"></div>
+    <ol class="event-rewards" id="event-rewards"></ol>
+    <p class="event-edition" id="event-edition" hidden></p>
+    <h2 class="event-h">Задания</h2>
+    <ul class="event-tasks" id="event-tasks"></ul>
   </main>
 
   <!-- ============ SEARCH ============ -->
@@ -391,6 +418,7 @@
       <h1 class="hero-title" id="profile-name">Гость</h1>
       <p class="hero-sub" id="profile-sub">Вход через Telegram</p>
       <button class="friend-badge" id="friend-badge" type="button" data-tier="new" hidden><svg width="14" height="14" aria-hidden="true"><use href="#i-heart-fill"/></svg><span>Друг Нотки</span></button>
+      <button class="friend-badge" id="edition-badge" type="button" data-tier="edition" hidden><svg width="14" height="14" aria-hidden="true"><use href="#i-disc"/></svg><span>Золотая паутина</span></button>
     </div>
     <button class="plus-card" id="menu-plus" type="button" hidden>
       <span class="plus-card-mark" aria-hidden="true"><svg width="22" height="22"><use href="#i-plus"/></svg></span>

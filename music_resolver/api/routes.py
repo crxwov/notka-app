@@ -18,7 +18,7 @@ from music_resolver.errors import AppError, ErrorCode
 from music_resolver.models import AlbumResponse, ArtistResponse, ResolveResponse, SearchResponse
 from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
-from music_resolver.services import mood_mix, plus_store
+from music_resolver.services import events_store, mood_mix, plus_store
 from music_resolver.services.playlist_import import read_playlist
 from music_resolver.utils.remux import defragment, defragment_all
 
@@ -300,6 +300,34 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             return plus_store.redeem(user_id, code)
         except plus_store.PromoError as exc:
             return JSONResponse({"error": {"code": exc.reason}}, status_code=400)
+
+    # ---- «События»: tasks, rewards and numbered editions (see events_store) ----
+    def event_user(init_data: str, test_user: str = "") -> int | None:
+        user_id = plus_store.verify_init_data(init_data)
+        # for the local test server only: NOTKA_TEST_USER stands in for Telegram,
+        # and a test may name its own listener in a header
+        if user_id is None and os.environ.get("NOTKA_TEST_USER", "").isdigit():
+            return int(test_user) if test_user.isdigit() else int(os.environ["NOTKA_TEST_USER"])
+        return user_id
+
+    @router.get("/events")
+    async def events_list(x_telegram_init_data: str = Header(default=""), x_notka_test_user: str = Header(default="")) -> dict:
+        user_id = event_user(x_telegram_init_data, x_notka_test_user)
+        return {"events": events_store.public(user_id), "known": user_id is not None}
+
+    @router.post("/events/sync")
+    async def events_sync(request: Request, x_telegram_init_data: str = Header(default=""), x_notka_test_user: str = Header(default="")):
+        user_id = event_user(x_telegram_init_data, x_notka_test_user)
+        if user_id is None:
+            return JSONResponse({"error": {"code": "NOT_IN_TELEGRAM"}}, status_code=401)
+        try:
+            body = await request.json()
+            progress = body.get("progress") if isinstance(body.get("progress"), dict) else {}
+            return events_store.sync(user_id, str(body.get("event") or ""), progress)
+        except KeyError:
+            return JSONResponse({"error": {"code": "NO_SUCH_EVENT"}}, status_code=404)
+        except (ValueError, AttributeError):
+            return JSONResponse({"error": {"code": "BAD_REQUEST"}}, status_code=400)
 
     @router.get("/resolve", response_model=ResolveResponse)
     async def resolve(
