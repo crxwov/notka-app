@@ -15,7 +15,7 @@
      edited, otherwise Telegram may keep showing the old version. -->
 <link rel="stylesheet" href="styles.css?v=63" />
 <link rel="stylesheet" href="atmosphere.css?v=6" />
-<link rel="stylesheet" href="events.css?v=4" />
+<link rel="stylesheet" href="events.css?v=5" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -150,13 +150,15 @@
       <span>Трек, исполнитель или альбом</span>
     </button>
 
-    <button class="event-banner" id="home-event" type="button" hidden>
-      <span class="eb-bg" aria-hidden="true"><span class="eb-word" id="event-banner-word">ХЭЛЛОУИН</span></span>
+    <button class="event-banner glass" id="home-event" type="button" hidden>
+      <span class="eb-text">
+        <span class="eb-pill" id="event-banner-kicker">13 дней</span>
+        <span class="event-banner-title" id="event-banner-title">Хэллоуин</span>
+        <span class="event-banner-sub" id="event-banner-sub">Зажги тыкву · <b id="event-banner-count">0/6</b></span>
+        <span class="eb-bars" id="event-banner-bars" aria-hidden="true"></span>
+      </span>
       <span class="eb-pk" id="event-banner-pk" aria-hidden="true"></span>
-      <span class="eb-pill" id="event-banner-kicker">13 дней</span>
-      <span class="event-banner-title" id="event-banner-title">Хэллоуин</span>
-      <span class="event-banner-sub" id="event-banner-sub">Зажги тыкву · <b id="event-banner-count">0/6</b></span>
-      <span class="eb-bars" id="event-banner-bars" aria-hidden="true"></span>
+      <span class="eb-word" id="event-banner-word" hidden></span>
     </button>
 
     <section class="block" id="home-recent-block" data-reveal hidden>

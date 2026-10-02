@@ -12,21 +12,19 @@
   --ev-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ---------- the banner on Home: bigger than the page it sits on, and the pumpkin breaks out of it ---------- */
-.event-banner { position: relative; display: block; width: 100%; height: 218px; margin: 8px 0 28px; border-radius: 34px; text-align: left; color: #fff; isolation: isolate; transition: transform 0.3s var(--ease-out); }
+/* ---------- the banner on Home: a piece of liquid glass, tinted by the light, with the pumpkin inside ---------- */
+.event-banner { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 156px; margin: 4px 0 24px; padding: 18px 8px 18px 20px; border-radius: 30px; text-align: left; color: #fff; overflow: hidden; transition: transform 0.3s var(--ease-out); }
 .event-banner:active { transform: scale(0.985); }
-.eb-bg { position: absolute; inset: 0; z-index: -1; border-radius: inherit; overflow: hidden; background: radial-gradient(110% 100% at 100% 100%, var(--ev-pink) 0%, transparent 58%), radial-gradient(90% 90% at 0% 0%, var(--ev-violet) 0%, transparent 62%), radial-gradient(70% 60% at 60% 120%, var(--ev-orange) 0%, transparent 70%), linear-gradient(135deg, #1b0b2e, var(--ev-ink)); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.14); }
-.eb-bg::after { content: ""; position: absolute; inset: 0; background: var(--ev-grain); mix-blend-mode: overlay; opacity: 0.9; }
-.eb-word { display: none; }
-.eb-pk { position: absolute; right: -12px; top: -36px; width: 176px; transform: rotate(8deg); pointer-events: none; z-index: 1; }
+.eb-text { position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.eb-pill { height: 28px; padding: 0 13px; display: inline-flex; align-items: center; border-radius: 999px; background: rgba(255, 255, 255, 0.16); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; }
+.event-banner-title { font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -0.04em; }
+.event-banner-sub { font-size: 15px; font-weight: 500; color: rgba(255, 255, 255, 0.86); }
+.event-banner-sub b { color: #ffd9a0; font-weight: 700; }
+.eb-bars { width: 100%; max-width: 190px; display: flex; gap: 4px; margin-top: 8px; }
+.eb-bars i { flex: 1; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12); transition: background 0.5s; }
+.eb-bars i.is-on { background: linear-gradient(90deg, #ffc067, #ff7aa6); box-shadow: 0 0 10px rgba(255, 150, 120, 0.55); }
+.eb-pk { position: relative; z-index: 1; flex: 0 0 142px; width: 142px; margin: -16px -4px -12px 0; transform: rotate(6deg); pointer-events: none; }
 .eb-pk .pk { display: block; width: 100%; overflow: visible; animation: pk-float 6s ease-in-out infinite; }
-.eb-pill { position: absolute; z-index: 2; left: 20px; top: 20px; height: 30px; padding: 0 13px; display: flex; align-items: center; border-radius: 999px; background: var(--ev-yellow); color: #17090c; font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
-.event-banner-title { position: absolute; z-index: 2; left: 20px; top: 66px; font-size: 38px; line-height: 0.9; font-weight: 800; letter-spacing: -0.055em; text-transform: uppercase; }
-.event-banner-sub { position: absolute; z-index: 2; left: 20px; top: 112px; font-size: 15.5px; font-weight: 600; color: rgba(255, 255, 255, 0.86); }
-.event-banner-sub b { color: var(--ev-yellow); font-weight: 800; }
-.eb-bars { position: absolute; z-index: 2; left: 20px; right: 20px; bottom: 22px; display: flex; gap: 5px; }
-.eb-bars i { flex: 1; height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); transition: background 0.5s; }
-.eb-bars i.is-on { background: var(--ev-yellow); box-shadow: 0 0 12px rgba(255, 233, 77, 0.6); }
 
 /* ---------- the page ---------- */
 #screen-event { background: var(--ev-grain), radial-gradient(120% 55% at 50% 0%, rgba(124, 63, 196, 0.42), transparent 72%), radial-gradient(90% 40% at 50% 38%, rgba(255, 77, 154, 0.16), transparent 70%), rgba(9, 4, 15, 0.93); }
