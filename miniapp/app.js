@@ -3226,7 +3226,7 @@
     $("event-tasks").innerHTML = ev.tasks.map((t, i) => {
       const v = taskValue(ev.id, t), done = v >= t.target, go = TASK_GO[t.kind];
       const canGo = !done && go && go.run;
-      return `<li class="event-task${done ? " is-done" : ""}"${canGo ? ` data-go="${t.kind}"` : ""}><span class="et-n">${String(i + 1).padStart(2, "0")}</span><span class="et-body"><b>${t.title}</b><span class="et-bar"><i style="width:${Math.round(Math.min(1, v / t.target) * 100)}%"></i></span><em>${taskLine(ev, t)}</em></span>${canGo ? '<span class="et-go"><svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></span>' : ""}</li>`;
+      return `<li class="event-task${done ? " is-done" : ""}"${canGo ? ` data-go="${t.kind}"` : ""}><span class="et-n">${String(i + 1).padStart(2, "0")}</span><span class="et-body"><b>${t.title}</b><span class="et-bar"><i style="--w:${Math.min(1, v / t.target).toFixed(3)}"></i></span><em>${taskLine(ev, t)}</em></span>${canGo ? '<span class="et-go"><svg width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></span>' : ""}</li>`;
     }).join("");
   }
   $("event-tasks").addEventListener("click", (e) => {
