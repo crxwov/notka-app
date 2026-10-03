@@ -747,8 +747,8 @@
     if (name === "home") renderHome();
     if (name === "library") renderLibrary();
     if (name === "favorites") renderFavoritesScreen();
-    if (name === "profile") renderProfile();
-    if (name === "account") renderAccountScreen();
+    if (name === "profile") { renderProfile(); revealIn("screen-profile", true); }
+    if (name === "account") { renderAccountScreen(); revealIn("screen-account", true); }
     if (name === "sound") renderSoundScreen();
     if (name === "stats") renderStatsScreen();
     if (name === "about") revealIn("screen-about", true);
@@ -2389,17 +2389,46 @@
     $("profile-name").textContent = displayName();
     $("profile-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : "Вход через Telegram";
     renderAvatarInto("profile-avatar-btn", "profile-initial");
+
+    // цифры слушателя прямо на профиле; тап открывает статистику
+    const S = statsFor("all");
+    const heard = S.tracks.length > 0 && S.seconds >= 1;
+    const minutes = Math.max(1, Math.round(S.seconds / 60));
+    $("profile-stats").classList.toggle("is-empty", !heard);
+    if (heard) {
+      countUp($("pf-minutes"), minutes);
+      countUp($("pf-tracks"), S.tracks.length);
+      countUp($("pf-artists"), S.artists.length);
+      $("pf-minutes-l").textContent = plural(minutes, "минута", "минуты", "минут");
+      $("pf-tracks-l").textContent = plural(S.tracks.length, "трек", "трека", "треков");
+      $("pf-artists-l").textContent = plural(S.artists.length, "исполнитель", "исполнителя", "исполнителей");
+    }
+
+    // под каждым пунктом то, что в нём сейчас выбрано
+    const crossfade = Store.getSetting("crossfade") || 0;
+    const atmo = lookValue("atmo");
+    const theme = PLAYER_THEMES[lookValue("playerTheme")];
+    $("pf-sub-account").textContent = `${displayName()}${tgUser && tgUser.username ? ` · @${tgUser.username}` : ""}`;
+    $("pf-sub-stats").textContent = heard ? `${minutes.toLocaleString("ru-RU")} ${plural(minutes, "минута", "минуты", "минут")} за всё время` : "Пока тихо";
+    $("pf-sub-look").textContent = `${atmo === "none" ? "Без атмосферы" : (ATMOS[atmo] && ATMOS[atmo].name) || "Атмосфера"} · плеер «${theme ? theme.name : "Стандарт"}»`;
+    $("pf-sub-sound").textContent = crossfade ? `Плавный переход ${crossfade} с` : "Плавный переход выключен";
+    $("pf-sub-about").textContent = ($("about-version").textContent || "").trim() || "Версия 1.1";
+    $("pf-version").textContent = `Нотка · ${($("about-version").textContent || "Версия 1.1").trim().toLowerCase()}`;
   }
+  function openSupport() {
+    const url = "https://t.me/notka_support";
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+    else window.open(url, "_blank");
+  }
+  $("profile-stats").addEventListener("click", () => showScreen("stats"));
+  $("pf-invite").addEventListener("click", () => shareInvite());
+  $("pf-support").addEventListener("click", openSupport);
   $("profile-back-btn").addEventListener("click", goBack);
   $("menu-stats").addEventListener("click", () => showScreen("stats"));
   $("menu-account").addEventListener("click", () => showScreen("account"));
   $("menu-sound").addEventListener("click", () => showScreen("sound"));
   $("menu-about").addEventListener("click", () => showScreen("about"));
-  $("about-support-btn").addEventListener("click", () => {
-    const url = "https://t.me/notka_support";
-    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
-    else window.open(url, "_blank");
-  });
+  $("about-support-btn").addEventListener("click", openSupport);
 
   // ============================================================
   // ACCOUNT (name/avatar from Telegram, local listening stats)
@@ -2409,7 +2438,107 @@
     renderAvatarInto("account-avatar", "account-initial");
     const platforms = { ios: "iPhone", android: "Android", android_x: "Android", tdesktop: "Telegram Desktop", macos: "Mac", weba: "Telegram Web", webk: "Telegram Web" };
     $("account-sessions-count").textContent = (tg && platforms[tg.platform]) || "Браузер";
+    const tgName = tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") : "";
+    const customName = !!Store.getAccountName(), customPhoto = !!Store.getAccountAvatar();
+    $("account-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : "";
+    $("acc-name-val").textContent = displayName();
+    $("acc-photo-val").textContent = customPhoto ? "Своё" : (tgUser && tgUser.photo_url ? "Из Telegram" : "Не выбрано");
+    $("acc-tg-val").textContent = tgUser ? (tgUser.username ? `@${tgUser.username}` : (tgName || "Подключён")) : "Не подключён";
+    $("account-restore-tg").hidden = !(tgUser && (customName || customPhoto));
+    $("acc-favs").textContent = String(state.favorites.length);
+    $("acc-lists").textContent = String(state.playlists.length);
+    $("acc-follows").textContent = String(state.followedArtists.length);
   }
+  $("account-row-name").addEventListener("click", () => $("account-name-row").click());
+  $("account-row-photo").addEventListener("click", () => changeAccountAvatar());
+  $("account-restore-tg").addEventListener("click", () => {
+    Store.setAccountName(null);
+    Store.setAccountAvatar(null);
+    renderAccountScreen();
+    renderProfile();
+    haptic("success");
+    showToast("Имя и фото из Telegram");
+  });
+
+  // копия данных одним текстом: на устройстве хранится всё, и так оно переезжает на новый телефон
+  const BACKUP_PREFIX = "NOTKA1:";
+  function buildBackup() {
+    const keepCover = (p) => (p.cover && p.cover.length > 30000 ? Object.assign({}, p, { cover: null }) : p);
+    const data = {
+      v: 1, at: Date.now(),
+      accountName: state.accountName, favorites: state.favorites, playlists: state.playlists.map(keepCover),
+      followedArtists: state.followedArtists, followedMeta: state.followedMeta, playlistFlags: state.playlistFlags,
+      settings: state.settings, listens: state.listens, events: state.events,
+    };
+    return BACKUP_PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function readBackup(text) {
+    const raw = String(text || "").replace(/\s+/g, "");
+    if (!raw.startsWith(BACKUP_PREFIX)) throw new Error("not a backup");
+    const data = JSON.parse(decodeURIComponent(escape(atob(raw.slice(BACKUP_PREFIX.length)))));
+    if (!data || data.v !== 1 || !Array.isArray(data.favorites) || !Array.isArray(data.playlists)) throw new Error("bad backup");
+    return data;
+  }
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; }
+    } catch (e) { /* the fallback below */ }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (e) { return false; }
+  }
+  $("account-backup").addEventListener("click", async () => {
+    const text = buildBackup();
+    if (await copyText(text)) { haptic("success"); showToast("Копия скопирована. Сохрани её, например, в «Избранное»"); return; }
+    // буфер недоступен: показываем текст, его можно скопировать руками
+    $("restore-title").textContent = "Копия данных";
+    $("restore-text").textContent = "Не получилось скопировать само. Выдели весь текст и скопируй его.";
+    $("restore-input").value = text;
+    $("restore-confirm").hidden = true;
+    openOverlay("restore-modal");
+    setTimeout(() => { $("restore-input").focus(); $("restore-input").select(); }, 80);
+  });
+  $("account-restore").addEventListener("click", () => {
+    $("restore-title").textContent = "Восстановить из копии";
+    $("restore-text").textContent = "Вставь текст копии. Любимое, плейлисты, подписки и статистика на этом устройстве будут заменены.";
+    $("restore-input").value = "";
+    $("restore-confirm").hidden = false;
+    openOverlay("restore-modal");
+    setTimeout(() => $("restore-input").focus(), 80);
+  });
+  $("restore-cancel").addEventListener("click", () => closeOverlay("restore-modal"));
+  $("restore-confirm").addEventListener("click", () => {
+    let data;
+    try { data = readBackup($("restore-input").value); } catch (e) { haptic("error"); showToast("Это не похоже на копию Нотки"); return; }
+    state.accountName = data.accountName || null;
+    state.favorites = data.favorites;
+    state.playlists = data.playlists;
+    state.followedArtists = data.followedArtists || [];
+    state.followedMeta = data.followedMeta || {};
+    state.playlistFlags = data.playlistFlags || {};
+    state.settings = Object.assign(state.settings, data.settings || {});
+    state.listens = data.listens || { seconds: 0, plays: 0, tracks: {}, artists: {} };
+    if (data.events) state.events = data.events;
+    persist();
+    closeOverlay("restore-modal");
+    haptic("success");
+    showToast("Данные восстановлены");
+    setTimeout(() => location.reload(), 700);
+  });
+  $("account-reset-stats").addEventListener("click", () => openOverlay("reset-stats-modal"));
+  $("reset-stats-cancel").addEventListener("click", () => closeOverlay("reset-stats-modal"));
+  $("reset-stats-confirm").addEventListener("click", () => {
+    state.listens = { seconds: 0, plays: 0, tracks: {}, artists: {}, days: {} };
+    persist();
+    closeOverlay("reset-stats-modal");
+    haptic("success");
+    showToast("Статистика сброшена");
+  });
   function setSwitch(id, on) {
     const el = $(id);
     if (el) el.setAttribute("aria-checked", on ? "true" : "false");

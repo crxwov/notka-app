@@ -423,13 +423,19 @@
     <header class="bar">
       <button class="round-btn round-glass back-btn" id="profile-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
     </header>
-    <div class="hero hero-profile">
+    <div class="hero hero-profile" data-reveal>
       <span class="avatar avatar-lg" id="profile-avatar-btn"><span id="profile-initial">Н</span></span>
       <h1 class="hero-title" id="profile-name">Гость</h1>
       <p class="hero-sub" id="profile-sub">Вход через Telegram</p>
       <button class="friend-badge" id="friend-badge" type="button" data-tier="new" hidden><svg width="14" height="14" aria-hidden="true"><use href="#i-heart-fill"/></svg><span>Друг Нотки</span></button>
     </div>
-    <button class="plus-card" id="menu-plus" type="button" hidden>
+    <button class="pf-stats" id="profile-stats" type="button" aria-label="Открыть статистику" data-reveal style="--i:1">
+      <span class="pf-stat"><b id="pf-minutes">0</b><i id="pf-minutes-l">минут</i></span>
+      <span class="pf-stat"><b id="pf-tracks">0</b><i id="pf-tracks-l">треков</i></span>
+      <span class="pf-stat"><b id="pf-artists">0</b><i id="pf-artists-l">исполнителей</i></span>
+      <span class="pf-empty">Включи пару треков, и здесь появятся твои цифры</span>
+    </button>
+    <button class="plus-card" id="menu-plus" type="button" hidden data-reveal style="--i:2">
       <span class="plus-card-mark" aria-hidden="true"><svg width="22" height="22"><use href="#i-plus"/></svg></span>
       <span class="row-meta">
         <span class="row-title">Нотка Плюс</span>
@@ -437,13 +443,18 @@
       </span>
       <svg class="row-chevron" width="20" height="20" aria-hidden="true"><use href="#i-chevron"/></svg>
     </button>
-    <div class="group">
-      <button class="group-row" id="menu-account" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-user"/></svg><span class="group-label">Аккаунт</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
-      <button class="group-row" id="menu-stats" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-chart"/></svg><span class="group-label">Статистика</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
-      <button class="group-row" id="menu-look" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-palette"/></svg><span class="group-label">Оформление</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
-      <button class="group-row" id="menu-sound" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-sound"/></svg><span class="group-label">Звук и загрузки</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
-      <button class="group-row" id="menu-about" type="button"><svg class="group-ic" width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg><span class="group-label">О Нотке</span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+    <div class="group pf-group" data-reveal style="--i:3">
+      <button class="group-row" id="menu-account" type="button"><svg class="group-ic" width="22" height="22"><use href="#i-user"/></svg><span class="group-label">Аккаунт<span class="group-sub" id="pf-sub-account"></span></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-stats" type="button"><svg class="group-ic" width="22" height="22"><use href="#i-chart"/></svg><span class="group-label">Статистика<span class="group-sub" id="pf-sub-stats"></span></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-look" type="button"><svg class="group-ic" width="22" height="22"><use href="#i-palette"/></svg><span class="group-label">Оформление<span class="group-sub" id="pf-sub-look"></span></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-sound" type="button"><svg class="group-ic" width="22" height="22"><use href="#i-sound"/></svg><span class="group-label">Звук и загрузки<span class="group-sub" id="pf-sub-sound"></span></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="menu-about" type="button"><svg class="group-ic" width="22" height="22"><use href="#i-info"/></svg><span class="group-label">О Нотке<span class="group-sub" id="pf-sub-about"></span></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
     </div>
+    <div class="pf-actions" data-reveal style="--i:4">
+      <button class="pill-btn pill-quiet" id="pf-invite" type="button"><svg width="20" height="20" aria-hidden="true"><use href="#i-share"/></svg><span>Пригласить</span></button>
+      <button class="pill-btn pill-quiet" id="pf-support" type="button"><svg width="20" height="20" aria-hidden="true"><use href="#i-info"/></svg><span>Написать нам</span></button>
+    </div>
+    <p class="fineprint" id="pf-version">Нотка</p>
   </main>
 
   <!-- ============ ACCOUNT ============ -->
@@ -453,7 +464,7 @@
       <div class="bar-title">Аккаунт</div>
       <span class="bar-spacer"></span>
     </header>
-    <div class="hero hero-profile">
+    <div class="hero hero-profile" data-reveal>
       <div class="cover-edit-wrap">
         <span class="avatar avatar-lg" id="account-avatar"><span id="account-initial">Н</span></span>
         <button class="round-btn round-glass cover-edit" id="account-avatar-edit-btn" type="button" aria-label="Изменить фото"><svg width="18" height="18" aria-hidden="true"><use href="#i-edit"/></svg></button>
@@ -462,13 +473,18 @@
         <span id="account-name">Гость</span>
         <svg width="18" height="18" aria-hidden="true"><use href="#i-edit"/></svg>
       </button>
+      <p class="hero-sub" id="account-sub"></p>
     </div>
 
-    <div class="group">
-      <div class="group-row" id="account-sessions-row"><span class="group-label">Где открыта Нотка<span class="group-sub">Любимое и плейлисты хранятся на этом устройстве</span></span><span class="group-value" id="account-sessions-count">—</span></div>
+    <div class="group" data-reveal style="--i:1">
+      <button class="group-row" id="account-row-name" type="button"><span class="group-label">Имя</span><span class="group-value" id="acc-name-val"></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button class="group-row" id="account-row-photo" type="button"><span class="group-label">Фото</span><span class="group-value" id="acc-photo-val"></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <div class="group-row"><span class="group-label">Telegram</span><span class="group-value" id="acc-tg-val"></span></div>
+      <div class="group-row" id="account-sessions-row"><span class="group-label">Где открыта Нотка<span class="group-sub">Любимое и плейлисты хранятся на этом устройстве</span></span><span class="group-value" id="account-sessions-count">Браузер</span></div>
+      <button class="group-row group-row-quiet" id="account-restore-tg" type="button" hidden><span class="group-label">Вернуть имя и фото из Telegram<span class="group-sub">Свои имя и фото будут убраны</span></span></button>
     </div>
 
-    <div class="group">
+    <div class="group" data-reveal style="--i:2">
       <div class="group-row">
         <span class="group-label">Показывать активность друзьям <span class="tag tag-soon">скоро</span><span class="group-sub">Что ты сейчас слушаешь</span></span>
         <button class="switch" id="toggle-activity" type="button" role="switch" aria-checked="false" aria-label="Показывать активность друзьям" disabled><span></span></button>
@@ -479,7 +495,17 @@
       </div>
     </div>
 
-    <button class="pill-btn pill-quiet pill-block" id="account-invite-btn" type="button">Пригласить друзей</button>
+    <h2 class="group-caption" data-reveal style="--i:3">Мои данные</h2>
+    <div class="group" data-reveal style="--i:3">
+      <div class="group-row"><span class="group-label">Любимые треки</span><span class="group-value" id="acc-favs">0</span></div>
+      <div class="group-row"><span class="group-label">Плейлисты</span><span class="group-value" id="acc-lists">0</span></div>
+      <div class="group-row"><span class="group-label">Подписки на исполнителей</span><span class="group-value" id="acc-follows">0</span></div>
+      <button class="group-row" id="account-backup" type="button"><span class="group-label">Скопировать копию данных<span class="group-sub">Любимое, плейлисты, подписки и статистика одним текстом: сохрани его, например, в «Избранное» Telegram</span></span></button>
+      <button class="group-row" id="account-restore" type="button"><span class="group-label">Восстановить из копии<span class="group-sub">Для нового телефона или после очистки</span></span></button>
+      <button class="group-row group-row-quiet" id="account-reset-stats" type="button"><span class="group-label">Сбросить статистику<span class="group-sub">Минуты, треки и исполнители начнутся с нуля</span></span></button>
+    </div>
+
+    <button class="pill-btn pill-quiet pill-block" id="account-invite-btn" type="button" data-reveal style="--i:4">Пригласить друзей</button>
   </main>
 
   <!-- ============ STATISTICS ============ -->
@@ -1128,6 +1154,29 @@
       <div class="modal-actions">
         <button class="pill-btn pill-quiet" id="account-name-cancel" type="button">Отмена</button>
         <button class="pill-btn pill-primary" id="account-name-save" type="button">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="restore-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="restore-title">
+    <div class="modal">
+      <p class="sheet-title" id="restore-title">Восстановить из копии</p>
+      <p class="modal-text" id="restore-text">Вставь текст копии. Любимое, плейлисты, подписки и статистика на этом устройстве будут заменены.</p>
+      <textarea id="restore-input" class="modal-input modal-area" rows="4" placeholder="NOTKA1:…" aria-label="Текст копии" spellcheck="false" autocomplete="off"></textarea>
+      <div class="modal-actions">
+        <button class="pill-btn pill-quiet" id="restore-cancel" type="button">Отмена</button>
+        <button class="pill-btn pill-primary" id="restore-confirm" type="button">Восстановить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="reset-stats-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="reset-stats-title">
+    <div class="modal">
+      <p class="sheet-title" id="reset-stats-title">Сбросить статистику?</p>
+      <p class="modal-text">Минуты, треки и исполнители начнутся с нуля. Любимое, плейлисты и подписки останутся.</p>
+      <div class="modal-actions">
+        <button class="pill-btn pill-quiet" id="reset-stats-cancel" type="button">Отмена</button>
+        <button class="pill-btn pill-primary" id="reset-stats-confirm" type="button">Сбросить</button>
       </div>
     </div>
   </div>
