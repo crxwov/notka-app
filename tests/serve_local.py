@@ -26,10 +26,9 @@ os.environ["NOTKA_TEST_USER"] = "424242"
 os.environ["NOTKA_FAKE_NOW"] = "2026-10-22"
 
 import uvicorn
-from fastapi.staticfiles import StaticFiles
 
-from music_resolver.main import create_app
+from music_resolver.main import create_app, mount_miniapp
 
 app = create_app()
-app.mount("/app", StaticFiles(directory=str(ROOT / "miniapp"), html=True), name="miniapp")
+mount_miniapp(app, ROOT / "miniapp")
 uvicorn.run(app, host="127.0.0.1", port=8099, log_level="warning")

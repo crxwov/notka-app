@@ -46,12 +46,11 @@ os.environ.setdefault("YTDLP_COOKIES_FROM_BROWSER", "chrome")
 
 def run_backend() -> None:
     import uvicorn
-    from fastapi.staticfiles import StaticFiles
 
-    from music_resolver.main import create_app
+    from music_resolver.main import create_app, mount_miniapp
 
     app = create_app()
-    app.mount("/app", StaticFiles(directory=str(ROOT / "miniapp"), html=True), name="miniapp")
+    mount_miniapp(app, ROOT / "miniapp")
     uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
 
 

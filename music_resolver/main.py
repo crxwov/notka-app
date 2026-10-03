@@ -22,3 +22,19 @@ def create_app(settings: Settings | None = None, service: MusicService | None = 
 
 
 app = create_app()
+
+
+def mount_miniapp(app: FastAPI, directory) -> None:
+    """Подключает интерфейс Нотки на /app со сжатием (gzip режет ~530 КБ до ~120 КБ).
+
+    Сжатие стоит только на файлах интерфейса: на весь сервер его ставить нельзя,
+    иначе пострадают потоки аудио и запросы Range.
+    """
+    from starlette.applications import Starlette
+    from starlette.middleware import Middleware
+    from starlette.middleware.gzip import GZipMiddleware
+    from starlette.staticfiles import StaticFiles
+
+    static = Starlette(middleware=[Middleware(GZipMiddleware, minimum_size=1024)])
+    static.mount("/", StaticFiles(directory=str(directory), html=True))
+    app.mount("/app", static, name="miniapp")

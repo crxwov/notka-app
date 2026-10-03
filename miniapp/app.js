@@ -41,6 +41,38 @@
     } catch (e) { /* haptics are a nicety */ }
   }
 
+  // слабые телефоны: сами замеряем плавность и при тормозах выключаем дорогое размытие фона
+  function perfGuard() {
+    const root = document.documentElement;
+    const KEY = "notka_perf";
+    let saved = "";
+    try { saved = localStorage.getItem(KEY) || ""; } catch (e) { /* storage may be blocked */ }
+    const weakHw = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 4) <= 2;
+    if (saved === "lite" || weakHw) root.classList.add("perf-lite");
+    let probing = false;
+    function probe() {
+      if (probing || root.classList.contains("perf-lite")) return;
+      probing = true;
+      const dts = [];
+      let last = 0;
+      const tick = (t) => {
+        if (last) dts.push(t - last);
+        last = t;
+        if (dts.length < 50) { requestAnimationFrame(tick); return; }
+        probing = false;
+        dts.sort((a, b) => a - b);
+        if (dts[dts.length >> 1] > 26) { // медиана дольше 26 мс: меньше ~38 кадров в секунду
+          root.classList.add("perf-lite");
+          try { localStorage.setItem(KEY, "lite"); } catch (e) { /* storage may be blocked */ }
+        }
+      };
+      requestAnimationFrame(tick);
+    }
+    setTimeout(probe, 2500);
+    return probe;
+  }
+  const perfProbe = perfGuard();
+
   // --- keyboard-safe viewport height ---
   // 100dvh doesn't reliably shrink when Telegram's in-app WebView opens the
   // on-screen keyboard (it's meant to track the *browser chrome*, not a
@@ -2443,6 +2475,163 @@
     showToast(on ? "Предпросмотр «Нотки Плюс» включён — смотри в профиле" : "Предпросмотр «Нотки Плюс» выключен");
   });
   $("menu-plus").addEventListener("click", () => showScreen("plus"));
+  // витрина под барабаном: у каждой функции своя, внутри переключаются варианты (сами и по тапу)
+  function setupPlusPanels() {
+    const panels = [...document.querySelectorAll("#plus-panels .pd")];
+    const ctl = panels.map((p) => {
+      const keys = (p.dataset.keys || "").split(",").filter(Boolean);
+      const stage = p.querySelector(".pd-stage");
+      const chipBox = p.querySelectorAll(".pd-chips .chip");
+      let idx = 0, timer = 0, hold = 0;
+      const set = (k) => {
+        idx = Math.max(0, keys.indexOf(k));
+        stage.querySelectorAll(".v").forEach((v) => v.classList.toggle("is-on", v.dataset.v === k));
+        chipBox.forEach((c) => {
+          const on = c.dataset.k === k;
+          c.classList.toggle("active", on);
+          if (on && c.dataset.p) stage.style.setProperty("--p", c.dataset.p);
+        });
+      };
+      chipBox.forEach((c) => c.addEventListener("click", () => { set(c.dataset.k); hold = Date.now() + 9000; haptic("select"); }));
+      return {
+        el: p,
+        start() {
+          if (!keys.length || timer) return;
+          timer = setInterval(() => { if (Date.now() > hold) set(keys[(idx + 1) % keys.length]); }, 3400);
+        },
+        stop() { clearInterval(timer); timer = 0; },
+      };
+    });
+    return { items: ctl, activate(i) { ctl.forEach((c, k) => (k === i ? c.start() : c.stop())); } };
+  }
+
+  // «барабан» функций Плюса: пункты едут мимо, соседние уходят в перспективу, за активным меняется цвет и витрина
+  function setupPlusWheel(panels) {
+    const root = $("plus-wheel");
+    if (!root) return null;
+    const items = [...root.querySelectorAll(".pw-item")];
+    const copies = [...root.querySelectorAll(".pw-copy")];
+    const dots = [...root.querySelectorAll(".pw-dots i")];
+    const shows = panels ? panels.items.map((c) => c.el) : [];
+    const n = items.length;
+    const STEP = 128; // сколько пикселей пальца на один пункт
+    let pos = 0, target = 0, vel = 0, raf = 0, last = 0, active = -1, drag = null, quiet = false, wheelAt = 0;
+    const wrap = (d) => ((((d + n / 2) % n) + n) % n) - n / 2;
+    const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+
+    function render() {
+      const cur = ((Math.round(pos) % n) + n) % n;
+      for (let i = 0; i < n; i++) {
+        const d = wrap(i - pos), ad = Math.abs(d), sg = Math.sign(d);
+        const x = sg * (ad <= 1 ? ad * 128 : 128 + (ad - 1) * 78);
+        const s = ad <= 1 ? 1 - ad * 0.38 : Math.max(0.26, 0.62 - (ad - 1) * 0.22);
+        const el = items[i];
+        el.style.transform = `translate3d(${x.toFixed(1)}px,0,${(-Math.min(ad, 2) * 120).toFixed(0)}px) rotateY(${(sg * Math.min(ad, 1.5) * 34).toFixed(1)}deg) scale(${s.toFixed(3)})`;
+        el.style.opacity = ad > 2.7 ? "0" : String(clamp(1 - ad * 0.4).toFixed(3));
+        el.style.visibility = ad > 2.7 ? "hidden" : "visible";
+        el.style.zIndex = String(10 - Math.round(ad * 3));
+        const ca = clamp(1 - ad * 1.8);
+        copies[i].style.opacity = ca.toFixed(3);
+        copies[i].style.transform = `translate3d(${(d * 46).toFixed(1)}px,0,0)`;
+        copies[i].style.visibility = ca > 0.01 ? "visible" : "hidden";
+        if (shows[i]) {
+          const pa = clamp(1 - ad * 2.2);
+          shows[i].style.opacity = pa.toFixed(3);
+          shows[i].style.transform = `translate3d(${(d * 60).toFixed(1)}px,0,0)`;
+          shows[i].style.display = pa > 0.01 ? "flex" : "none";
+          shows[i].style.pointerEvents = ad < 0.3 ? "auto" : "none";
+        }
+      }
+      if (cur !== active) {
+        active = cur;
+        items.forEach((el, i) => { el.classList.toggle("is-on", i === cur); el.tabIndex = i === cur ? 0 : -1; el.setAttribute("aria-current", i === cur ? "true" : "false"); });
+        dots.forEach((el, i) => el.classList.toggle("is-on", i === cur));
+        shows.forEach((el, i) => el.classList.toggle("is-active", i === cur));
+        if (panels) panels.activate(cur);
+        if (!quiet) haptic("select");
+      }
+    }
+    function frame(t) {
+      const dt = Math.min(0.034, (t - last) / 1000 || 0.016); last = t;
+      if (!drag) {
+        const k = 130, c = 2 * Math.sqrt(k) * 0.98; // пружина без отскока
+        vel += (k * (target - pos) - c * vel) * dt; pos += vel * dt;
+        if (Math.abs(target - pos) < 0.0006 && Math.abs(vel) < 0.002) { pos = target; vel = 0; render(); raf = 0; return; }
+      }
+      render(); raf = requestAnimationFrame(frame);
+    }
+    const kick = () => { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+    const goTo = (i) => { target = Math.round(pos) + wrap(i - Math.round(pos)); kick(); };
+    const stepBy = (dir) => { target = Math.round(target) + dir; kick(); };
+
+    let tapBlock = false;
+    root.addEventListener("pointerdown", (e) => {
+      if (e.button) return;
+      drag = { id: e.pointerId, x0: e.clientX, p0: pos, t: e.timeStamp, v: 0, moved: false };
+      vel = 0;
+    });
+    root.addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x0;
+      if (!drag.moved) {
+        if (Math.abs(dx) < 6) return;
+        drag.moved = true; root.classList.add("is-drag");
+        try { root.setPointerCapture(e.pointerId); } catch (err) { /* already released */ }
+      }
+      const np = drag.p0 - dx / STEP, dtm = Math.max(1, e.timeStamp - drag.t);
+      drag.v = 0.7 * drag.v + 0.3 * ((np - pos) / dtm * 1000);
+      pos = np; drag.t = e.timeStamp; render();
+    });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const d = drag; drag = null; root.classList.remove("is-drag");
+      if (d.moved) {
+        tapBlock = true; setTimeout(() => { tapBlock = false; }, 0);
+        const v = clamp(d.v, -6, 6);
+        target = Math.round(pos + v * 0.2); vel = v * 0.35;
+      } else target = Math.round(target);
+      kick();
+    };
+    root.addEventListener("pointerup", end);
+    root.addEventListener("pointercancel", end);
+    items.forEach((el, i) => el.addEventListener("click", () => { if (!tapBlock) goTo(i); }));
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); stepBy(1); }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); stepBy(-1); }
+    });
+    root.addEventListener("wheel", (e) => {
+      if (Math.abs(e.deltaX) < 14 || Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      if (e.timeStamp - wheelAt > 260) { wheelAt = e.timeStamp; stepBy(Math.sign(e.deltaX)); }
+    }, { passive: false });
+
+    render();
+    return {
+      // при открытии экрана барабан сам подъезжает на место
+      intro() { quiet = true; pos = -1.8; target = 0; vel = 0; active = -1; render(); quiet = false; kick(); },
+    };
+  }
+  const plusPanels = setupPlusPanels();
+  const plusWheel = setupPlusWheel(plusPanels);
+
+  // настоящие цифры слушателя и его инициал для витрин «Итоги» и «Друг Нотки»
+  function fillPlusLive() {
+    const l = state.listens || {};
+    const vals = { minutes: Math.round((l.seconds || 0) / 60), plays: l.plays || 0, tracks: Object.keys(l.tracks || {}).length, artists: Object.keys(l.artists || {}).length };
+    const words = { minutes: ["минута", "минуты", "минут"], plays: ["прослушивание", "прослушивания", "прослушиваний"], tracks: ["трек", "трека", "треков"], artists: ["исполнитель", "исполнителя", "исполнителей"] };
+    document.querySelectorAll("#plus-panels [data-stat]").forEach((el) => {
+      const k = el.dataset.stat, n = vals[k];
+      el.textContent = n ? n.toLocaleString("ru-RU") : "♪";
+      const w = document.querySelector(`#plus-panels [data-word="${k}"]`);
+      if (w) w.textContent = n ? (k === "minutes" ? plural(n, ...words[k]) + " с Ноткой" : plural(n, ...words[k])) : "пока тихо, начни слушать";
+    });
+    const initial = ($("profile-initial") && $("profile-initial").textContent) || "Н";
+    document.querySelectorAll("#plus-panels .fr-initial").forEach((el) => { el.textContent = initial; });
+    document.querySelectorAll("#plus-panels [data-ago]").forEach((el) => {
+      el.textContent = new Date(Date.now() - Number(el.dataset.ago) * 864e5).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+    });
+  }
+
   $("plus-back-btn").addEventListener("click", goBack);
 
   // Who has Плюс. Real subscriptions will come from the server once
@@ -2546,12 +2735,11 @@
     $("plus-cd-art").style.backgroundImage = art;
     $("plus-cassette-title").textContent = track ? track.title || "Без названия" : "Твоя музыка";
     $("plus-cassette-artist").textContent = track ? track.artist || "" : "в Нотке Плюс";
-    // the listener's own minutes; a newcomer has none yet, and a zero would read as a verdict
-    const minutes = Math.round(state.listens.seconds / 60);
-    $("plus-recap-num").textContent = minutes ? minutes.toLocaleString("ru-RU") : "♪";
-    $("plus-recap-word").textContent = minutes ? plural(minutes, "минута", "минуты", "минут") : "твои итоги";
+    fillPlusLive();
     syncPlusUI();
     revealIn("screen-plus", true);
+    if (plusWheel) plusWheel.intro();
+    setTimeout(perfProbe, 1800);
     clearInterval(plusStageTimer);
     plusStageTimer = setInterval(() => {
       if (currentScreen !== "plus") { clearInterval(plusStageTimer); return; }

@@ -55,12 +55,11 @@ def keep_bot_running() -> None:
 
 def main() -> None:
     import uvicorn
-    from fastapi.staticfiles import StaticFiles
 
-    from music_resolver.main import create_app
+    from music_resolver.main import create_app, mount_miniapp
 
     app = create_app()
-    app.mount("/app", StaticFiles(directory=str(ROOT / "miniapp"), html=True), name="miniapp")
+    mount_miniapp(app, ROOT / "miniapp")
     if RUN_BOT:
         threading.Thread(target=keep_bot_running, daemon=True).start()
     print(f"Notka is up on 127.0.0.1:{PORT}" + (f", public address {PUBLIC_URL}" if PUBLIC_URL else ""), flush=True)

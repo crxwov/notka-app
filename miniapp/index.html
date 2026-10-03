@@ -713,81 +713,98 @@
       <button class="round-btn round-glass back-btn" id="plus-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
     </header>
 
-    <!-- the stage: the player themes, live, wearing the listener's own cover -->
-    <div class="plus-stage" id="plus-stage" data-show="vinyl" data-reveal aria-hidden="true">
-      <span class="plus-stage-glow" id="plus-stage-glow"></span>
-      <span class="show-item show-vinyl">
-        <span class="show-disc"><span class="show-disc-art" id="plus-disc-art"></span><span class="vinyl-grooves"></span></span>
-        <span class="tonearm show-arm"><i></i></span>
-      </span>
-      <span class="show-item show-cassette">
-        <span class="cassette" aria-hidden="true">
-          <span class="cassette-sticker">
-            <span class="cassette-band"><b>A</b><i>Нотка</i></span>
-            <span class="cassette-cover" id="plus-cassette-art"></span>
-            <span class="cassette-lines"><b id="plus-cassette-title"></b><i id="plus-cassette-artist"></i></span>
-          </span>
-          <span class="cassette-window"><i class="reel reel-l"></i><i class="reel reel-r"></i></span>
-          <span class="cassette-foot"></span>
-        </span>
-      </span>
-      <span class="show-item show-cd">
-        <span class="show-disc show-disc-cd"><span class="show-disc-art" id="plus-cd-art"></span><span class="cd-sheen"></span></span>
-      </span>
-    </div>
-    <div class="plus-stage-tabs" id="plus-stage-tabs" data-reveal>
-      <button class="chip active" type="button" data-show="vinyl">Винил</button>
-      <button class="chip" type="button" data-show="cassette">Кассета</button>
-      <button class="chip" type="button" data-show="cd">Диск</button>
+    <div class="plus-hero">
+      <h1 class="plus-title">Что даёт Плюс</h1>
     </div>
 
-    <h1 class="plus-title" data-reveal>Нотка Плюс</h1>
-    <p class="plus-promise" data-reveal>Нотка бесплатная.<br>Плюс&nbsp;— чтобы она стала твоей.</p>
-    <button class="pill-btn pill-quiet plus-try" id="plus-try-btn" type="button" data-reveal>Примерить на своей музыке</button>
-
-    <section class="scene" data-reveal>
-      <div class="scene-demo demo-moods" aria-hidden="true"><i>Неделю назад</i><i>Месяц назад</i><i>Три месяца назад</i></div>
-      <h2 class="scene-title">Машина времени</h2>
-      <p class="scene-text">Что ты слушал неделю, месяц, три месяца назад, и тот день можно включить целиком.</p>
-    </section>
-
-    <section class="scene" data-reveal>
-      <div class="scene-demo demo-seasons" aria-hidden="true">
-        <span class="atmo-card" data-atmo="autumn"><span class="atmo-view"><i></i><i></i><i></i></span></span>
-        <span class="atmo-card" data-atmo="winter"><span class="atmo-view"><i></i><i></i><i></i></span></span>
-        <span class="atmo-card" data-atmo="rain"><span class="atmo-view"><i></i><i></i><i></i></span></span>
-        <span class="atmo-card" data-atmo="night"><span class="atmo-view"><i></i><i></i><i></i></span></span>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="pwg" gradientUnits="userSpaceOnUse" x1="14" y1="6" x2="106" y2="114"><stop offset="0" style="stop-color:var(--c-core)"/><stop offset=".34" style="stop-color:var(--c-warm)"/><stop offset=".68" style="stop-color:var(--c-mid)"/><stop offset="1" style="stop-color:var(--c-deep)"/></linearGradient></defs></svg>
+    <div class="pw" id="plus-wheel" tabindex="0" role="group" aria-roledescription="карусель" aria-label="Что входит в Плюс">
+      <div class="pw-track">
+        <button class="pw-item" type="button" style="--a:#FF7A33;--b:#FFC15A" aria-label="Машина времени"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M56 64V12A52 52 0 1 0 108 64Z" fill="url(#pwg)"/><path d="M68 52V8a44 44 0 0 1 44 44Z" fill="url(#pwg)"/></svg></span></button>
+        <button class="pw-item" type="button" style="--a:#35C6EE;--b:#8A8CFF" aria-label="Атмосферы"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M84 8A54 54 0 1 0 112 90 44 44 0 0 1 84 8Z" fill="url(#pwg)"/></svg></span></button>
+        <button class="pw-item" type="button" style="--a:#FF4FA0;--b:#FF9A5C" aria-label="Настроение"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><g fill="url(#pwg)"><circle cx="60" cy="30" r="27"/><circle cx="60" cy="90" r="27"/><circle cx="30" cy="60" r="27"/><circle cx="90" cy="60" r="27"/><circle cx="60" cy="60" r="30"/></g></svg></span></button>
+        <button class="pw-item" type="button" style="--a:#FF4E6D;--b:#FFA07A" aria-label="Друг Нотки"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><clipPath id="pca"><circle cx="42" cy="60" r="36"/></clipPath><mask id="pm3"><rect width="120" height="120" fill="#fff"/><g clip-path="url(#pca)"><circle cx="78" cy="60" r="36" fill="#000"/></g></mask><g fill="url(#pwg)" mask="url(#pm3)"><circle cx="42" cy="60" r="36"/><circle cx="78" cy="60" r="36"/></g></svg></span></button>
+        <button class="pw-item" type="button" style="--a:#8B5CFF;--b:#D29BFF" aria-label="Темы плеера"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><mask id="pm4"><rect width="120" height="120" fill="#fff"/><circle cx="60" cy="60" r="31" fill="none" stroke="#000" stroke-width="7" stroke-dasharray="42 21" stroke-linecap="round"/><circle cx="60" cy="60" r="10" fill="#000"/></mask><circle cx="60" cy="60" r="52" fill="url(#pwg)" mask="url(#pm4)"/></svg></span></button>
+        <button class="pw-item" type="button" style="--a:#2FD3A8;--b:#8CF0D2" aria-label="Перевод текста"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><mask id="pm5"><rect width="120" height="120" fill="#fff"/><rect x="6" y="48" width="62" height="52" rx="22" fill="#000" stroke="#000" stroke-width="16"/></mask><rect x="38" y="12" width="76" height="62" rx="24" fill="url(#pwg)" mask="url(#pm5)"/><rect x="6" y="48" width="62" height="52" rx="22" fill="url(#pwg)"/></svg></span></button>
+        <button class="pw-item" type="button" style="--a:#FFC94D;--b:#FF8A4C" aria-label="Твои итоги"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M60 16a44 44 0 1 1-38 22" fill="none" stroke="url(#pwg)" stroke-width="24" stroke-linecap="round"/><circle cx="60" cy="60" r="11" fill="url(#pwg)"/></svg></span></button>
       </div>
-      <h2 class="scene-title">Атмосфера</h2>
-      <p class="scene-text">Осень, зима, весна, дождь и звёздная ночь: свет, погода и детали по всей Нотке. А праздничные темы вроде Хэллоуина и Нового года можно получить за задания.</p>
-    </section>
-
-    <section class="scene" data-reveal>
-      <div class="scene-demo demo-moods" aria-hidden="true"><i>Бодрое</i><i>Спокойное</i><i>Для работы</i><i>Грустное</i><i>Вечеринка</i></div>
-      <h2 class="scene-title">Микс под настроение</h2>
-      <p class="scene-text">Скажи, что сейчас нужно — бодрое, спокойное, для работы, — и «Мой микс» подстроится.</p>
-    </section>
-
-    <section class="scene" data-reveal>
-      <div class="scene-demo demo-translate" aria-hidden="true">
-        <span><b>Hold the light a little longer</b><i>Подержи свет ещё немного</i></span>
-        <span><b>We were louder than the rain</b><i>Мы были громче дождя</i></span>
-        <span><b>Meet me where the night begins</b><i>Встреть меня там, где начинается ночь</i></span>
+      <div class="pw-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="pw-copies" aria-live="polite">
+        <div class="pw-copy"><h2 class="pw-name">Машина времени</h2><p class="pw-desc">Что ты слушал неделю, месяц или три месяца назад. Тот день можно включить целиком.</p></div>
+        <div class="pw-copy"><h2 class="pw-name">Атмосферы</h2><p class="pw-desc">Осень, зима, весна, дождь и звёздная ночь по всей Нотке.</p></div>
+        <div class="pw-copy"><h2 class="pw-name">Настроение</h2><p class="pw-desc">«Мой микс» подстраивается под бодрое, спокойное, рабочее или грустное.</p></div>
+        <div class="pw-copy"><h2 class="pw-name">Друг Нотки</h2><p class="pw-desc">Значок рядом с твоим именем. Растёт, пока ты слушаешь.</p></div>
+        <div class="pw-copy"><h2 class="pw-name">Темы плеера</h2><p class="pw-desc">Винил, кассета или диск с обложкой того, что играет.</p></div>
+        <div class="pw-copy"><h2 class="pw-name">Перевод текста <span class="tag tag-soon">скоро</span></h2><p class="pw-desc">Строки песни на русском рядом с оригиналом.</p></div>
+        <div class="pw-copy"><h2 class="pw-name">Твои итоги <span class="tag tag-soon">скоро</span></h2><p class="pw-desc">Месяц и год в карточках, которыми можно поделиться.</p></div>
       </div>
-      <h2 class="scene-title">Перевод текста <span class="tag tag-soon">скоро</span></h2>
-      <p class="scene-text">Строка на русском — сразу под оригиналом, в такт музыке.</p>
-    </section>
+    </div>
 
-    <div class="scene-pair">
-      <section class="scene" data-reveal style="--i:0">
-        <div class="scene-demo demo-recap" aria-hidden="true"><i></i><i></i><span><b id="plus-recap-num">0</b><em id="plus-recap-word">минут</em></span></div>
-        <h2 class="scene-title">Твои итоги <span class="tag tag-soon">скоро</span></h2>
-        <p class="scene-text">Месяц и год в карточках, которыми хочется поделиться.</p>
+    <div class="pds" id="plus-panels">
+      <section class="pd" data-keys="week,month,quarter" aria-label="Машина времени">
+        <div class="pd-stage pd-swap pd-time" style="--p:.16">
+          <div class="tm-rail"><i class="tm-fill"></i><b class="tm-dot"></b></div>
+          <div class="tm-ends"><span>сегодня</span><span>три месяца назад</span></div>
+          <div class="tm-body"><div class="v is-on" data-v="week"><p class="tm-when">Неделю назад</p><p class="tm-date" data-ago="7"></p><ul class="tm-list"><li><i class="cv" style="--h:38"></i><span><b>Yellow</b><em>Coldplay</em></span></li><li><i class="cv" style="--h:262"></i><span><b>Creep</b><em>Radiohead</em></span></li><li><i class="cv" style="--h:12"></i><span><b>Believer</b><em>Imagine Dragons</em></span></li></ul></div><div class="v" data-v="month"><p class="tm-when">Месяц назад</p><p class="tm-date" data-ago="30"></p><ul class="tm-list"><li><i class="cv" style="--h:200"></i><span><b>Smells Like Teen Spirit</b><em>Nirvana</em></span></li><li><i class="cv" style="--h:340"></i><span><b>Blinding Lights</b><em>The Weeknd</em></span></li><li><i class="cv" style="--h:28"></i><span><b>Звезда по имени Солнце</b><em>Кино</em></span></li></ul></div><div class="v" data-v="quarter"><p class="tm-when">Три месяца назад</p><p class="tm-date" data-ago="90"></p><ul class="tm-list"><li><i class="cv" style="--h:300"></i><span><b>Dancing Queen</b><em>ABBA</em></span></li><li><i class="cv" style="--h:160"></i><span><b>Shape of You</b><em>Ed Sheeran</em></span></li><li><i class="cv" style="--h:8"></i><span><b>Группа крови</b><em>Кино</em></span></li></ul></div></div>
+        </div>
+        <div class="pd-chips"><button class="chip active" type="button" data-k="week" data-p="0.16">Неделя</button><button class="chip" type="button" data-k="month" data-p="0.5">Месяц</button><button class="chip" type="button" data-k="quarter" data-p="0.94">Три месяца</button></div>
+        <p class="pd-note">Пример: так выглядит день из твоей истории.</p>
       </section>
-      <section class="scene" data-reveal style="--i:1">
-        <div class="scene-demo demo-thanks" aria-hidden="true"><svg width="44" height="44"><use href="#i-heart-fill"/></svg></div>
-        <h2 class="scene-title">Друг Нотки</h2>
-        <p class="scene-text">Значок в профиле, который растёт вместе с тобой: чем дольше с Плюсом, тем он ярче.</p>
+
+      <section class="pd" data-keys="autumn,winter,rain,night" aria-label="Атмосферы">
+        <div class="pd-stage pd-atmo demo-seasons"><span class="atmo-card v is-on" data-v="autumn" data-atmo="autumn"><span class="atmo-view"><i></i><i></i><i></i></span><b class="at-name">Осень</b></span><span class="atmo-card v" data-v="winter" data-atmo="winter"><span class="atmo-view"><i></i><i></i><i></i></span><b class="at-name">Зима</b></span><span class="atmo-card v" data-v="rain" data-atmo="rain"><span class="atmo-view"><i></i><i></i><i></i></span><b class="at-name">Дождь</b></span><span class="atmo-card v" data-v="night" data-atmo="night"><span class="atmo-view"><i></i><i></i><i></i></span><b class="at-name">Звёздная ночь</b></span></div>
+        <div class="pd-chips"><button class="chip active" type="button" data-k="autumn">Осень</button><button class="chip" type="button" data-k="winter">Зима</button><button class="chip" type="button" data-k="rain">Дождь</button><button class="chip" type="button" data-k="night">Ночь</button></div>
+        <p class="pd-note">Атмосфера меняет фон и частицы по всей Нотке.</p>
+      </section>
+
+      <section class="pd" data-keys="bright,calm,work,sad" aria-label="Настроение">
+        <div class="pd-stage pd-swap pd-mood"><div class="v is-on" data-v="bright" style="--m1:var(--c-warm);--m2:var(--c-mid)"><div class="md-head"><span class="md-orb"></span><div><p class="md-kicker">Мой микс</p><h3 class="md-name">Бодрое</h3></div></div><ul class="tm-list"><li><i class="cv" style="--h:30"></i><span><b>Happy</b><em>Pharrell Williams</em></span></li><li><i class="cv" style="--h:330"></i><span><b>Dance Monkey</b><em>Tones and I</em></span></li><li><i class="cv" style="--h:8"></i><span><b>Don't Stop Me Now</b><em>Queen</em></span></li></ul></div><div class="v" data-v="calm" style="--m1:var(--c-core);--m2:var(--c-deep)"><div class="md-head"><span class="md-orb"></span><div><p class="md-kicker">Мой микс</p><h3 class="md-name">Спокойное</h3></div></div><ul class="tm-list"><li><i class="cv" style="--h:190"></i><span><b>Weightless</b><em>Marconi Union</em></span></li><li><i class="cv" style="--h:214"></i><span><b>Holocene</b><em>Bon Iver</em></span></li><li><i class="cv" style="--h:250"></i><span><b>Teardrop</b><em>Massive Attack</em></span></li></ul></div><div class="v" data-v="work" style="--m1:var(--c-mid);--m2:var(--c-deep)"><div class="md-head"><span class="md-orb"></span><div><p class="md-kicker">Мой микс</p><h3 class="md-name">Для работы</h3></div></div><ul class="tm-list"><li><i class="cv" style="--h:262"></i><span><b>Time</b><em>Hans Zimmer</em></span></li><li><i class="cv" style="--h:230"></i><span><b>Nuvole Bianche</b><em>Ludovico Einaudi</em></span></li><li><i class="cv" style="--h:280"></i><span><b>Experience</b><em>Ludovico Einaudi</em></span></li></ul></div><div class="v" data-v="sad" style="--m1:color-mix(in srgb, var(--c-deep) 62%, #6F86B8);--m2:color-mix(in srgb, var(--c-deep) 55%, #000)"><div class="md-head"><span class="md-orb"></span><div><p class="md-kicker">Мой микс</p><h3 class="md-name">Грустное</h3></div></div><ul class="tm-list"><li><i class="cv" style="--h:220"></i><span><b>Hurt</b><em>Johnny Cash</em></span></li><li><i class="cv" style="--h:240"></i><span><b>Mad World</b><em>Gary Jules</em></span></li><li><i class="cv" style="--h:12"></i><span><b>Кукушка</b><em>Кино</em></span></li></ul></div></div>
+        <div class="pd-chips"><button class="chip active" type="button" data-k="bright">Бодрое</button><button class="chip" type="button" data-k="calm">Спокойное</button><button class="chip" type="button" data-k="work">Работа</button><button class="chip" type="button" data-k="sad">Грусть</button></div>
+      </section>
+
+      <section class="pd" data-keys="l1,l2,l3" aria-label="Друг Нотки">
+        <div class="pd-stage pd-swap pd-friend"><div class="v is-on" data-v="l1" style="--s:44px;--lv:0.22"><div class="fr-av"><span class="fr-initial">Н</span><span class="fr-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 3.2v11.1a3.4 3.4 0 1 1-2.2-3.2V6.4L9.6 7.5v9.6a3.4 3.4 0 1 1-2.2-3.2V5.2l9.2-2Z" fill="currentColor"/></svg></span></div><p class="fr-hours">1 час с Ноткой</p><div class="fr-bar"><i></i></div><p class="fr-text">Только начал: значок совсем маленький.</p></div><div class="v" data-v="l2" style="--s:58px;--lv:0.6"><div class="fr-av"><span class="fr-initial">Н</span><span class="fr-badge has-ring"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 3.2v11.1a3.4 3.4 0 1 1-2.2-3.2V6.4L9.6 7.5v9.6a3.4 3.4 0 1 1-2.2-3.2V5.2l9.2-2Z" fill="currentColor"/></svg></span></div><p class="fr-hours">10 часов с Ноткой</p><div class="fr-bar"><i></i></div><p class="fr-text">Появилось кольцо. Значок заметен.</p></div><div class="v" data-v="l3" style="--s:72px;--lv:1"><div class="fr-av"><span class="fr-initial">Н</span><span class="fr-badge has-ring"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 3.2v11.1a3.4 3.4 0 1 1-2.2-3.2V6.4L9.6 7.5v9.6a3.4 3.4 0 1 1-2.2-3.2V5.2l9.2-2Z" fill="currentColor"/></svg><i class="sp s1"></i><i class="sp s2"></i><i class="sp s3"></i></span></div><p class="fr-hours">100 часов с Ноткой</p><div class="fr-bar"><i></i></div><p class="fr-text">Значок с искрами: ты свой в Нотке.</p></div></div>
+        <div class="pd-chips"><button class="chip active" type="button" data-k="l1">1 час</button><button class="chip" type="button" data-k="l2">10 часов</button><button class="chip" type="button" data-k="l3">100 часов</button></div>
+      </section>
+
+      <section class="pd pd-themes" aria-label="Темы плеера">
+        <div class="plus-stage" id="plus-stage" data-show="vinyl" aria-hidden="true">
+          <span class="plus-stage-glow" id="plus-stage-glow"></span>
+          <span class="show-item show-vinyl">
+            <span class="show-disc"><span class="show-disc-art" id="plus-disc-art"></span><span class="vinyl-grooves"></span></span>
+            <span class="tonearm show-arm"><i></i></span>
+          </span>
+          <span class="show-item show-cassette">
+            <span class="cassette" aria-hidden="true">
+              <span class="cassette-sticker">
+                <span class="cassette-band"><b>A</b><i>Нотка</i></span>
+                <span class="cassette-cover" id="plus-cassette-art"></span>
+                <span class="cassette-lines"><b id="plus-cassette-title"></b><i id="plus-cassette-artist"></i></span>
+              </span>
+              <span class="cassette-window"><i class="reel reel-l"></i><i class="reel reel-r"></i></span>
+              <span class="cassette-foot"></span>
+            </span>
+          </span>
+          <span class="show-item show-cd">
+            <span class="show-disc show-disc-cd"><span class="show-disc-art" id="plus-cd-art"></span><span class="cd-sheen"></span></span>
+          </span>
+        </div>
+        <div class="plus-stage-tabs" id="plus-stage-tabs">
+          <button class="chip active" type="button" data-show="vinyl">Винил</button>
+          <button class="chip" type="button" data-show="cassette">Кассета</button>
+          <button class="chip" type="button" data-show="cd">Диск</button>
+        </div>
+        <button class="pill-btn pill-quiet plus-try" id="plus-try-btn" type="button">Примерить на своей музыке</button>
+      </section>
+
+      <section class="pd" data-keys="t0,t1,t2,t3" aria-label="Перевод текста">
+        <div class="pd-stage pd-swap pd-tr"><div class="v is-on" data-v="t0"><p class="tr-o">Hold the light a little longer</p><p class="tr-t">Подержи свет ещё немного</p></div><div class="v" data-v="t1"><p class="tr-o">We were louder than the rain</p><p class="tr-t">Мы были громче дождя</p></div><div class="v" data-v="t2"><p class="tr-o">Meet me where the night begins</p><p class="tr-t">Встреть меня там, где начинается ночь</p></div><div class="v" data-v="t3"><p class="tr-o">Every song was a goodbye</p><p class="tr-t">Каждая песня была прощанием</p></div></div>
+        <p class="pd-note">Так будет выглядеть в плеере. Функция скоро появится.</p>
+      </section>
+
+      <section class="pd" data-keys="minutes,plays,tracks,artists" aria-label="Твои итоги">
+        <div class="pd-stage pd-swap pd-rc"><div class="v is-on" data-v="minutes" style="--r1:var(--c-warm);--r2:var(--c-mid)"><div class="rc-card"><b class="rc-num" data-stat="minutes">0</b><span class="rc-word" data-word="minutes"></span></div></div><div class="v" data-v="plays" style="--r1:var(--c-mid);--r2:var(--c-deep)"><div class="rc-card"><b class="rc-num" data-stat="plays">0</b><span class="rc-word" data-word="plays"></span></div></div><div class="v" data-v="tracks" style="--r1:var(--c-core);--r2:var(--c-warm)"><div class="rc-card"><b class="rc-num" data-stat="tracks">0</b><span class="rc-word" data-word="tracks"></span></div></div><div class="v" data-v="artists" style="--r1:var(--c-deep);--r2:var(--c-mid)"><div class="rc-card"><b class="rc-num" data-stat="artists">0</b><span class="rc-word" data-word="artists"></span></div></div></div>
+        <p class="pd-note">Твои настоящие цифры. Карточки скоро появятся.</p>
       </section>
     </div>
 

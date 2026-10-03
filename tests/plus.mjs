@@ -14,7 +14,7 @@ try {
   await b.goto(`${BASE}/app/`);
   await b.eval(`localStorage.setItem("notka_state_v2", ${JSON.stringify(JSON.stringify({ favorites: [], playlists: [], onboardingSeenV2: true }))}); localStorage.removeItem("notka_plus_preview"); localStorage.removeItem("notka_plus_local"); true`);
   await b.goto(`${BASE}/app/`);
-  await b.waitFor("document.body.dataset.screen !== 'splash'", 8000, "leave splash");
+  await b.waitFor("!!document.body && document.body.dataset.screen !== 'splash'", 8000, "leave splash");
   await b.click("#home-avatar-btn");
   // config.js has PLUS_PREVIEW on while Нотка runs from the home computer
   check("the card is in the profile while the preview flag is on", await b.eval("window.NOTKA_CONFIG.PLUS_PREVIEW === true && !document.getElementById('menu-plus').hidden"));
@@ -22,7 +22,7 @@ try {
   await b.click("#menu-plus");
   await b.sleep(1200);
   check("the screen opens", (await b.eval("document.body.dataset.screen")) === "plus");
-  check("the stage shows a theme and six scenes follow", await b.eval("document.getElementById('plus-stage').dataset.show === 'vinyl' && document.querySelectorAll('#screen-plus .scene').length === 6"));
+  check("the stage shows a theme and seven feature items follow", await b.eval("document.getElementById('plus-stage').dataset.show === 'vinyl' && document.querySelectorAll('#screen-plus .pw-item').length === 7"));
   await b.sleep(4600);
   check("the themes take turns by themselves", await b.eval("document.getElementById('plus-stage').dataset.show === 'cassette'"));
   await b.click('#plus-stage-tabs [data-show="vinyl"]');
