@@ -28,7 +28,7 @@ try {
   await b.waitFor("document.body.dataset.screen !== 'splash'", 8000, "leave splash");
   await openLook();
   check("the section opens from the profile", (await b.eval("document.body.dataset.screen")) === "look");
-  check("four players on the stage, eight colors, covers to pick from, five patterns", await b.eval("document.querySelectorAll('#look-stage .look-slide').length === 4 && document.querySelectorAll('#look-colors .swatch').length === 8 && document.querySelectorAll('#look-covers .look-cover').length >= 2 && document.querySelectorAll('.pattern-opt').length === 5"));
+  check("four players on the stage, eight colors, covers to pick from, two patterns", await b.eval("document.querySelectorAll('#look-stage .look-slide').length === 4 && document.querySelectorAll('#look-colors .swatch').length === 8 && document.querySelectorAll('#look-covers .look-cover').length >= 2 && document.querySelectorAll('.pattern-opt').length === 2"));
   check("the stage wears the listener's own cover", await b.eval("document.querySelector('#look-stage .show-disc-art').style.backgroundImage.length > 10 && document.querySelector('#look-stage .js-title').textContent.length > 0"));
   await b.click('#look-stage .look-slide[data-theme="vinyl"]');
   await b.sleep(300);
@@ -59,13 +59,10 @@ try {
 
   await b.click("#plus-back-btn");
   await b.sleep(500);
-  for (const bg of ["rings", "stars", "calm"]) {
-    await b.click(`.pattern-opt[data-bg="${bg}"]`);
-    await b.sleep(1300);
-    await b.shot("look-bg-" + bg);
-  }
-  check("the last pattern picked is saved", (await saved("bgPattern")) === "calm" && await b.eval("getComputedStyle(document.querySelector('.orb')).animationName === 'none'"));
-  await b.click('.pattern-opt[data-bg="stars"]');
+  await b.click('.pattern-opt[data-bg="light"]');
+  await b.sleep(1300);
+  check("the plain light is saved and the rays go", (await saved("bgPattern")) === "light" && await b.eval("getComputedStyle(document.querySelector('.light-shape')).opacity < 0.1"));
+  await b.click('.pattern-opt[data-bg="prism"]');
 
   // ---- the colors of one cover, kept for any music ----
   await b.eval("document.querySelectorAll('#look-covers .look-cover')[0].click(); true");
@@ -85,7 +82,7 @@ try {
 
   await b.goto(`${BASE}/app/`);
   await b.waitFor("document.body.dataset.screen !== 'splash'", 8000, "leave splash");
-  check("the look is there after reopening", (await root("--c-warm")) === pinnedWarm && (await b.eval("document.body.dataset.bg")) === "stars");
+  check("the look is there after reopening", (await root("--c-warm")) === pinnedWarm && (await b.eval("document.body.dataset.bg")) === "prism");
 
   // back to «Как у трека»
   await openLook();

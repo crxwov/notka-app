@@ -173,13 +173,10 @@ body[data-screen="home"] .light-art.is-shown { opacity: 0.5; }
 body[data-screen="player"] .light-art.is-shown { opacity: 0.85; -webkit-mask-image: none; mask-image: none; }
 
 /* PATTERNS OF THE LIGHT (Оформление). The light itself stays what it is
-   — one orb — and a pattern only adds to it: rays, rings, sparks. */
-.light-pattern { position: absolute; inset: 0; opacity: 0; transition: opacity 1.1s var(--ease-out); }
-.light-pattern i { display: none; position: absolute; will-change: transform; }
+   — one orb — and a pattern only adds to it: rays. */
 .light-shape { position: absolute; inset: 0; opacity: 0; transition: opacity 1.1s var(--ease-out); }
 .light-shape i { display: none; position: absolute; will-change: transform; }
-body[data-bg="stars"] .light-pattern, body[data-bg="prism"] .light-shape, body[data-bg="rings"] .light-shape { opacity: 1; }
-body[data-bg="stars"] .light-pattern i { display: block; }
+body[data-bg="prism"] .light-shape { opacity: 1; }
 
 /* ПРИЗМА: beams fan out of the orb and turn slowly, two layers against each other */
 body[data-bg="prism"] .light-shape i:nth-child(-n+2) { display: block; inset: -46%; border-radius: 50%; mix-blend-mode: screen; -webkit-mask-image: radial-gradient(closest-side, #000 16%, rgba(0, 0, 0, 0.55) 46%, transparent 76%); mask-image: radial-gradient(closest-side, #000 16%, rgba(0, 0, 0, 0.55) 46%, transparent 76%); }
@@ -187,24 +184,12 @@ body[data-bg="prism"] .light-shape i:nth-child(1) { background: repeating-conic-
 body[data-bg="prism"] .light-shape i:nth-child(2) { background: repeating-conic-gradient(from 24deg, transparent 0deg 20deg, color-mix(in srgb, var(--c-mid) 34%, transparent) 23deg 30deg, transparent 33deg 60deg); animation: shape-turn 110s linear infinite reverse; }
 @keyframes shape-turn { to { transform: rotate(360deg); } }
 
-/* КОЛЬЦА: rings leave the orb one after another, like sound */
-body[data-bg="rings"] .light-shape i { display: block; left: 50%; top: 42%; width: 44%; aspect-ratio: 1 / 1; margin: -22% 0 0 -22%; border-radius: 50%; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--c-core) 60%, transparent), 0 0 26px color-mix(in srgb, var(--c-warm) 34%, transparent), inset 0 0 26px color-mix(in srgb, var(--c-warm) 20%, transparent); opacity: 0; animation: shape-ring 7.5s var(--ease-out) infinite; }
-body[data-bg="rings"] .light-shape i:nth-child(2) { animation-delay: 2.5s; }
-body[data-bg="rings"] .light-shape i:nth-child(3) { animation-delay: 5s; }
-@keyframes shape-ring { 0% { transform: scale(0.5); opacity: 0; } 14% { opacity: 0.85; } 100% { transform: scale(2.4); opacity: 0; } }
 
-/* ИСКРЫ: sparks rise through the light and twinkle */
-body[data-bg="stars"] .light-pattern i { left: 0; right: 0; top: 0; }
-body[data-bg="stars"] .light-pattern i:nth-child(1) { bottom: -150px; background-image: radial-gradient(circle at 22% 30%, var(--c-core) 0 1.3px, transparent 2px), radial-gradient(circle at 71% 78%, #fff 0 1px, transparent 1.6px); background-size: 130px 150px; animation: sparks-a 15s linear infinite, twinkle 3.4s ease-in-out infinite alternate; }
-body[data-bg="stars"] .light-pattern i:nth-child(2) { bottom: -110px; background-image: radial-gradient(circle at 60% 20%, #fff 0 0.9px, transparent 1.5px), radial-gradient(circle at 12% 66%, var(--c-core) 0 1px, transparent 1.6px); background-size: 90px 110px; opacity: 0.6; animation: sparks-b 24s linear infinite; }
-body[data-bg="stars"] .light-pattern i:nth-child(3) { bottom: -190px; background-image: radial-gradient(circle at 40% 55%, var(--c-warm) 0 1.5px, transparent 3.4px), radial-gradient(circle at 86% 12%, var(--c-core) 0 1.2px, transparent 2.8px); background-size: 230px 190px; opacity: 0.6; animation: sparks-c 34s linear infinite, twinkle 5s ease-in-out infinite alternate-reverse; }
 @keyframes sparks-a { to { transform: translateY(-150px); } }
 @keyframes sparks-b { to { transform: translateY(-110px); } }
 @keyframes sparks-c { to { transform: translateY(-190px); } }
 @keyframes twinkle { from { opacity: 0.35; } to { opacity: 1; } }
 
-/* ПОКОЙ: the same light, standing still */
-body[data-bg="calm"] .light *, body[data-bg="calm"] .light { animation: none !important; }
 
 .light-group {
   --size: min(118vw, 600px);
@@ -1949,25 +1934,19 @@ body.is-playing .reel { animation-play-state: running; }
 .is-seen .look-covers .look-cover, .is-seen .look-swatches .swatch { animation: card-in 0.7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 55ms); }
 
 /* 3 — the pattern: the light itself, small, doing what it will do behind everything */
-.pattern-opts { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px 26px; padding: 4px 20px 10px; }
+.pattern-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 26px; padding: 4px 0 10px; }
 .pattern-opts::-webkit-scrollbar { display: none; }
-.pattern-opt { position: relative; flex: 0 0 auto; width: 128px; display: flex; flex-direction: column; align-items: stretch; gap: 9px; text-align: left; transition: transform 0.3s var(--ease-out); }
+.pattern-opt { position: relative; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 9px; text-align: left; transition: transform 0.3s var(--ease-out); }
 .pattern-opt:active { transform: scale(0.96); }
 .pattern-name { font-size: 15px; line-height: 1.2; font-weight: 700; padding: 0 2px; }
 .pattern-thumb { position: relative; display: block; height: 164px; border-radius: 24px; overflow: hidden; background: #0A0810; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); outline: 2px solid transparent; outline-offset: 3px; transition: outline-color 0.25s; }
 .pattern-thumb i { position: absolute; display: block; }
 /* every thumbnail holds the same orb… */
 .pattern-thumb::before { content: ""; position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%; background: radial-gradient(closest-side, var(--c-core) 0 8%, var(--c-warm) 38%, var(--c-mid) 66%, transparent 100%); animation: core-pulse 4.5s ease-in-out infinite; }
-.pt-calm::before { animation: none; }
 /* …and what the pattern adds to it */
 .pt-prism i:nth-child(1), .pt-prism i:nth-child(2) { inset: -60%; border-radius: 50%; mix-blend-mode: screen; -webkit-mask-image: radial-gradient(closest-side, #000 14%, transparent 62%); mask-image: radial-gradient(closest-side, #000 14%, transparent 62%); top: -64%; bottom: -56%; }
 .pt-prism i:nth-child(1) { background: repeating-conic-gradient(from 0deg, transparent 0deg 13deg, color-mix(in srgb, var(--c-core) 55%, transparent) 15.5deg 18.5deg, transparent 21deg 42deg, color-mix(in srgb, var(--c-warm) 50%, transparent) 45deg 53deg, transparent 56deg 72deg); animation: shape-turn 26s linear infinite; }
 .pt-prism i:nth-child(2) { background: repeating-conic-gradient(from 24deg, transparent 0deg 20deg, color-mix(in srgb, var(--c-mid) 50%, transparent) 23deg 30deg, transparent 33deg 60deg); animation: shape-turn 38s linear infinite reverse; }
-.pt-rings i { left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--c-core) 70%, transparent); opacity: 0; animation: shape-ring 4.5s var(--ease-out) infinite; }
-.pt-rings i:nth-child(2) { animation-delay: 1.5s; }
-.pt-rings i:nth-child(3) { animation-delay: 3s; }
-.pt-stars i:nth-child(1) { inset: 0 0 -40px 0; background-image: radial-gradient(circle at 20% 30%, #fff 0 1px, transparent 1.6px), radial-gradient(circle at 70% 75%, var(--c-core) 0 1.2px, transparent 1.9px); background-size: 34px 40px; animation: pt-sparks 5s linear infinite, twinkle 2.6s ease-in-out infinite alternate; }
-@keyframes pt-sparks { to { transform: translateY(-40px); } }
 
 /* chosen things wear one mark: a ring round the picture and a tick */
 #screen-look .pattern-opt.is-on .pattern-thumb, #screen-look .atmo-card.is-on .atmo-view { outline-color: var(--text); }

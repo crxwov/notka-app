@@ -2916,7 +2916,7 @@
     gold: { name: "Золото", palette: { core: "#FFF3C9", warm: "#FFC24B", mid: "#FF7A3D", deep: "#7A2E1E" } },
     mono: { name: "Серебро", palette: { core: "#FFFFFF", warm: "#C9C4D6", mid: "#8E88A0", deep: "#3B3650" } },
   };
-  const BG_PATTERNS = { light: "Свет", prism: "Призма", rings: "Кольца", stars: "Искры", calm: "Покой" };
+  const BG_PATTERNS = { light: "Свет", prism: "Призма" };
   // light: "track" | "preset:<id>" | "pinned" (the palette and cover are in lightPinned)
   const LOOK_DEFAULTS = { playerTheme: "standard", light: "track", bgPattern: "light", atmo: "none" };
   // «Атмосфера»: seasons and nature. Plus ones come with Нотка Плюс; the
