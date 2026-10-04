@@ -195,20 +195,41 @@ body[data-screen="player"] .light-art.is-shown { opacity: 0.85; -webkit-mask-ima
 @keyframes aurora-b { 0% { transform: translate(10%, -4%) scaleX(0.94); } 100% { transform: translate(-12%, 6%) scaleX(1.1); } }
 @keyframes aurora-c { 0% { transform: translate(-6%, -6%) scaleX(1.08); } 100% { transform: translate(12%, 5%) scaleX(0.9); } }
 
-/* ГОРИЗОНТ: the light does not hang above, it rises from below the screen */
-body[data-bg="horizon"][data-screen="home"] .light-group { --y: 92vh; --s: 1.25; }
-body[data-bg="horizon"][data-screen="player"] .light-group { --y: 66vh; --s: 1.7; }
+/* ГОРИЗОНТ: a dusk sky fills the screen and drifts slowly, the sun rises and sinks at the bottom */
+.light::before { content: ""; position: absolute; inset: 0; opacity: 0; transition: opacity 1.1s var(--ease-out); }
+body[data-bg="horizon"] .light::before, .pattern-thumb[data-bg="horizon"] .pv::before {
+  content: ""; position: absolute; inset: 0; opacity: 1;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c-deep) 80%, transparent) 0%, color-mix(in srgb, var(--c-mid) 55%, transparent) 32%, color-mix(in srgb, var(--c-warm) 55%, transparent) 60%, color-mix(in srgb, var(--c-core) 26%, transparent) 76%, color-mix(in srgb, var(--c-mid) 60%, transparent) 100%);
+  background: linear-gradient(in oklab 180deg, color-mix(in srgb, var(--c-deep) 80%, transparent) 0%, color-mix(in srgb, var(--c-mid) 55%, transparent) 32%, color-mix(in srgb, var(--c-warm) 55%, transparent) 60%, color-mix(in srgb, var(--c-core) 26%, transparent) 76%, color-mix(in srgb, var(--c-mid) 60%, transparent) 100%);
+  background-size: 100% 190%;
+  animation: sky-flow 18s var(--ease-in-out) infinite alternate;
+}
+@keyframes sky-flow { from { background-position: 0 0; } to { background-position: 0 100%; } }
+body[data-bg="horizon"][data-screen] .light-group { --y: 84vh; --s: 1.2; }
+[data-bg="horizon"] .orb-violet { animation-name: horizon-a; }
+[data-bg="horizon"] .orb-magenta { animation-name: horizon-b; }
+[data-bg="horizon"] .orb-orange { animation-name: horizon-c; }
+@keyframes horizon-a { 0% { transform: translate(-8%, 10%) scaleX(1.1); } 100% { transform: translate(8%, -12%) scaleX(0.95); } }
+@keyframes horizon-b { 0% { transform: translate(8%, 6%) scaleX(0.95); } 100% { transform: translate(-8%, -14%) scaleX(1.1); } }
+@keyframes horizon-c { 0% { transform: translate(0, 14%) scale(0.94); } 100% { transform: translate(0, -10%) scale(1.08); } }
 
-/* ЛАВА: big lobes of the light overlap, so their colours melt into each other, and rise and sink like wax in a lamp */
-[data-bg="lava"] .light-group { --s: 1.12; }
-[data-bg="lava"] .orb-violet { inset: 34% -24% -26% -24%; animation-name: lava-a; }
-[data-bg="lava"] .orb-magenta { inset: 8% -8% 22% 0%; animation-name: lava-b; }
-[data-bg="lava"] .orb-orange { inset: -14% 12% 46% 14%; animation-name: lava-c; }
-/* no crescents in these: they would read as rings */
-[data-bg="lava"] .orb-rim, [data-bg="lava"] .orb-rim-b, [data-bg="aurora"] .orb-rim, [data-bg="aurora"] .orb-rim-b, [data-bg="horizon"] .orb-rim, [data-bg="horizon"] .orb-rim-b { opacity: 0 !important; }
-@keyframes lava-a { 0% { transform: translate(-6%, 8%) scale(1.04); } 50% { transform: translate(8%, -26%) scale(0.92); } 100% { transform: translate(-4%, 14%) scale(1.08); } }
-@keyframes lava-b { 0% { transform: translate(8%, -10%) scale(0.96); } 50% { transform: translate(-10%, 22%) scale(1.08); } 100% { transform: translate(6%, -18%) scale(0.94); } }
-@keyframes lava-c { 0% { transform: translate(-6%, 24%) scale(0.9); } 50% { transform: translate(10%, -12%) scale(1.1); } 100% { transform: translate(-8%, 30%) scale(0.92); } }
+/* ЛАВА: a field of five big soft blobs fills the whole screen, one colour each, and they wander (the manner of Apple Music) */
+body[data-bg="lava"][data-screen] .light-group { --y: 50vh; --s: 1; }
+[data-bg="lava"] .light-group { width: var(--lw, 150vw); height: var(--lh, 120vh); }
+body[data-bg="lava"] .light { background: color-mix(in srgb, var(--c-deep) 46%, var(--bg)); }
+[data-bg="lava"] .orb { opacity: 1; }
+[data-bg="lava"] .orb-violet { inset: 38% 28% -22% -22%; animation-name: lava-a; }
+[data-bg="lava"] .orb-magenta { inset: 18% -26% 18% 40%; animation-name: lava-b; }
+[data-bg="lava"] .orb-orange { inset: -18% 34% 50% -12%; animation-name: lava-c; }
+[data-bg="lava"] .orb-rim { inset: 52% -18% -24% 26%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c-mid) 85%, transparent), color-mix(in srgb, var(--c-mid) 25%, transparent) 60%, transparent); opacity: 0.8 !important; animation-name: lava-b; animation-duration: 23s; }
+[data-bg="lava"] .orb-rim-b { inset: -16% -14% 56% 36%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c-warm) 80%, transparent), color-mix(in srgb, var(--c-warm) 22%, transparent) 62%, transparent); opacity: 0.7 !important; animation-name: lava-c; animation-duration: 19s; }
+[data-bg="aurora"] .orb-rim, [data-bg="aurora"] .orb-rim-b, [data-bg="horizon"] .orb-rim, [data-bg="horizon"] .orb-rim-b { opacity: 0 !important; }
+[data-bg="lava"] .orb-core { inset: 16% 40% 52% 22%; opacity: 0.28 !important; }
+/* a little shade over the field, so white text keeps its contrast on any colour */
+body[data-bg="lava"] .light::after, .pattern-thumb[data-bg="lava"] .pv::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 6, 14, 0.18), rgba(8, 6, 14, 0.42)); pointer-events: none; }
+@keyframes lava-a { 0% { transform: translate(-6%, 4%) scale(1.04); } 50% { transform: translate(14%, -10%) scale(0.94); } 100% { transform: translate(4%, 12%) scale(1.1); } }
+@keyframes lava-b { 0% { transform: translate(6%, -6%) scale(0.96); } 50% { transform: translate(-14%, 10%) scale(1.1); } 100% { transform: translate(-2%, -12%) scale(0.94); } }
+@keyframes lava-c { 0% { transform: translate(-8%, 8%) scale(0.94); } 50% { transform: translate(12%, 16%) scale(1.08); } 100% { transform: translate(8%, -8%) scale(0.96); } }
 
 @keyframes sparks-a { to { transform: translateY(-150px); } }
 @keyframes sparks-b { to { transform: translateY(-110px); } }
@@ -1970,8 +1991,10 @@ body.is-playing .reel { animation-play-state: running; }
 .pv .light-group { --size: 500px !important; --y: 190px !important; --s: 1 !important; opacity: 1 !important; animation: none; }
 .pattern-thumb .pv .orb-rim, .pattern-thumb .pv .orb-rim-b { opacity: 0.4 !important; }
 .pattern-thumb .pv .orb-core { opacity: 0.95 !important; }
-.pattern-thumb[data-bg="horizon"] .pv .light-group { --y: 650px !important; --s: 1.3 !important; }
-.pv-ui { position: absolute; inset: 0; }
+.pattern-thumb[data-bg="horizon"] .pv .light-group { --y: 580px !important; --s: 1.2 !important; }
+.pattern-thumb[data-bg="lava"] .pv .light-group { --lw: 585px; --lh: 823px; --y: 343px !important; --s: 1 !important; }
+.pattern-thumb[data-bg="lava"] { background: color-mix(in srgb, var(--c-deep) 46%, var(--bg)); }
+.pv-ui { position: absolute; inset: 0; z-index: 1; }
 .pv-ui i { position: absolute; display: block; border-radius: 16px; background: rgba(255, 255, 255, 0.12); }
 .pv-ui .a { left: 26px; top: 34px; width: 54px; height: 54px; border-radius: 50%; }
 .pv-ui .b { left: 26px; top: 118px; width: 250px; height: 34px; border-radius: 12px; background: rgba(255, 255, 255, 0.34); }
@@ -2086,8 +2109,8 @@ body.lyrics-open .lyrics {
 body.lyrics-open .player-art { opacity: 0; transform: scale(0.8); filter: blur(16px); pointer-events: none; }
 .lyrics-lines { list-style: none; margin: 0; padding: 0; }
 .lyrics-line {
-  font-size: 23px;
-  line-height: 1.28;
+  font-size: 30px;
+  line-height: 1.24;
   font-weight: 700;
   letter-spacing: -0.02em;
   padding: 8px 0;
@@ -2101,7 +2124,7 @@ body.lyrics-open .player-art { opacity: 0; transform: scale(0.8); filter: blur(1
 .lyrics-line.is-past { opacity: 0.34; }
 .lyrics-line.is-active { opacity: 1; text-shadow: 0 2px 22px rgba(4, 2, 10, 0.45); }
 /* a text without timings is simply readable from top to bottom */
-.lyrics-lines:not(.is-synced) .lyrics-line { font-size: 19px; font-weight: 600; padding: 4px 0; opacity: 0.86; }
+.lyrics-lines:not(.is-synced) .lyrics-line { font-size: 25px; font-weight: 600; padding: 4px 0; opacity: 0.86; }
 .lyrics-lines:not(.is-synced) .lyrics-line:empty { height: 18px; }
 .lyrics-note { font-size: 16px; line-height: 1.45; color: var(--text-2); text-align: center; padding: 22% 16px 0; }
 .lyrics-note:empty { display: none; }
@@ -2123,7 +2146,7 @@ body.lyrics-open .player-art { opacity: 0; transform: scale(0.8); filter: blur(1
 .lyrics-skeleton span:nth-child(6) { width: 58%; animation-delay: 0.4s; }
 @keyframes lyrics-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @media (max-height: 700px) {
-  .lyrics-line { font-size: 20px; padding: 6px 0; }
+  .lyrics-line { font-size: 26px; padding: 6px 0; }
 }
 
 /* ==========================================================
@@ -2482,4 +2505,4 @@ body[data-screen="player"] .player-only { display: block; }
 #screen-account .group-row .group-sub { white-space: normal; line-height: 1.35; }
 #screen-account .group-value { max-width: 55%; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .perf-lite .pv *, .perf-lite .pv { animation: none !important; }
-.pattern-thumb[data-bg="lava"] .pv .orb-rim, .pattern-thumb[data-bg="lava"] .pv .orb-rim-b, .pattern-thumb[data-bg="aurora"] .pv .orb-rim, .pattern-thumb[data-bg="aurora"] .pv .orb-rim-b, .pattern-thumb[data-bg="horizon"] .pv .orb-rim, .pattern-thumb[data-bg="horizon"] .pv .orb-rim-b { opacity: 0 !important; }
+.pattern-thumb[data-bg="aurora"] .pv .orb-rim, .pattern-thumb[data-bg="aurora"] .pv .orb-rim-b, .pattern-thumb[data-bg="horizon"] .pv .orb-rim, .pattern-thumb[data-bg="horizon"] .pv .orb-rim-b { opacity: 0 !important; }
