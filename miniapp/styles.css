@@ -187,9 +187,17 @@ body[data-screen="player"] .light-art.is-shown { opacity: 0.85; -webkit-mask-ima
 @keyframes shape-turn { to { transform: rotate(360deg); } }
 
 /* СИЯНИЕ: the orb is pulled into a wide ribbon that sways across the screen */
-[data-bg="aurora"] .light-group { width: calc(var(--size) * 1.9); height: calc(var(--size) * 0.62); }
-[data-bg="aurora"] .orb-core { opacity: 1 !important; }
-[data-bg="aurora"] .orb { filter: saturate(1.35) brightness(1.2); }
+[data-bg="aurora"] .light-group { width: calc(var(--size) * 1.8); height: calc(var(--size) * 0.6); }
+/* curtains of light hang from above and sway, each at its own pace */
+[data-bg="aurora"] .light-shape { opacity: 1; }
+[data-bg="aurora"] .orb { opacity: 0.6; }
+[data-bg="aurora"] .light-shape i { display: block; top: -95%; bottom: -35%; width: 20%; mix-blend-mode: screen; -webkit-mask-image: linear-gradient(90deg, transparent, #000 35%, #000 65%, transparent); mask-image: linear-gradient(90deg, transparent, #000 35%, #000 65%, transparent); transform-origin: 50% 0; }
+[data-bg="aurora"] .light-shape i:nth-child(1) { left: 10%; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--c-core) 52%, transparent) 46%, color-mix(in srgb, var(--c-mid) 40%, transparent) 70%, transparent 100%); animation: curtain-a 11s var(--ease-in-out) infinite alternate; }
+[data-bg="aurora"] .light-shape i:nth-child(2) { left: 40%; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--c-mid) 60%, transparent) 44%, color-mix(in srgb, var(--c-deep) 40%, transparent) 68%, transparent 100%); animation: curtain-b 15s var(--ease-in-out) infinite alternate; }
+[data-bg="aurora"] .light-shape i:nth-child(3) { left: 70%; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--c-core) 44%, transparent) 46%, color-mix(in srgb, var(--c-warm) 30%, transparent) 72%, transparent 100%); animation: curtain-c 13s var(--ease-in-out) infinite alternate; }
+@keyframes curtain-a { 0% { transform: translateX(-14%) skewX(-9deg) scaleX(1); opacity: 0.55; } 50% { opacity: 1; } 100% { transform: translateX(22%) skewX(8deg) scaleX(1.5); opacity: 0.7; } }
+@keyframes curtain-b { 0% { transform: translateX(18%) skewX(7deg) scaleX(1.35); opacity: 0.8; } 50% { opacity: 0.5; } 100% { transform: translateX(-20%) skewX(-8deg) scaleX(0.9); opacity: 1; } }
+@keyframes curtain-c { 0% { transform: translateX(-18%) skewX(8deg) scaleX(0.9); opacity: 0.6; } 50% { opacity: 1; } 100% { transform: translateX(16%) skewX(-7deg) scaleX(1.4); opacity: 0.55; } }
 [data-bg="aurora"] .orb-violet { animation-name: aurora-a; }
 [data-bg="aurora"] .orb-magenta { animation-name: aurora-b; }
 [data-bg="aurora"] .orb-orange { animation-name: aurora-c; }
