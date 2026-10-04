@@ -1982,30 +1982,27 @@ body.is-playing .reel { animation-play-state: running; }
 /* 3 — the pattern: the light itself, small, doing what it will do behind everything */
 .pattern-opts { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px 26px; padding: 4px 20px 10px; scroll-snap-type: x proximity; scroll-padding-inline: 20px; }
 .pattern-opts::-webkit-scrollbar { display: none; }
-.pattern-opt { position: relative; flex: 0 0 auto; width: 132px; display: flex; flex-direction: column; align-items: stretch; gap: 10px; text-align: left; scroll-snap-align: start; transition: transform 0.3s var(--ease-out); }
+.pattern-opt { position: relative; flex: 0 0 auto; width: 156px; display: flex; flex-direction: column; align-items: stretch; gap: 10px; text-align: left; scroll-snap-align: start; transition: transform 0.3s var(--ease-out); }
 .pattern-opt:active { transform: scale(0.96); }
 .pattern-name { font-size: 15px; line-height: 1.2; font-weight: 700; padding: 0 2px; }
 /* a little screen of the app, with the light on it as it will be behind the real one */
-.pattern-thumb { position: relative; display: block; height: 232px; border-radius: 24px; overflow: hidden; isolation: isolate; background: var(--bg); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); outline: 2px solid transparent; outline-offset: 3px; transition: outline-color 0.25s; }
-.pv { position: absolute; left: 0; top: 0; width: 390px; height: 686px; transform: scale(0.3385); transform-origin: 0 0; }
-.pv .light-group { --size: 500px !important; --y: 190px !important; --s: 1 !important; opacity: 1 !important; animation: none; }
-.pattern-thumb .pv .orb-rim, .pattern-thumb .pv .orb-rim-b { opacity: 0.4 !important; }
+.pattern-thumb { position: relative; display: block; height: 270px; border-radius: 24px; overflow: hidden; isolation: isolate; background: var(--bg); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); outline: 2px solid transparent; outline-offset: 3px; transition: outline-color 0.25s; }
+.pv { position: absolute; left: 0; top: 0; width: 390px; height: 675px; transform: scale(0.4); transform-origin: 0 0; }
+.pv .light-group { --size: 500px !important; --y: 210px !important; --s: 1 !important; opacity: 1 !important; animation: none; }
+.pattern-thumb .pv .orb-rim, .pattern-thumb .pv .orb-rim-b { opacity: 0.2 !important; }
 .pattern-thumb .pv .orb-core { opacity: 0.95 !important; }
-.pattern-thumb[data-bg="horizon"] .pv .light-group { --y: 580px !important; --s: 1.2 !important; }
-.pattern-thumb[data-bg="lava"] .pv .light-group { --lw: 585px; --lh: 823px; --y: 343px !important; --s: 1 !important; }
+.pattern-thumb[data-bg="horizon"] .pv .light-group { --y: 620px !important; --s: 1 !important; }
+.pattern-thumb[data-bg="lava"] .pv .light-group { --lw: 585px; --lh: 810px; --y: 337px !important; --s: 1 !important; }
 .pattern-thumb[data-bg="lava"] { background: color-mix(in srgb, var(--c-deep) 14%, var(--bg)); }
 .pv-ui { position: absolute; inset: 0; z-index: 1; }
-.pv-ui i { position: absolute; display: block; border-radius: 16px; background: rgba(255, 255, 255, 0.12); }
-.pv-ui .a { left: 26px; top: 34px; width: 54px; height: 54px; border-radius: 50%; }
-.pv-ui .b { left: 26px; top: 118px; width: 250px; height: 34px; border-radius: 12px; background: rgba(255, 255, 255, 0.34); }
-.pv-ui .c { left: 26px; top: 170px; width: 170px; height: 20px; border-radius: 8px; }
-.pv-ui .d1, .pv-ui .d2 { top: 240px; width: 150px; height: 150px; border-radius: 24px; }
-.pv-ui .d1 { left: 26px; }
-.pv-ui .d2 { left: 196px; }
-.pv-ui .e1, .pv-ui .e2, .pv-ui .e3 { left: 26px; width: 338px; height: 72px; border-radius: 20px; background: rgba(255, 255, 255, 0.07); }
-.pv-ui .e1 { top: 430px; }
-.pv-ui .e2 { top: 518px; }
-.pv-ui .e3 { top: 606px; }
+.pv-ui i { position: absolute; display: block; }
+/* only what the light sits behind on the home screen: the play button, the name, the dock */
+.pv-ui .a { left: 138px; top: 150px; width: 114px; height: 114px; border-radius: 50%; background: linear-gradient(150deg, #FFFFFF, #FFEFD9); box-shadow: 0 0 0 12px rgba(255, 255, 255, 0.14), 0 20px 40px -14px rgba(0, 0, 0, 0.5); }
+.pv-ui .a::after { content: ""; position: absolute; left: 44px; top: 36px; border-style: solid; border-width: 21px 0 21px 34px; border-color: transparent transparent transparent #14101c; }
+.pv-ui .b { left: 108px; top: 300px; width: 174px; height: 26px; border-radius: 13px; background: rgba(255, 255, 255, 0.92); }
+.pv-ui .c { left: 78px; top: 346px; width: 234px; height: 15px; border-radius: 8px; background: rgba(255, 255, 255, 0.4); }
+.pv-ui .d1 { left: 120px; top: 392px; width: 150px; height: 42px; border-radius: 21px; background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.22); }
+.pv-ui .e1 { left: 20px; right: 20px; top: 580px; height: 66px; border-radius: 33px; background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.2); }
 
 /* chosen things wear one mark: a ring round the picture and a tick */
 #screen-look .pattern-opt.is-on .pattern-thumb, #screen-look .atmo-card.is-on .atmo-view { outline-color: var(--text); }

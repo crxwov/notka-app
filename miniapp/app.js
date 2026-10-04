@@ -3167,7 +3167,7 @@
     const box = $("look-patterns");
     if (box.children.length) return;
     const orbs = ["violet", "magenta", "orange", "rim", "rim-b", "core"].map((n) => `<span class="orb orb-${n}"></span>`).join("");
-    const ui = '<span class="pv-ui"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d1"></i><i class="d2"></i><i class="e1"></i><i class="e2"></i><i class="e3"></i></span>';
+    const ui = '<span class="pv-ui"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d1"></i><i class="e1"></i></span>';
     box.innerHTML = Object.entries(BG_PATTERNS).map(([id, name]) => `<button class="pattern-opt" type="button" data-bg="${id}"><span class="pattern-thumb" data-bg="${id}" aria-hidden="true"><span class="pv"><span class="light-group"><span class="light-shape"><i></i><i></i><i></i></span>${orbs}</span>${ui}</span></span><span class="pattern-name">${name}</span></button>`).join("");
   }
   function renderLookScreen() {
