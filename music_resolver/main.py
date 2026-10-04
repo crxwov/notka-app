@@ -32,9 +32,21 @@ def mount_miniapp(app: FastAPI, directory) -> None:
     """
     from starlette.applications import Starlette
     from starlette.middleware import Middleware
+    from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.middleware.gzip import GZipMiddleware
     from starlette.staticfiles import StaticFiles
 
-    static = Starlette(middleware=[Middleware(GZipMiddleware, minimum_size=1024)])
+    class Revalidate(BaseHTTPMiddleware):
+        """Страница и её скрипты с телефона каждый раз сверяются с сервером (304, если не менялись):
+        иначе Telegram держит старый index.html и новые версии не доходят."""
+
+        async def dispatch(self, request, call_next):
+            response = await call_next(request)
+            path = request.url.path
+            if path.endswith(("/", ".html", ".js", ".css")) or "." not in path.rsplit("/", 1)[-1]:
+                response.headers["Cache-Control"] = "no-cache"
+            return response
+
+    static = Starlette(middleware=[Middleware(GZipMiddleware, minimum_size=1024), Middleware(Revalidate)])
     static.mount("/", StaticFiles(directory=str(directory), html=True))
     app.mount("/app", static, name="miniapp")
