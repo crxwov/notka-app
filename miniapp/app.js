@@ -3021,6 +3021,7 @@
     const theme = lookValue("playerTheme");
     document.body.dataset.playerTheme = theme;
     document.body.dataset.bg = lookValue("bgPattern");
+    $("light").dataset.bg = document.body.dataset.bg; // the light alone wears the pattern: the little previews must not follow it
     const atmo = lookValue("atmo");
     document.body.dataset.atmo = atmo;
     const atmoSet = atmo === "none" ? {} : Object.assign(atmoSettings(atmo), currentScreen === "event" ? { bats: "often", life: "both" } : {});
