@@ -13,9 +13,10 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=83" />
+<link rel="stylesheet" href="styles.css?v=101" />
 <link rel="stylesheet" href="atmosphere.css?v=7" />
 <link rel="stylesheet" href="events.css?v=10" />
+<link rel="stylesheet" href="system.css?v=3" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -395,9 +396,8 @@
   <main class="screen" id="screen-add-tracks" hidden>
     <header class="bar">
       <button class="round-btn round-glass back-btn" id="add-tracks-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
-      <div class="bar-title">Добавить треки</div>
-      <span class="bar-spacer"></span>
     </header>
+    <h1 class="look-title">Добавить треки</h1>
     <label class="field">
       <svg width="20" height="20" aria-hidden="true"><use href="#i-search"/></svg>
       <input id="add-tracks-search" type="search" inputmode="search" enterkeyhint="search" placeholder="Трек или исполнитель" autocomplete="off" aria-label="Найти трек для плейлиста" />
@@ -409,9 +409,8 @@
   <main class="screen" id="screen-edit-playlist" hidden>
     <header class="bar">
       <button class="round-btn round-glass back-btn" id="edit-playlist-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
-      <div class="bar-title">Редактировать</div>
-      <span class="bar-spacer"></span>
     </header>
+    <h1 class="look-title">Редактировать</h1>
     <p class="hint">Удерживай трек и опусти его в щель внизу — он исчезнет из плейлиста. Вверх или вниз — поменять порядок.</p>
     <div class="edit-shredder" id="edit-playlist-list"></div>
     <p class="empty-note empty-center" id="edit-playlist-empty" hidden>В плейлисте пока нет треков</p>
@@ -460,9 +459,8 @@
   <main class="screen" id="screen-account" hidden>
     <header class="bar">
       <button class="round-btn round-glass back-btn" id="account-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
-      <div class="bar-title">Аккаунт</div>
-      <span class="bar-spacer"></span>
     </header>
+    <h1 class="look-title" data-reveal>Аккаунт</h1>
     <div class="hero hero-profile" data-reveal>
       <div class="cover-edit-wrap">
         <span class="avatar avatar-lg" id="account-avatar"><span id="account-initial">Н</span></span>
@@ -511,9 +509,8 @@
   <main class="screen" id="screen-stats" hidden>
     <header class="bar">
       <button class="round-btn round-glass back-btn" id="stats-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
-      <div class="bar-title">Статистика</div>
-      <span class="bar-spacer"></span>
     </header>
+    <h1 class="look-title">Статистика</h1>
     <div class="chips stats-chips" id="stats-periods" role="tablist" aria-label="За какое время">
       <button class="chip" type="button" role="tab" aria-selected="false" data-period="7">Неделя</button>
       <button class="chip" type="button" role="tab" aria-selected="false" data-period="30">Месяц</button>

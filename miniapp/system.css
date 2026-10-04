@@ -1,0 +1,49 @@
+/* ЕДИНАЯ СИСТЕМА. Загружается последней и приводит все экраны к одним правилам:
+   одна шкала заголовков, одни скругления, одни отступы между разделами.
+   Новые экраны берут значения отсюда, а не придумывают свои. */
+:root {
+  --t-title: 40px;   /* большой заголовок экрана */
+  --t-hero: 28px;    /* имя в центре (профиль, плейлист, альбом, о Нотке) */
+  --t-h2: 22px;      /* заголовок раздела внутри экрана */
+  --gap-sec: 32px;   /* между разделами */
+  --gap-head: 14px;  /* от заголовка раздела до его содержимого */
+  /* скругления: --radius-s 10 (мелкие обложки), --radius-m 16 (полки, сетка), --radius-l 24 (карточки, большие обложки) */
+}
+
+/* большие заголовки экранов */
+.display, .look-title, .mood-title, .plus-title, .event-title {
+  font-size: var(--t-title); line-height: 1; font-weight: 800; letter-spacing: -0.04em;
+}
+.display.page-title { margin: 14px 0 22px; }
+
+/* имя в центре */
+.hero-title, .about-hero .hero-title { font-size: var(--t-hero); line-height: 1.12; font-weight: 800; letter-spacing: -0.03em; }
+.pw-name { font-size: var(--t-hero); font-weight: 800; letter-spacing: -0.03em; }
+
+/* заголовки разделов */
+.h2, .look-h, .mood-h, .event-h, .group-caption, .results-section .h2, .block-title {
+  font-size: var(--t-h2); line-height: 1.15; font-weight: 800; letter-spacing: -0.03em; color: var(--text);
+}
+.block-head { margin-bottom: var(--gap-head); }
+.block-title, .look-h, .event-h, .mood-h { margin-bottom: var(--gap-head); }
+.mood-h { margin-top: var(--gap-sec); }
+.event-h { margin-top: var(--gap-sec); }
+.group-caption { margin: var(--gap-sec) 2px var(--gap-head); display: flex; align-items: center; gap: 8px; }
+.results-section .h2 { margin: 22px 0 8px; }
+
+/* разделы друг под другом */
+.block { margin-bottom: var(--gap-sec); }
+.look-sec, .snd-sec { margin-top: var(--gap-sec); }
+
+/* карточки и группы: одно скругление */
+.group, .plus-card, .import-card, .xf, .event-banner { border-radius: var(--radius-l); }
+.cover-sm, .cover-md { border-radius: var(--radius-s); }
+.playlist-card .cover { border-radius: var(--radius-m); }
+.cover-lg { border-radius: var(--radius-l); }
+
+/* подпись под большим заголовком */
+.look-note, .mood-lede { font-size: 16px; line-height: 1.4; color: var(--text-2); margin: 10px 2px 0; max-width: 30em; text-wrap: pretty; }
+
+/* заголовок экрана сразу под кнопкой «назад»; заголовок «Статистика», «Добавить треки», «Редактировать» — такие же, как у «Оформления» */
+.screen > .look-title + .chips, .screen > .look-title + .field, .screen > .look-title + p { margin-top: 18px; }
+.atmo-opt-row .chip { height: 38px; font-size: 15px; padding: 0 16px; }
