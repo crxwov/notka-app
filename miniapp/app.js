@@ -372,7 +372,7 @@
   const BRAND_HUES = [14, 24, 34, 336, 348, 6, 318];
   function fallbackCover(seed) {
     const h = BRAND_HUES[hashString(seed) % BRAND_HUES.length];
-    return `radial-gradient(circle at 34% 30%, hsl(${(h + 20) % 360} 100% 88%) 0 8%, hsl(${h} 92% 60%) 36%, hsl(${(h + 330) % 360} 72% 50%) 64%, hsl(262 66% 38%) 100%)`;
+    return `radial-gradient(circle at 34% 30%, hsl(${(h + 20) % 360} 90% 90%) 0 8%, hsl(${h} 76% 62%) 36%, hsl(${(h + 340) % 360} 50% 52%) 64%, hsl(310 40% 22%) 100%)`;
   }
 
   function setCoverEl(el, url, seed) {
@@ -649,7 +649,7 @@
 
   function brandPaletteFor(seed) {
     const h = BRAND_HUES[hashString(seed) % BRAND_HUES.length];
-    return { core: hsl(h, 1, 0.88), warm: hsl(h, 0.94, 0.6), mid: hsl((h + 34) % 360, 0.82, 0.56), deep: "#6D34E0" };
+    return { core: hsl(h, 0.9, 0.9), warm: hsl(h, 0.76, 0.62), mid: hsl((h + 340) % 360, 0.5, 0.52), deep: "#47204E" };
   }
 
   let artUrlShown = null;
@@ -667,7 +667,7 @@
 
   // What the playing track gives the light. «Оформление» can put a chosen
   // palette or one pinned cover in its place (see paintLight).
-  const DEFAULT_PALETTE = { core: "#FFE3B8", warm: "#FF6A2E", mid: "#E23C8C", deep: "#6D34E0" };
+  const DEFAULT_PALETTE = { core: "#FFE2D2", warm: "#EE905A", mid: "#CF5A68", deep: "#47204E" };
   let trackLight = { palette: null, art: null };
 
   async function lightForTrack(track) {

@@ -38,10 +38,10 @@
    quiet. Color is emitted by the orb only; the UI is neutral.
    ========================================================== */
 
-@property --c-core    { syntax: "<color>"; inherits: true; initial-value: #FFE3B8; }
-@property --c-warm    { syntax: "<color>"; inherits: true; initial-value: #FF6A2E; }
-@property --c-mid     { syntax: "<color>"; inherits: true; initial-value: #E23C8C; }
-@property --c-deep    { syntax: "<color>"; inherits: true; initial-value: #6D34E0; }
+@property --c-core    { syntax: "<color>"; inherits: true; initial-value: #FFE2D2; }
+@property --c-warm    { syntax: "<color>"; inherits: true; initial-value: #EE905A; }
+@property --c-mid     { syntax: "<color>"; inherits: true; initial-value: #CF5A68; }
+@property --c-deep    { syntax: "<color>"; inherits: true; initial-value: #47204E; }
 
 :root {
   /* ground + surfaces */
@@ -57,10 +57,10 @@
   --text-3: rgba(244, 239, 255, 0.52);
 
   /* the light (animated per track) */
-  --c-core: #FFE3B8;
-  --c-warm: #FF6A2E;
-  --c-mid: #E23C8C;
-  --c-deep: #6D34E0;
+  --c-core: #FFE2D2;
+  --c-warm: #EE905A;
+  --c-mid: #CF5A68;
+  --c-deep: #47204E;
 
   /* reserved: now-playing only — the playing track's own light */
   --now: var(--c-core);
@@ -109,7 +109,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-::selection { background: rgba(255, 106, 46, 0.38); color: #fff; }
+::selection { background: rgba(238, 144, 90, 0.38); color: #fff; }
 input { caret-color: var(--text); }
 
 button {
