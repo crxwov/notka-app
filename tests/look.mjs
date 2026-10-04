@@ -28,7 +28,7 @@ try {
   await b.waitFor("document.body.dataset.screen !== 'splash'", 8000, "leave splash");
   await openLook();
   check("the section opens from the profile", (await b.eval("document.body.dataset.screen")) === "look");
-  check("four players on the stage, eight colors, covers to pick from, two patterns", await b.eval("document.querySelectorAll('#look-stage .look-slide').length === 4 && document.querySelectorAll('#look-colors .swatch').length === 8 && document.querySelectorAll('#look-covers .look-cover').length >= 2 && document.querySelectorAll('.pattern-opt').length === 2"));
+  check("four players on the stage, eight colors, covers to pick from, five patterns", await b.eval("document.querySelectorAll('#look-stage .look-slide').length === 4 && document.querySelectorAll('#look-colors .swatch').length === 8 && document.querySelectorAll('#look-covers .look-cover').length >= 2 && document.querySelectorAll('.pattern-opt').length === 5"));
   check("the stage wears the listener's own cover", await b.eval("document.querySelector('#look-stage .show-disc-art').style.backgroundImage.length > 10 && document.querySelector('#look-stage .js-title').textContent.length > 0"));
   await b.click('#look-stage .look-slide[data-theme="vinyl"]');
   await b.sleep(300);

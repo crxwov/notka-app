@@ -13,7 +13,9 @@ await b.waitFor("!!document.body && document.body.dataset.screen !== 'splash'", 
 await b.sleep(1200);
 await b.click("#home-avatar-btn"); await b.sleep(800);
 await b.click("#menu-look"); await b.sleep(1500);
-for (let i = 0; i < 6; i++) {
+await b.eval("document.getElementById('screen-look').scrollTo(0, 99999); true"); await b.sleep(900);
+for (const x of [0, 280, 600]) { await b.eval(`document.getElementById('look-patterns').scrollLeft = ${x}; true`); await b.sleep(500); await b.shot(`${P}-pat${x}`); }
+for (let i = 0; i < 0; i++) {
   await b.eval(`document.getElementById('screen-look').scrollTo(0, ${i * 700}); true`);
   await b.sleep(1100);
   await b.shot(`${P}-${i}`);

@@ -2916,7 +2916,7 @@
     gold: { name: "Золото", palette: { core: "#FFF3C9", warm: "#FFC24B", mid: "#FF7A3D", deep: "#7A2E1E" } },
     mono: { name: "Серебро", palette: { core: "#FFFFFF", warm: "#C9C4D6", mid: "#8E88A0", deep: "#3B3650" } },
   };
-  const BG_PATTERNS = { light: "Свет", prism: "Призма" };
+  const BG_PATTERNS = { light: "Свет", prism: "Призма", aurora: "Сияние", horizon: "Горизонт", lava: "Лава" };
   // light: "track" | "preset:<id>" | "pinned" (the palette and cover are in lightPinned)
   const LOOK_DEFAULTS = { playerTheme: "standard", light: "track", bgPattern: "light", atmo: "none" };
   // «Атмосфера»: seasons and nature. Plus ones come with Нотка Плюс; the
@@ -3162,8 +3162,17 @@
     setAtmoSetting(atmo, c.dataset.setting, c.dataset.v);
     applyLook();
   });
+  // every pattern is shown as a little screen with the same light on it
+  function renderPatterns() {
+    const box = $("look-patterns");
+    if (box.children.length) return;
+    const orbs = ["violet", "magenta", "orange", "rim", "rim-b", "core"].map((n) => `<span class="orb orb-${n}"></span>`).join("");
+    const ui = '<span class="pv-ui"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d1"></i><i class="d2"></i><i class="e1"></i><i class="e2"></i><i class="e3"></i></span>';
+    box.innerHTML = Object.entries(BG_PATTERNS).map(([id, name]) => `<button class="pattern-opt" type="button" data-bg="${id}"><span class="pattern-thumb" data-bg="${id}" aria-hidden="true"><span class="pv"><span class="light-group"><span class="light-shape"><i></i><i></i><i></i></span>${orbs}</span>${ui}</span></span><span class="pattern-name">${name}</span></button>`).join("");
+  }
   function renderLookScreen() {
     renderAtmoStage();
+    renderPatterns();
     const colors = $("look-colors");
     if (!colors.children.length) {
       const swatch = (value, name, p) => {
