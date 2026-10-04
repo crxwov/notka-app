@@ -2564,19 +2564,31 @@
   // ============================================================
   // SOUND & DOWNLOADS
   // ============================================================
+  // the crossfade, drawn: the first track fades out while the next fades in, over as many seconds as are set
+  function paintCrossfade(val) {
+    const o = (val / 12) * 150; // overlap, in the width of the drawing (300)
+    const l = 150 - o / 2, r = 150 + o / 2;
+    $("xf-path-a").setAttribute("d", `M0,84 L0,22 L${l.toFixed(1)},22 L${r.toFixed(1)},84 Z`);
+    $("xf-path-b").setAttribute("d", `M300,84 L300,22 L${r.toFixed(1)},22 L${l.toFixed(1)},84 Z`);
+    $("crossfade-value").textContent = val === 0 ? "Выкл" : String(val);
+    $("crossfade-unit").textContent = val === 0 ? "" : "сек";
+    $("crossfade-slider").style.setProperty("--p", `${(val / 12) * 100}%`);
+  }
   function renderSoundScreen() {
     const crossfade = Store.getSetting("crossfade") || 0;
     $("crossfade-slider").value = crossfade;
-    $("crossfade-value").textContent = crossfade === 0 ? "Выключен" : `${crossfade} сек`;
+    paintCrossfade(crossfade);
     $("crossfade-note").textContent = volumeWorks
-      ? "Трек мягко затухает в конце и появляется в начале."
+      ? "Трек мягко затухает в конце, а следующий уже набирает громкость."
       : "На этом устройстве Telegram не даёт менять громкость — переход не сработает.";
+    revealIn("screen-sound", true);
   }
   $("sound-back-btn").addEventListener("click", goBack);
   $("crossfade-slider").addEventListener("input", (e) => {
     const val = parseInt(e.target.value, 10) || 0;
     Store.setSetting("crossfade", val);
-    $("crossfade-value").textContent = val === 0 ? "Выключен" : `${val} сек`;
+    paintCrossfade(val);
+    haptic("select");
   });
 
   // ============================================================

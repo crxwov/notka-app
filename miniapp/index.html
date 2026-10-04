@@ -569,19 +569,43 @@
       <div class="bar-title">Звук и загрузки</div>
       <span class="bar-spacer"></span>
     </header>
-    <div class="group">
-      <div class="group-row">
-        <span class="group-label">Нормализация громкости <span class="tag tag-soon">скоро</span></span>
-        <button class="switch" id="toggle-normalize" type="button" role="switch" aria-checked="false" aria-label="Нормализация громкости" disabled><span></span></button>
+    <h1 class="look-title" data-reveal>Звук и загрузки</h1>
+
+    <section class="look-sec snd-sec" data-reveal>
+      <h2 class="look-h">Плавный переход</h2>
+      <div class="xf">
+        <div class="xf-value"><b id="crossfade-value">Выкл</b><span id="crossfade-unit"></span></div>
+        <svg class="xf-fig" viewBox="0 0 300 84" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="xf-a" x1="0" x2="1"><stop offset="0" stop-color="var(--c-core)" stop-opacity="0.75"/><stop offset="1" stop-color="var(--c-warm)" stop-opacity="0.55"/></linearGradient>
+            <linearGradient id="xf-b" x1="0" x2="1"><stop offset="0" stop-color="var(--c-mid)" stop-opacity="0.55"/><stop offset="1" stop-color="var(--c-deep)" stop-opacity="0.9"/></linearGradient>
+          </defs>
+          <path id="xf-path-a" fill="url(#xf-a)" d=""/>
+          <path id="xf-path-b" fill="url(#xf-b)" d=""/>
+        </svg>
+        <input type="range" class="xf-range" id="crossfade-slider" min="0" max="12" value="0" aria-label="Плавный переход, секунды" />
+        <div class="xf-ends"><span>Выкл</span><span>12 с</span></div>
       </div>
-      <div class="group-row group-row-stack">
-        <span class="group-label">Плавный переход<span class="group-sub" id="crossfade-value">Выключен</span></span>
-        <input type="range" class="range" id="crossfade-slider" min="0" max="12" value="0" aria-label="Плавный переход, секунды" />
-        <span class="group-sub" id="crossfade-note">Трек мягко затухает в конце и появляется в начале.</span>
+      <p class="snd-note" id="crossfade-note">Трек мягко затухает в конце, а следующий уже набирает громкость.</p>
+    </section>
+
+    <section class="look-sec snd-sec" data-reveal>
+      <h2 class="look-h">Загрузки</h2>
+      <div class="group snd-how">
+        <div class="group-row group-row-stack"><span class="group-label">Один трек<span class="group-sub">«…» у трека → «Скачать»</span></span></div>
+        <div class="group-row group-row-stack"><span class="group-label">Весь плейлист<span class="group-sub">«…» в плейлисте → «Скачать все треки»</span></span></div>
       </div>
-    </div>
-    <h2 class="group-caption">Загрузки</h2>
-    <div class="group"><p class="group-note">Чтобы сохранить трек на устройство, нажми «…» у трека → «Скачать». Плейлист целиком — «…» в плейлисте → «Скачать все треки». Файлы попадают в загрузки телефона.</p></div>
+      <p class="snd-note">Файлы попадают в загрузки телефона.</p>
+    </section>
+
+    <section class="look-sec snd-sec" data-reveal>
+      <div class="group">
+        <div class="group-row">
+          <span class="group-label">Выравнивание громкости <span class="tag tag-soon">скоро</span><span class="group-sub">Все треки звучат одинаково громко</span></span>
+          <button class="switch" id="toggle-normalize" type="button" role="switch" aria-checked="false" aria-label="Выравнивание громкости" disabled><span></span></button>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- ============ ABOUT ============ -->
@@ -1197,6 +1221,6 @@
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=3"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=60"></script>
+<script src="app.js?v=61"></script>
 </body>
 </html>
