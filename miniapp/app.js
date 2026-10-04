@@ -3115,8 +3115,7 @@
       b.dataset.atmo = id;
       const view = document.createElement("span");
       view.className = "atmo-view";
-      if (id === "none") view.textContent = "Без атмосферы";
-      else for (let i = 0; i < 3; i++) {
+      if (id !== "none") for (let i = 0; i < 3; i++) {
         const piece = document.createElement("i");
         piece.style.cssText = `--x:${[18, 52, 84][i]}%;--d:${[5.2, 6.8, 8.4][i]}s;--w:${[-1.2, -3.4, -5.2][i]}s`;
         view.appendChild(piece);
@@ -3145,7 +3144,7 @@
     if (!box) return;
     if (atmo === "none") {
       atmoOptsFor = null;
-      box.innerHTML = '<p class="atmo-hint">Выбери атмосферу, и здесь появятся её настройки: свет, погода, детали.</p>';
+      box.innerHTML = "";
       return;
     }
     const key = atmo + JSON.stringify(current);
@@ -3223,12 +3222,13 @@
     revealIn("screen-look", true);
     // the theme that is on stands in view
     const on = stage.querySelector(".look-slide.is-on");
-    if (on) stage.scrollLeft = Math.max(0, on.offsetLeft - 20);
+    if (on) stage.scrollLeft = on.offsetLeft - (stage.clientWidth - on.offsetWidth) / 2;
   }
   $("look-stage").addEventListener("click", (e) => {
     const slide = e.target.closest(".look-slide");
     if (!slide) return;
     haptic("light");
+    slide.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
     setPlayerTheme(slide.dataset.theme);
   });
   $("look-colors").addEventListener("click", (e) => {

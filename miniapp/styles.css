@@ -1907,18 +1907,18 @@ body.is-playing .reel { animation-play-state: running; }
    things to pick from (the player with your own cover, orbs of light,
    sleeves), each chapter coming in as it is scrolled to. Whatever is
    picked is seen at once: the screen itself is the preview. */
-.look-title { font-size: clamp(40px, 12.5vw, 54px); line-height: 0.98; font-weight: 800; letter-spacing: -0.045em; margin: 14px 0 0; text-wrap: balance; background: linear-gradient(100deg, var(--c-core), var(--c-warm) 55%, var(--c-mid)); -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: 0.1em; }
-.look-note { font-size: 15px; line-height: 1.45; color: var(--text-2); margin: 10px 2px 0; text-wrap: pretty; }
-.look-sec { margin-top: 40px; }
-.look-h { display: flex; align-items: flex-end; gap: 10px; font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -0.035em; margin: 0 0 18px; }
-.look-n { font-size: 84px; line-height: 0.74; font-weight: 800; letter-spacing: -0.06em; color: transparent; -webkit-text-stroke: 2px rgba(244, 239, 255, 0.55); }
+#screen-look .bar-title { opacity: 0; }
+.look-title { font-size: clamp(38px, 11.5vw, 46px); line-height: 1; font-weight: 800; letter-spacing: -0.04em; margin: 14px 0 0; }
+.look-note { font-size: 15px; line-height: 1.4; color: var(--text-2); margin: 8px 0 0; text-wrap: pretty; max-width: 30em; }
+.look-sec { margin-top: 34px; }
+.look-h { font-size: 22px; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 14px; }
 
 /* 1 — the player: every theme stands here itself, with your cover */
-.look-stage { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px; padding: 6px 20px 10px; scroll-snap-type: x mandatory; scroll-padding-inline: 20px; }
+.look-stage { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px; padding: 6px calc(50% - min(31vw, 125px)) 10px; scroll-snap-type: x mandatory; }
 .look-stage::-webkit-scrollbar { display: none; }
-.look-slide { flex-shrink: 0; width: min(72vw, 286px); display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 16px 16px 18px; border-radius: 30px; text-align: left; scroll-snap-align: start; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line), inset 0 1px 0 rgba(255, 255, 255, 0.1); transition: transform 0.3s var(--ease-out), box-shadow 0.35s var(--ease-out), background-color 0.35s; }
-.look-slide:active { transform: scale(0.98); }
-.look-slide.is-on { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 0 2px var(--text); }
+.look-slide { flex-shrink: 0; width: min(62vw, 250px); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 0 4px; text-align: center; scroll-snap-align: center; opacity: 0.55; transform: scale(0.92); transition: transform 0.55s var(--ease-out), opacity 0.4s var(--ease-out); }
+.look-slide:active { transform: scale(0.88); transition-duration: 0.2s; }
+.look-slide.is-on { opacity: 1; transform: none; }
 .look-obj { width: 100%; height: 200px; display: flex; align-items: center; justify-content: center; }
 .look-std { width: 176px; height: 176px; border-radius: 26px; background: var(--orb-mini) center / cover; box-shadow: 0 26px 44px -18px rgba(4, 2, 10, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
 .look-slide .show-disc { width: 184px; }
@@ -1926,8 +1926,8 @@ body.is-playing .reel { animation-play-state: running; }
 .look-slide .cassette-lines b { font-size: 12px; }
 .look-slide .cassette-lines i { font-size: 10.5px; }
 .look-stage .reel { animation-play-state: running; }
-.look-slide-name { display: flex; align-items: center; gap: 10px; font-size: 24px; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; }
-.look-slide.is-on .look-slide-name::after { content: ""; width: 22px; height: 22px; border-radius: 50%; background: var(--btn-light) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6.5 12.5l3.6 3.6 7.4-8' fill='none' stroke='%230C0A12' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / 16px no-repeat; }
+.look-slide-name { display: flex; align-items: center; gap: 8px; font-size: 17px; line-height: 1.1; font-weight: 700; letter-spacing: -0.015em; }
+.look-slide.is-on .look-slide-name::after { content: ""; width: 20px; height: 20px; border-radius: 50%; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6.5 12.5l3.6 3.6 7.4-8' fill='none' stroke='%230C0A12' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / 16px no-repeat, var(--btn-light); }
 
 /* 2 — the color: orbs of light; and sleeves lying about, to take the colors from */
 .look-swatches { gap: 4px; padding-top: 6px; padding-bottom: 8px; margin-bottom: 18px; scroll-snap-type: none; }
@@ -1949,26 +1949,48 @@ body.is-playing .reel { animation-play-state: running; }
 .is-seen .look-covers .look-cover, .is-seen .look-swatches .swatch { animation: card-in 0.7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 55ms); }
 
 /* 3 — the pattern: the light itself, small, doing what it will do behind everything */
-.pattern-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 30px; }
-.pattern-opt { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 10px 10px 14px; border-radius: 26px; text-align: left; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); transition: transform 0.25s var(--ease-out), box-shadow 0.35s var(--ease-out), background-color 0.35s; }
-.pattern-opt:active { transform: scale(0.97); }
-.pattern-opt.is-on { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 0 2px var(--text); }
-.pattern-opt:last-child:nth-child(odd) { grid-column: span 2; }
-.pattern-name { font-size: 20px; line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; padding: 0 6px; }
-.pattern-thumb { position: relative; display: block; height: 104px; border-radius: 18px; overflow: hidden; background: var(--bg); }
+.pattern-opts { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px 26px; padding: 4px 20px 10px; }
+.pattern-opts::-webkit-scrollbar { display: none; }
+.pattern-opt { position: relative; flex: 0 0 auto; width: 128px; display: flex; flex-direction: column; align-items: stretch; gap: 9px; text-align: left; transition: transform 0.3s var(--ease-out); }
+.pattern-opt:active { transform: scale(0.96); }
+.pattern-name { font-size: 15px; line-height: 1.2; font-weight: 700; padding: 0 2px; }
+.pattern-thumb { position: relative; display: block; height: 164px; border-radius: 24px; overflow: hidden; background: #0A0810; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); outline: 2px solid transparent; outline-offset: 3px; transition: outline-color 0.25s; }
 .pattern-thumb i { position: absolute; display: block; }
 /* every thumbnail holds the same orb… */
-.pattern-thumb::before { content: ""; position: absolute; left: 50%; top: 46%; width: 86px; height: 86px; margin: -43px 0 0 -43px; border-radius: 50%; background: radial-gradient(closest-side, var(--c-core) 0 8%, var(--c-warm) 38%, var(--c-mid) 66%, transparent 100%); animation: core-pulse 4.5s ease-in-out infinite; }
+.pattern-thumb::before { content: ""; position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%; background: radial-gradient(closest-side, var(--c-core) 0 8%, var(--c-warm) 38%, var(--c-mid) 66%, transparent 100%); animation: core-pulse 4.5s ease-in-out infinite; }
 .pt-calm::before { animation: none; }
 /* …and what the pattern adds to it */
 .pt-prism i:nth-child(1), .pt-prism i:nth-child(2) { inset: -60%; border-radius: 50%; mix-blend-mode: screen; -webkit-mask-image: radial-gradient(closest-side, #000 14%, transparent 62%); mask-image: radial-gradient(closest-side, #000 14%, transparent 62%); top: -64%; bottom: -56%; }
 .pt-prism i:nth-child(1) { background: repeating-conic-gradient(from 0deg, transparent 0deg 13deg, color-mix(in srgb, var(--c-core) 55%, transparent) 15.5deg 18.5deg, transparent 21deg 42deg, color-mix(in srgb, var(--c-warm) 50%, transparent) 45deg 53deg, transparent 56deg 72deg); animation: shape-turn 26s linear infinite; }
 .pt-prism i:nth-child(2) { background: repeating-conic-gradient(from 24deg, transparent 0deg 20deg, color-mix(in srgb, var(--c-mid) 50%, transparent) 23deg 30deg, transparent 33deg 60deg); animation: shape-turn 38s linear infinite reverse; }
-.pt-rings i { left: 50%; top: 46%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--c-core) 70%, transparent); opacity: 0; animation: shape-ring 4.5s var(--ease-out) infinite; }
+.pt-rings i { left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--c-core) 70%, transparent); opacity: 0; animation: shape-ring 4.5s var(--ease-out) infinite; }
 .pt-rings i:nth-child(2) { animation-delay: 1.5s; }
 .pt-rings i:nth-child(3) { animation-delay: 3s; }
 .pt-stars i:nth-child(1) { inset: 0 0 -40px 0; background-image: radial-gradient(circle at 20% 30%, #fff 0 1px, transparent 1.6px), radial-gradient(circle at 70% 75%, var(--c-core) 0 1.2px, transparent 1.9px); background-size: 34px 40px; animation: pt-sparks 5s linear infinite, twinkle 2.6s ease-in-out infinite alternate; }
 @keyframes pt-sparks { to { transform: translateY(-40px); } }
+
+/* chosen things wear one mark: a ring round the picture and a tick */
+#screen-look .pattern-opt.is-on .pattern-thumb, #screen-look .atmo-card.is-on .atmo-view { outline-color: var(--text); }
+#screen-look .pattern-opt.is-on .pattern-thumb::after, #screen-look .atmo-card.is-on .atmo-view::after { content: ""; position: absolute; right: 9px; bottom: 9px; width: 22px; height: 22px; border-radius: 50%; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6.5 12.5l3.6 3.6 7.4-8' fill='none' stroke='%230C0A12' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / 16px no-repeat, var(--btn-light); animation: tick-in 0.45s var(--ease-out) both; }
+@keyframes tick-in { from { transform: scale(0.3); opacity: 0; } }
+#screen-look .atmo-stage { gap: 12px; padding-top: 6px; padding-bottom: 2px; }
+#screen-look .look-obj { height: 190px; }
+#screen-look .atmo-card { width: 132px; gap: 9px; }
+#screen-look .atmo-view { width: 132px; height: 178px; border-radius: 24px; }
+#screen-look .atmo-card.is-off .atmo-view { background: rgba(255, 255, 255, 0.07); }
+#screen-look .atmo-name { font-size: 15px; gap: 7px; padding: 0 2px; }
+#screen-look .tag-loot { background: rgba(255, 255, 255, 0.14); color: var(--text); }
+#screen-look .tag-plus { background: rgba(255, 255, 255, 0.14); color: var(--text); }
+#screen-look .atmo-opts { margin-top: 10px; }
+#screen-look .atmo-opts:empty { display: none; }
+#screen-look .atmo-opt-t { font-size: 13px; letter-spacing: 0.01em; }
+#screen-look .look-sub { margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--text); }
+#screen-look .look-covers { gap: 12px; padding-top: 8px; padding-bottom: 12px; }
+#screen-look .look-cover, #screen-look .look-cover:nth-child(even), #screen-look .look-cover:nth-child(3n) { rotate: none; }
+#screen-look .look-cover .cover { width: 76px; height: 76px; border-radius: 16px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+#screen-look .look-cover.is-on .cover { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--text); }
+#screen-look .swatch { width: 80px; font-size: 13px; font-weight: 600; gap: 8px; }
+#screen-look .swatch i { width: 60px; height: 60px; }
 
 .look-try { position: sticky; z-index: 4; bottom: calc(var(--dock) + var(--sab) + 12px); display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 -6px; padding: 8px 8px 8px 18px; border-radius: 999px; font-size: 15px; font-weight: 600; background: rgba(22, 18, 30, 0.95); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 18px 36px -12px rgba(4, 2, 10, 0.9); animation: bar-in 0.5s var(--ease-out) both; }
 .look-try .theme-try-keep { height: 38px; white-space: nowrap; flex-shrink: 0; }
