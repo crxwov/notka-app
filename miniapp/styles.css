@@ -2481,3 +2481,4 @@ body[data-screen="player"] .player-only { display: block; }
 #screen-account .group-row .group-sub { white-space: normal; line-height: 1.35; }
 #screen-account .group-value { max-width: 55%; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .perf-lite .pv *, .perf-lite .pv { animation: none !important; }
+.pattern-thumb[data-bg="lava"] .pv .orb-rim, .pattern-thumb[data-bg="lava"] .pv .orb-rim-b, .pattern-thumb[data-bg="aurora"] .pv .orb-rim, .pattern-thumb[data-bg="aurora"] .pv .orb-rim-b, .pattern-thumb[data-bg="horizon"] .pv .orb-rim, .pattern-thumb[data-bg="horizon"] .pv .orb-rim-b { opacity: 0 !important; }
