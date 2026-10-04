@@ -44,7 +44,7 @@ try {
   check("…as a try: the bar is shown and nothing is saved", !(await b.eval("document.getElementById('look-try').hidden")) && (await saved("light")) === null);
   await b.click('.pattern-opt[data-bg="prism"]');
   await b.sleep(1300);
-  check("a pattern is on at once, added to the same orb", (await b.eval("document.body.dataset.bg")) === "prism" && await b.eval("getComputedStyle(document.querySelector('.light-shape')).opacity > 0.9 && getComputedStyle(document.querySelector('.light-shape i')).animationName === 'shape-turn' && getComputedStyle(document.querySelector('.light-group')).opacity > 0.3"));
+  check("a pattern is on at once, added to the same orb", (await b.eval("document.body.dataset.bg")) === "prism" && await b.eval("getComputedStyle(document.querySelector('.light-shape')).opacity > 0.9 && getComputedStyle(document.querySelector('.light-shape i')).animationName.startsWith('ray-sway') && getComputedStyle(document.querySelector('.light-group')).opacity > 0.3"));
   await b.shot("look-2-ocean-prism");
   await b.eval("document.getElementById('screen-look').scrollTo(0, 99999); true");
   await b.sleep(1300);
