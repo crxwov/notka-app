@@ -223,7 +223,8 @@ body[data-bg="lava"] .light { background: color-mix(in srgb, var(--c-deep) 14%, 
 [data-bg="lava"] .orb-orange { inset: -18% 34% 50% -12%; animation-name: lava-c; }
 [data-bg="lava"] .orb-rim { inset: 52% -18% -24% 26%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c-mid) 85%, transparent), color-mix(in srgb, var(--c-mid) 25%, transparent) 60%, transparent); opacity: 0.8 !important; animation-name: lava-b; animation-duration: 23s; }
 [data-bg="lava"] .orb-rim-b { inset: -16% -14% 56% 36%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c-warm) 80%, transparent), color-mix(in srgb, var(--c-warm) 22%, transparent) 62%, transparent); opacity: 0.7 !important; animation-name: lava-c; animation-duration: 19s; }
-[data-bg="aurora"] .orb-rim, [data-bg="aurora"] .orb-rim-b, [data-bg="horizon"] .orb-rim, [data-bg="horizon"] .orb-rim-b { opacity: 0 !important; }
+[data-bg="aurora"] .orb-rim, [data-bg="aurora"] .orb-rim-b, [data-bg="horizon"] .orb-rim, [data-bg="horizon"] .orb-rim-b, [data-bg="prism"] .orb-rim, [data-bg="prism"] .orb-rim-b { opacity: 0 !important; }
+[data-bg="prism"] .orb-core { inset: 32%; opacity: 1 !important; }
 [data-bg="lava"] .orb-core { inset: 16% 40% 52% 22%; opacity: 0.28 !important; }
 /* a little shade over the field, so white text keeps its contrast on any colour */
 body[data-bg="lava"] .light::after, .pattern-thumb[data-bg="lava"] .pv::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 6, 14, 0.36), rgba(8, 6, 14, 0.58)); pointer-events: none; }
@@ -2502,4 +2503,4 @@ body[data-screen="player"] .player-only { display: block; }
 #screen-account .group-row .group-sub { white-space: normal; line-height: 1.35; }
 #screen-account .group-value { max-width: 55%; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .perf-lite .pv *, .perf-lite .pv { animation: none !important; }
-.pattern-thumb[data-bg="aurora"] .pv .orb-rim, .pattern-thumb[data-bg="aurora"] .pv .orb-rim-b, .pattern-thumb[data-bg="horizon"] .pv .orb-rim, .pattern-thumb[data-bg="horizon"] .pv .orb-rim-b { opacity: 0 !important; }
+.pattern-thumb[data-bg="prism"] .pv .orb-rim, .pattern-thumb[data-bg="prism"] .pv .orb-rim-b, .pattern-thumb[data-bg="aurora"] .pv .orb-rim, .pattern-thumb[data-bg="aurora"] .pv .orb-rim-b, .pattern-thumb[data-bg="horizon"] .pv .orb-rim, .pattern-thumb[data-bg="horizon"] .pv .orb-rim-b { opacity: 0 !important; }
