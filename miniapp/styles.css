@@ -199,15 +199,16 @@ body[data-screen="player"] .light-art.is-shown { opacity: 0.85; -webkit-mask-ima
 body[data-bg="horizon"][data-screen="home"] .light-group { --y: 92vh; --s: 1.25; }
 body[data-bg="horizon"][data-screen="player"] .light-group { --y: 66vh; --s: 1.7; }
 
-/* ЛАВА: three lobes of the light part and wander round each other */
-[data-bg="lava"] .orb-violet { inset: 46% 40% -2% -22%; animation-name: lava-a; }
-[data-bg="lava"] .orb-magenta { inset: -4% -22% 48% 42%; animation-name: lava-b; }
-[data-bg="lava"] .orb-orange { inset: 26% 4% 20% 30%; animation-name: lava-c; }
+/* ЛАВА: big lobes of the light overlap, so their colours melt into each other, and rise and sink like wax in a lamp */
+[data-bg="lava"] .light-group { --s: 1.12; }
+[data-bg="lava"] .orb-violet { inset: 34% -24% -26% -24%; animation-name: lava-a; }
+[data-bg="lava"] .orb-magenta { inset: 8% -8% 22% 0%; animation-name: lava-b; }
+[data-bg="lava"] .orb-orange { inset: -14% 12% 46% 14%; animation-name: lava-c; }
 /* no crescents in these: they would read as rings */
 [data-bg="lava"] .orb-rim, [data-bg="lava"] .orb-rim-b, [data-bg="aurora"] .orb-rim, [data-bg="aurora"] .orb-rim-b, [data-bg="horizon"] .orb-rim, [data-bg="horizon"] .orb-rim-b { opacity: 0 !important; }
-@keyframes lava-a { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(38%, -22%) scale(1.12); } 100% { transform: translate(14%, 18%) scale(0.92); } }
-@keyframes lava-b { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-40%, 20%) scale(0.9); } 100% { transform: translate(-12%, -16%) scale(1.1); } }
-@keyframes lava-c { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(24%, 34%) scale(1.1); } 100% { transform: translate(-22%, -12%) scale(0.94); } }
+@keyframes lava-a { 0% { transform: translate(-6%, 8%) scale(1.04); } 50% { transform: translate(8%, -26%) scale(0.92); } 100% { transform: translate(-4%, 14%) scale(1.08); } }
+@keyframes lava-b { 0% { transform: translate(8%, -10%) scale(0.96); } 50% { transform: translate(-10%, 22%) scale(1.08); } 100% { transform: translate(6%, -18%) scale(0.94); } }
+@keyframes lava-c { 0% { transform: translate(-6%, 24%) scale(0.9); } 50% { transform: translate(10%, -12%) scale(1.1); } 100% { transform: translate(-8%, 30%) scale(0.92); } }
 
 @keyframes sparks-a { to { transform: translateY(-150px); } }
 @keyframes sparks-b { to { transform: translateY(-110px); } }

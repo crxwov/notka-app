@@ -9,10 +9,9 @@ await b.eval(`localStorage.clear(); localStorage.setItem("notka_state_v2", ${JSO
 await b.goto(`${BASE}/app/`);
 await b.waitFor("!!document.body && document.body.dataset.screen !== 'splash'", 8000, "x");
 await b.sleep(1500);
-for (const bg of ["light", "prism", "aurora", "horizon", "lava"]) {
+for (const bg of (process.argv[2] ? [process.argv[2]] : ["light", "prism", "aurora", "horizon", "lava"])) {
   await b.eval(`document.body.dataset.bg = ${JSON.stringify(bg)}; true`);
-  await b.sleep(1800);
-  await b.shot("bg-" + bg);
+  for (const t of [1800, 3500, 3500]) { await b.sleep(t); await b.shot("bg-" + bg + "-" + t + Math.random().toString(36).slice(2, 4)); }
 }
 console.log(b.errors.filter((e) => !/Haptic/.test(e)).join("|").slice(0, 300) || "ok");
 await b.close();
