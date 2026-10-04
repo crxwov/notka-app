@@ -187,7 +187,9 @@ body[data-screen="player"] .light-art.is-shown { opacity: 0.85; -webkit-mask-ima
 @keyframes shape-turn { to { transform: rotate(360deg); } }
 
 /* СИЯНИЕ: the orb is pulled into a wide ribbon that sways across the screen */
-[data-bg="aurora"] .light-group { width: calc(var(--size) * 1.75); height: calc(var(--size) * 0.5); }
+[data-bg="aurora"] .light-group { width: calc(var(--size) * 1.9); height: calc(var(--size) * 0.62); }
+[data-bg="aurora"] .orb-core { opacity: 1 !important; }
+[data-bg="aurora"] .orb { filter: saturate(1.35) brightness(1.2); }
 [data-bg="aurora"] .orb-violet { animation-name: aurora-a; }
 [data-bg="aurora"] .orb-magenta { animation-name: aurora-b; }
 [data-bg="aurora"] .orb-orange { animation-name: aurora-c; }
@@ -216,7 +218,7 @@ body[data-bg="horizon"][data-screen] .light-group { --y: 92vh; --s: 1; }
 /* ЛАВА: a field of five big soft blobs fills the whole screen, one colour each, and they wander (the manner of Apple Music) */
 body[data-bg="lava"][data-screen] .light-group { --y: 50vh; --s: 1; }
 [data-bg="lava"] .light-group { width: var(--lw, 150vw); height: var(--lh, 120vh); }
-body[data-bg="lava"] .light { background: color-mix(in srgb, var(--c-deep) 14%, var(--bg)); }
+body[data-bg="lava"] .light { background: color-mix(in srgb, var(--c-deep) 24%, var(--bg)); }
 [data-bg="lava"] .orb { opacity: 1; }
 [data-bg="lava"] .orb-violet { inset: 38% 28% -22% -22%; animation-name: lava-a; }
 [data-bg="lava"] .orb-magenta { inset: 18% -26% 18% 40%; animation-name: lava-b; }
@@ -225,9 +227,9 @@ body[data-bg="lava"] .light { background: color-mix(in srgb, var(--c-deep) 14%, 
 [data-bg="lava"] .orb-rim-b { inset: -16% -14% 56% 36%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c-warm) 80%, transparent), color-mix(in srgb, var(--c-warm) 22%, transparent) 62%, transparent); opacity: 0.7 !important; animation-name: lava-c; animation-duration: 19s; }
 [data-bg="aurora"] .orb-rim, [data-bg="aurora"] .orb-rim-b, [data-bg="horizon"] .orb-rim, [data-bg="horizon"] .orb-rim-b, [data-bg="prism"] .orb-rim, [data-bg="prism"] .orb-rim-b { opacity: 0 !important; }
 [data-bg="prism"] .orb-core { inset: 32%; opacity: 1 !important; }
-[data-bg="lava"] .orb-core { inset: 16% 40% 52% 22%; opacity: 0.28 !important; }
+[data-bg="lava"] .orb-core { inset: 16% 40% 52% 22%; opacity: 0.45 !important; }
 /* a little shade over the field, so white text keeps its contrast on any colour */
-body[data-bg="lava"] .light::after, .pattern-thumb[data-bg="lava"] .pv::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 6, 14, 0.36), rgba(8, 6, 14, 0.58)); pointer-events: none; }
+body[data-bg="lava"] .light::after, .pattern-thumb[data-bg="lava"] .pv::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 6, 14, 0.1), rgba(8, 6, 14, 0.34)); pointer-events: none; }
 @keyframes lava-a { 0% { transform: translate(-6%, 4%) scale(1.04); } 50% { transform: translate(14%, -10%) scale(0.94); } 100% { transform: translate(4%, 12%) scale(1.1); } }
 @keyframes lava-b { 0% { transform: translate(6%, -6%) scale(0.96); } 50% { transform: translate(-14%, 10%) scale(1.1); } 100% { transform: translate(-2%, -12%) scale(0.94); } }
 @keyframes lava-c { 0% { transform: translate(-8%, 8%) scale(0.94); } 50% { transform: translate(12%, 16%) scale(1.08); } 100% { transform: translate(8%, -8%) scale(0.96); } }
@@ -1994,7 +1996,7 @@ body.is-playing .reel { animation-play-state: running; }
 .pattern-thumb .pv .orb-core { opacity: 0.95 !important; }
 .pattern-thumb[data-bg="horizon"] .pv .light-group { --y: 620px !important; --s: 1 !important; }
 .pattern-thumb[data-bg="lava"] .pv .light-group { --lw: 585px; --lh: 810px; --y: 337px !important; --s: 1 !important; }
-.pattern-thumb[data-bg="lava"] { background: color-mix(in srgb, var(--c-deep) 14%, var(--bg)); }
+.pattern-thumb[data-bg="lava"] { background: color-mix(in srgb, var(--c-deep) 24%, var(--bg)); }
 .pv-ui { position: absolute; inset: 0; z-index: 1; }
 .pv-ui i { position: absolute; display: block; }
 /* only what the light sits behind on the home screen: the play button, the name, the dock */
