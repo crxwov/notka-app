@@ -202,3 +202,13 @@ body.quote-picking .player-foot { opacity: 0; pointer-events: none; }
 .quote-stage img { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; border-radius: var(--radius-m); transition: opacity 0.25s var(--ease-out); }
 #quote-share-btn { flex: none; width: auto; margin: 0 10px; }
 body.quote-sheet-open .quote-bar { display: none; }
+
+/* свайп по плееру: обложка и название едут за пальцем и возвращаются, новый трек въезжает сбоку */
+.screen-player { touch-action: pan-y; }
+.player-art-wrap, .player-meta { transition: transform 0.35s var(--ease-out), opacity 0.35s var(--ease-out); }
+@keyframes swipe-in-right { from { transform: translateX(46px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes swipe-in-left { from { transform: translateX(-46px); opacity: 0; } to { transform: none; opacity: 1; } }
+.swipe-in-right { animation: swipe-in-right 0.4s var(--ease-out) both; }
+.swipe-in-left { animation: swipe-in-left 0.4s var(--ease-out) both; }
+.screen-player { -webkit-user-select: none; user-select: none; }
+.screen-player img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }

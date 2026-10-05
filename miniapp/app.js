@@ -4114,7 +4114,7 @@
   $("plus-recap-btn").addEventListener("click", openRecap);
 
   // карточка как картинка
-  const loadShareImg = (url) => new Promise((resolve) => {
+  const loadShareImgOnce = (url) => new Promise((resolve) => {
     if (!url) { resolve(null); return; }
     const img = new Image();
     const timer = setTimeout(() => resolve(null), 8000);
@@ -4123,6 +4123,8 @@
     img.onerror = () => { clearTimeout(timer); resolve(null); };
     img.src = url;
   });
+  // обложка иногда не успевает с первого раза: одна повторная попытка
+  const loadShareImg = async (url) => (await loadShareImgOnce(url)) || (await loadShareImgOnce(url));
   function coverFit(ctx, img, x, y, w, h) {
     const k = Math.max(w / img.width, h / img.height);
     const iw = w / k, ih = h / k;
@@ -4415,33 +4417,33 @@
     ctx.fillText("Нотка", pad + 76, 124);
 
     if (style === "light") {
-      // как текст в плеере Нотки: строки одного размера, слева, поющаяся горит, соседние приглушены
+      // как текст в плеере Нотки: слева, поющаяся строка горит и чуть крупнее, соседние приглушены
       const cw = W - pad * 2;
       const prev = quoteCtx.before.length ? quoteCtx.before[quoteCtx.before.length - 1] : "";
       const next = quoteCtx.after.length ? quoteCtx.after[0] : "";
       const regionTop = 190, regionBottom = H - 60 - 250 - 36, regionH = regionBottom - regionTop;
       let layout = null;
-      for (const size of [96, 90, 84, 78, 72, 66, 60, 54]) {
-        ctx.font = `700 ${size}px ${F}`;
-        const wrapGroup = (arr, cap) => arr.reduce((acc, ln) => acc.concat(wrapLines(ctx, ln, cw, 9)), []).slice(0, cap);
-        const g = [wrapGroup(prev ? [prev] : [], 2), wrapGroup(lines, 9), wrapGroup(next ? [next] : [], 2)];
-        const count = g[0].length + g[1].length + g[2].length;
+      for (const size of [82, 76, 70, 64, 58, 52, 48]) {
+        const big = Math.round(size * 1.3);
+        const wrapGroup = (arr, cap, fs) => { ctx.font = `700 ${fs}px ${F}`; return arr.reduce((acc, ln) => acc.concat(wrapLines(ctx, ln, cw, 9)), []).slice(0, cap); };
+        const g = [wrapGroup(prev ? [prev] : [], 2, size), wrapGroup(lines, 9, big), wrapGroup(next ? [next] : [], 2, size)];
         const gaps = (g[0].length ? 1 : 0) + (g[2].length ? 1 : 0);
-        const h = count * size * 1.2 + gaps * size * 0.45;
-        layout = { size, g, h };
+        const h = (g[0].length + g[2].length) * size * 1.2 + g[1].length * big * 1.14 + gaps * size * 0.5;
+        layout = { size, big, g, h };
         if (h <= regionH) break;
       }
-      const { size: S, g: groups, h: blockH } = layout;
-      const slh = S * 1.2;
+      const { size: S, big: BIG, g: groups, h: blockH } = layout;
       let y = regionTop + (regionH - Math.min(blockH, regionH)) / 2;
-      ctx.font = `700 ${S}px ${F}`;
       groups.forEach((grp, gi) => {
         if (!grp.length) return;
+        const fs = gi === 1 ? BIG : S;
+        ctx.font = `${gi === 1 ? 800 : 700} ${fs}px ${F}`;
         ctx.fillStyle = gi === 1 ? "#fff" : gi === 0 ? "rgba(255,255,255,0.36)" : "rgba(255,255,255,0.5)";
         if (gi === 1) { ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 2; }
-        grp.forEach((ln) => { ctx.fillText(ln, pad, y + S * 0.9); y += slh; });
+        const lhh = gi === 1 ? fs * 1.14 : fs * 1.2;
+        grp.forEach((ln) => { ctx.fillText(ln, pad, y + fs * 0.88); y += lhh; });
         ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-        y += S * 0.45;
+        y += S * 0.5;
       });
       // плеер
       const sx = 60, sh = 250, sy = H - 60 - sh, sw = W - 120;
@@ -5515,6 +5517,62 @@
   };
   artWrap.addEventListener("pointerup", endArtGrab);
   artWrap.addEventListener("pointercancel", endArtGrab);
+
+  // ---- свайп по плееру: влево — следующий трек, вправо — предыдущий
+  const playerScreen = $("screen-player");
+  let swipe = null;
+  const swipeTargets = () => [document.querySelector(".player-art-wrap"), document.querySelector(".player-meta")];
+  playerScreen.addEventListener("pointerdown", (e) => {
+    if (!currentTrack || e.pointerType === "mouse" && e.button !== 0) return;
+    if (document.body.classList.contains("quote-picking") || openOverlays.length) return;
+    if (e.target.closest("button, input, a, textarea, #player-progress-track, .scrub-times, .theme-try")) return;
+    // у винила, диска и кассеты палец на самой обложке крутит и перематывает, свайп тут не нужен
+    if (artTheme() !== "standard" && !document.body.classList.contains("lyrics-open")) {
+      const el = artTheme() === "cassette" ? playerCassette : $("player-art");
+      const r = el.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return;
+    }
+    swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, locked: false, t: performance.now() };
+  });
+  playerScreen.addEventListener("pointermove", (e) => {
+    if (!swipe || e.pointerId !== swipe.id) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    if (!swipe.locked) {
+      if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; } // это вертикальный жест: текст, закрытие
+      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      swipe.locked = true;
+      try { playerScreen.setPointerCapture(e.pointerId); } catch (err) { /* works without capture */ }
+    }
+    swipe.dx = dx;
+    const k = Math.max(-1, Math.min(1, dx / 220));
+    swipeTargets().forEach((el) => { if (!el) return; el.style.transition = "none"; el.style.transform = `translateX(${dx * 0.55}px)`; el.style.opacity = String(1 - Math.abs(k) * 0.55); });
+  });
+  const endSwipe = (e) => {
+    if (!swipe || (e && e.pointerId !== swipe.id)) return;
+    const s = swipe;
+    swipe = null;
+    if (!s.locked) return;
+    const speed = Math.abs(s.dx) / Math.max(1, performance.now() - s.t);
+    const go = e && e.type === "pointerup" && (Math.abs(s.dx) > 80 || (Math.abs(s.dx) > 40 && speed > 0.5));
+    swipeTargets().forEach((el) => { if (!el) return; el.style.transition = ""; el.style.transform = ""; el.style.opacity = ""; });
+    if (!go) return;
+    haptic("light");
+    const dir = s.dx < 0 ? 1 : -1;
+    const token0 = playToken;
+    playAdjacent(dir);
+    // новый трек въезжает с той стороны, куда ушёл прежний
+    if (playToken !== token0) {
+      swipeTargets().forEach((el) => {
+        if (!el) return;
+        el.classList.remove("swipe-in-left", "swipe-in-right");
+        void el.offsetWidth;
+        el.classList.add(dir > 0 ? "swipe-in-right" : "swipe-in-left");
+        setTimeout(() => el.classList.remove("swipe-in-left", "swipe-in-right"), 450);
+      });
+    }
+  };
+  playerScreen.addEventListener("pointerup", endSwipe);
+  playerScreen.addEventListener("pointercancel", endSwipe);
   let lastPositionSync = 0;
 
   // Telegram's in-app WebView frequently misjudges the *real* length of
