@@ -45,13 +45,14 @@
   function perfGuard() {
     const root = document.documentElement;
     const KEY = "notka_perf";
+    const AUTO_LITE = false;
     let saved = "";
     try { saved = localStorage.getItem(KEY) || ""; } catch (e) { /* storage may be blocked */ }
-    const weakHw = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 4) <= 2;
-    if (saved === "lite" || weakHw) root.classList.add("perf-lite");
+    // автоматический облегчённый режим пока выключен (AUTO_LITE = false), в том числе старая отметка из памяти
+    if (AUTO_LITE && saved === "lite") root.classList.add("perf-lite");
     let probing = false;
     function probe() {
-      if (probing || root.classList.contains("perf-lite")) return;
+      if (!AUTO_LITE || probing || root.classList.contains("perf-lite")) return;
       probing = true;
       const dts = [];
       let last = 0;

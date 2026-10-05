@@ -14,7 +14,7 @@
 .display, .look-title, .mood-title, .plus-title, .event-title {
   font-size: var(--t-title); line-height: 1; font-weight: 800; letter-spacing: -0.04em;
 }
-.display.page-title { margin: 14px 0 22px; }
+.display.page-title { margin: 12px 0 18px; }
 
 /* имя в центре */
 .hero-title, .about-hero .hero-title { font-size: var(--t-hero); line-height: 1.12; font-weight: 800; letter-spacing: -0.03em; }
@@ -47,3 +47,18 @@
 /* заголовок экрана сразу под кнопкой «назад»; заголовок «Статистика», «Добавить треки», «Редактировать» — такие же, как у «Оформления» */
 .screen > .look-title + .chips, .screen > .look-title + .field, .screen > .look-title + p { margin-top: 18px; }
 .atmo-opt-row .chip { height: 38px; font-size: 15px; padding: 0 16px; }
+
+/* круглое остаётся круглым (исполнители, аватары), даже если размер задаёт скругление */
+.cover-round, .cover-lg.cover-round, .cover-sm.cover-round, .cover-md.cover-round { border-radius: 50%; }
+
+/* Аккаунт: фото и имя в одну строку слева, под большим заголовком (а не по центру поверх него) */
+#screen-account .hero-profile { display: grid; grid-template-columns: auto 1fr; column-gap: 18px; align-items: center; justify-items: start; text-align: left; padding: 6px 0 0; margin: 18px 0 var(--gap-sec); }
+#screen-account .hero-profile .cover-edit-wrap { grid-row: 1 / span 2; }
+#screen-account .hero-profile .avatar-lg { width: 84px; height: 84px; font-size: 34px; margin: 0; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16), 0 18px 36px -12px color-mix(in srgb, var(--c-mid) 80%, transparent); }
+#screen-account .hero-profile .cover-edit { width: 34px; height: 34px; bottom: -2px; right: -6px; }
+#screen-account .hero-profile .hero-name-btn { grid-column: 2; align-self: end; display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-hero); font-weight: 800; letter-spacing: -0.03em; min-height: 0; padding: 0; }
+#screen-account .hero-profile .hero-sub { grid-column: 2; align-self: start; margin-top: 2px; }
+#screen-account .hero-profile:has(.hero-sub:empty) .hero-name-btn { grid-row: 1 / span 2; align-self: center; }
+
+/* Плюс: над плашкой с ценой контент плавно гаснет, а не упирается в её край */
+.plus-bar::before { content: ""; position: absolute; left: -12px; right: -12px; top: -40px; height: 40px; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.85)); }
