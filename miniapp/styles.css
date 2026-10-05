@@ -1551,20 +1551,19 @@ button.group-row:active { background: var(--surface-1); }
 
 /* the price: a bar that stays at hand over the page */
 #screen-plus { padding-bottom: calc(var(--sab) + 28px); }
-.plus-bar { position: sticky; z-index: 4; bottom: calc(var(--sab) + 10px); margin: 0 -8px 4px; padding: 8px; border-radius: 28px; background: rgba(22, 18, 30, 0.95); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 22px 44px -14px rgba(4, 2, 10, 0.9); animation: bar-in 0.7s var(--ease-out) 0.35s both; }
+.plus-bar { position: sticky; z-index: 4; bottom: calc(var(--sab) + 10px); margin: 0 0 4px; padding: 12px; border-radius: 28px; background: rgba(22, 18, 30, 0.95); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 22px 44px -14px rgba(4, 2, 10, 0.9); animation: bar-in 0.7s var(--ease-out) 0.35s both; }
 @keyframes bar-in { from { opacity: 0; transform: translateY(40px); } }
-.plus-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
-.plus-plan { display: flex; align-items: baseline; justify-content: center; gap: 6px; height: 38px; padding: 0 10px; border-radius: 999px; font-size: 13px; line-height: 38px; white-space: nowrap; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--line); transition: background-color 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out), transform 0.2s var(--ease-out); }
-.plus-plan b { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
-.plus-plan:active { transform: scale(0.97); }
-.plus-plan.is-on { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 0 2px var(--text); }
 .plus-buy { height: 50px; font-size: 17px; }
-.plus-bar-note { font-size: 12.5px; line-height: 1.35; color: var(--text-3); text-align: center; padding: 6px 8px 0; }
-.plus-bar.is-active .plus-plans { display: none; }
+.plus-bar-head { font-size: 19px; line-height: 1.2; font-weight: 800; letter-spacing: -0.02em; padding: 4px 44px 0 6px; }
+.plus-bar-note { font-size: 13.5px; line-height: 1.35; color: var(--text-2); padding: 3px 6px 12px; }
+.plus-bar-close { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); background: rgba(255, 255, 255, 0.08); }
+.plus-bar-close:active { transform: scale(0.9); }
+.plus-bar.is-dismissed { display: none; }
+.plus-bar.is-active .plus-bar-head { display: none; }
 .plus-promo-link { display: flex; margin: 6px auto 0; min-height: 36px; font-size: 14px; color: var(--text-2); }
 .plus-bar.is-active ~ .plus-promo-link { display: none; }
 .plus-bar.is-real .plus-buy { display: none; }
-.plus-bar.is-real .plus-bar-note { font-size: 16px; font-weight: 600; color: var(--text); padding: 12px 8px; }
+.plus-bar.is-real .plus-bar-note { font-size: 16px; font-weight: 600; color: var(--text); padding: 6px 44px 6px 6px; }
 
 /* the promo code */
 .promo-input { text-align: center; font-size: 22px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }

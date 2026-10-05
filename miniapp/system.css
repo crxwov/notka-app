@@ -61,4 +61,4 @@
 #screen-account .hero-profile:has(.hero-sub:empty) .hero-name-btn { grid-row: 1 / span 2; align-self: center; }
 
 /* Плюс: над плашкой с ценой контент плавно гаснет, а не упирается в её край */
-.plus-bar::before { content: ""; position: absolute; left: -12px; right: -12px; top: -40px; height: 40px; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.85)); }
+.plus-bar::before { content: ""; position: absolute; left: -4px; right: -4px; top: -40px; height: 40px; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.85)); }

@@ -2832,7 +2832,6 @@
   function longDate(seconds) {
     return new Date(seconds * 1000).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
   }
-  let plusPlan = "month";
   function syncPlusUI() {
     const on = hasPlus();
     const real = hasRealPlus();
@@ -2840,23 +2839,16 @@
     renderFriendBadge();
     $("plus-bar").classList.toggle("is-active", on);
     $("plus-bar").classList.toggle("is-real", real);
-    $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";
+    $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать бесплатно";
     $("plus-bar-note").textContent = real
       ? `Плюс включён до ${longDate(plusUntil())}`
       : on
       ? "Плюс включён в режиме предпросмотра. Оплата не списывалась."
-      : `Потом ${plusPlan === "year" ? "600 ★ в год" : "75 ★ в месяц"}. Отмена в любой момент.`;
+      : "Потом 89 ₽ в месяц. Отмена в любой момент.";
   }
-  $("plus-plans").addEventListener("click", (e) => {
-    const plan = e.target.closest(".plus-plan");
-    if (!plan) return;
-    plusPlan = plan.dataset.plan;
-    $("plus-plans").querySelectorAll(".plus-plan").forEach((p) => {
-      p.classList.toggle("is-on", p === plan);
-      p.setAttribute("aria-checked", p === plan ? "true" : "false");
-    });
+  $("plus-bar-close").addEventListener("click", () => {
     haptic("light");
-    syncPlusUI();
+    $("plus-bar").classList.add("is-dismissed");
   });
 
   // The stage on top of the page: the themes play live, with the cover of
@@ -2879,6 +2871,7 @@
     $("plus-cassette-artist").textContent = track ? track.artist || "" : "в Нотке Плюс";
     fillPlusLive();
     syncPlusUI();
+    $("plus-bar").classList.remove("is-dismissed"); // плашка возвращается при каждом заходе
     revealIn("screen-plus", true);
     if (plusWheel) plusWheel.intro();
     setTimeout(perfProbe, 1800);
