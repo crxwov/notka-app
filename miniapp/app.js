@@ -4027,6 +4027,7 @@
     el.dataset.v = String(i % 4);
     const add = (cls, text, tag) => { const n = document.createElement(tag || "span"); n.className = cls; n.textContent = text; el.appendChild(n); return n; };
     if (card.type === "artist") {
+      el.classList.add("has-photo");
       const ph = document.createElement("span");
       ph.className = "rcp-photo";
       const cv = document.createElement("span");
@@ -4140,88 +4141,108 @@
     if (line) lines.push(line);
     return lines.slice(0, maxLines);
   }
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  function lumOf(color) {
+    try {
+      const c = document.createElement("canvas"); c.width = c.height = 1;
+      const x = c.getContext("2d", { willReadFrequently: true });
+      x.fillStyle = color; x.fillRect(0, 0, 1, 1);
+      const d = x.getImageData(0, 0, 1, 1).data;
+      return (0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2]) / 255;
+    } catch (e) { return 0.5; }
+  }
+  function themeColors() {
+    const css = getComputedStyle(document.documentElement);
+    const col = (n, d) => (css.getPropertyValue(n) || d).trim() || d;
+    return { core: col("--c-core", "#FFE2D2"), warm: col("--c-warm", "#EE905A"), mid: col("--c-mid", "#CF5A68"), deep: col("--c-deep", "#47204E") };
+  }
+  // логотип Нотки для картинок: нота с шаром
+  function drawLogo(ctx, x, y, size, color) {
+    ctx.save();
+    ctx.translate(x, y);
+    const k = size / 24;
+    ctx.scale(k, k);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(9, 16.6, 5.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 2.3; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(13.8, 16.6); ctx.lineTo(13.8, 3.4); ctx.bezierCurveTo(16.4, 3.9, 19, 5.6, 19.7, 9); ctx.stroke();
+    ctx.restore();
+  }
+  const SHARE_FONT = "Onest, system-ui, -apple-system, sans-serif";
   async function renderRecapImage(card, index) {
     try { await document.fonts.load("800 100px Onest"); } catch (e) { /* the system font is fine */ }
-    const W = 1080, H = 1350;
+    const W = 1080, H = 1350, F = SHARE_FONT;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
-    const css = getComputedStyle(document.documentElement);
-    const col = (n, d) => (css.getPropertyValue(n) || d).trim() || d;
-    const warm = col("--c-warm", "#EE905A"), mid = col("--c-mid", "#CF5A68"), deep = col("--c-deep", "#47204E");
+    const th = themeColors();
     const v = index % 4;
-    const pairs = [[warm, deep], [mid, deep], [deep, "#16101f"], [mid, deep]];
-    const g = ctx.createLinearGradient(0, 0, W * 0.5, H);
-    g.addColorStop(0, pairs[v][0]); g.addColorStop(1, pairs[v][1]);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    const shade = ctx.createLinearGradient(0, 0, 0, H);
-    shade.addColorStop(0, "rgba(10,6,16,0.0)"); shade.addColorStop(1, "rgba(10,6,16,0.45)");
-    ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
-    const F = "Onest, system-ui, -apple-system, sans-serif";
-    const pad = 84;
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    ctx.font = `700 40px ${F}`;
-    ctx.textBaseline = "alphabetic";
+    const dark = "#1b0d14";
+    const scheme = [{ bg: th.warm, fg: dark, soft: "rgba(27,13,20,0.68)" }, { bg: th.core, fg: dark, soft: "rgba(27,13,20,0.68)" }, { bg: th.mid, fg: "#fff", soft: "rgba(255,255,255,0.8)" }, { bg: th.deep, fg: th.core, soft: "rgba(255,255,255,0.7)" }][v];
+    let fg = scheme.fg, soft = scheme.soft;
+    ctx.fillStyle = scheme.bg; ctx.fillRect(0, 0, W, H);
     if (card.type === "artist") {
+      ctx.fillStyle = th.deep; ctx.fillRect(0, 0, W, H);
       const img = await loadShareImg(card.photo ? hiResArtwork(card.photo) : null);
-      if (img) {
-        coverFit(ctx, img, 0, 0, W, H);
-        const sh = ctx.createLinearGradient(0, 0, 0, H);
-        sh.addColorStop(0, "rgba(10,6,16,0.55)"); sh.addColorStop(0.4, "rgba(10,6,16,0.05)"); sh.addColorStop(1, "rgba(10,6,16,0.9)");
-        ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H);
-      }
+      if (img) coverFit(ctx, img, 0, 0, W, H);
+      const sh = ctx.createLinearGradient(0, 0, 0, H);
+      sh.addColorStop(0, "rgba(10,6,16,0.5)"); sh.addColorStop(0.38, "rgba(10,6,16,0.04)"); sh.addColorStop(1, "rgba(10,6,16,0.86)");
+      ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H);
+      fg = "#fff"; soft = "rgba(255,255,255,0.8)";
     }
-    ctx.fillStyle = "rgba(255,255,255,0.82)";
-    ctx.font = `700 42px ${F}`;
+    const pad = 84;
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = soft; ctx.font = `700 42px ${F}`;
     ctx.fillText(card.kicker, pad, 40 + pad);
-    ctx.textAlign = "right";
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = `800 34px ${F}`;
-    ctx.fillText("Нотка", W - pad, 40 + pad);
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#fff";
+    drawLogo(ctx, W - pad - 52, pad - 4, 52, soft);
+    ctx.fillStyle = fg;
     if (card.type === "minutes") {
       const num = card.minutes.toLocaleString("ru-RU");
-      const size = num.length >= 6 ? 250 : num.length >= 4 ? 300 : 360;
+      const size = num.length >= 6 ? 270 : num.length >= 4 ? 330 : 400;
       ctx.font = `800 ${size}px ${F}`;
-      ctx.fillText(num, pad - 8, H - 360);
-      ctx.font = `800 70px ${F}`;
-      ctx.fillText(card.word, pad, H - 270);
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.font = `500 42px ${F}`;
-      wrapLines(ctx, `${card.note} ${card.tracks} ${plural(card.tracks, "трек", "трека", "треков")}, ${card.artists} ${plural(card.artists, "исполнитель", "исполнителя", "исполнителей")}.`, W - pad * 2, 3).forEach((l, i) => ctx.fillText(l, pad, H - 190 + i * 56));
+      ctx.fillText(num, pad - 10, H - 380);
+      ctx.font = `800 76px ${F}`;
+      ctx.fillText(card.word, pad, H - 285);
+      ctx.fillStyle = soft; ctx.font = `500 42px ${F}`;
+      wrapLines(ctx, `${card.note} ${card.tracks} ${plural(card.tracks, "трек", "трека", "треков")}, ${card.artists} ${plural(card.artists, "исполнитель", "исполнителя", "исполнителей")}.`, W - pad * 2, 3).forEach((l, i) => ctx.fillText(l, pad, H - 200 + i * 56));
     } else if (card.type === "artist") {
-      ctx.font = `800 120px ${F}`;
+      ctx.font = `800 128px ${F}`;
       const lines = wrapLines(ctx, card.name, W - pad * 2, 3);
-      lines.forEach((l, i) => ctx.fillText(l, pad, H - 200 - (lines.length - 1 - i) * 120));
-      ctx.font = `800 62px ${F}`;
-      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      lines.forEach((l, i) => ctx.fillText(l, pad, H - 210 - (lines.length - 1 - i) * 124));
+      ctx.font = `800 62px ${F}`; ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.fillText(card.sub, pad, H - 110);
     } else {
       const imgs = await Promise.all(card.rows.map((r) => loadShareImg(r.art ? hiResArtwork(r.art) : null)));
       const round = card.type === "artists";
       card.rows.forEach((r, i) => {
         const y = 300 + i * 190;
-        ctx.fillStyle = "rgba(255,255,255,0.6)";
-        ctx.font = `800 54px ${F}`;
+        ctx.fillStyle = soft; ctx.font = `800 54px ${F}`;
         ctx.fillText(String(i + 1), pad, y + 100);
         const x = pad + 80, s = 140;
         ctx.save();
         if (round) { ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2 - 8, s / 2, 0, Math.PI * 2); ctx.closePath(); } else roundPath(ctx, x, y - 8, s, s, 26);
         ctx.clip();
-        if (imgs[i]) coverFit(ctx, imgs[i], x, y - 8, s, s); else { ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect(x, y - 8, s, s); }
+        if (imgs[i]) coverFit(ctx, imgs[i], x, y - 8, s, s); else { ctx.fillStyle = "rgba(128,128,128,0.35)"; ctx.fillRect(x, y - 8, s, s); }
         ctx.restore();
-        ctx.fillStyle = "#fff";
-        ctx.font = `700 50px ${F}`;
+        ctx.fillStyle = fg; ctx.font = `700 50px ${F}`;
         const title = wrapLines(ctx, r.title, W - x - s - 24 - pad, 1)[0] || "";
         ctx.fillText(title + (title.length < r.title.length ? "…" : ""), x + s + 28, y + 52);
-        ctx.fillStyle = "rgba(255,255,255,0.72)";
-        ctx.font = `500 40px ${F}`;
-        const sub = wrapLines(ctx, r.sub, W - x - s - 24 - pad, 1)[0] || "";
-        ctx.fillText(sub, x + s + 28, y + 108);
+        ctx.fillStyle = soft; ctx.font = `500 40px ${F}`;
+        ctx.fillText(wrapLines(ctx, r.sub, W - x - s - 24 - pad, 1)[0] || "", x + s + 28, y + 108);
       });
     }
     return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+  }
+
+  // отправка картинки: только сама картинка, без подписи
+  async function shareImageBlob(blob, name) {
+    const file = new File([blob], name, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); haptic("success"); return; }
+      catch (e) { if (e && e.name === "AbortError") return; /* else show the picture below */ }
+    }
+    $("recap-preview").src = URL.createObjectURL(blob);
+    openOverlay("recap-modal");
   }
   $("recap-share-btn").addEventListener("click", async () => {
     const btn = $("recap-share-btn");
@@ -4234,13 +4255,186 @@
     try {
       const blob = await renderRecapImage(card, index);
       if (!blob) throw new Error("no image");
-      const file = new File([blob], "notka-itogi.png", { type: "image/png" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], text: "Мои итоги в Нотке" }); haptic("success"); return; }
-        catch (e) { if (e && e.name === "AbortError") return; /* else show the picture below */ }
+      await shareImageBlob(blob, "notka-itogi.png");
+    } catch (e) {
+      showToast("Не получилось собрать картинку. Попробуй ещё раз");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ============================================================
+  // ЦИТАТА ИЗ ПЕСНИ: выбираешь строки в тексте и получаешь карточку
+  // ============================================================
+  let quotePicking = false;
+  const quotePicked = new Set();
+  let quoteStyle = "poster";
+  let quoteLines = [];
+  let quoteTrack = null;
+  let quoteToken = 0;
+  let quoteUrl = "";
+  const QUOTE_MAX = 6;
+  function quoteBarText() {
+    const n = quotePicked.size;
+    $("quote-bar-text").textContent = n ? `${n} ${plural(n, "строка", "строки", "строк")} выбрано` : "Выбери строки из текста";
+    $("quote-bar-make").disabled = !n;
+  }
+  function startQuotePick() {
+    if (!lyricsOpen || !lyricsData || !lyricsData.lines.length) return;
+    quotePicking = true;
+    quotePicked.clear();
+    lyricsList.classList.add("is-picking");
+    $("player-quote-btn").setAttribute("aria-pressed", "true");
+    $("quote-bar").hidden = false;
+    quoteBarText();
+    haptic("light");
+  }
+  function endQuotePick() {
+    quotePicking = false;
+    quotePicked.clear();
+    lyricsList.classList.remove("is-picking");
+    lyricsList.querySelectorAll(".is-picked").forEach((li) => li.classList.remove("is-picked"));
+    $("player-quote-btn").setAttribute("aria-pressed", "false");
+    $("quote-bar").hidden = true;
+  }
+  function toggleQuoteLine(li) {
+    const i = +li.dataset.i;
+    if (quotePicked.has(i)) { quotePicked.delete(i); li.classList.remove("is-picked"); }
+    else {
+      if (quotePicked.size >= QUOTE_MAX) { showToast(`Можно выбрать до ${QUOTE_MAX} строк`); return; }
+      quotePicked.add(i); li.classList.add("is-picked");
+    }
+    haptic("select");
+    quoteBarText();
+  }
+  $("player-quote-btn").addEventListener("click", () => { if (quotePicking) endQuotePick(); else startQuotePick(); });
+  $("quote-bar-cancel").addEventListener("click", endQuotePick);
+
+  async function renderQuoteImage(track, lines, style) {
+    try { await document.fonts.load("800 100px Onest"); } catch (e) { /* the system font is fine */ }
+    const W = 1080, H = 1350, F = SHARE_FONT;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    ctx.textBaseline = "alphabetic";
+    const th = themeColors();
+    const art = track.artwork ? hiResArtwork(track.artwork) : null;
+    const img = await loadShareImg(art);
+    const text = lines.join(" ");
+    if (style === "poster") {
+      const barH = 170, picH = H - barH;
+      ctx.fillStyle = th.deep; ctx.fillRect(0, 0, W, H);
+      if (img) coverFit(ctx, img, 0, 0, W, picH);
+      else { const g = ctx.createLinearGradient(0, 0, W, picH); g.addColorStop(0, th.warm); g.addColorStop(1, th.deep); ctx.fillStyle = g; ctx.fillRect(0, 0, W, picH); }
+      const sh = ctx.createLinearGradient(0, picH * 0.45, 0, picH);
+      sh.addColorStop(0, "rgba(0,0,0,0)"); sh.addColorStop(1, "rgba(0,0,0,0.38)");
+      ctx.fillStyle = sh; ctx.fillRect(0, 0, W, picH);
+      // строки на белых полосках, как на плакатах с цитатами
+      ctx.font = `600 58px ${F}`;
+      const maxW = W - 140 - 40;
+      let all = [];
+      lines.forEach((ln) => { all = all.concat(wrapLines(ctx, ln, maxW, 6)); });
+      if (all.length > 8) all = all.slice(0, 8);
+      const lh = 100, padX = 20;
+      let y = picH - 70 - (all.length - 1) * lh - 78;
+      all.forEach((ln, i) => {
+        const w = ctx.measureText(ln).width + padX * 2;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(70, y + i * lh - 4, w, 86);
+        ctx.fillStyle = "#111";
+        ctx.fillText(ln, 70 + padX, y + i * lh + 58);
+      });
+      ctx.fillStyle = "#000"; ctx.fillRect(0, picH, W, barH);
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, picH, W, 3);
+      ctx.fillStyle = "#fff"; ctx.font = `700 42px ${F}`;
+      let cap = `${track.artist || ""}, «${track.title || ""}»`.toUpperCase();
+      const capMax = W - 70 - 300;
+      while (ctx.measureText(cap).width > capMax && cap.length > 4) cap = cap.slice(0, -2);
+      ctx.fillText(cap, 70, picH + 104);
+      drawLogo(ctx, W - 70 - 170 - 8, picH + 56, 54, "#fff");
+      ctx.font = `800 44px ${F}`;
+      ctx.fillText("Нотка", W - 70 - 110, picH + 102);
+    } else {
+      let pal = null;
+      try { pal = art ? await paletteFromArtwork(track.artwork) : null; } catch (e) { pal = null; }
+      pal = pal || th;
+      const bg = pal.deep, cardBg = pal.warm;
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+      const light = lumOf(cardBg) > 0.55;
+      const ink = light ? "#14090f" : "#fff";
+      const inkSoft = light ? "rgba(20,9,15,0.68)" : "rgba(255,255,255,0.78)";
+      const cx = 90, cw = W - 180, px = 76;
+      // подбираем размер так, чтобы цитата влезла
+      let size = 92, wrapped = [];
+      for (; size >= 52; size -= 4) {
+        ctx.font = `800 ${size}px ${F}`;
+        wrapped = [];
+        lines.forEach((ln) => { wrapped = wrapped.concat(wrapLines(ctx, ln, cw - px * 2, 8)); });
+        if (wrapped.length * size * 1.1 <= 640) break;
       }
-      $("recap-preview").src = URL.createObjectURL(blob);
-      openOverlay("recap-modal");
+      const lh = size * 1.1;
+      const head = 150, gapA = 70, foot = 120;
+      const ch = 70 + head + gapA + wrapped.length * lh + 60 + foot;
+      const cy = Math.max(60, (H - ch) / 2);
+      ctx.fillStyle = cardBg; roundPath(ctx, cx, cy, cw, ch, 56); ctx.fill();
+      // обложка, название, исполнитель
+      const cs = 130, cyy = cy + 70;
+      ctx.save(); roundPath(ctx, cx + px, cyy, cs, cs, 24); ctx.clip();
+      if (img) coverFit(ctx, img, cx + px, cyy, cs, cs); else { ctx.fillStyle = "rgba(128,128,128,0.35)"; ctx.fillRect(cx + px, cyy, cs, cs); }
+      ctx.restore();
+      ctx.fillStyle = ink; ctx.font = `700 46px ${F}`;
+      const tmax = cw - px * 2 - cs - 30;
+      const cut = (str, font) => { ctx.font = font; let t = str; while (ctx.measureText(t).width > tmax && t.length > 3) t = t.slice(0, -2); return t === str ? t : t + "…"; };
+      ctx.fillText(cut(track.title || "", `700 46px ${F}`), cx + px + cs + 30, cyy + 56);
+      ctx.fillStyle = inkSoft;
+      ctx.fillText(cut(track.artist || "", `500 40px ${F}`), cx + px + cs + 30, cyy + 108);
+      // цитата
+      ctx.fillStyle = ink; ctx.font = `800 ${size}px ${F}`;
+      wrapped.forEach((ln, i) => ctx.fillText(ln, cx + px, cyy + cs + gapA + size * 0.85 + i * lh));
+      // подпись
+      drawLogo(ctx, cx + px, cy + ch - 70 - 44, 56, ink);
+      ctx.fillStyle = ink; ctx.font = `800 46px ${F}`;
+      ctx.fillText("Нотка", cx + px + 70, cy + ch - 70);
+    }
+    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+  }
+  async function paintQuotePreview() {
+    const token = ++quoteToken;
+    $("quote-preview").style.opacity = "0.4";
+    const blob = await renderQuoteImage(quoteTrack, quoteLines, quoteStyle);
+    if (token !== quoteToken || !blob) return;
+    if (quoteUrl) URL.revokeObjectURL(quoteUrl);
+    quoteUrl = URL.createObjectURL(blob);
+    $("quote-preview").src = quoteUrl;
+    $("quote-preview").style.opacity = "";
+    $("quote-preview").dataset.ready = "1";
+  }
+  $("quote-bar-make").addEventListener("click", () => {
+    if (!quotePicked.size || !currentTrack || !lyricsData) return;
+    quoteTrack = currentTrack;
+    quoteLines = [...quotePicked].sort((a, b) => a - b).map((i) => lyricsData.lines[i].text);
+    $("quote-preview").dataset.ready = "";
+    openOverlay("quote-sheet");
+    paintQuotePreview();
+  });
+  $("quote-styles").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    quoteStyle = chip.dataset.style;
+    $("quote-styles").querySelectorAll(".chip").forEach((c) => { c.classList.toggle("active", c === chip); c.setAttribute("aria-selected", c === chip ? "true" : "false"); });
+    haptic("light");
+    paintQuotePreview();
+  });
+  $("quote-share-btn").addEventListener("click", async () => {
+    const btn = $("quote-share-btn");
+    if (btn.disabled || !quoteTrack) return;
+    btn.disabled = true;
+    try {
+      const blob = await renderQuoteImage(quoteTrack, quoteLines, quoteStyle);
+      if (!blob) throw new Error("no image");
+      closeOverlay("quote-sheet");
+      await shareImageBlob(blob, "notka-citata.png");
+      endQuotePick();
     } catch (e) {
       showToast("Не получилось собрать картинку. Попробуй ещё раз");
     } finally {
@@ -4588,6 +4782,7 @@
     lyricsList.innerHTML = "";
     lyricsList.classList.toggle("is-synced", !!data.synced);
     $("lyrics-note").textContent = data.lines.length ? "" : "Для этого трека текста пока нет.";
+    document.body.classList.toggle("has-lyrics", data.lines.length > 0);
     const frag = document.createDocumentFragment();
     data.lines.forEach((line, i) => {
       const li = document.createElement("li");
@@ -4608,6 +4803,8 @@
     if (lyricsCache.has(track.id)) { renderLyrics(lyricsCache.get(track.id)); return; }
     if (!track.title) { renderLyrics({ lines: [], synced: false }); return; }
     lyricsData = null;
+    document.body.classList.remove("has-lyrics");
+    endQuotePick();
     lyricsList.innerHTML = "";
     $("lyrics-note").textContent = "";
     $("lyrics-skeleton").hidden = false;
@@ -4653,6 +4850,7 @@
     lyricsOpen = on;
     document.body.classList.toggle("lyrics-open", on);
     lyricsBox.inert = !on;
+    if (!on) endQuotePick();
     $("player-lyrics-btn").setAttribute("aria-pressed", on ? "true" : "false");
     syncPrism();
     if (on) { loadLyrics(); syncLyrics(true); }
@@ -4688,6 +4886,7 @@
   lyricsBox.addEventListener("touchcancel", endLyricsPull);
   lyricsList.addEventListener("click", (e) => {
     const li = e.target.closest(".lyrics-line");
+    if (li && quotePicking) { toggleQuoteLine(li); return; }
     if (!li || !lyricsData || !lyricsData.synced) return;
     try { audio.currentTime = lyricsData.lines[+li.dataset.i].t; } catch (err) { return; }
     lyricsTouchedAt = 0;

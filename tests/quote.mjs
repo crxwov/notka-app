@@ -1,0 +1,54 @@
+// Цитата из песни: выбор строк в тексте, карточка «Постер» и «Карточка», картинка 1080x1350.
+//   node tests/quote.mjs   (нужен tests/serve_local.py и интернет)
+import { launch } from "./cdp.mjs";
+const BASE = "http://127.0.0.1:8099";
+const b = await launch({ dir: "C:/Users/leksik/Documents/Notka/tests/shots", port: 9378 });
+let bad = 0;
+const check = (name, ok, extra = "") => { console.log((ok ? "PASS " : "FAIL ") + name + " " + extra); if (!ok) bad++; };
+const found = ((await (await fetch(`${BASE}/search?q=${encodeURIComponent("Кино Группа крови")}`)).json()).results || []).filter((t) => t.artwork).slice(0, 3);
+const seed = { favorites: found, recent: [], playlists: [], onboardingSeenV2: true, settings: {} };
+await b.goto(`${BASE}/health`);
+await b.eval(`localStorage.clear(); localStorage.setItem("notka_state_v2", ${JSON.stringify(JSON.stringify(seed))}); true`);
+await b.goto(`${BASE}/app/`);
+await b.waitFor("!!document.body && document.body.dataset.screen !== 'splash'", 8000, "x");
+await b.sleep(800);
+await b.click('.tab[data-tab="library"]'); await b.sleep(500);
+await b.click("#open-favorites-btn"); await b.sleep(600);
+await b.click("#favorites-list .track-row .row-main");
+await b.waitFor("(() => { const a = document.getElementById('audio'); return !a.paused && a.currentTime > 0.5; })()", 60000, "playing");
+await b.click("#mini-open-btn"); await b.sleep(900);
+check("no quote button before the text is open", await b.eval("getComputedStyle(document.getElementById('player-quote-btn')).display === 'none'"));
+await b.click("#player-lyrics-btn");
+await b.waitFor("document.querySelectorAll('#lyrics-lines .lyrics-line').length > 3", 30000, "lyrics");
+await b.sleep(500);
+check("the quote button shows with the text", await b.eval("getComputedStyle(document.getElementById('player-quote-btn')).display !== 'none'"));
+await b.click("#player-quote-btn"); await b.sleep(400);
+check("the pick bar is open and «Карточка» waits for a line", await b.eval("!document.getElementById('quote-bar').hidden && document.getElementById('quote-bar-make').disabled"));
+const t0 = await b.eval("document.getElementById('audio').currentTime");
+await b.eval("document.querySelectorAll('#lyrics-lines .lyrics-line')[2].click(); document.querySelectorAll('#lyrics-lines .lyrics-line')[3].click(); true");
+await b.sleep(300);
+check("two lines picked, the song did not jump", await b.eval(`document.querySelectorAll('#lyrics-lines .is-picked').length === 2 && Math.abs(document.getElementById('audio').currentTime - ${t0}) < 3 && !document.getElementById('quote-bar-make').disabled`));
+await b.shot("quote-pick");
+await b.click("#quote-bar-make");
+await b.waitFor("document.getElementById('quote-preview').dataset.ready === '1' && document.getElementById('quote-preview').naturalWidth > 0", 20000, "poster");
+await b.sleep(500);
+check("the poster is 1080x1350", await b.eval("document.getElementById('quote-preview').naturalWidth === 1080 && document.getElementById('quote-preview').naturalHeight === 1350"));
+await b.shot("quote-poster");
+await b.eval("document.getElementById('quote-preview').dataset.ready = ''; true");
+await b.click('#quote-styles [data-style="card"]');
+await b.waitFor("document.getElementById('quote-preview').dataset.ready === '1'", 20000, "card");
+await b.sleep(500);
+check("the card is 1080x1350", await b.eval("document.getElementById('quote-preview').naturalWidth === 1080 && document.getElementById('quote-preview').naturalHeight === 1350"));
+await b.shot("quote-card");
+// сами картинки на просмотр
+const dump = async (name) => {
+  const data = await b.eval("(() => { const i = document.getElementById('quote-preview'); const c = document.createElement('canvas'); c.width = 540; c.height = 675; c.getContext('2d').drawImage(i, 0, 0, 540, 675); return c.toDataURL('image/png'); })()");
+  const fs = await import("node:fs");
+  fs.writeFileSync(`C:/Users/leksik/Documents/Notka/tests/shots/${name}.png`, Buffer.from(data.split(",")[1], "base64"));
+};
+await dump("quote-card-image");
+await b.eval("document.querySelector('#quote-styles [data-style=\"poster\"]').click(); true");
+await b.sleep(2500);
+await dump("quote-poster-image");
+console.log(bad ? "FAILED" : "ALL PASS");
+process.exit(bad ? 1 : 0);
