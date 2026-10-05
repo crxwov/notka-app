@@ -25,9 +25,9 @@ check("the quote button shows with the text", await b.eval("getComputedStyle(doc
 await b.click("#player-quote-btn"); await b.sleep(400);
 check("the pick bar is open and «Карточка» waits for a line", await b.eval("!document.getElementById('quote-bar').hidden && document.getElementById('quote-bar-make').disabled"));
 const t0 = await b.eval("document.getElementById('audio').currentTime");
-await b.eval("document.querySelectorAll('#lyrics-lines .lyrics-line')[2].click(); document.querySelectorAll('#lyrics-lines .lyrics-line')[3].click(); true");
+await b.eval("(() => { const l = [...document.querySelectorAll('#lyrics-lines .lyrics-line')]; const top = l.map((e, i) => [e.textContent.length, i]).sort((a, b) => b[0] - a[0]).slice(0, 3).map((x) => x[1]); top.forEach((i) => l[i].click()); return true; })()");
 await b.sleep(300);
-check("two lines picked, the song did not jump", await b.eval(`document.querySelectorAll('#lyrics-lines .is-picked').length === 2 && Math.abs(document.getElementById('audio').currentTime - ${t0}) < 3 && !document.getElementById('quote-bar-make').disabled`));
+check("at most two lines can be picked, the song did not jump", await b.eval(`document.querySelectorAll('#lyrics-lines .is-picked').length === 2 && Math.abs(document.getElementById('audio').currentTime - ${t0}) < 3 && !document.getElementById('quote-bar-make').disabled`));
 await b.shot("quote-pick");
 await b.click("#quote-bar-make");
 await b.waitFor("document.getElementById('quote-preview').dataset.ready === '1' && document.getElementById('quote-preview').naturalWidth > 0", 20000, "poster");

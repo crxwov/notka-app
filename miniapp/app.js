@@ -4316,10 +4316,10 @@
   let quoteTrack = null;
   let quoteToken = 0;
   let quoteUrl = "";
-  const QUOTE_MAX = 6;
+  const QUOTE_MAX = 2;
   function quoteBarText() {
     const n = quotePicked.size;
-    $("quote-bar-text").textContent = n ? `${n} ${plural(n, "строка", "строки", "строк")} выбрано` : "Выбери строки из текста";
+    $("quote-bar-text").textContent = n ? `${n} ${plural(n, "строка", "строки", "строк")} выбрано` : "Выбери 1–2 строки";
     $("quote-bar-make").disabled = !n;
   }
   function startQuotePick() {
@@ -4415,35 +4415,20 @@
     ctx.fillText("Нотка", pad + 76, 124);
 
     if (style === "light") {
-      // как в тексте на Apple Music и в нашем плеере: строка горит крупно, соседние размыты, внизу плеер Нотки
+      // строка горит по центру, внизу плеер Нотки
       const cw = W - pad * 2;
-      const prev = quoteCtx.before.length ? quoteCtx.before[quoteCtx.before.length - 1] : "";
-      const next = quoteCtx.after.length ? quoteCtx.after[0] : "";
-      const CTX = 58, ctxLh = CTX * 1.2, gapC = 46;
-      const nCtx = (prev ? 1 : 0) + (next ? 1 : 0);
-      const regionTop = 250, regionH = 790;
-      const litMax = regionH - nCtx * (ctxLh + gapC);
-      const fit = fitText(ctx, lines, cw, [132, 124, 116, 108, 100, 92, 84, 76, 68, 60], litMax, 1.1);
+      const regionTop = 190, regionBottom = H - 60 - 250 - 40;
+      const regionH = regionBottom - regionTop;
+      const fit = fitText(ctx, lines, cw, [136, 128, 120, 112, 104, 96, 88, 80, 72, 64, 56], regionH, 1.1);
       const lh = fit.size * 1.1;
       const litH = fit.wrapped.length * lh;
-      const total = litH + nCtx * (ctxLh + gapC);
-      let y = regionTop + (regionH - total) / 2;
-      const blurOk = (() => { try { ctx.filter = "blur(1px)"; const ok = ctx.filter === "blur(1px)"; ctx.filter = "none"; return ok; } catch (e) { return false; } })();
-      const drawCtx = (str, yy) => {
-        ctx.font = `800 ${CTX}px ${F}`;
-        const t = cutText(ctx, str, cw);
-        if (blurOk) { ctx.filter = "blur(6px)"; ctx.fillStyle = "rgba(255,255,255,0.68)"; } else ctx.fillStyle = "rgba(255,255,255,0.22)";
-        ctx.fillText(t, pad, yy + CTX * 0.9);
-        ctx.filter = "none";
-      };
-      if (prev) { drawCtx(prev, y); y += ctxLh + gapC; }
+      const y = regionTop + (regionH - litH) / 2;
       ctx.font = `800 ${fit.size}px ${F}`;
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center";
       ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 28; ctx.shadowOffsetY = 3;
-      fit.wrapped.forEach((ln, i) => ctx.fillText(ln, pad, y + fit.size * 0.9 + i * lh));
+      fit.wrapped.forEach((ln, i) => ctx.fillText(ln, W / 2, y + fit.size * 0.86 + i * lh));
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      y += litH + gapC;
-      if (next) drawCtx(next, y);
+      ctx.textAlign = "left";
       // плеер
       const sx = 60, sh = 250, sy = H - 60 - sh, sw = W - 120;
       roundPath(ctx, sx, sy, sw, sh, 64);
@@ -4469,10 +4454,10 @@
       roundPath(ctx, px0, py, Math.max(11, pw * frac), 11, 6); ctx.fillStyle = "#fff"; ctx.fill();
     } else {
       // цитата и большая пластинка с тонармом, как в темах плеера
-      const fit = fitText(ctx, lines, W - pad * 2, [118, 108, 98, 90, 82, 74, 66, 58, 50], 520, 1.1);
+      const fit = fitText(ctx, lines, W - pad * 2, [118, 108, 98, 90, 82, 74, 66, 58, 50], 440, 1.1);
       const lh = fit.size * 1.1;
       const textH = fit.wrapped.length * lh;
-      const top = 230 + Math.max(0, (520 - textH) / 2);
+      const top = 230 + Math.max(0, (440 - textH) / 2);
       ctx.fillStyle = "#fff"; ctx.font = `800 ${fit.size}px ${F}`;
       ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 24;
       fit.wrapped.forEach((ln, i) => ctx.fillText(ln, pad, top + fit.size * 0.88 + i * lh));
