@@ -4426,39 +4426,54 @@
       roundPath(ctx, px0, py, pw, 11, 6); ctx.fillStyle = "rgba(255,255,255,0.24)"; ctx.fill();
       roundPath(ctx, px0, py, Math.max(11, pw * frac), 11, 6); ctx.fillStyle = "#fff"; ctx.fill();
     } else {
-      // цитата и пластинка с обложкой, как в темах плеера
-      const fit = fitText(ctx, lines, W - pad * 2, [100, 92, 84, 76, 68, 60, 54, 48], 560, 1.1);
+      // цитата и большая пластинка с тонармом, как в темах плеера
+      const fit = fitText(ctx, lines, W - pad * 2, [118, 108, 98, 90, 82, 74, 66, 58, 50], 520, 1.1);
       const lh = fit.size * 1.1;
+      const textH = fit.wrapped.length * lh;
+      const top = 230 + Math.max(0, (520 - textH) / 2);
       ctx.fillStyle = "#fff"; ctx.font = `800 ${fit.size}px ${F}`;
       ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 24;
-      fit.wrapped.forEach((ln, i) => ctx.fillText(ln, pad, 270 + fit.size * 0.88 + i * lh));
+      fit.wrapped.forEach((ln, i) => ctx.fillText(ln, pad, top + fit.size * 0.88 + i * lh));
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
       // пластинка
-      const dx = 900, dy = 1330, dr = 470;
+      const dx = 690, dy = 1390, dr = 630;
       ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 60; ctx.shadowOffsetY = 20;
-      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, dr + 10, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 70; ctx.shadowOffsetY = 24;
+      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, dr + 12, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       ctx.save();
       ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.clip();
       ctx.fillStyle = rgba(mid, 1); ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
       if (img) { ctx.translate(dx, dy); ctx.rotate(-0.22); coverFit(ctx, img, -dr, -dr, dr * 2, dr * 2); ctx.rotate(0.22); ctx.translate(-dx, -dy); }
       ctx.strokeStyle = "rgba(0,0,0,0.22)"; ctx.lineWidth = 2;
-      for (let rr = 110; rr < dr; rr += 13) { ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.stroke(); }
+      for (let rr = 140; rr < dr; rr += 14) { ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.stroke(); }
       const sheen = ctx.createLinearGradient(dx - dr, dy - dr, dx + dr * 0.6, dy + dr * 0.6);
-      sheen.addColorStop(0, "rgba(255,255,255,0.22)"); sheen.addColorStop(0.5, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(255,255,255,0.08)");
+      sheen.addColorStop(0, "rgba(255,255,255,0.24)"); sheen.addColorStop(0.5, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(255,255,255,0.08)");
       ctx.fillStyle = sheen; ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
       ctx.restore();
-      ctx.fillStyle = rgba(warm, 1); ctx.beginPath(); ctx.arc(dx, dy, 74, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(dx, dy, 74, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, 13, 0, Math.PI * 2); ctx.fill();
-      // подпись слева внизу
-      ctx.fillStyle = "#fff"; ctx.font = `800 48px ${F}`;
-      const tl = wrapLines(ctx, track.title || "", 330, 3);
-      const baseY = H - 84 - 44 - (tl.length - 1) * 56;
-      tl.forEach((ln, i) => ctx.fillText(ln, pad, baseY + i * 56));
-      ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `500 38px ${F}`;
-      wrapLines(ctx, track.artist || "", 330, 2).forEach((ln, i) => ctx.fillText(ln, pad, baseY + tl.length * 56 - 6 + i * 46));
+      ctx.fillStyle = rgba(warm, 1); ctx.beginPath(); ctx.arc(dx, dy, 92, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(dx, dy, 92, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, 16, 0, Math.PI * 2); ctx.fill();
+      // тонарм
+      const ax = 985, ay = 850, hx = 790, hy = 1215;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+      ctx.strokeStyle = "#F4EFFF"; ctx.lineCap = "round"; ctx.lineWidth = 18;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = "#16101f"; ctx.beginPath(); ctx.arc(ax, ay, 46, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#F4EFFF"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(ax, ay, 46, 0, Math.PI * 2); ctx.stroke();
+      ctx.translate(hx, hy); ctx.rotate(Math.atan2(hy - ay, hx - ax) - Math.PI / 2);
+      ctx.fillStyle = "#F4EFFF"; roundPath(ctx, -26, -6, 52, 96, 14); ctx.fill();
+      ctx.restore();
+      // название и исполнитель на стеклянной плашке
+      const pw = 520, ph = 168, px = 60, py = H - 60 - ph;
+      roundPath(ctx, px, py, pw, ph, 52);
+      ctx.fillStyle = "rgba(20,12,24,0.55)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.24)"; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.font = `800 52px ${F}`;
+      ctx.fillText(cutText(ctx, track.title || "", pw - 72), px + 36, py + 76);
+      ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `500 42px ${F}`;
+      ctx.fillText(cutText(ctx, track.artist || "", pw - 72), px + 36, py + 130);
     }
     return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
   }
