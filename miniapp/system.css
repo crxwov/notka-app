@@ -73,10 +73,10 @@
 
 /* шапка Плюса: наклонённая куча плееров с настоящими треками лежит позади заголовка */
 #screen-plus { isolation: isolate; }
-.plus-hero { padding-top: 10px; }
-.plus-showcase { position: absolute; left: 0; right: 0; top: 0; height: 400px; overflow: hidden; pointer-events: none; z-index: -1; }
-.ps-mask { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(180deg, #000 0, #000 22%, transparent 84%); mask-image: linear-gradient(180deg, #000 0, #000 22%, transparent 84%); }
-.ps-field { position: absolute; left: 50%; top: -70px; width: 640px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; transform: translateX(-50%) rotate(-14deg); opacity: 0.3; }
+.plus-hero { padding-top: 150px; }
+.plus-showcase { position: absolute; left: 0; right: 0; top: 0; height: 290px; overflow: hidden; pointer-events: none; z-index: -1; }
+.ps-mask { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(180deg, #000 0, #000 40%, transparent 100%); mask-image: linear-gradient(180deg, #000 0, #000 40%, transparent 100%); }
+.ps-field { position: absolute; left: 50%; top: -70px; width: 640px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; transform: translateX(-50%) rotate(-14deg); opacity: 0.24; }
 .ps-field > i { position: relative; display: flex; align-items: center; gap: 10px; padding: 11px 12px 17px 11px; border-radius: var(--radius-m); background: linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 30%, #2a2037), #1c1627); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
 .ps-field > i:nth-child(3n+2) { margin-top: 40px; }
 .ps-field > i:nth-child(3n) { margin-top: -22px; }
