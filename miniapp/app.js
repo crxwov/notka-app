@@ -2840,6 +2840,10 @@
     $("plus-bar").classList.toggle("is-active", on);
     $("plus-bar").classList.toggle("is-real", real);
     $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать бесплатно";
+    $("plan-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";
+    $("plan-buy-btn").hidden = real;
+    $("plan-state").hidden = !on;
+    $("plan-state").textContent = real ? `Плюс включён до ${longDate(plusUntil())}` : "Плюс включён в режиме предпросмотра. Оплата не списывалась.";
     $("plus-bar-note").textContent = real
       ? `Плюс включён до ${longDate(plusUntil())}`
       : on
@@ -2870,6 +2874,7 @@
     $("plus-cassette-title").textContent = track ? track.title || "Без названия" : "Твоя музыка";
     $("plus-cassette-artist").textContent = track ? track.artist || "" : "в Нотке Плюс";
     fillPlusLive();
+    fillPlusCollage();
     syncPlusUI();
     $("plus-bar").classList.remove("is-dismissed"); // плашка возвращается при каждом заходе
     revealIn("screen-plus", true);
@@ -2897,14 +2902,39 @@
     else showToast("Тема включена. Запусти любой трек и открой плеер");
   });
 
-  $("plus-buy-btn").addEventListener("click", () => {
+  const togglePlusPreview = () => {
     const on = !hasPlus();
     try { localStorage.setItem("notka_plus_local", on ? "1" : "0"); } catch (e) { return; }
     haptic(on ? "success" : "light");
     showToast(on ? "Плюс включён для предпросмотра. Оплата не списывалась" : "Плюс выключен");
     syncPlusUI();
     if (on) keepTriedLook(); else { endLookTry(); applyLook(); }
-  });
+  };
+  $("plus-buy-btn").addEventListener("click", togglePlusPreview);
+  $("plan-buy-btn").addEventListener("click", togglePlusPreview);
+
+  // когда внизу страницы виден сам план с кнопкой, плавающая плашка не нужна
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver((entries) => {
+      $("plus-bar").classList.toggle("is-covered", entries.some((e) => e.isIntersecting));
+    }, { root: $("screen-plus"), threshold: 0.35 }).observe(document.querySelector(".plan-card"));
+  }
+
+  // подборка обложек сверху страницы Плюса: твои обложки, а где их мало — цвета темы
+  function fillPlusCollage() {
+    const seen = new Set(), urls = [];
+    const add = (t) => { if (t && t.artwork && !seen.has(t.artwork) && urls.length < 16) { seen.add(t.artwork); urls.push(t.artwork); } };
+    (state.favorites || []).forEach(add);
+    (state.recent || []).forEach(add);
+    (state.playlists || []).forEach((p) => Object.values(p.tracksCache || {}).forEach(add));
+    const grid = $("plus-collage-grid");
+    grid.textContent = "";
+    for (let i = 0; i < 16; i++) {
+      const tile = document.createElement("i");
+      if (urls.length >= 4 && urls[i % urls.length]) tile.style.backgroundImage = `url("${hiResArtwork(urls[i % urls.length]).replace(/"/g, "%22")}")`;
+      grid.appendChild(tile);
+    }
+  }
 
   // ============================================================
   // HOW НОТКА LOOKS — the player theme, the color of the light, the

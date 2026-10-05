@@ -62,3 +62,25 @@
 
 /* Плюс: над плашкой с ценой контент плавно гаснет, а не упирается в её край */
 .plus-bar::before { content: ""; position: absolute; left: -4px; right: -4px; top: -40px; height: 40px; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.85)); }
+
+/* Страница Плюса: подборка обложек сверху, метка, «Твой план» (по мотивам страницы подписки в музыкальных сервисах) */
+#screen-plus { isolation: isolate; }
+.plus-collage { position: absolute; left: 0; right: 0; top: 0; height: 380px; overflow: hidden; pointer-events: none; z-index: -1; -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.75) 35%, transparent 95%); mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.75) 35%, transparent 95%); }
+.plus-collage-grid { position: absolute; left: 50%; top: -70px; width: 620px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; transform: translateX(-50%) rotate(-14deg); opacity: 0.45; }
+.plus-collage-grid i { display: block; aspect-ratio: 1; border-radius: var(--radius-s); background: linear-gradient(150deg, var(--c-warm), var(--c-mid) 60%, var(--c-deep)) center / cover; }
+.plus-collage-grid i:nth-child(3n+2) { background: linear-gradient(210deg, var(--c-mid), var(--c-deep)) center / cover; }
+.plus-collage-grid i:nth-child(5n) { background: linear-gradient(120deg, var(--c-core), var(--c-warm)) center / cover; }
+.plus-brand { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.plus-brand-orb { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--c-core), var(--c-warm) 45%, var(--c-mid) 80%); box-shadow: 0 0 14px color-mix(in srgb, var(--c-warm) 60%, transparent); }
+.plus-plan-sec { margin: var(--gap-sec) 0 22px; }
+.plus-plan-h { margin-bottom: var(--gap-head); }
+.plan-card { padding: 22px 20px 20px; border-radius: var(--radius-l); background: var(--surface-2, rgba(255, 255, 255, 0.07)); box-shadow: inset 0 0 0 1px var(--line); }
+.plan-name { font-size: 26px; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; color: var(--c-warm); }
+.plan-price { margin-top: 12px; font-size: 16px; color: var(--text-2); }
+.plan-price b { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+.plan-list { margin: 18px 0 0; padding: 18px 0 0 20px; border-top: 1px solid var(--line); font-size: 16px; line-height: 1.4; }
+.plan-list li { margin-bottom: 8px; padding-left: 2px; }
+.plan-state { margin-top: 6px; font-size: 16px; font-weight: 600; }
+.plan-buy { margin-top: 18px; height: 52px; font-size: 17px; }
+.plan-buy[hidden] { display: none; }
+.plus-bar.is-covered { display: none; }
