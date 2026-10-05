@@ -4373,53 +4373,58 @@
     ctx.fillText("Нотка", pad + 76, 124);
 
     if (style === "light") {
-      // строка горит, строки вокруг приглушены, внизу плеер Нотки
-      let before = quoteCtx.before, after = quoteCtx.after;
-      let fit = null, useCtx = false;
-      for (const [nb, na] of [[2, 2], [1, 1]]) {
-        const b2 = before.slice(-nb), a2 = after.slice(0, na);
-        if (!b2.length && !a2.length) continue;
-        const f = fitText(ctx, [...b2, ...lines, ...a2], W - pad * 2, [78, 72, 66, 62], 760, 1.16);
-        if (f.size >= 62 && f.wrapped.length * f.size * 1.16 <= 760) { fit = f; useCtx = true; before = b2; after = a2; break; }
-      }
-      if (!fit) fit = fitText(ctx, lines, W - pad * 2, [84, 76, 70, 64, 58, 52, 48], 760, 1.16);
-      const lh = fit.size * 1.16;
-      const nBefore = useCtx ? before.reduce((n, ln) => { ctx.font = `800 ${fit.size}px ${F}`; return n + wrapLines(ctx, ln, W - pad * 2, 9).length; }, 0) : 0;
-      const nMain = fit.wrapped.length - (useCtx ? after.reduce((n, ln) => { ctx.font = `800 ${fit.size}px ${F}`; return n + wrapLines(ctx, ln, W - pad * 2, 9).length; }, 0) : 0) - nBefore;
-      const top = 230 + (760 - fit.wrapped.length * lh) / 2;
+      // как в тексте на Apple Music и в нашем плеере: строка горит крупно, соседние размыты, внизу плеер Нотки
+      const cw = W - pad * 2;
+      const prev = quoteCtx.before.length ? quoteCtx.before[quoteCtx.before.length - 1] : "";
+      const next = quoteCtx.after.length ? quoteCtx.after[0] : "";
+      const CTX = 58, ctxLh = CTX * 1.2, gapC = 46;
+      const nCtx = (prev ? 1 : 0) + (next ? 1 : 0);
+      const regionTop = 250, regionH = 790;
+      const litMax = regionH - nCtx * (ctxLh + gapC);
+      const fit = fitText(ctx, lines, cw, [132, 124, 116, 108, 100, 92, 84, 76, 68, 60], litMax, 1.1);
+      const lh = fit.size * 1.1;
+      const litH = fit.wrapped.length * lh;
+      const total = litH + nCtx * (ctxLh + gapC);
+      let y = regionTop + (regionH - total) / 2;
+      const blurOk = (() => { try { ctx.filter = "blur(1px)"; const ok = ctx.filter === "blur(1px)"; ctx.filter = "none"; return ok; } catch (e) { return false; } })();
+      const drawCtx = (str, yy) => {
+        ctx.font = `800 ${CTX}px ${F}`;
+        const t = cutText(ctx, str, cw);
+        if (blurOk) { ctx.filter = "blur(6px)"; ctx.fillStyle = "rgba(255,255,255,0.68)"; } else ctx.fillStyle = "rgba(255,255,255,0.22)";
+        ctx.fillText(t, pad, yy + CTX * 0.9);
+        ctx.filter = "none";
+      };
+      if (prev) { drawCtx(prev, y); y += ctxLh + gapC; }
       ctx.font = `800 ${fit.size}px ${F}`;
-      fit.wrapped.forEach((ln, i) => {
-        const lit = !useCtx || (i >= nBefore && i < nBefore + nMain);
-        ctx.fillStyle = lit ? "#fff" : "rgba(255,255,255,0.34)";
-        if (lit) { ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 2; }
-        ctx.fillText(ln, pad, top + fit.size * 0.88 + i * lh);
-        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      });
+      ctx.fillStyle = "#fff";
+      ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 28; ctx.shadowOffsetY = 3;
+      fit.wrapped.forEach((ln, i) => ctx.fillText(ln, pad, y + fit.size * 0.9 + i * lh));
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      y += litH + gapC;
+      if (next) drawCtx(next, y);
       // плеер
-      const sx = 70, sy = 1112, sw = W - 140, sh = 170;
-      roundPath(ctx, sx, sy, sw, sh, 52);
-      ctx.fillStyle = "rgba(255,255,255,0.13)"; ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.24)"; ctx.lineWidth = 2; ctx.stroke();
-      const cs = 112, cx0 = sx + 26, cy0 = sy + 22;
-      ctx.save(); roundPath(ctx, cx0, cy0, cs, cs, 28); ctx.clip();
+      const sx = 60, sh = 250, sy = H - 60 - sh, sw = W - 120;
+      roundPath(ctx, sx, sy, sw, sh, 64);
+      ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.26)"; ctx.lineWidth = 2.5; ctx.stroke();
+      const cs = 154, cx0 = sx + 34, cy0 = sy + 30;
+      ctx.save(); roundPath(ctx, cx0, cy0, cs, cs, 36); ctx.clip();
       if (img) coverFit(ctx, img, cx0, cy0, cs, cs); else { ctx.fillStyle = rgba(warm, 1); ctx.fillRect(cx0, cy0, cs, cs); }
       ctx.restore();
-      const tx = cx0 + cs + 28, tmax = sw - (tx - sx) - 26 - 96 - 20;
-      ctx.fillStyle = "#fff"; ctx.font = `700 44px ${F}`;
-      ctx.fillText(cutText(ctx, track.title || "", tmax), tx, cy0 + 50);
-      ctx.fillStyle = "rgba(255,255,255,0.72)"; ctx.font = `500 36px ${F}`;
-      ctx.fillText(cutText(ctx, track.artist || "", tmax), tx, cy0 + 98);
-      // кнопка паузы
-      const bx = sx + sw - 26 - 48, by = cy0 + 50;
-      ctx.fillStyle = "#F4EFFF"; ctx.beginPath(); ctx.arc(bx, by, 48, 0, Math.PI * 2); ctx.fill();
+      const tx = cx0 + cs + 34, tmax = sw - (tx - sx) - 34 - 130 - 24;
+      ctx.fillStyle = "#fff"; ctx.font = `800 58px ${F}`;
+      ctx.fillText(cutText(ctx, track.title || "", tmax), tx, cy0 + 70);
+      ctx.fillStyle = "rgba(255,255,255,0.74)"; ctx.font = `500 46px ${F}`;
+      ctx.fillText(cutText(ctx, track.artist || "", tmax), tx, cy0 + 130);
+      const bx = sx + sw - 34 - 65, by = cy0 + cs / 2;
+      ctx.fillStyle = "#F4EFFF"; ctx.beginPath(); ctx.arc(bx, by, 65, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#16101f";
-      roundPath(ctx, bx - 17, by - 20, 11, 40, 4); ctx.fill();
-      roundPath(ctx, bx + 6, by - 20, 11, 40, 4); ctx.fill();
-      // полоска: на каком месте песни эта строка
+      roundPath(ctx, bx - 23, by - 27, 15, 54, 5); ctx.fill();
+      roundPath(ctx, bx + 8, by - 27, 15, 54, 5); ctx.fill();
       const frac = quoteCtx.frac == null ? 0.38 : Math.max(0.03, Math.min(0.97, quoteCtx.frac));
-      const px0 = sx + 30, pw = sw - 60, py = sy + sh - 26;
-      roundPath(ctx, px0, py, pw, 8, 4); ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fill();
-      roundPath(ctx, px0, py, Math.max(8, pw * frac), 8, 4); ctx.fillStyle = "#fff"; ctx.fill();
+      const px0 = sx + 38, pw = sw - 76, py = sy + sh - 44;
+      roundPath(ctx, px0, py, pw, 11, 6); ctx.fillStyle = "rgba(255,255,255,0.24)"; ctx.fill();
+      roundPath(ctx, px0, py, Math.max(11, pw * frac), 11, 6); ctx.fillStyle = "#fff"; ctx.fill();
     } else {
       // цитата и пластинка с обложкой, как в темах плеера
       const fit = fitText(ctx, lines, W - pad * 2, [100, 92, 84, 76, 68, 60, 54, 48], 560, 1.1);
