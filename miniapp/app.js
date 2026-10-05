@@ -713,7 +713,7 @@
   const bottomNav = $("bottom-nav");
   const miniPlayer = $("mini-player");
   const TAB_SCREENS = new Set(["home", "search", "library"]);
-  const NO_MINI_SCREENS = new Set(["player", "onboarding", "splash"]);
+  const NO_MINI_SCREENS = new Set(["player", "onboarding", "splash", "plus"]);
 
   // Each step is { name, params }. Artist and album screens are single
   // DOM nodes reused for every artist/album, so going back has to know
@@ -2955,27 +2955,23 @@
   function fillPlusShowcase() {
     const seen = new Set(), list = [];
     const add = (t) => { if (t && t.title && t.artwork && !seen.has(t.id) && list.length < 9) { seen.add(t.id); list.push(t); } };
+    if (currentTrack) add(currentTrack);
     (state.favorites || []).forEach(add);
     (state.recent || []).forEach(add);
     (state.playlists || []).forEach((p) => Object.values(p.tracksCache || {}).forEach(add));
-    const demo = PLUS_DEMO_TRACKS;
-    const pool = list.length >= 5 ? list : list.concat(demo.slice(0, 9 - list.length));
+    const pool = list.length >= 5 ? list : list.concat(PLUS_DEMO_TRACKS.slice(0, 9 - list.length));
     const field = $("ps-field");
     field.textContent = "";
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 18; i++) {
       const t = pool[(i * 4) % pool.length] || pool[i % pool.length];
       const card = document.createElement("i");
-      card.innerHTML = '<span class="ps-cover"></span><span class="ps-meta"><b></b><em></em></span>';
+      card.innerHTML = '<span class="ps-cover"></span><span class="ps-meta"><b></b><em></em></span><span class="ps-play"><svg><use href="#' + (i % 3 === 1 ? "i-play" : "i-pause") + '"/></svg></span><span class="ps-bar"><u></u></span>';
       card.querySelector("b").textContent = t.title;
       card.querySelector("em").textContent = t.artist || "";
+      card.querySelector("u").style.width = 18 + ((i * 29) % 65) + "%";
       if (t.artwork) card.querySelector(".ps-cover").style.backgroundImage = `url("${hiResArtwork(t.artwork).replace(/"/g, "%22")}")`;
       field.appendChild(card);
     }
-    const player = currentTrack && currentTrack.title ? currentTrack : pool[0];
-    const pl = document.querySelector("#plus-showcase .ps-player");
-    pl.querySelector("b").textContent = player.title;
-    pl.querySelector("em").textContent = player.artist || "";
-    pl.querySelector(".ps-cover").style.backgroundImage = player.artwork ? `url("${hiResArtwork(player.artwork).replace(/"/g, "%22")}")` : "";
   }
 
   // ============================================================

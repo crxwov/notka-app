@@ -71,29 +71,25 @@
 .plan-buy[hidden] { display: none; }
 .plus-bar.is-covered { display: none; }
 
-/* шапка Плюса: навалено много настоящих треков под наклоном, поверх лежит мини-плеер */
+/* шапка Плюса: наклонённая куча плееров с настоящими треками лежит позади заголовка */
 #screen-plus { isolation: isolate; }
-.plus-hero { padding-top: 272px; }
-.plus-showcase { position: absolute; left: 0; right: 0; top: 0; height: 352px; overflow: hidden; pointer-events: none; z-index: -1; }
-.ps-mask { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(180deg, #000 0, #000 52%, transparent 96%); mask-image: linear-gradient(180deg, #000 0, #000 52%, transparent 96%); }
-.ps-field { position: absolute; left: 50%; top: -80px; width: 700px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; transform: translateX(-50%) rotate(-12deg); }
-.ps-field > i { display: flex; align-items: center; gap: 10px; padding: 7px 10px 7px 7px; border-radius: 14px; background: rgba(40, 32, 54, 0.95); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
-.ps-field > i:nth-child(4n+2) { margin-top: 26px; }
-.ps-field > i:nth-child(4n+3) { margin-top: -14px; }
-.ps-field > i:nth-child(4n) { margin-top: 18px; }
-.ps-cover { display: block; width: 38px; height: 38px; flex-shrink: 0; border-radius: var(--radius-s); background: linear-gradient(150deg, var(--c-warm), var(--c-mid) 60%, var(--c-deep)) center / cover; }
-.ps-field > i:nth-child(4n+2) .ps-cover { background-image: linear-gradient(210deg, var(--c-mid), var(--c-deep)); }
-.ps-field > i:nth-child(4n) .ps-cover { background-image: linear-gradient(120deg, var(--c-core), var(--c-warm)); }
-.ps-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.plus-hero { padding-top: 10px; }
+.plus-showcase { position: absolute; left: 0; right: 0; top: 0; height: 400px; overflow: hidden; pointer-events: none; z-index: -1; }
+.ps-mask { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(180deg, #000 0, #000 22%, transparent 84%); mask-image: linear-gradient(180deg, #000 0, #000 22%, transparent 84%); }
+.ps-field { position: absolute; left: 50%; top: -70px; width: 640px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; transform: translateX(-50%) rotate(-14deg); opacity: 0.3; }
+.ps-field > i { position: relative; display: flex; align-items: center; gap: 10px; padding: 11px 12px 17px 11px; border-radius: var(--radius-m); background: linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 30%, #2a2037), #1c1627); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.ps-field > i:nth-child(3n+2) { margin-top: 40px; }
+.ps-field > i:nth-child(3n) { margin-top: -22px; }
+.ps-cover { display: block; width: 42px; height: 42px; flex-shrink: 0; border-radius: var(--radius-s); background: linear-gradient(150deg, var(--c-warm), var(--c-mid) 60%, var(--c-deep)) center / cover; }
+.ps-field > i:nth-child(3n+2) .ps-cover { background-image: linear-gradient(210deg, var(--c-mid), var(--c-deep)); }
+.ps-field > i:nth-child(3n) .ps-cover { background-image: linear-gradient(120deg, var(--c-core), var(--c-warm)); }
+.ps-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .ps-meta b { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ps-meta em { font-style: normal; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-player { position: absolute; left: 20px; right: 20px; bottom: 28px; display: flex; align-items: center; gap: 12px; padding: 12px 14px 17px 12px; border-radius: var(--radius-m); background: linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 40%, #261c33), #1b1526); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 26px 46px -12px rgba(4, 2, 10, 0.9), 0 0 50px -10px color-mix(in srgb, var(--c-mid) 80%, transparent); }
-.ps-player .ps-cover { width: 54px; height: 54px; }
-.ps-player .ps-meta b { font-size: 16px; }
-.ps-player .ps-meta em { font-size: 14px; }
-.ps-play { margin-left: auto; width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
-.ps-bar { position: absolute; left: 14px; right: 14px; bottom: 7px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
-.ps-bar u { display: block; width: 38%; height: 100%; border-radius: 3px; background: var(--c-warm); }
+.ps-play { width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
+.ps-play svg { width: 16px; height: 16px; }
+.ps-bar { position: absolute; left: 11px; right: 12px; bottom: 7px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.ps-bar u { display: block; height: 100%; border-radius: 3px; background: var(--c-warm); }
 
 /* план: выбор срока и сама карточка */
 .plan-card { position: relative; padding: 22px 16px 18px; border-radius: var(--radius-l); background: radial-gradient(120% 70% at 12% 0%, color-mix(in srgb, var(--c-mid) 34%, transparent), transparent 70%), linear-gradient(180deg, #221a2f, #151019); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 30px 60px -28px color-mix(in srgb, var(--c-mid) 80%, #000); }
