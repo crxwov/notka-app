@@ -26,7 +26,7 @@ try {
   await b.sleep(4600);
   check("the themes take turns by themselves", await b.eval("document.getElementById('plus-stage').dataset.show === 'cassette'"));
   await b.click('#plus-stage-tabs [data-show="vinyl"]');
-  check("the price is in roubles", await b.eval("document.getElementById('plus-bar-note').textContent.includes('89 ₽') && !document.getElementById('plus-bar').textContent.includes('★')"));
+  check("the price is in roubles", await b.eval("document.getElementById('plus-bar-note').textContent.includes('₽') && !document.getElementById('plus-bar').textContent.includes('★')"));
   const bar = await b.eval("(() => { const r = document.getElementById('plus-bar').getBoundingClientRect(); return { bottom: Math.round(r.bottom), h: innerHeight }; })()");
   check("the price bar is on screen without scrolling", bar.bottom <= bar.h && bar.bottom > bar.h - 80, JSON.stringify(bar));
   await b.shot("plus-1");

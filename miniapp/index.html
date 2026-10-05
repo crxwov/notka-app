@@ -13,10 +13,10 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=105" />
+<link rel="stylesheet" href="styles.css?v=106" />
 <link rel="stylesheet" href="atmosphere.css?v=7" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=11" />
+<link rel="stylesheet" href="system.css?v=12" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -730,7 +730,6 @@
 
   <!-- ============ НОТКА ПЛЮС ============ -->
   <main class="screen" id="screen-plus" hidden>
-    <div class="plus-collage" id="plus-collage" aria-hidden="true"><div class="plus-collage-grid" id="plus-collage-grid"></div></div>
     <header class="bar">
       <button class="round-btn round-glass back-btn" id="plus-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
     </header>
@@ -738,6 +737,13 @@
     <div class="plus-hero">
       <p class="plus-brand"><i class="plus-brand-orb" aria-hidden="true"></i>Нотка Плюс</p>
       <h1 class="plus-title">Что даёт Плюс</h1>
+    </div>
+
+    <div class="plus-showcase" id="plus-showcase" aria-hidden="true">
+      <div class="ps-card ps-c1"><i class="ps-cover"></i><span class="ps-meta"><b></b><em></em></span><svg width="20" height="20"><use href="#i-heart-fill"/></svg></div>
+      <div class="ps-card ps-c2"><i class="ps-cover"></i><span class="ps-meta"><b></b><em></em></span><svg width="20" height="20"><use href="#i-heart-fill"/></svg></div>
+      <div class="ps-card ps-c3"><i class="ps-cover"></i><span class="ps-meta"><b></b><em></em></span><svg width="20" height="20"><use href="#i-heart-fill"/></svg></div>
+      <div class="ps-player"><i class="ps-cover"></i><span class="ps-meta"><b></b><em></em></span><span class="ps-play"><svg width="22" height="22"><use href="#i-pause"/></svg></span><span class="ps-bar"><u></u></span></div>
     </div>
 
     <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="pwg" gradientUnits="userSpaceOnUse" x1="14" y1="6" x2="106" y2="114"><stop offset="0" style="stop-color:var(--c-core)"/><stop offset=".34" style="stop-color:var(--c-warm)"/><stop offset=".68" style="stop-color:var(--c-mid)"/><stop offset="1" style="stop-color:var(--c-deep)"/></linearGradient></defs></svg>
@@ -832,10 +838,14 @@
     </div>
 
     <section class="plus-plan-sec" data-reveal aria-label="План">
-      <h2 class="h2 plus-plan-h">Твой план</h2>
+      <h2 class="h2 plus-plan-h">Выбери план</h2>
       <div class="plan-card">
-        <p class="plan-name">Нотка Плюс</p>
-        <p class="plan-price"><b>89 ₽</b> / месяц</p>
+        <p class="plan-name"><i class="plus-brand-orb" aria-hidden="true"></i>Нотка Плюс</p>
+        <div class="plan-opts" id="plan-opts" role="radiogroup" aria-label="План">
+          <button class="plan-opt is-on" type="button" role="radio" aria-checked="true" data-plan="year"><span class="po-radio"></span><span class="po-main"><b>Год</b><i>62 ₽ в месяц</i></span><span class="po-price"><b>749 ₽</b><s>1 068 ₽</s></span><em class="po-badge">−30%</em></button>
+          <button class="plan-opt" type="button" role="radio" aria-checked="false" data-plan="quarter"><span class="po-radio"></span><span class="po-main"><b>3 месяца</b><i>76 ₽ в месяц</i></span><span class="po-price"><b>229 ₽</b><s>267 ₽</s></span><em class="po-badge">−14%</em></button>
+          <button class="plan-opt" type="button" role="radio" aria-checked="false" data-plan="month"><span class="po-radio"></span><span class="po-main"><b>Месяц</b><i>без скидки</i></span><span class="po-price"><b>89 ₽</b></span></button>
+        </div>
         <ul class="plan-list">
           <li>Первые 7 дней бесплатно</li>
           <li>Все функции Плюса: машина времени, атмосферы, настроения, темы плеера</li>
@@ -1214,6 +1224,6 @@
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=3"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=66"></script>
+<script src="app.js?v=67"></script>
 </body>
 </html>

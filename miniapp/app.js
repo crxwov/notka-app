@@ -2832,6 +2832,20 @@
   function longDate(seconds) {
     return new Date(seconds * 1000).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
   }
+  const PLUS_PLANS = {
+    year: { then: "749 ₽ в год" },
+    quarter: { then: "229 ₽ за 3 месяца" },
+    month: { then: "89 ₽ в месяц" },
+  };
+  let plusPlan = "year";
+  // плашка с пробным периодом: в первый заход, потом на каждый десятый, и если не заходил 3 дня и больше
+  function planBarVisit() {
+    let visits = 0, last = 0;
+    try { visits = +localStorage.getItem("notka_plus_visits") || 0; last = +localStorage.getItem("notka_plus_last") || 0; } catch (e) { /* no storage: always show */ }
+    const show = visits % 10 === 0 || (last && Date.now() - last > 3 * 86400000);
+    try { localStorage.setItem("notka_plus_visits", String(visits + 1)); localStorage.setItem("notka_plus_last", String(Date.now())); } catch (e) { /* once more next time */ }
+    $("plus-bar").classList.toggle("is-skipped", !show && !hasPlus());
+  }
   function syncPlusUI() {
     const on = hasPlus();
     const real = hasRealPlus();
@@ -2848,7 +2862,7 @@
       ? `Плюс включён до ${longDate(plusUntil())}`
       : on
       ? "Плюс включён в режиме предпросмотра. Оплата не списывалась."
-      : "Потом 89 ₽ в месяц. Отмена в любой момент.";
+      : `Потом ${PLUS_PLANS[plusPlan].then}. Отмена в любой момент.`;
   }
   $("plus-bar-close").addEventListener("click", () => {
     haptic("light");
@@ -2874,7 +2888,8 @@
     $("plus-cassette-title").textContent = track ? track.title || "Без названия" : "Твоя музыка";
     $("plus-cassette-artist").textContent = track ? track.artist || "" : "в Нотке Плюс";
     fillPlusLive();
-    fillPlusCollage();
+    fillPlusShowcase();
+    planBarVisit();
     syncPlusUI();
     $("plus-bar").classList.remove("is-dismissed"); // плашка возвращается при каждом заходе
     revealIn("screen-plus", true);
@@ -2902,6 +2917,17 @@
     else showToast("Тема включена. Запусти любой трек и открой плеер");
   });
 
+  $("plan-opts").addEventListener("click", (e) => {
+    const opt = e.target.closest(".plan-opt");
+    if (!opt) return;
+    plusPlan = opt.dataset.plan;
+    $("plan-opts").querySelectorAll(".plan-opt").forEach((o) => {
+      o.classList.toggle("is-on", o === opt);
+      o.setAttribute("aria-checked", o === opt ? "true" : "false");
+    });
+    haptic("light");
+    syncPlusUI();
+  });
   const togglePlusPreview = () => {
     const on = !hasPlus();
     try { localStorage.setItem("notka_plus_local", on ? "1" : "0"); } catch (e) { return; }
@@ -2920,20 +2946,26 @@
     }, { root: $("screen-plus"), threshold: 0.35 }).observe(document.querySelector(".plan-card"));
   }
 
-  // подборка обложек сверху страницы Плюса: твои обложки, а где их мало — цвета темы
-  function fillPlusCollage() {
-    const seen = new Set(), urls = [];
-    const add = (t) => { if (t && t.artwork && !seen.has(t.artwork) && urls.length < 16) { seen.add(t.artwork); urls.push(t.artwork); } };
+  // шапка страницы Плюса: настоящие карточки твоих треков и мини-плеер
+  const PLUS_DEMO_TRACKS = [
+    { title: "Yellow", artist: "Coldplay" }, { title: "Creep", artist: "Radiohead" },
+    { title: "Blinding Lights", artist: "The Weeknd" }, { title: "Dancing Queen", artist: "ABBA" },
+  ];
+  function fillPlusShowcase() {
+    const seen = new Set(), list = [];
+    const add = (t) => { if (t && t.title && t.artwork && !seen.has(t.id) && list.length < 4) { seen.add(t.id); list.push(t); } };
     (state.favorites || []).forEach(add);
     (state.recent || []).forEach(add);
     (state.playlists || []).forEach((p) => Object.values(p.tracksCache || {}).forEach(add));
-    const grid = $("plus-collage-grid");
-    grid.textContent = "";
-    for (let i = 0; i < 16; i++) {
-      const tile = document.createElement("i");
-      if (urls.length >= 4 && urls[i % urls.length]) tile.style.backgroundImage = `url("${hiResArtwork(urls[i % urls.length]).replace(/"/g, "%22")}")`;
-      grid.appendChild(tile);
-    }
+    for (let i = 0; list.length < 4; i++) list.push(PLUS_DEMO_TRACKS[i]);
+    const player = currentTrack && currentTrack.title ? currentTrack : list[0];
+    const cards = [list[1], list[2], list[3], player];
+    document.querySelectorAll("#plus-showcase .ps-c1, #plus-showcase .ps-c2, #plus-showcase .ps-c3, #plus-showcase .ps-player").forEach((el, i) => {
+      const t = cards[i];
+      el.querySelector("b").textContent = t.title;
+      el.querySelector("em").textContent = t.artist || "";
+      el.querySelector(".ps-cover").style.backgroundImage = t.artwork ? `url("${hiResArtwork(t.artwork).replace(/"/g, "%22")}")` : "";
+    });
   }
 
   // ============================================================
