@@ -71,22 +71,26 @@
 .plan-buy[hidden] { display: none; }
 .plus-bar.is-covered { display: none; }
 
-/* шапка Плюса: настоящие карточки треков и мини-плеер, как в самой Нотке */
-.plus-showcase { position: relative; height: 246px; margin: 20px 0 6px; pointer-events: none; }
-.ps-card, .ps-player { position: absolute; display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; border-radius: var(--radius-m); background: rgba(34, 27, 46, 0.92); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 18px 34px -16px rgba(4, 2, 10, 0.8); animation: ps-float 6s ease-in-out infinite; }
-.ps-card svg { margin-left: auto; color: var(--c-warm); flex-shrink: 0; }
-.ps-c1 { top: 0; left: 0; right: 36px; transform: rotate(-1.6deg); opacity: 0.7; }
-.ps-c2 { top: 54px; left: 22px; right: 10px; transform: rotate(1.2deg); opacity: 0.88; animation-delay: -2s; }
-.ps-c3 { top: 108px; left: 6px; right: 24px; transform: rotate(-0.8deg); animation-delay: -4s; }
-.ps-player { top: 170px; left: 0; right: 0; padding: 12px 14px 16px 12px; background: linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 38%, #241b30), #1b1526); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 24px 44px -14px color-mix(in srgb, var(--c-mid) 70%, #000); animation-name: none; }
-@keyframes ps-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -4px; } }
-.ps-cover { width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--radius-s); background: linear-gradient(150deg, var(--c-warm), var(--c-mid) 60%, var(--c-deep)) center / cover; }
-.ps-player .ps-cover { width: 52px; height: 52px; }
-.ps-c2 .ps-cover { background-image: linear-gradient(210deg, var(--c-mid), var(--c-deep)); }
-.ps-c3 .ps-cover { background-image: linear-gradient(120deg, var(--c-core), var(--c-warm)); }
+/* шапка Плюса: навалено много настоящих треков под наклоном, поверх лежит мини-плеер */
+#screen-plus { isolation: isolate; }
+.plus-hero { padding-top: 272px; }
+.plus-showcase { position: absolute; left: 0; right: 0; top: 0; height: 352px; overflow: hidden; pointer-events: none; z-index: -1; }
+.ps-mask { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(180deg, #000 0, #000 52%, transparent 96%); mask-image: linear-gradient(180deg, #000 0, #000 52%, transparent 96%); }
+.ps-field { position: absolute; left: 50%; top: -80px; width: 700px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; transform: translateX(-50%) rotate(-12deg); }
+.ps-field > i { display: flex; align-items: center; gap: 10px; padding: 7px 10px 7px 7px; border-radius: 14px; background: rgba(40, 32, 54, 0.95); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.ps-field > i:nth-child(4n+2) { margin-top: 26px; }
+.ps-field > i:nth-child(4n+3) { margin-top: -14px; }
+.ps-field > i:nth-child(4n) { margin-top: 18px; }
+.ps-cover { display: block; width: 38px; height: 38px; flex-shrink: 0; border-radius: var(--radius-s); background: linear-gradient(150deg, var(--c-warm), var(--c-mid) 60%, var(--c-deep)) center / cover; }
+.ps-field > i:nth-child(4n+2) .ps-cover { background-image: linear-gradient(210deg, var(--c-mid), var(--c-deep)); }
+.ps-field > i:nth-child(4n) .ps-cover { background-image: linear-gradient(120deg, var(--c-core), var(--c-warm)); }
 .ps-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ps-meta b { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-meta em { font-style: normal; font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-meta b { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-meta em { font-style: normal; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-player { position: absolute; left: 20px; right: 20px; bottom: 28px; display: flex; align-items: center; gap: 12px; padding: 12px 14px 17px 12px; border-radius: var(--radius-m); background: linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 40%, #261c33), #1b1526); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 26px 46px -12px rgba(4, 2, 10, 0.9), 0 0 50px -10px color-mix(in srgb, var(--c-mid) 80%, transparent); }
+.ps-player .ps-cover { width: 54px; height: 54px; }
+.ps-player .ps-meta b { font-size: 16px; }
+.ps-player .ps-meta em { font-size: 14px; }
 .ps-play { margin-left: auto; width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
 .ps-bar { position: absolute; left: 14px; right: 14px; bottom: 7px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
 .ps-bar u { display: block; width: 38%; height: 100%; border-radius: 3px; background: var(--c-warm); }

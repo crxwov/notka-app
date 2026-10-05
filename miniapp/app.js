@@ -2948,24 +2948,34 @@
 
   // шапка страницы Плюса: настоящие карточки твоих треков и мини-плеер
   const PLUS_DEMO_TRACKS = [
-    { title: "Yellow", artist: "Coldplay" }, { title: "Creep", artist: "Radiohead" },
-    { title: "Blinding Lights", artist: "The Weeknd" }, { title: "Dancing Queen", artist: "ABBA" },
+    { title: "Yellow", artist: "Coldplay" }, { title: "Creep", artist: "Radiohead" }, { title: "Blinding Lights", artist: "The Weeknd" },
+    { title: "Dancing Queen", artist: "ABBA" }, { title: "Smells Like Teen Spirit", artist: "Nirvana" }, { title: "Shape of You", artist: "Ed Sheeran" },
+    { title: "Believer", artist: "Imagine Dragons" }, { title: "Numb", artist: "Linkin Park" }, { title: "Bad Guy", artist: "Billie Eilish" },
   ];
   function fillPlusShowcase() {
     const seen = new Set(), list = [];
-    const add = (t) => { if (t && t.title && t.artwork && !seen.has(t.id) && list.length < 4) { seen.add(t.id); list.push(t); } };
+    const add = (t) => { if (t && t.title && t.artwork && !seen.has(t.id) && list.length < 9) { seen.add(t.id); list.push(t); } };
     (state.favorites || []).forEach(add);
     (state.recent || []).forEach(add);
     (state.playlists || []).forEach((p) => Object.values(p.tracksCache || {}).forEach(add));
-    for (let i = 0; list.length < 4; i++) list.push(PLUS_DEMO_TRACKS[i]);
-    const player = currentTrack && currentTrack.title ? currentTrack : list[0];
-    const cards = [list[1], list[2], list[3], player];
-    document.querySelectorAll("#plus-showcase .ps-c1, #plus-showcase .ps-c2, #plus-showcase .ps-c3, #plus-showcase .ps-player").forEach((el, i) => {
-      const t = cards[i];
-      el.querySelector("b").textContent = t.title;
-      el.querySelector("em").textContent = t.artist || "";
-      el.querySelector(".ps-cover").style.backgroundImage = t.artwork ? `url("${hiResArtwork(t.artwork).replace(/"/g, "%22")}")` : "";
-    });
+    const demo = PLUS_DEMO_TRACKS;
+    const pool = list.length >= 5 ? list : list.concat(demo.slice(0, 9 - list.length));
+    const field = $("ps-field");
+    field.textContent = "";
+    for (let i = 0; i < 28; i++) {
+      const t = pool[(i * 4) % pool.length] || pool[i % pool.length];
+      const card = document.createElement("i");
+      card.innerHTML = '<span class="ps-cover"></span><span class="ps-meta"><b></b><em></em></span>';
+      card.querySelector("b").textContent = t.title;
+      card.querySelector("em").textContent = t.artist || "";
+      if (t.artwork) card.querySelector(".ps-cover").style.backgroundImage = `url("${hiResArtwork(t.artwork).replace(/"/g, "%22")}")`;
+      field.appendChild(card);
+    }
+    const player = currentTrack && currentTrack.title ? currentTrack : pool[0];
+    const pl = document.querySelector("#plus-showcase .ps-player");
+    pl.querySelector("b").textContent = player.title;
+    pl.querySelector("em").textContent = player.artist || "";
+    pl.querySelector(".ps-cover").style.backgroundImage = player.artwork ? `url("${hiResArtwork(player.artwork).replace(/"/g, "%22")}")` : "";
   }
 
   // ============================================================
