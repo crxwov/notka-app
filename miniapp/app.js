@@ -4025,39 +4025,42 @@
     const el = document.createElement("article");
     el.className = "rcp-card";
     el.dataset.v = String(i % 4);
-    const add = (cls, text, tag) => { const n = document.createElement(tag || "span"); n.className = cls; n.textContent = text; el.appendChild(n); return n; };
-    if (card.type === "artist") {
-      el.classList.add("has-photo");
-      const ph = document.createElement("span");
-      ph.className = "rcp-photo";
-      const cv = document.createElement("span");
-      setCoverEl(cv, card.photo ? hiResArtwork(card.photo) : null, card.name);
-      ph.appendChild(cv);
-      el.appendChild(ph);
-    }
-    add("rcp-kicker", card.kicker);
+    const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+    const top = mk("div", "rcp-top");
+    const brand = mk("span", "rcp-brand");
+    brand.innerHTML = '<svg aria-hidden="true"><use href="#i-note-mono"/></svg>';
+    brand.appendChild(document.createTextNode("Нотка"));
+    top.append(brand, mk("span", "rcp-pill", card.kicker));
+    el.appendChild(top);
     if (card.type === "minutes") {
-      const num = add("rcp-num", card.minutes.toLocaleString("ru-RU"), "b");
+      const num = mk("b", "rcp-num", card.minutes.toLocaleString("ru-RU"));
       if (String(card.minutes).length >= 4) num.classList.add("is-long");
-      add("rcp-word", card.word);
-      add("rcp-note", `${card.note} ${card.tracks} ${plural(card.tracks, "трек", "трека", "треков")}, ${card.artists} ${plural(card.artists, "исполнитель", "исполнителя", "исполнителей")}.`, "p");
+      el.append(num, mk("span", "rcp-word", card.word), mk("p", "rcp-note", card.note));
+      const plate = mk("div", "rcp-plate");
+      [[card.tracks, plural(card.tracks, "трек", "трека", "треков")], [card.artists, plural(card.artists, "исполнитель", "исполнителя", "исполнителей")]].forEach(([n, w]) => {
+        const st = mk("span", "rcp-stat");
+        st.append(mk("b", "", String(n)), mk("span", "", w));
+        plate.appendChild(st);
+      });
+      el.appendChild(plate);
     } else if (card.type === "artist") {
-      add("rcp-name", card.name, "b");
-      add("rcp-word", card.sub);
+      el.classList.add("is-artist");
+      const head = mk("div", "rcp-artist-head");
+      head.append(mk("b", "rcp-name", card.name), mk("span", "rcp-word", card.sub));
+      const disc = mk("div", "rcp-disc");
+      const cv = mk("span");
+      setCoverEl(cv, card.photo ? hiResArtwork(card.photo) : null, card.name);
+      disc.appendChild(cv);
+      el.append(head, disc);
     } else {
-      const list = document.createElement("div");
-      list.className = "rcp-list";
+      const list = mk("div", "rcp-list");
       card.rows.forEach((r, n) => {
-        const row = document.createElement("div");
-        row.className = "rcp-row" + (card.type === "artists" ? " is-round" : "");
-        const num = document.createElement("i"); num.textContent = String(n + 1);
-        const cv = document.createElement("span"); cv.className = "cover";
+        const row = mk("div", "rcp-row" + (card.type === "artists" ? " is-round" : ""));
+        const cv = mk("span", "cover");
         setCoverEl(cv, r.art ? hiResArtwork(r.art) : null, r.seed);
-        const t = document.createElement("span"); t.className = "t";
-        const b = document.createElement("b"); b.textContent = r.title;
-        const em = document.createElement("em"); em.textContent = r.sub;
-        t.append(b, em);
-        row.append(num, cv, t);
+        const t = mk("span", "t");
+        t.append(mk("b", "", r.title), mk("em", "", r.sub));
+        row.append(mk("i", "", String(n + 1)), cv, t);
         list.appendChild(row);
       });
       el.appendChild(list);
@@ -4169,66 +4172,105 @@
     ctx.restore();
   }
   const SHARE_FONT = "Onest, system-ui, -apple-system, sans-serif";
+  // вертикальная плашка из стекла, как в карточках с цитатами
+  function glassPlate(ctx, x, y, w, h, r, strong) {
+    roundPath(ctx, x, y, w, h, r);
+    ctx.fillStyle = strong ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.13)"; ctx.fill();
+    ctx.strokeStyle = strong ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.24)"; ctx.lineWidth = 2.5; ctx.stroke();
+  }
   async function renderRecapImage(card, index) {
     try { await document.fonts.load("800 100px Onest"); } catch (e) { /* the system font is fine */ }
     const W = 1080, H = 1350, F = SHARE_FONT;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
-    const th = themeColors();
-    const v = index % 4;
-    const dark = "#1b0d14";
-    const scheme = [{ bg: th.warm, fg: dark, soft: "rgba(27,13,20,0.68)" }, { bg: th.core, fg: dark, soft: "rgba(27,13,20,0.68)" }, { bg: th.mid, fg: "#fff", soft: "rgba(255,255,255,0.8)" }, { bg: th.deep, fg: th.core, soft: "rgba(255,255,255,0.7)" }][v];
-    let fg = scheme.fg, soft = scheme.soft;
-    ctx.fillStyle = scheme.bg; ctx.fillRect(0, 0, W, H);
-    if (card.type === "artist") {
-      ctx.fillStyle = th.deep; ctx.fillRect(0, 0, W, H);
-      const img = await loadShareImg(card.photo ? hiResArtwork(card.photo) : null);
-      if (img) coverFit(ctx, img, 0, 0, W, H);
-      const sh = ctx.createLinearGradient(0, 0, 0, H);
-      sh.addColorStop(0, "rgba(10,6,16,0.5)"); sh.addColorStop(0.38, "rgba(10,6,16,0.04)"); sh.addColorStop(1, "rgba(10,6,16,0.86)");
-      ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H);
-      fg = "#fff"; soft = "rgba(255,255,255,0.8)";
-    }
-    const pad = 84;
     ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = soft; ctx.font = `700 42px ${F}`;
-    ctx.fillText(card.kicker, pad, 40 + pad);
-    drawLogo(ctx, W - pad - 52, pad - 4, 52, soft);
-    ctx.fillStyle = fg;
+    const th = themeColors();
+    const deep = rgbOf(th.deep), warm = rgbOf(th.warm), mid = rgbOf(th.mid);
+    ctx.fillStyle = rgba(mixRgb(deep, [12, 10, 18], 0.6), 1); ctx.fillRect(0, 0, W, H);
+    const v = index % 4;
+    const lights = [[[120, 80, 780, warm, 0.8], [1080, 800, 740, mid, 0.66]], [[1060, 80, 760, warm, 0.8], [0, 900, 740, mid, 0.66]], [[540, 1350, 860, warm, 0.76], [0, 120, 700, mid, 0.66]], [[0, 1350, 780, warm, 0.78], [1080, 150, 740, mid, 0.66]]][v];
+    lights.forEach(([x, y, r, col, al]) => glowAt(ctx, x, y, r, col, al));
+    const pad = 84;
+    // метка и подпись периода
+    drawLogo(ctx, pad, 76, 60, "rgba(255,255,255,0.92)");
+    ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.font = `800 44px ${F}`;
+    ctx.fillText("Нотка", pad + 76, 124);
+    ctx.font = `700 40px ${F}`;
+    const kick = cutText(ctx, card.kicker, 520);
+    const kw = ctx.measureText(kick).width + 64;
+    glassPlate(ctx, W - 60 - kw, 64, kw, 90, 45, false);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(kick, W - 60 - kw + 32, 124);
+    ctx.fillStyle = "#fff";
     if (card.type === "minutes") {
       const num = card.minutes.toLocaleString("ru-RU");
-      const size = num.length >= 6 ? 270 : num.length >= 4 ? 330 : 400;
+      const size = num.length >= 6 ? 290 : num.length >= 4 ? 350 : 420;
       ctx.font = `800 ${size}px ${F}`;
-      ctx.fillText(num, pad - 10, H - 380);
-      ctx.font = `800 76px ${F}`;
-      ctx.fillText(card.word, pad, H - 285);
-      ctx.fillStyle = soft; ctx.font = `500 42px ${F}`;
-      wrapLines(ctx, `${card.note} ${card.tracks} ${plural(card.tracks, "трек", "трека", "треков")}, ${card.artists} ${plural(card.artists, "исполнитель", "исполнителя", "исполнителей")}.`, W - pad * 2, 3).forEach((l, i) => ctx.fillText(l, pad, H - 200 + i * 56));
+      ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 36;
+      ctx.fillText(num, pad - 10, 640);
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+      ctx.font = `800 82px ${F}`;
+      ctx.fillText(card.word, pad, 750);
+      ctx.fillStyle = "rgba(255,255,255,0.78)"; ctx.font = `500 46px ${F}`;
+      wrapLines(ctx, card.note, W - pad * 2, 3).forEach((l, i) => ctx.fillText(l, pad, 835 + i * 60));
+      const px = 60, ph = 190, py = H - 60 - ph, pw = W - 120;
+      glassPlate(ctx, px, py, pw, ph, 56, false);
+      const stats = [[card.tracks, plural(card.tracks, "трек", "трека", "треков")], [card.artists, plural(card.artists, "исполнитель", "исполнителя", "исполнителей")]];
+      stats.forEach(([n, w], i) => {
+        const cx = px + pw * (i * 2 + 1) / 4;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#fff"; ctx.font = `800 84px ${F}`; ctx.fillText(String(n), cx, py + 98);
+        ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `500 40px ${F}`; ctx.fillText(w, cx, py + 154);
+        ctx.textAlign = "left";
+      });
+      ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fillRect(px + pw / 2 - 1, py + 40, 2, ph - 80);
     } else if (card.type === "artist") {
-      ctx.font = `800 128px ${F}`;
+      ctx.font = `800 132px ${F}`;
       const lines = wrapLines(ctx, card.name, W - pad * 2, 3);
-      lines.forEach((l, i) => ctx.fillText(l, pad, H - 210 - (lines.length - 1 - i) * 124));
+      ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 30;
+      ctx.fillStyle = "#fff";
+      lines.forEach((l, i) => ctx.fillText(l, pad, 300 + i * 126));
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
       ctx.font = `800 62px ${F}`; ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.fillText(card.sub, pad, H - 110);
+      ctx.fillText(card.sub, pad, 300 + lines.length * 126 + 22);
+      const img = await loadShareImg(card.photo ? hiResArtwork(card.photo) : null);
+      const dx = 690, dy = 1400, dr = 640;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 70; ctx.shadowOffsetY = 24;
+      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, dr + 12, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = rgba(mid, 1); ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
+      if (img) { ctx.translate(dx, dy); ctx.rotate(-0.22); coverFit(ctx, img, -dr, -dr, dr * 2, dr * 2); ctx.rotate(0.22); ctx.translate(-dx, -dy); }
+      ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.lineWidth = 2;
+      for (let rr = 140; rr < dr; rr += 14) { ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.stroke(); }
+      const sheen = ctx.createLinearGradient(dx - dr, dy - dr, dx + dr * 0.6, dy + dr * 0.6);
+      sheen.addColorStop(0, "rgba(255,255,255,0.24)"); sheen.addColorStop(0.5, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(255,255,255,0.08)");
+      ctx.fillStyle = sheen; ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
+      ctx.restore();
     } else {
-      const imgs = await Promise.all(card.rows.map((r) => loadShareImg(r.art ? hiResArtwork(r.art) : null)));
       const round = card.type === "artists";
+      const imgs = await Promise.all(card.rows.map((r) => loadShareImg(r.art ? hiResArtwork(r.art) : null)));
+      const rh = 168, gap = 20, x0 = 60, w0 = W - 120, y0 = 250;
       card.rows.forEach((r, i) => {
-        const y = 300 + i * 190;
-        ctx.fillStyle = soft; ctx.font = `800 54px ${F}`;
-        ctx.fillText(String(i + 1), pad, y + 100);
-        const x = pad + 80, s = 140;
+        const y = y0 + i * (rh + gap);
+        glassPlate(ctx, x0, y, w0, rh, 48, i === 0);
+        ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = `800 52px ${F}`; ctx.textAlign = "center";
+        ctx.fillText(String(i + 1), x0 + 54, y + rh / 2 + 18);
+        ctx.textAlign = "left";
+        const s = 120, cx = x0 + 100, cy = y + (rh - s) / 2;
         ctx.save();
-        if (round) { ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2 - 8, s / 2, 0, Math.PI * 2); ctx.closePath(); } else roundPath(ctx, x, y - 8, s, s, 26);
+        if (round) { ctx.beginPath(); ctx.arc(cx + s / 2, cy + s / 2, s / 2, 0, Math.PI * 2); ctx.closePath(); } else roundPath(ctx, cx, cy, s, s, 30);
         ctx.clip();
-        if (imgs[i]) coverFit(ctx, imgs[i], x, y - 8, s, s); else { ctx.fillStyle = "rgba(128,128,128,0.35)"; ctx.fillRect(x, y - 8, s, s); }
+        if (imgs[i]) coverFit(ctx, imgs[i], cx, cy, s, s); else { ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(cx, cy, s, s); }
         ctx.restore();
-        ctx.fillStyle = fg; ctx.font = `700 50px ${F}`;
-        const title = wrapLines(ctx, r.title, W - x - s - 24 - pad, 1)[0] || "";
-        ctx.fillText(title + (title.length < r.title.length ? "…" : ""), x + s + 28, y + 52);
-        ctx.fillStyle = soft; ctx.font = `500 40px ${F}`;
-        ctx.fillText(wrapLines(ctx, r.sub, W - x - s - 24 - pad, 1)[0] || "", x + s + 28, y + 108);
+        const tx = cx + s + 30, tmax = x0 + w0 - tx - 36;
+        ctx.fillStyle = "#fff"; ctx.font = `800 52px ${F}`;
+        ctx.fillText(cutText(ctx, r.title, tmax), tx, y + 76);
+        ctx.fillStyle = "rgba(255,255,255,0.74)"; ctx.font = `500 40px ${F}`;
+        ctx.fillText(cutText(ctx, r.sub, tmax), tx, y + 128);
       });
     }
     return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));

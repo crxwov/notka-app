@@ -55,6 +55,16 @@ check("the card turns into a 1080x1350 picture", shared.w === 1080 && shared.h =
 await b.eval("document.getElementById('recap-preview').scrollIntoView(); true");
 await b.shot("recap-modal");
 await b.click("#recap-modal-close"); await b.sleep(400);
+{
+  const fs = await import("node:fs");
+  for (let i = 0; i < 4; i++) {
+    await b.eval(`document.getElementById('recap-deck').scrollTo({ left: ${i} * (document.querySelector('.rcp-card').offsetWidth + 12), behavior: 'instant' }); true`); await b.sleep(500);
+    await b.click("#recap-share-btn"); await b.sleep(3000);
+    const data = await b.eval("(() => { const i = document.getElementById('recap-preview'); const c = document.createElement('canvas'); c.width = 540; c.height = 675; c.getContext('2d').drawImage(i, 0, 0, 540, 675); return c.toDataURL('image/png'); })()");
+    fs.writeFileSync(`C:/Users/leksik/Documents/Notka/tests/shots/recap-img-${i}.png`, Buffer.from(data.split(",")[1], "base64"));
+    await b.click("#recap-modal-close"); await b.sleep(400);
+  }
+}
 await b.click('#recap-periods [data-period="all"]'); await b.sleep(600);
 check("«Всё время» also has cards", (await b.eval("document.querySelectorAll('#recap-deck .rcp-card').length")) >= 3);
 console.log(bad ? "FAILED" : "ALL PASS");
