@@ -4117,7 +4117,7 @@
   const loadShareImg = (url) => new Promise((resolve) => {
     if (!url) { resolve(null); return; }
     const img = new Image();
-    const timer = setTimeout(() => resolve(null), 5000);
+    const timer = setTimeout(() => resolve(null), 8000);
     img.crossOrigin = "anonymous";
     img.onload = () => { clearTimeout(timer); resolve(img); };
     img.onerror = () => { clearTimeout(timer); resolve(null); };
@@ -4415,37 +4415,34 @@
     ctx.fillText("Нотка", pad + 76, 124);
 
     if (style === "light") {
-      // строка горит по центру, соседние размыты, внизу плеер Нотки
+      // как текст в плеере Нотки: строки одного размера, слева, поющаяся горит, соседние приглушены
       const cw = W - pad * 2;
       const prev = quoteCtx.before.length ? quoteCtx.before[quoteCtx.before.length - 1] : "";
       const next = quoteCtx.after.length ? quoteCtx.after[0] : "";
-      const CTX = 58, ctxLh = CTX * 1.2, gapC = 50;
-      const nCtx = (prev ? 1 : 0) + (next ? 1 : 0);
-      const regionTop = 190, regionBottom = H - 60 - 250 - 40, regionH = regionBottom - regionTop;
-      const litMax = regionH - nCtx * (ctxLh + gapC);
-      const fit = fitText(ctx, lines, cw, [132, 124, 116, 108, 100, 92, 84, 76, 68, 60, 54], litMax, 1.1);
-      const lh = fit.size * 1.1;
-      const litH = fit.wrapped.length * lh;
-      const total = litH + nCtx * (ctxLh + gapC);
-      let y = regionTop + (regionH - total) / 2;
-      const blurOk = (() => { try { ctx.filter = "blur(1px)"; const ok = ctx.filter === "blur(1px)"; ctx.filter = "none"; return ok; } catch (e) { return false; } })();
-      ctx.textAlign = "center";
-      const drawCtx = (str, yy) => {
-        ctx.font = `800 ${CTX}px ${F}`;
-        const t = cutText(ctx, str, cw);
-        if (blurOk) { ctx.filter = "blur(6px)"; ctx.fillStyle = "rgba(255,255,255,0.68)"; } else ctx.fillStyle = "rgba(255,255,255,0.28)";
-        ctx.fillText(t, W / 2, yy + CTX * 0.9);
-        ctx.filter = "none";
-      };
-      if (prev) { drawCtx(prev, y); y += ctxLh + gapC; }
-      ctx.font = `800 ${fit.size}px ${F}`;
-      ctx.fillStyle = "#fff";
-      ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 28; ctx.shadowOffsetY = 3;
-      fit.wrapped.forEach((ln, i) => ctx.fillText(ln, W / 2, y + fit.size * 0.86 + i * lh));
-      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      y += litH + gapC;
-      if (next) drawCtx(next, y);
-      ctx.textAlign = "left";
+      const regionTop = 190, regionBottom = H - 60 - 250 - 36, regionH = regionBottom - regionTop;
+      let layout = null;
+      for (const size of [96, 90, 84, 78, 72, 66, 60, 54]) {
+        ctx.font = `700 ${size}px ${F}`;
+        const wrapGroup = (arr, cap) => arr.reduce((acc, ln) => acc.concat(wrapLines(ctx, ln, cw, 9)), []).slice(0, cap);
+        const g = [wrapGroup(prev ? [prev] : [], 2), wrapGroup(lines, 9), wrapGroup(next ? [next] : [], 2)];
+        const count = g[0].length + g[1].length + g[2].length;
+        const gaps = (g[0].length ? 1 : 0) + (g[2].length ? 1 : 0);
+        const h = count * size * 1.2 + gaps * size * 0.45;
+        layout = { size, g, h };
+        if (h <= regionH) break;
+      }
+      const { size: S, g: groups, h: blockH } = layout;
+      const slh = S * 1.2;
+      let y = regionTop + (regionH - Math.min(blockH, regionH)) / 2;
+      ctx.font = `700 ${S}px ${F}`;
+      groups.forEach((grp, gi) => {
+        if (!grp.length) return;
+        ctx.fillStyle = gi === 1 ? "#fff" : gi === 0 ? "rgba(255,255,255,0.36)" : "rgba(255,255,255,0.5)";
+        if (gi === 1) { ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 2; }
+        grp.forEach((ln) => { ctx.fillText(ln, pad, y + S * 0.9); y += slh; });
+        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        y += S * 0.45;
+      });
       // плеер
       const sx = 60, sh = 250, sy = H - 60 - sh, sw = W - 120;
       roundPath(ctx, sx, sy, sw, sh, 64);
