@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -164,6 +165,17 @@ _COOKIE_ERROR_MARKERS = ("cookie database", "could not copy", "could not decrypt
 _COOKIE_DECRYPT_MARKERS = ("failed to decrypt with dpapi",)
 
 
+# Когда база cookies браузера занята (Chrome открыт), каждая попытка читать её
+# заканчивается ошибкой и повтором без cookies: это лишние секунды на каждом треке.
+# После первой такой ошибки десять минут идём сразу без cookies.
+_cookie_pause_until = 0.0
+
+
+def _pause_cookies() -> None:
+    global _cookie_pause_until
+    _cookie_pause_until = time.time() + 600
+
+
 def _is_cookie_error(exc: Exception) -> bool:
     text = str(exc).lower()
     if any(marker in text for marker in _COOKIE_DECRYPT_MARKERS):
@@ -185,6 +197,8 @@ class YtDlpResolver:
         return self._to_resolved(info)
 
     def _base_opts(self, use_cookies: bool = True) -> dict:
+        if use_cookies and time.time() < _cookie_pause_until:
+            use_cookies = False
         opts = {
             "quiet": True,
             "no_warnings": True,
@@ -239,6 +253,7 @@ class YtDlpResolver:
                 return ydl.extract_info(target, download=False)
         except Exception as exc:
             if self._uses_browser_cookies() and _is_cookie_error(exc):
+                _pause_cookies()
                 # The browser (e.g. Chrome) is open and holds a lock on its
                 # own cookie database, so yt-dlp can't copy it out to read
                 # from — that's a bug in *this machine's current state*,
@@ -312,6 +327,7 @@ class YtDlpResolver:
             for leftover in dest_dir.glob(f"{tmp_stem}*"):
                 leftover.unlink(missing_ok=True)
             if self._uses_browser_cookies() and _is_cookie_error(exc):
+                _pause_cookies()
                 # Same locked-cookie-database problem as _extract (see its
                 # comment) — retry once with no cookies before giving up.
                 fallback_opts = self._download_opts(use_cookies=False, outtmpl=outtmpl)

@@ -4723,6 +4723,25 @@
     safe("seekto", (d) => { if (d && typeof d.seekTime === "number") audio.currentTime = d.seekTime; });
   }
 
+  // Если трек не играет, ищем ему замену: тот же трек от другой загрузки (другой источник, тот же исполнитель, та же длина)
+  const altTried = new Set();
+  async function findEquivalent(track) {
+    try {
+      const q = `${track.artist || ""} ${track.title || ""}`.trim();
+      if (!q) return null;
+      const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const norm = (s) => String(s || "").toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+      const t0 = norm(track.title), a0 = norm(track.artist);
+      const firstWord = (s) => s.split(" ")[0] || "";
+      return (data.results || []).find((c) => c.id !== track.id && c.sourceId !== track.sourceId
+        && norm(c.title) === t0
+        && (!a0 || norm(c.artist).includes(firstWord(a0)) || a0.includes(firstWord(norm(c.artist))))
+        && (!track.duration || !c.duration || Math.abs(c.duration - track.duration) <= 10)) || null;
+    } catch (e) { return null; }
+  }
+
   async function playTrack(track, queue, opts) {
     opts = opts || {};
     const token = ++playToken;
@@ -4799,6 +4818,18 @@
       setLoading(false);
       setPlaying(false);
       haptic("error");
+      // выбранная запись не играет (источник отказал): пробуем равноценную с тем же названием и исполнителем
+      if (!opts.altTried && !altTried.has(track.id)) {
+        altTried.add(track.id);
+        const alt = await findEquivalent(track);
+        if (token !== playToken) return;
+        if (alt) {
+          const swap = (arr) => { const i = arr.findIndex((t) => t.id === track.id); if (i >= 0) arr[i] = alt; };
+          swap(currentQueue); swap(originalQueue);
+          playTrack(alt, currentQueue, { keepQueue: true, altTried: true });
+          return;
+        }
+      }
       const hasNext = currentQueueIndex >= 0 && currentQueueIndex < currentQueue.length - 1;
       if (hasNext && failStreak < 3) {
         failStreak++;
