@@ -3306,13 +3306,13 @@
     revealIn("screen-look", true);
     // the theme that is on stands in view
     const on = stage.querySelector(".look-slide.is-on");
-    if (on) stage.scrollLeft = on.offsetLeft - (stage.clientWidth - on.offsetWidth) / 2;
+    if (on) stage.scrollLeft = Math.max(0, on.offsetLeft - 20);
   }
   $("look-stage").addEventListener("click", (e) => {
     const slide = e.target.closest(".look-slide");
     if (!slide) return;
     haptic("light");
-    slide.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    slide.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
     setPlayerTheme(slide.dataset.theme);
   });
   $("look-colors").addEventListener("click", (e) => {

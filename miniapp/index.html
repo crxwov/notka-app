@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=107" />
 <link rel="stylesheet" href="atmosphere.css?v=7" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=20" />
+<link rel="stylesheet" href="system.css?v=22" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -615,20 +615,12 @@
       <h1 class="hero-title">Нотка</h1>
       <p class="hero-sub" id="about-version">Версия 1.1</p>
     </div>
-    <p class="about-lead" data-reveal>Музыка прямо в Telegram. Ничего не нужно устанавливать и нигде регистрироваться: открываешь чат, находишь трек — и он играет.</p>
-
-    <h2 class="look-h about-h" data-reveal>Что умеет</h2>
-    <div class="about-list" data-reveal>
-      <div class="about-row"><b>Мой микс</b><span>Сам подбирает музыку по тому, что ты слушаешь</span></div>
-      <div class="about-row"><b>Текст в такт</b><span>Строка загорается, когда её поют</span></div>
-      <div class="about-row"><b>Поиск</b><span>Треки, исполнители и альбомы</span></div>
-      <div class="about-row"><b>Любимое и плейлисты</b><span>Всё собрано в одном месте</span></div>
-      <div class="about-row"><b>Статистика</b><span>Кого и сколько ты слушаешь</span></div>
-      <div class="about-row"><b>И ещё</b><span>Скачивание треков, таймер сна, отправить другу</span></div>
-    </div>
+    <p class="about-lead" data-reveal>Нотка — музыка прямо в Telegram. Мы делаем её, чтобы слушать любимое было просто: открыл чат, нашёл трек, и он играет.</p>
+    <p class="about-text" data-reveal>Нотка запоминает, что ты слушаешь, и сама подбирает, что включить дальше. Чем больше слушаешь, тем точнее.</p>
+    <p class="about-text" data-reveal>Нотка бесплатная. Нотка Плюс нужна тем, кто хочет нас поддержать: он оплачивает сервер, на котором всё работает, и добавляет красивые мелочи.</p>
 
     <div class="about-note" data-reveal>
-      <p>Нотка бесплатная. Если что-то не работает, неудобно или чего-то не хватает — напиши нам, мы читаем все сообщения.</p>
+      <p>Если что-то не работает или чего-то не хватает, напиши нам. Мы читаем все сообщения.</p>
       <span class="about-sign">Команда Нотки</span>
     </div>
     <button class="pill-btn pill-primary pill-block" id="about-support-btn" type="button" data-reveal>Написать в поддержку</button>
@@ -738,7 +730,7 @@
     </header>
 
     <div class="plus-hero">
-      <p class="plus-brand"><i class="plus-brand-orb" aria-hidden="true"></i>Нотка Плюс</p>
+      <p class="plus-brand"><span class="plus-brand-mark" aria-hidden="true"><svg width="16" height="16"><use href="#i-plus"/></svg></span>Нотка Плюс</p>
       <h1 class="plus-title">Что даёт Плюс</h1>
     </div>
 
@@ -836,7 +828,7 @@
     <section class="plus-plan-sec" data-reveal aria-label="План">
       <h2 class="h2 plus-plan-h">Выбери план</h2>
       <div class="plan-card">
-        <p class="plan-name"><i class="plus-brand-orb" aria-hidden="true"></i>Нотка Плюс</p>
+        <p class="plan-name"><span class="plus-brand-mark" aria-hidden="true"><svg width="16" height="16"><use href="#i-plus"/></svg></span>Нотка Плюс</p>
         <div class="plan-opts" id="plan-opts" role="radiogroup" aria-label="План">
           <button class="plan-opt is-on" type="button" role="radio" aria-checked="true" data-plan="year"><span class="po-radio"></span><span class="po-main"><b>Год</b><i>62 ₽ в месяц</i></span><span class="po-price"><b>749 ₽</b><s>1 068 ₽</s></span><em class="po-badge">−30%</em></button>
           <button class="plan-opt" type="button" role="radio" aria-checked="false" data-plan="quarter"><span class="po-radio"></span><span class="po-main"><b>3 месяца</b><i>76 ₽ в месяц</i></span><span class="po-price"><b>229 ₽</b><s>267 ₽</s></span><em class="po-badge">−14%</em></button>
@@ -1220,6 +1212,6 @@
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=3"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=71"></script>
+<script src="app.js?v=72"></script>
 </body>
 </html>

@@ -112,3 +112,22 @@
 .plan-state { margin-top: 6px; padding: 0 4px; font-size: 16px; font-weight: 600; }
 .plan-buy { margin-top: 16px; height: 54px; font-size: 17px; }
 .plus-bar.is-skipped { display: none; }
+
+/* метка Плюса: тот же круг с плюсом, что на карточке «Нотка Плюс» в профиле */
+.plus-brand-mark { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
+.plan-name .plus-brand-mark { width: 30px; height: 30px; }
+
+/* Оформление, выбор плеера: ровно по левому краю, как ряд атмосфер */
+#screen-look .look-stage { gap: 12px; padding: 6px 20px 10px; scroll-padding-inline: 20px; scroll-snap-type: x mandatory; }
+#screen-look .look-slide { width: 196px; align-items: flex-start; text-align: left; scroll-snap-align: start; gap: 9px; padding: 0; }
+#screen-look .look-obj { width: 196px; height: 196px; justify-content: flex-start; }
+#screen-look .look-std { width: 196px; height: 196px; border-radius: var(--radius-l); }
+#screen-look .look-slide .show-disc { width: 196px; }
+#screen-look .look-slide .cassette { max-width: 196px; }
+#screen-look .look-slide-name { padding: 0 2px; font-size: 15px; }
+
+/* О Нотке: коротко, кто мы и что делаем */
+.about-text { margin: 18px 2px 0; font-size: 16px; line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
+.about-lead + .about-text { margin-top: 18px; }
+.about-lead { margin-bottom: 0; }
+.about-text + .about-note, .about-text ~ .about-note { margin-top: 28px; }

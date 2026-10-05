@@ -60,7 +60,7 @@ try {
   await b.click("#home-avatar-btn");
   await b.click("#menu-about");
   await b.sleep(600);
-  check("«О Нотке» shows what Нотка can do", await b.eval("document.querySelectorAll('#screen-about .about-row').length === 6"));
+  check("«О Нотке» tells who we are, with no feature list", await b.eval("document.querySelectorAll('#screen-about .about-text').length === 2 && document.querySelectorAll('#screen-about .about-row').length === 0"));
   await b.sleep(900);
   await b.shot("about-1");
   await b.eval("document.getElementById('screen-about').scrollTo(0, 99999); true");
