@@ -13,10 +13,10 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=107" />
+<link rel="stylesheet" href="styles.css?v=108" />
 <link rel="stylesheet" href="atmosphere.css?v=7" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=22" />
+<link rel="stylesheet" href="system.css?v=23" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -511,6 +511,7 @@
       <button class="round-btn round-glass back-btn" id="stats-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
     </header>
     <h1 class="look-title">Статистика</h1>
+    <button class="pill-btn pill-quiet stats-recap-btn" id="stats-recap-btn" type="button">Итоги карточками</button>
     <div class="chips stats-chips" id="stats-periods" role="tablist" aria-label="За какое время">
       <button class="chip" type="button" role="tab" aria-selected="false" data-period="7">Неделя</button>
       <button class="chip" type="button" role="tab" aria-selected="false" data-period="30">Месяц</button>
@@ -559,6 +560,24 @@
     <p class="fineprint">Считается на этом устройстве</p>
   </main>
 
+  <!-- ============ ИТОГИ ============ -->
+  <main class="screen" id="screen-recap" hidden>
+    <header class="bar">
+      <button class="round-btn round-glass back-btn" id="recap-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
+    </header>
+    <h1 class="look-title" data-reveal>Итоги</h1>
+    <div class="chips stats-chips" id="recap-periods" role="tablist" aria-label="За какое время">
+      <button class="chip active" type="button" role="tab" aria-selected="true" data-period="30">Месяц</button>
+      <button class="chip" type="button" role="tab" aria-selected="false" data-period="all">Всё время</button>
+    </div>
+    <p class="stats-lede" id="recap-empty" hidden>Послушай пару треков, и здесь появятся твои карточки.</p>
+    <div id="recap-body" hidden>
+      <div class="rcp-deck" id="recap-deck"></div>
+      <div class="rcp-dots" id="recap-dots" aria-hidden="true"></div>
+      <button class="pill-btn pill-primary pill-block rcp-share" id="recap-share-btn" type="button">Поделиться карточкой</button>
+    </div>
+  </main>
+
   <!-- ============ SOUND ============ -->
   <main class="screen" id="screen-sound" hidden>
     <header class="bar">
@@ -598,8 +617,8 @@
     <section class="look-sec snd-sec" data-reveal>
       <div class="group">
         <div class="group-row">
-          <span class="group-label">Выравнивание громкости <span class="tag tag-soon">скоро</span><span class="group-sub">Все треки звучат одинаково громко</span></span>
-          <button class="switch" id="toggle-normalize" type="button" role="switch" aria-checked="false" aria-label="Выравнивание громкости" disabled><span></span></button>
+          <span class="group-label">Выравнивание громкости<span class="group-sub" id="normalize-sub">Все треки звучат одинаково громко</span></span>
+          <button class="switch" id="toggle-normalize" type="button" role="switch" aria-checked="false" aria-label="Выравнивание громкости"><span></span></button>
         </div>
       </div>
     </section>
@@ -753,7 +772,7 @@
         <div class="pw-copy"><h2 class="pw-name">Друг Нотки</h2><p class="pw-desc">Значок рядом с твоим именем. Растёт, пока ты слушаешь.</p></div>
         <div class="pw-copy"><h2 class="pw-name">Темы плеера</h2><p class="pw-desc">Винил, кассета или диск с обложкой того, что играет.</p></div>
         <div class="pw-copy"><h2 class="pw-name">Перевод текста <span class="tag tag-soon">скоро</span></h2><p class="pw-desc">Строки песни на русском рядом с оригиналом.</p></div>
-        <div class="pw-copy"><h2 class="pw-name">Твои итоги <span class="tag tag-soon">скоро</span></h2><p class="pw-desc">Месяц и год в карточках, которыми можно поделиться.</p></div>
+        <div class="pw-copy"><h2 class="pw-name">Твои итоги</h2><p class="pw-desc">Месяц и всё время в карточках, которыми можно поделиться.</p></div>
       </div>
     </div>
 
@@ -821,7 +840,8 @@
 
       <section class="pd" data-keys="minutes,plays,tracks,artists" aria-label="Твои итоги">
         <div class="pd-stage pd-swap pd-rc"><div class="v is-on" data-v="minutes" style="--r1:var(--c-warm);--r2:var(--c-mid)"><div class="rc-card"><b class="rc-num" data-stat="minutes">0</b><span class="rc-word" data-word="minutes"></span></div></div><div class="v" data-v="plays" style="--r1:var(--c-mid);--r2:var(--c-deep)"><div class="rc-card"><b class="rc-num" data-stat="plays">0</b><span class="rc-word" data-word="plays"></span></div></div><div class="v" data-v="tracks" style="--r1:var(--c-core);--r2:var(--c-warm)"><div class="rc-card"><b class="rc-num" data-stat="tracks">0</b><span class="rc-word" data-word="tracks"></span></div></div><div class="v" data-v="artists" style="--r1:var(--c-deep);--r2:var(--c-mid)"><div class="rc-card"><b class="rc-num" data-stat="artists">0</b><span class="rc-word" data-word="artists"></span></div></div></div>
-        <p class="pd-note">Твои настоящие цифры. Карточки скоро появятся.</p>
+        <p class="pd-note">Твои настоящие цифры.</p>
+        <button class="pill-btn pill-quiet plus-try" id="plus-recap-btn" type="button">Открыть свои итоги</button>
       </section>
     </div>
 
@@ -1166,6 +1186,17 @@
     </div>
   </div>
 
+  <div id="recap-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="recap-modal-title">
+    <div class="modal">
+      <p class="sheet-title" id="recap-modal-title">Твоя карточка</p>
+      <p class="modal-text">Нажми на картинку и удерживай, чтобы сохранить или отправить.</p>
+      <img class="rcp-preview" id="recap-preview" alt="Карточка итогов" />
+      <div class="modal-actions">
+        <button class="pill-btn pill-primary" id="recap-modal-close" type="button">Готово</button>
+      </div>
+    </div>
+  </div>
+
   <div id="restore-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="restore-title">
     <div class="modal">
       <p class="sheet-title" id="restore-title">Восстановить из копии</p>
@@ -1212,6 +1243,6 @@
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=3"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=72"></script>
+<script src="app.js?v=73"></script>
 </body>
 </html>

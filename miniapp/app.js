@@ -709,6 +709,7 @@
     look: $("screen-look"),
     mood: $("screen-mood"),
     stats: $("screen-stats"),
+    recap: $("screen-recap"),
   };
   const bottomNav = $("bottom-nav");
   const miniPlayer = $("mini-player");
@@ -752,6 +753,7 @@
     if (name === "account") { renderAccountScreen(); revealIn("screen-account", true); }
     if (name === "sound") renderSoundScreen();
     if (name === "stats") renderStatsScreen();
+    if (name === "recap") renderRecap();
     if (name === "about") revealIn("screen-about", true);
     if (name === "plus") openPlusScreen();
     if (name === "look") renderLookScreen();
@@ -2582,8 +2584,22 @@
     $("crossfade-note").textContent = volumeWorks
       ? "Трек мягко затухает в конце, а следующий уже набирает громкость."
       : "На этом устройстве Telegram не даёт менять громкость — переход не сработает.";
+    const sw = $("toggle-normalize");
+    const on = loudness.supported && !!Store.getSetting("loudness");
+    sw.disabled = !loudness.supported;
+    sw.setAttribute("aria-checked", on ? "true" : "false");
+    $("normalize-sub").textContent = loudness.supported ? "Все треки звучат одинаково громко" : "Здесь это не работает: Нотка открыта не через наш сервер";
     revealIn("screen-sound", true);
   }
+  $("toggle-normalize").addEventListener("click", () => {
+    const sw = $("toggle-normalize");
+    if (sw.disabled) return;
+    const on = sw.getAttribute("aria-checked") !== "true";
+    sw.setAttribute("aria-checked", on ? "true" : "false");
+    Store.setSetting("loudness", on);
+    haptic("select");
+    loudness.refresh();
+  });
   $("sound-back-btn").addEventListener("click", goBack);
   $("crossfade-slider").addEventListener("input", (e) => {
     const val = parseInt(e.target.value, 10) || 0;
@@ -3986,6 +4002,254 @@
   $("stats-back-btn").addEventListener("click", goBack);
 
   // ============================================================
+  // ИТОГИ: карточки месяца и всего времени, которыми можно поделиться
+  // ============================================================
+  let recapPeriod = "30";
+  let recapCards = [];
+  function recapData() {
+    const all = recapPeriod === "all";
+    const S = statsFor(all ? "all" : 30);
+    if (!S.tracks.length || S.seconds < 1) return [];
+    const minutes = Math.max(1, Math.round(S.seconds / 60));
+    const cards = [{ type: "minutes", kicker: all ? "Всё время в Нотке" : "Твой месяц в Нотке", minutes, word: `${plural(minutes, "минута", "минуты", "минут")} музыки`, note: minutesNote(minutes), tracks: S.tracks.length, artists: S.artists.length }];
+    const top = S.artists[0];
+    if (top) {
+      const m = Math.max(1, Math.round(top.seconds / 60));
+      cards.push({ type: "artist", kicker: "Исполнитель № 1", name: top.name, photo: artistFace(top.name), sub: `${m} ${plural(m, "минута", "минуты", "минут")} вместе` });
+    }
+    if (S.tracks.length >= 2) cards.push({ type: "tracks", kicker: "Чаще всего играло", rows: S.tracks.slice(0, 5).map((x) => ({ title: x.track.title, sub: x.track.artist || "", art: x.track.artwork, seed: x.track.id })) });
+    if (S.artists.length >= 3) cards.push({ type: "artists", kicker: "Твоя пятёрка", rows: S.artists.slice(0, 5).map((a) => { const m = Math.max(1, Math.round(a.seconds / 60)); return { title: a.name, sub: `${m} ${plural(m, "минута", "минуты", "минут")}`, art: artistFace(a.name), seed: a.name }; }) });
+    return cards;
+  }
+  function recapCardEl(card, i) {
+    const el = document.createElement("article");
+    el.className = "rcp-card";
+    el.dataset.v = String(i % 4);
+    const add = (cls, text, tag) => { const n = document.createElement(tag || "span"); n.className = cls; n.textContent = text; el.appendChild(n); return n; };
+    if (card.type === "artist") {
+      const ph = document.createElement("span");
+      ph.className = "rcp-photo";
+      const cv = document.createElement("span");
+      setCoverEl(cv, card.photo ? hiResArtwork(card.photo) : null, card.name);
+      ph.appendChild(cv);
+      el.appendChild(ph);
+    }
+    add("rcp-kicker", card.kicker);
+    if (card.type === "minutes") {
+      const num = add("rcp-num", card.minutes.toLocaleString("ru-RU"), "b");
+      if (String(card.minutes).length >= 4) num.classList.add("is-long");
+      add("rcp-word", card.word);
+      add("rcp-note", `${card.note} ${card.tracks} ${plural(card.tracks, "трек", "трека", "треков")}, ${card.artists} ${plural(card.artists, "исполнитель", "исполнителя", "исполнителей")}.`, "p");
+    } else if (card.type === "artist") {
+      add("rcp-name", card.name, "b");
+      add("rcp-word", card.sub);
+    } else {
+      const list = document.createElement("div");
+      list.className = "rcp-list";
+      card.rows.forEach((r, n) => {
+        const row = document.createElement("div");
+        row.className = "rcp-row" + (card.type === "artists" ? " is-round" : "");
+        const num = document.createElement("i"); num.textContent = String(n + 1);
+        const cv = document.createElement("span"); cv.className = "cover";
+        setCoverEl(cv, r.art ? hiResArtwork(r.art) : null, r.seed);
+        const t = document.createElement("span"); t.className = "t";
+        const b = document.createElement("b"); b.textContent = r.title;
+        const em = document.createElement("em"); em.textContent = r.sub;
+        t.append(b, em);
+        row.append(num, cv, t);
+        list.appendChild(row);
+      });
+      el.appendChild(list);
+    }
+    return el;
+  }
+  function renderRecap() {
+    recapCards = recapData();
+    const empty = !recapCards.length;
+    $("recap-body").hidden = empty;
+    $("recap-empty").hidden = !empty;
+    if (empty) return;
+    const deck = $("recap-deck");
+    deck.textContent = "";
+    recapCards.forEach((c, i) => deck.appendChild(recapCardEl(c, i)));
+    deck.scrollLeft = 0;
+    const dots = $("recap-dots");
+    dots.textContent = "";
+    recapCards.forEach((_, i) => { const d = document.createElement("i"); if (i === 0) d.className = "is-on"; dots.appendChild(d); });
+    revealIn("screen-recap", true);
+  }
+  function recapIndex() {
+    const deck = $("recap-deck");
+    const first = deck.firstElementChild;
+    if (!first) return 0;
+    const step = first.offsetWidth + 12;
+    return Math.max(0, Math.min(recapCards.length - 1, Math.round(deck.scrollLeft / step)));
+  }
+  $("recap-deck").addEventListener("scroll", () => {
+    const i = recapIndex();
+    $("recap-dots").querySelectorAll("i").forEach((d, n) => d.classList.toggle("is-on", n === i));
+  }, { passive: true });
+  $("recap-periods").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    recapPeriod = chip.dataset.period;
+    $("recap-periods").querySelectorAll(".chip").forEach((c) => {
+      c.classList.toggle("active", c === chip);
+      c.setAttribute("aria-selected", c === chip ? "true" : "false");
+    });
+    haptic("light");
+    renderRecap();
+  });
+  $("recap-back-btn").addEventListener("click", goBack);
+  $("recap-modal-close").addEventListener("click", () => closeOverlay("recap-modal"));
+  function openRecap() {
+    if (!hasPlus()) { showToast("Итоги входят в Нотку Плюс"); showScreen("plus"); return; }
+    showScreen("recap");
+  }
+  $("stats-recap-btn").addEventListener("click", openRecap);
+  $("plus-recap-btn").addEventListener("click", openRecap);
+
+  // карточка как картинка
+  const loadShareImg = (url) => new Promise((resolve) => {
+    if (!url) { resolve(null); return; }
+    const img = new Image();
+    const timer = setTimeout(() => resolve(null), 5000);
+    img.crossOrigin = "anonymous";
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = () => { clearTimeout(timer); resolve(null); };
+    img.src = url;
+  });
+  function coverFit(ctx, img, x, y, w, h) {
+    const k = Math.max(w / img.width, h / img.height);
+    const iw = w / k, ih = h / k;
+    ctx.drawImage(img, (img.width - iw) / 2, (img.height - ih) / 2, iw, ih, x, y, w, h);
+  }
+  function roundPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function wrapLines(ctx, text, maxW, maxLines) {
+    const words = String(text).split(/\s+/);
+    const lines = [];
+    let line = "";
+    words.forEach((w) => {
+      const test = line ? line + " " + w : w;
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+    });
+    if (line) lines.push(line);
+    return lines.slice(0, maxLines);
+  }
+  async function renderRecapImage(card, index) {
+    try { await document.fonts.load("800 100px Onest"); } catch (e) { /* the system font is fine */ }
+    const W = 1080, H = 1350;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    const css = getComputedStyle(document.documentElement);
+    const col = (n, d) => (css.getPropertyValue(n) || d).trim() || d;
+    const warm = col("--c-warm", "#EE905A"), mid = col("--c-mid", "#CF5A68"), deep = col("--c-deep", "#47204E");
+    const v = index % 4;
+    const pairs = [[warm, deep], [mid, deep], [deep, "#16101f"], [mid, deep]];
+    const g = ctx.createLinearGradient(0, 0, W * 0.5, H);
+    g.addColorStop(0, pairs[v][0]); g.addColorStop(1, pairs[v][1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const shade = ctx.createLinearGradient(0, 0, 0, H);
+    shade.addColorStop(0, "rgba(10,6,16,0.0)"); shade.addColorStop(1, "rgba(10,6,16,0.45)");
+    ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
+    const F = "Onest, system-ui, -apple-system, sans-serif";
+    const pad = 84;
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = `700 40px ${F}`;
+    ctx.textBaseline = "alphabetic";
+    if (card.type === "artist") {
+      const img = await loadShareImg(card.photo ? hiResArtwork(card.photo) : null);
+      if (img) {
+        coverFit(ctx, img, 0, 0, W, H);
+        const sh = ctx.createLinearGradient(0, 0, 0, H);
+        sh.addColorStop(0, "rgba(10,6,16,0.55)"); sh.addColorStop(0.4, "rgba(10,6,16,0.05)"); sh.addColorStop(1, "rgba(10,6,16,0.9)");
+        ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H);
+      }
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.82)";
+    ctx.font = `700 42px ${F}`;
+    ctx.fillText(card.kicker, pad, 40 + pad);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = `800 34px ${F}`;
+    ctx.fillText("Нотка", W - pad, 40 + pad);
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#fff";
+    if (card.type === "minutes") {
+      const num = card.minutes.toLocaleString("ru-RU");
+      const size = num.length >= 6 ? 250 : num.length >= 4 ? 300 : 360;
+      ctx.font = `800 ${size}px ${F}`;
+      ctx.fillText(num, pad - 8, H - 360);
+      ctx.font = `800 70px ${F}`;
+      ctx.fillText(card.word, pad, H - 270);
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = `500 42px ${F}`;
+      wrapLines(ctx, `${card.note} ${card.tracks} ${plural(card.tracks, "трек", "трека", "треков")}, ${card.artists} ${plural(card.artists, "исполнитель", "исполнителя", "исполнителей")}.`, W - pad * 2, 3).forEach((l, i) => ctx.fillText(l, pad, H - 190 + i * 56));
+    } else if (card.type === "artist") {
+      ctx.font = `800 120px ${F}`;
+      const lines = wrapLines(ctx, card.name, W - pad * 2, 3);
+      lines.forEach((l, i) => ctx.fillText(l, pad, H - 200 - (lines.length - 1 - i) * 120));
+      ctx.font = `800 62px ${F}`;
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.fillText(card.sub, pad, H - 110);
+    } else {
+      const imgs = await Promise.all(card.rows.map((r) => loadShareImg(r.art ? hiResArtwork(r.art) : null)));
+      const round = card.type === "artists";
+      card.rows.forEach((r, i) => {
+        const y = 300 + i * 190;
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.font = `800 54px ${F}`;
+        ctx.fillText(String(i + 1), pad, y + 100);
+        const x = pad + 80, s = 140;
+        ctx.save();
+        if (round) { ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2 - 8, s / 2, 0, Math.PI * 2); ctx.closePath(); } else roundPath(ctx, x, y - 8, s, s, 26);
+        ctx.clip();
+        if (imgs[i]) coverFit(ctx, imgs[i], x, y - 8, s, s); else { ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect(x, y - 8, s, s); }
+        ctx.restore();
+        ctx.fillStyle = "#fff";
+        ctx.font = `700 50px ${F}`;
+        const title = wrapLines(ctx, r.title, W - x - s - 24 - pad, 1)[0] || "";
+        ctx.fillText(title + (title.length < r.title.length ? "…" : ""), x + s + 28, y + 52);
+        ctx.fillStyle = "rgba(255,255,255,0.72)";
+        ctx.font = `500 40px ${F}`;
+        const sub = wrapLines(ctx, r.sub, W - x - s - 24 - pad, 1)[0] || "";
+        ctx.fillText(sub, x + s + 28, y + 108);
+      });
+    }
+    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+  }
+  $("recap-share-btn").addEventListener("click", async () => {
+    const btn = $("recap-share-btn");
+    if (btn.disabled) return;
+    const index = recapIndex();
+    const card = recapCards[index];
+    if (!card) return;
+    btn.disabled = true;
+    haptic("light");
+    try {
+      const blob = await renderRecapImage(card, index);
+      if (!blob) throw new Error("no image");
+      const file = new File([blob], "notka-itogi.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], text: "Мои итоги в Нотке" }); haptic("success"); return; }
+        catch (e) { if (e && e.name === "AbortError") return; /* else show the picture below */ }
+      }
+      $("recap-preview").src = URL.createObjectURL(blob);
+      openOverlay("recap-modal");
+    } catch (e) {
+      showToast("Не получилось собрать картинку. Попробуй ещё раз");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+
+  // ============================================================
   // PLAYBACK
   // ============================================================
   const audio = $("audio");
@@ -5022,6 +5286,79 @@
   }
   audio.addEventListener("loadstart", () => { statLast = null; statHeard = 0; statCounted = false; });
   audio.addEventListener("seeking", () => { statLast = null; });
+
+
+  // ============================================================
+  // ВЫРАВНИВАНИЕ ГРОМКОСТИ: первые секунды трека измеряем, дальше подтягиваем или
+  // приглушаем до общего уровня. Работает через Web Audio, поэтому и там, где
+  // Telegram не даёт менять громкость. Включается в «Звук и загрузки».
+  // ============================================================
+  const loudness = (() => {
+    const KEY = "notka_gain";
+    const TARGET = 0.12, MIN = 0.45, MAX = 1.7;
+    let ctx = null, gainNode = null, analyser = null, buf = null, timer = null, sumSq = 0, frames = 0, trackId = null;
+    let cache = {};
+    try { cache = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { cache = {}; }
+    const sameOrigin = (() => { try { return !API_BASE_URL || new URL(API_BASE_URL, location.href).origin === location.origin; } catch (e) { return false; } })();
+    const supported = sameOrigin && !!(window.AudioContext || window.webkitAudioContext);
+    const enabled = () => !!Store.getSetting("loudness");
+    function ensure() {
+      if (ctx) return true;
+      if (!supported) return false;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        ctx = new AC();
+        const src = ctx.createMediaElementSource(audio);
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        buf = new Float32Array(analyser.fftSize);
+        gainNode = ctx.createGain();
+        const limiter = ctx.createDynamicsCompressor();
+        limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.003; limiter.release.value = 0.15;
+        src.connect(analyser); analyser.connect(gainNode); gainNode.connect(limiter); limiter.connect(ctx.destination);
+        return true;
+      } catch (e) { ctx = null; return false; }
+    }
+    function setGain(g, fast) {
+      if (!gainNode) return;
+      gainNode.gain.setTargetAtTime(g, ctx.currentTime, fast ? 0.02 : 0.5);
+    }
+    function remember(id, g) {
+      cache[id] = Math.round(g * 100) / 100;
+      const keys = Object.keys(cache);
+      if (keys.length > 400) delete cache[keys[0]];
+      try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch (e) { /* kept for this session */ }
+    }
+    function stop() { clearInterval(timer); timer = null; }
+    function onPlaying(track) {
+      stop();
+      if (!enabled() || !track || !ensure()) { setGain(1, true); return; }
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      trackId = track.id; sumSq = 0; frames = 0;
+      if (cache[trackId]) { setGain(cache[trackId], true); return; }
+      setGain(1, true);
+      timer = setInterval(() => {
+        if (audio.paused || audio.volume < 0.99 || trackId !== (currentTrack && currentTrack.id)) return; // during a fade the level isn't the track's own
+        analyser.getFloatTimeDomainData(buf);
+        let s = 0;
+        for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+        const rms = Math.sqrt(s / buf.length);
+        if (rms < 0.006) return; // silence between notes isn't loudness
+        sumSq += rms * rms; frames++;
+        if (frames >= 45) { // about five seconds of real sound
+          stop();
+          const g = Math.max(MIN, Math.min(MAX, TARGET / Math.sqrt(sumSq / frames)));
+          remember(trackId, g);
+          setGain(g, false);
+        }
+      }, 120);
+    }
+    function reset() { stop(); }
+    function refresh() { if (!enabled()) { stop(); setGain(1, false); } else if (!audio.paused && currentTrack) onPlaying(currentTrack); }
+    return { supported, onPlaying, reset, refresh, enabled };
+  })();
+  audio.addEventListener("playing", () => loudness.onPlaying(currentTrack));
+  audio.addEventListener("loadstart", () => loudness.reset());
 
   // «Плавный переход»: fade in at the start, fade out at the end
   const volumeWorks = (() => { try { const p = document.createElement("audio"); p.volume = 0.5; return Math.abs(p.volume - 0.5) < 0.01; } catch (e) { return false; } })();
