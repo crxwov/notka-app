@@ -4466,14 +4466,14 @@
       ctx.fillStyle = "#F4EFFF"; roundPath(ctx, -26, -6, 52, 96, 14); ctx.fill();
       ctx.restore();
       // название и исполнитель на стеклянной плашке
-      const pw = 520, ph = 168, px = 60, py = H - 60 - ph;
+      const pw = 560, ph = 150, px = W - 60 - pw, py = 56;
       roundPath(ctx, px, py, pw, ph, 52);
       ctx.fillStyle = "rgba(20,12,24,0.55)"; ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.24)"; ctx.lineWidth = 2.5; ctx.stroke();
       ctx.fillStyle = "#fff"; ctx.font = `800 52px ${F}`;
-      ctx.fillText(cutText(ctx, track.title || "", pw - 72), px + 36, py + 76);
+      ctx.fillText(cutText(ctx, track.title || "", pw - 72), px + 36, py + 68);
       ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `500 42px ${F}`;
-      ctx.fillText(cutText(ctx, track.artist || "", pw - 72), px + 36, py + 130);
+      ctx.fillText(cutText(ctx, track.artist || "", pw - 72), px + 36, py + 118);
     }
     return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
   }
