@@ -4268,7 +4268,8 @@
   // ============================================================
   let quotePicking = false;
   const quotePicked = new Set();
-  let quoteStyle = "poster";
+  let quoteStyle = "light";
+  let quoteCtx = { before: [], after: [], frac: null };
   let quoteLines = [];
   let quoteTrack = null;
   let quoteToken = 0;
@@ -4284,6 +4285,7 @@
     quotePicking = true;
     quotePicked.clear();
     lyricsList.classList.add("is-picking");
+    document.body.classList.add("quote-picking");
     $("player-quote-btn").setAttribute("aria-pressed", "true");
     $("quote-bar").hidden = false;
     quoteBarText();
@@ -4293,6 +4295,7 @@
     quotePicking = false;
     quotePicked.clear();
     lyricsList.classList.remove("is-picking");
+    document.body.classList.remove("quote-picking");
     lyricsList.querySelectorAll(".is-picked").forEach((li) => li.classList.remove("is-picked"));
     $("player-quote-btn").setAttribute("aria-pressed", "false");
     $("quote-bar").hidden = true;
@@ -4310,6 +4313,40 @@
   $("player-quote-btn").addEventListener("click", () => { if (quotePicking) endQuotePick(); else startQuotePick(); });
   $("quote-bar-cancel").addEventListener("click", endQuotePick);
 
+  function rgbOf(color) {
+    try {
+      const c = document.createElement("canvas"); c.width = c.height = 1;
+      const x = c.getContext("2d", { willReadFrequently: true });
+      x.fillStyle = color; x.fillRect(0, 0, 1, 1);
+      const d = x.getImageData(0, 0, 1, 1).data;
+      return [d[0], d[1], d[2]];
+    } catch (e) { return [120, 80, 120]; }
+  }
+  const rgba = (rgb, a) => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
+  const mixRgb = (a, b, k) => a.map((v, i) => Math.round(v * (1 - k) + b[i] * k));
+  function glowAt(ctx, x, y, r, rgb, alpha) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgba(rgb, alpha)); g.addColorStop(1, rgba(rgb, 0));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1080, 1350);
+  }
+  function fitText(ctx, lines, maxW, sizes, maxH, lhK) {
+    for (const size of sizes) {
+      ctx.font = `800 ${size}px ${SHARE_FONT}`;
+      let wrapped = [];
+      lines.forEach((ln) => { wrapped = wrapped.concat(wrapLines(ctx, ln, maxW, 9)); });
+      if (wrapped.length * size * lhK <= maxH) return { size, wrapped };
+    }
+    const size = sizes[sizes.length - 1];
+    ctx.font = `800 ${size}px ${SHARE_FONT}`;
+    let wrapped = [];
+    lines.forEach((ln) => { wrapped = wrapped.concat(wrapLines(ctx, ln, maxW, 9)); });
+    return { size, wrapped: wrapped.slice(0, Math.floor(maxH / (size * lhK))) };
+  }
+  function cutText(ctx, str, maxW) {
+    let t = String(str);
+    while (ctx.measureText(t).width > maxW && t.length > 3) t = t.slice(0, -2);
+    return t === String(str) ? t : t.trimEnd() + "…";
+  }
   async function renderQuoteImage(track, lines, style) {
     try { await document.fonts.load("800 100px Onest"); } catch (e) { /* the system font is fine */ }
     const W = 1080, H = 1350, F = SHARE_FONT;
@@ -4320,81 +4357,103 @@
     const th = themeColors();
     const art = track.artwork ? hiResArtwork(track.artwork) : null;
     const img = await loadShareImg(art);
-    const text = lines.join(" ");
-    if (style === "poster") {
-      const barH = 170, picH = H - barH;
-      ctx.fillStyle = th.deep; ctx.fillRect(0, 0, W, H);
-      if (img) coverFit(ctx, img, 0, 0, W, picH);
-      else { const g = ctx.createLinearGradient(0, 0, W, picH); g.addColorStop(0, th.warm); g.addColorStop(1, th.deep); ctx.fillStyle = g; ctx.fillRect(0, 0, W, picH); }
-      const sh = ctx.createLinearGradient(0, picH * 0.45, 0, picH);
-      sh.addColorStop(0, "rgba(0,0,0,0)"); sh.addColorStop(1, "rgba(0,0,0,0.38)");
-      ctx.fillStyle = sh; ctx.fillRect(0, 0, W, picH);
-      // строки на белых полосках, как на плакатах с цитатами
-      ctx.font = `600 58px ${F}`;
-      const maxW = W - 140 - 40;
-      let all = [];
-      lines.forEach((ln) => { all = all.concat(wrapLines(ctx, ln, maxW, 6)); });
-      if (all.length > 8) all = all.slice(0, 8);
-      const lh = 100, padX = 20;
-      let y = picH - 70 - (all.length - 1) * lh - 78;
-      all.forEach((ln, i) => {
-        const w = ctx.measureText(ln).width + padX * 2;
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(70, y + i * lh - 4, w, 86);
-        ctx.fillStyle = "#111";
-        ctx.fillText(ln, 70 + padX, y + i * lh + 58);
-      });
-      ctx.fillStyle = "#000"; ctx.fillRect(0, picH, W, barH);
-      ctx.fillStyle = "#fff"; ctx.fillRect(0, picH, W, 3);
-      ctx.fillStyle = "#fff"; ctx.font = `700 42px ${F}`;
-      let cap = `${track.artist || ""}, «${track.title || ""}»`.toUpperCase();
-      const capMax = W - 70 - 300;
-      while (ctx.measureText(cap).width > capMax && cap.length > 4) cap = cap.slice(0, -2);
-      ctx.fillText(cap, 70, picH + 104);
-      drawLogo(ctx, W - 70 - 170 - 8, picH + 56, 54, "#fff");
-      ctx.font = `800 44px ${F}`;
-      ctx.fillText("Нотка", W - 70 - 110, picH + 102);
-    } else {
-      let pal = null;
-      try { pal = art ? await paletteFromArtwork(track.artwork) : null; } catch (e) { pal = null; }
-      pal = pal || th;
-      const bg = pal.deep, cardBg = pal.warm;
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-      const light = lumOf(cardBg) > 0.55;
-      const ink = light ? "#14090f" : "#fff";
-      const inkSoft = light ? "rgba(20,9,15,0.68)" : "rgba(255,255,255,0.78)";
-      const cx = 90, cw = W - 180, px = 76;
-      // подбираем размер так, чтобы цитата влезла
-      let size = 92, wrapped = [];
-      for (; size >= 52; size -= 4) {
-        ctx.font = `800 ${size}px ${F}`;
-        wrapped = [];
-        lines.forEach((ln) => { wrapped = wrapped.concat(wrapLines(ctx, ln, cw - px * 2, 8)); });
-        if (wrapped.length * size * 1.1 <= 640) break;
+    let pal = null;
+    try { pal = art ? await paletteFromArtwork(track.artwork) : null; } catch (e) { pal = null; }
+    pal = pal || th;
+    const deep = rgbOf(pal.deep), warm = rgbOf(pal.warm), mid = rgbOf(pal.mid), core = rgbOf(pal.core);
+    const night = [12, 10, 18];
+    // фон: тёмный и живой свет, как в самой Нотке
+    ctx.fillStyle = rgba(mixRgb(deep, night, 0.6), 1); ctx.fillRect(0, 0, W, H);
+    if (style === "light") { glowAt(ctx, 160, 260, 760, warm, 0.8); glowAt(ctx, 960, 700, 720, mid, 0.65); glowAt(ctx, 560, 90, 420, core, 0.35); }
+    else { glowAt(ctx, 900, 1150, 980, warm, 0.75); glowAt(ctx, 120, 220, 760, mid, 0.6); glowAt(ctx, 540, 640, 420, core, 0.2); }
+    const pad = 84;
+    // метка Нотки
+    drawLogo(ctx, pad, 76, 60, "rgba(255,255,255,0.92)");
+    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = `800 44px ${F}`;
+    ctx.fillText("Нотка", pad + 76, 124);
+
+    if (style === "light") {
+      // строка горит, строки вокруг приглушены, внизу плеер Нотки
+      let before = quoteCtx.before, after = quoteCtx.after;
+      let fit = null, useCtx = false;
+      for (const [nb, na] of [[2, 2], [1, 1]]) {
+        const b2 = before.slice(-nb), a2 = after.slice(0, na);
+        if (!b2.length && !a2.length) continue;
+        const f = fitText(ctx, [...b2, ...lines, ...a2], W - pad * 2, [78, 72, 66, 62], 760, 1.16);
+        if (f.size >= 62 && f.wrapped.length * f.size * 1.16 <= 760) { fit = f; useCtx = true; before = b2; after = a2; break; }
       }
-      const lh = size * 1.1;
-      const head = 150, gapA = 70, foot = 120;
-      const ch = 70 + head + gapA + wrapped.length * lh + 60 + foot;
-      const cy = Math.max(60, (H - ch) / 2);
-      ctx.fillStyle = cardBg; roundPath(ctx, cx, cy, cw, ch, 56); ctx.fill();
-      // обложка, название, исполнитель
-      const cs = 130, cyy = cy + 70;
-      ctx.save(); roundPath(ctx, cx + px, cyy, cs, cs, 24); ctx.clip();
-      if (img) coverFit(ctx, img, cx + px, cyy, cs, cs); else { ctx.fillStyle = "rgba(128,128,128,0.35)"; ctx.fillRect(cx + px, cyy, cs, cs); }
+      if (!fit) fit = fitText(ctx, lines, W - pad * 2, [84, 76, 70, 64, 58, 52, 48], 760, 1.16);
+      const lh = fit.size * 1.16;
+      const nBefore = useCtx ? before.reduce((n, ln) => { ctx.font = `800 ${fit.size}px ${F}`; return n + wrapLines(ctx, ln, W - pad * 2, 9).length; }, 0) : 0;
+      const nMain = fit.wrapped.length - (useCtx ? after.reduce((n, ln) => { ctx.font = `800 ${fit.size}px ${F}`; return n + wrapLines(ctx, ln, W - pad * 2, 9).length; }, 0) : 0) - nBefore;
+      const top = 230 + (760 - fit.wrapped.length * lh) / 2;
+      ctx.font = `800 ${fit.size}px ${F}`;
+      fit.wrapped.forEach((ln, i) => {
+        const lit = !useCtx || (i >= nBefore && i < nBefore + nMain);
+        ctx.fillStyle = lit ? "#fff" : "rgba(255,255,255,0.34)";
+        if (lit) { ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 2; }
+        ctx.fillText(ln, pad, top + fit.size * 0.88 + i * lh);
+        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      });
+      // плеер
+      const sx = 70, sy = 1112, sw = W - 140, sh = 170;
+      roundPath(ctx, sx, sy, sw, sh, 52);
+      ctx.fillStyle = "rgba(255,255,255,0.13)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.24)"; ctx.lineWidth = 2; ctx.stroke();
+      const cs = 112, cx0 = sx + 26, cy0 = sy + 22;
+      ctx.save(); roundPath(ctx, cx0, cy0, cs, cs, 28); ctx.clip();
+      if (img) coverFit(ctx, img, cx0, cy0, cs, cs); else { ctx.fillStyle = rgba(warm, 1); ctx.fillRect(cx0, cy0, cs, cs); }
       ctx.restore();
-      ctx.fillStyle = ink; ctx.font = `700 46px ${F}`;
-      const tmax = cw - px * 2 - cs - 30;
-      const cut = (str, font) => { ctx.font = font; let t = str; while (ctx.measureText(t).width > tmax && t.length > 3) t = t.slice(0, -2); return t === str ? t : t + "…"; };
-      ctx.fillText(cut(track.title || "", `700 46px ${F}`), cx + px + cs + 30, cyy + 56);
-      ctx.fillStyle = inkSoft;
-      ctx.fillText(cut(track.artist || "", `500 40px ${F}`), cx + px + cs + 30, cyy + 108);
-      // цитата
-      ctx.fillStyle = ink; ctx.font = `800 ${size}px ${F}`;
-      wrapped.forEach((ln, i) => ctx.fillText(ln, cx + px, cyy + cs + gapA + size * 0.85 + i * lh));
-      // подпись
-      drawLogo(ctx, cx + px, cy + ch - 70 - 44, 56, ink);
-      ctx.fillStyle = ink; ctx.font = `800 46px ${F}`;
-      ctx.fillText("Нотка", cx + px + 70, cy + ch - 70);
+      const tx = cx0 + cs + 28, tmax = sw - (tx - sx) - 26 - 96 - 20;
+      ctx.fillStyle = "#fff"; ctx.font = `700 44px ${F}`;
+      ctx.fillText(cutText(ctx, track.title || "", tmax), tx, cy0 + 50);
+      ctx.fillStyle = "rgba(255,255,255,0.72)"; ctx.font = `500 36px ${F}`;
+      ctx.fillText(cutText(ctx, track.artist || "", tmax), tx, cy0 + 98);
+      // кнопка паузы
+      const bx = sx + sw - 26 - 48, by = cy0 + 50;
+      ctx.fillStyle = "#F4EFFF"; ctx.beginPath(); ctx.arc(bx, by, 48, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#16101f";
+      roundPath(ctx, bx - 17, by - 20, 11, 40, 4); ctx.fill();
+      roundPath(ctx, bx + 6, by - 20, 11, 40, 4); ctx.fill();
+      // полоска: на каком месте песни эта строка
+      const frac = quoteCtx.frac == null ? 0.38 : Math.max(0.03, Math.min(0.97, quoteCtx.frac));
+      const px0 = sx + 30, pw = sw - 60, py = sy + sh - 26;
+      roundPath(ctx, px0, py, pw, 8, 4); ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fill();
+      roundPath(ctx, px0, py, Math.max(8, pw * frac), 8, 4); ctx.fillStyle = "#fff"; ctx.fill();
+    } else {
+      // цитата и пластинка с обложкой, как в темах плеера
+      const fit = fitText(ctx, lines, W - pad * 2, [100, 92, 84, 76, 68, 60, 54, 48], 560, 1.1);
+      const lh = fit.size * 1.1;
+      ctx.fillStyle = "#fff"; ctx.font = `800 ${fit.size}px ${F}`;
+      ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 24;
+      fit.wrapped.forEach((ln, i) => ctx.fillText(ln, pad, 270 + fit.size * 0.88 + i * lh));
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+      // пластинка
+      const dx = 900, dy = 1330, dr = 470;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 60; ctx.shadowOffsetY = 20;
+      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, dr + 10, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = rgba(mid, 1); ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
+      if (img) { ctx.translate(dx, dy); ctx.rotate(-0.22); coverFit(ctx, img, -dr, -dr, dr * 2, dr * 2); ctx.rotate(0.22); ctx.translate(-dx, -dy); }
+      ctx.strokeStyle = "rgba(0,0,0,0.22)"; ctx.lineWidth = 2;
+      for (let rr = 110; rr < dr; rr += 13) { ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.stroke(); }
+      const sheen = ctx.createLinearGradient(dx - dr, dy - dr, dx + dr * 0.6, dy + dr * 0.6);
+      sheen.addColorStop(0, "rgba(255,255,255,0.22)"); sheen.addColorStop(0.5, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(255,255,255,0.08)");
+      ctx.fillStyle = sheen; ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
+      ctx.restore();
+      ctx.fillStyle = rgba(warm, 1); ctx.beginPath(); ctx.arc(dx, dy, 74, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(dx, dy, 74, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, 13, 0, Math.PI * 2); ctx.fill();
+      // подпись слева внизу
+      ctx.fillStyle = "#fff"; ctx.font = `800 48px ${F}`;
+      const tl = wrapLines(ctx, track.title || "", 330, 3);
+      const baseY = H - 84 - 44 - (tl.length - 1) * 56;
+      tl.forEach((ln, i) => ctx.fillText(ln, pad, baseY + i * 56));
+      ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `500 38px ${F}`;
+      wrapLines(ctx, track.artist || "", 330, 2).forEach((ln, i) => ctx.fillText(ln, pad, baseY + tl.length * 56 - 6 + i * 46));
     }
     return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
   }
@@ -4409,10 +4468,19 @@
     $("quote-preview").style.opacity = "";
     $("quote-preview").dataset.ready = "1";
   }
+  new MutationObserver(() => document.body.classList.toggle("quote-sheet-open", $("quote-sheet").classList.contains("open")))
+    .observe($("quote-sheet"), { attributes: true, attributeFilter: ["class"] });
   $("quote-bar-make").addEventListener("click", () => {
     if (!quotePicked.size || !currentTrack || !lyricsData) return;
     quoteTrack = currentTrack;
-    quoteLines = [...quotePicked].sort((a, b) => a - b).map((i) => lyricsData.lines[i].text);
+    const idx = [...quotePicked].sort((a, b) => a - b);
+    quoteLines = idx.map((i) => lyricsData.lines[i].text);
+    const all = lyricsData.lines;
+    quoteCtx = {
+      before: all.slice(Math.max(0, idx[0] - 2), idx[0]).map((l) => l.text).filter(Boolean),
+      after: all.slice(idx[idx.length - 1] + 1, idx[idx.length - 1] + 3).map((l) => l.text).filter(Boolean),
+      frac: lyricsData.synced && (quoteTrack.duration || audio.duration) ? all[idx[0]].t / (quoteTrack.duration || audio.duration) : null,
+    };
     $("quote-preview").dataset.ready = "";
     openOverlay("quote-sheet");
     paintQuotePreview();
@@ -4840,8 +4908,8 @@
       items[k].classList.toggle("is-active", k === i);
       items[k].classList.toggle("is-past", k < i);
     }
-    // don't pull the text away from someone who is scrolling it by hand
-    if (!jump && Date.now() - lyricsTouchedAt < 3000) return;
+    // don't pull the text away from someone who is scrolling it by hand or picking lines
+    if (quotePicking || (!jump && Date.now() - lyricsTouchedAt < 3000)) return;
     const top = i < 0 ? 0 : Math.max(0, items[i].offsetTop - lyricsBox.clientHeight * 0.3);
     lyricsBox.scrollTo({ top, behavior: jump ? "auto" : "smooth" });
   }

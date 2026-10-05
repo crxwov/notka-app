@@ -32,13 +32,13 @@ await b.shot("quote-pick");
 await b.click("#quote-bar-make");
 await b.waitFor("document.getElementById('quote-preview').dataset.ready === '1' && document.getElementById('quote-preview').naturalWidth > 0", 20000, "poster");
 await b.sleep(500);
-check("the poster is 1080x1350", await b.eval("document.getElementById('quote-preview').naturalWidth === 1080 && document.getElementById('quote-preview').naturalHeight === 1350"));
+check("the «Свет» card is 1080x1350", await b.eval("document.getElementById('quote-preview').naturalWidth === 1080 && document.getElementById('quote-preview').naturalHeight === 1350"));
 await b.shot("quote-poster");
 await b.eval("document.getElementById('quote-preview').dataset.ready = ''; true");
-await b.click('#quote-styles [data-style="card"]');
+await b.click('#quote-styles [data-style="vinyl"]');
 await b.waitFor("document.getElementById('quote-preview').dataset.ready === '1'", 20000, "card");
 await b.sleep(500);
-check("the card is 1080x1350", await b.eval("document.getElementById('quote-preview').naturalWidth === 1080 && document.getElementById('quote-preview').naturalHeight === 1350"));
+check("the «Винил» card is 1080x1350", await b.eval("document.getElementById('quote-preview').naturalWidth === 1080 && document.getElementById('quote-preview').naturalHeight === 1350"));
 await b.shot("quote-card");
 // сами картинки на просмотр
 const dump = async (name) => {
@@ -47,7 +47,7 @@ const dump = async (name) => {
   fs.writeFileSync(`C:/Users/leksik/Documents/Notka/tests/shots/${name}.png`, Buffer.from(data.split(",")[1], "base64"));
 };
 await dump("quote-card-image");
-await b.eval("document.querySelector('#quote-styles [data-style=\"poster\"]').click(); true");
+await b.eval("document.querySelector('#quote-styles [data-style=\"light\"]').click(); true");
 await b.sleep(2500);
 await dump("quote-poster-image");
 console.log(bad ? "FAILED" : "ALL PASS");
