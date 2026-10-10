@@ -87,7 +87,8 @@ async def _spotify_pages(token: str, playlist_id: str) -> list[dict | None]:
                 break
             for entry in page:
                 data = ((entry or {}).get("itemV2") or {}).get("data") or {}
-                if not data.get("name"):
+                # music only: podcast episodes, removed and restricted entries carry no track
+                if not data.get("name") or data.get("__typename") not in (None, "Track"):
                     continue
                 artists = ", ".join(
                     (a.get("profile") or {}).get("name", "")
@@ -110,9 +111,10 @@ async def _spotify(kind: str, item_id: str) -> dict:
     except (KeyError, TypeError, ValueError) as exc:
         raise _unreadable("Spotify did not show this playlist") from exc
     tracks = [_item(t.get("title"), t.get("subtitle"), t.get("duration")) for t in entity.get("trackList") or []]
-    # a hundred is where the embed stops: the playlist may well go on
+    # the embed shows at most a hundred, and fewer still when some of them are not shown to
+    # an anonymous visitor: the playlist is always read by pages, the embed list is the fallback
     token = ((page_state.get("settings") or {}).get("session") or {}).get("accessToken")
-    if kind == "playlist" and token and len(tracks) >= PAGE:
+    if kind == "playlist" and token:
         try:
             more = await _spotify_pages(token, item_id)
             if len(more) > len(tracks):
