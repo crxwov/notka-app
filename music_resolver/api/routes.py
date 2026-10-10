@@ -18,7 +18,7 @@ from music_resolver.errors import AppError, ErrorCode
 from music_resolver.models import AlbumResponse, ArtistResponse, ResolveResponse, SearchResponse
 from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
-from music_resolver.services import events_store, mood_mix, plus_store
+from music_resolver.services import events_store, mood_mix, plus_store, sync_store
 from music_resolver.services.playlist_import import read_playlist
 from music_resolver.utils.remux import defragment, defragment_all
 
@@ -274,6 +274,27 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     # ---- «Нотка Плюс»: who has it, and promo codes. The listener is
     # recognised by the Mini App's signed initData. ----
     promo_attempts: dict[int, list[float]] = {}
+
+    # ---- «один аккаунт — все устройства»: the listener's favourites, playlists,
+    # settings and listening stats under their Telegram account (see sync_store) ----
+    @router.post("/sync")
+    async def sync_account(request: Request, x_telegram_init_data: str = Header(default="")):
+        user_id = plus_store.verify_init_data(x_telegram_init_data)
+        if user_id is None:
+            return JSONResponse({"error": {"code": "NOT_IN_TELEGRAM"}}, status_code=401)
+        raw = await request.body()
+        if len(raw) > sync_store.MAX_BYTES:
+            return JSONResponse({"error": {"code": "TOO_BIG"}}, status_code=413)
+        try:
+            body = json.loads(raw or b"{}")
+        except ValueError:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        try:
+            return await asyncio.to_thread(sync_store.exchange, user_id, body)
+        except sync_store.TooBig:
+            return JSONResponse({"error": {"code": "TOO_BIG"}}, status_code=413)
 
     @router.get("/plus/status")
     async def plus_status(x_telegram_init_data: str = Header(default="")) -> dict:
