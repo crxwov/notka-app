@@ -31,20 +31,46 @@
   // On a computer Telegram opens a Mini App in a small window; ask for the
   // whole screen (Bot API 8.0). Older clients just keep the window, which
   // the layout handles too.
-  // Fullscreen covers the whole screen (the Windows taskbar too) and has no
-  // window buttons, so it is the listener's choice: a button in the side
-  // panel, remembered, Esc leaves it. The window is the default.
+  // On a computer the Mini App opens on the whole screen. That mode has no
+  // window buttons and covers the Windows taskbar, so it is made livable:
+  //  - the side panel has «свернуть в окно» and «закрыть», Esc and F11 too;
+  //  - when the window loses focus (Alt+Tab, the Win key, another program)
+  //    it steps back to a window by itself, so the taskbar and other
+  //    programs are reachable, and widens again when focus is back;
+  //  - leaving it by the button is remembered: then it stays a window.
   const canFullscreen = !!(tg && tgAtLeast("8.0") && tg.requestFullscreen && tg.exitFullscreen && ["tdesktop", "macos", "unigram"].includes(tg.platform));
   const FULLSCREEN_KEY = "notka_fullscreen";
-  let wantFullscreen = false;
-  try { wantFullscreen = localStorage.getItem(FULLSCREEN_KEY) === "1"; } catch (e) { /* storage may be blocked */ }
-  if (canFullscreen && wantFullscreen && !tg.isFullscreen) {
-    try { tg.requestFullscreen(); } catch (e) { /* stays in the window */ }
+  let wantFullscreen = true;
+  try { wantFullscreen = localStorage.getItem(FULLSCREEN_KEY) !== "0"; } catch (e) { /* storage may be blocked */ }
+  let steppedBack = false; // we left fullscreen only because focus went elsewhere
+  let fullscreenFailed = false;
+  function enterFullscreen() {
+    if (!canFullscreen || fullscreenFailed || tg.isFullscreen) return;
+    try { tg.requestFullscreen(); } catch (e) { fullscreenFailed = true; }
   }
   function setFullscreen(on) {
     if (!canFullscreen) return;
+    wantFullscreen = on;
+    steppedBack = false;
     try { localStorage.setItem(FULLSCREEN_KEY, on ? "1" : "0"); } catch (e) { /* ignore */ }
     try { on ? tg.requestFullscreen() : tg.exitFullscreen(); } catch (e) { /* ignore */ }
+  }
+  if (canFullscreen) {
+    if (wantFullscreen) enterFullscreen();
+    if (tg.onEvent) tg.onEvent("fullscreenFailed", () => { fullscreenFailed = true; });
+    let blurTimer = 0;
+    window.addEventListener("blur", () => {
+      clearTimeout(blurTimer);
+      blurTimer = setTimeout(() => {
+        if (document.hasFocus() || !wantFullscreen || !tg.isFullscreen) return;
+        steppedBack = true;
+        try { tg.exitFullscreen(); } catch (e) { /* ignore */ }
+      }, 250);
+    });
+    window.addEventListener("focus", () => {
+      clearTimeout(blurTimer);
+      if (steppedBack && wantFullscreen) { steppedBack = false; enterFullscreen(); }
+    });
   }
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
   const hasTgBack = !!(tg && tg.BackButton && tgAtLeast("6.1"));
@@ -783,15 +809,19 @@
     renderAvatarInto("side-avatar", "side-initial");
     $("side-name").textContent = displayName();
     $("side-fs-btn").hidden = !canFullscreen;
-    $("side-fs-label").textContent = tg && tg.isFullscreen ? "Выйти из полного экрана" : "На весь экран";
+    $("side-fs-label").textContent = tg && tg.isFullscreen ? "Свернуть в окно" : "На весь экран";
+    $("side-close-btn").hidden = !canFullscreen;
   }
   $("side-fav-btn").addEventListener("click", () => showScreen("favorites"));
   $("side-profile-btn").addEventListener("click", () => showScreen("profile"));
   $("side-fs-btn").addEventListener("click", () => setFullscreen(!(tg && tg.isFullscreen)));
   if (tg && tg.onEvent) tg.onEvent("fullscreenChanged", renderSidebar);
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && tg && tg.isFullscreen && !openOverlays.length) setFullscreen(false);
+    if (!canFullscreen) return;
+    if (e.key === "Escape" && tg.isFullscreen && !openOverlays.length) setFullscreen(false);
+    else if (e.key === "F11") { e.preventDefault(); setFullscreen(!tg.isFullscreen); }
   });
+  $("side-close-btn").addEventListener("click", () => { try { tg.close(); } catch (e) { /* not in Telegram */ } });
 
   // A wide window (Telegram Desktop, a browser) gets the computer layout:
   // the tabs become a side panel, the mini player a bar at the bottom.
