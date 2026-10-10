@@ -36,7 +36,7 @@ await b.sleep(600);
 const p2 = await at();
 check("dragging to 20% seeks there", Math.abs(p2 / dur - 0.2) < 0.06, `pos ${p2.toFixed(1)}`);
 await b.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }).catch(() => {});
-const shot = await b.send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: g.y - 70, width: 390, height: 90, scale: 2 } });
+const shot = await b.send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: g.y - 80, width: 390, height: 100, scale: 2 } });
 (await import("node:fs")).writeFileSync("_tmp/mini.png", Buffer.from(shot.data, "base64"));
 // higher in the strip: a drag seeks, a plain tap opens the player
 const yHigh = g.y - 18;

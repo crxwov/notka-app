@@ -738,9 +738,9 @@
     miniPlayer.hidden = !showMini;
     document.body.classList.toggle("no-tabbar", !showTabs);
     let dock = 0;
-    if (showTabs && showMini) dock = 156;
+    if (showTabs && showMini) dock = 168;
     else if (showTabs) dock = 84;
-    else if (showMini) dock = 82;
+    else if (showMini) dock = 94;
     document.documentElement.style.setProperty("--dock", `${dock}px`);
   }
 
@@ -5936,7 +5936,7 @@
   // strip (on the line itself) seeks at once; higher up it seeks only when
   // dragged sideways, so a plain tap there still opens the player.
   const MINI_INSET = 18; // the visible line is inset from the strip's ends
-  const MINI_LINE_ZONE = 16; // px from the bottom edge that count as «on the line»
+  const MINI_LINE_ZONE = 20; // px from the bottom edge that count as «on the line»
   let miniGrab = null;
   function miniPct(e) {
     const r = miniScrub.getBoundingClientRect();
