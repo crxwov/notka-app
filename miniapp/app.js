@@ -870,7 +870,7 @@
     miniPlayer.hidden = !showMini;
     document.body.classList.toggle("no-tabbar", !showTabs);
     let dock = 0;
-    if (desk) dock = showMini ? 124 : 0;
+    if (desk) dock = showMini ? 108 : 0;
     else if (showTabs && showMini) dock = 160;
     else if (showTabs) dock = 84;
     else if (showMini) dock = 86;
@@ -6241,7 +6241,7 @@
     const r = miniScrub.getBoundingClientRect();
     miniGrab = { id: e.pointerId, x: e.clientX, on: false, dead: !effectiveDuration() };
     try { miniScrub.setPointerCapture(e.pointerId); } catch (err) { /* works without capture too */ }
-    if (!miniGrab.dead && (isDesktop() || r.bottom - e.clientY <= MINI_LINE_ZONE)) { miniStart(); renderScrubPosition(miniPct(e)); }
+    if (!miniGrab.dead && r.bottom - e.clientY <= MINI_LINE_ZONE) { miniStart(); renderScrubPosition(miniPct(e)); }
   });
   miniScrub.addEventListener("pointermove", (e) => {
     if (!miniGrab || miniGrab.dead || e.pointerId !== miniGrab.id) return;

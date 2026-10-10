@@ -329,55 +329,40 @@ body.is-desktop #stats-body > .block { grid-column: 1 / -1; }
 body.is-desktop #screen-profile, body.is-desktop #screen-account, body.is-desktop #screen-sound, body.is-desktop #screen-about { --pad-x: max(40px, calc((100vw - var(--side) - 760px) / 2)); }
 
 /* ==========================================================
-   THE BAR AT THE BOTTOM (computer): track on the left, transport and a
-   wide seek line in the middle, the rest on the right. It is a bar of its
-   own, not a pill floating over the content; the content ends above it.
+   THE PLAYER BAR (computer): the phone's glass pill, unchanged in look
+   (cover, title, play, the thin line at the bottom), only wider, with the
+   extra controls added on its right.
    ========================================================== */
-.mini-center, .mini-transport, .mini-seek { display: contents; } /* a phone: the same row as before */
+.mini-center, .mini-transport, .mini-seek { display: contents; } /* the phone's single row */
 .mini-desk { display: none; }
 .mini-scrub { --tl: 21px; }
-body.is-desktop .mini-desk { display: flex; }
-body.is-desktop .mini-player.glass,
-body.is-desktop.no-tabbar .mini-player.glass {
-  display: grid;
-  grid-template-columns: minmax(200px, 1fr) minmax(340px, 600px) minmax(200px, 1fr);
-  align-items: center;
-  column-gap: 28px;
-  left: var(--side);
-  right: 16px;
+body.is-desktop .mini-desk { display: flex; align-items: center; flex: 0 0 auto; }
+body.is-desktop .mini-player,
+body.is-desktop.no-tabbar .mini-player {
+  --bar-x: max(40px, calc((100vw - var(--side) - 1120px) / 2)); /* the edges of the page's column */
+  left: calc(var(--side) + var(--bar-x));
+  right: var(--bar-x);
   bottom: calc(var(--sab) + 16px);
-  height: 88px;
-  padding: 0 22px;
-  border-radius: 22px;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)), rgba(20, 12, 24, 0.9);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  backdrop-filter: blur(28px) saturate(150%);
+  gap: 6px;
+  padding-right: 14px;
 }
-body.is-desktop .mini-main { grid-column: 1; gap: 14px; cursor: pointer; min-width: 0; }
-body.is-desktop .mini-main .cover { width: 56px; height: 56px; border-radius: 12px; }
-body.is-desktop .mini-title { font-size: 15.5px; }
-body.is-desktop .mini-center { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
-body.is-desktop .mini-transport { display: flex; align-items: center; justify-content: center; gap: 14px; }
-body.is-desktop .mini-play { width: 44px; height: 44px; }
-body.is-desktop .mini-seek { display: flex; align-items: center; gap: 10px; width: 100%; }
-body.is-desktop .mini-time { flex: 0 0 auto; width: 40px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); }
-body.is-desktop #mp-time-cur { justify-content: flex-end; }
-body.is-desktop .mini-scrub { --tl: 5px; position: relative; inset: auto; flex: 1; min-width: 0; height: 22px; z-index: 1; }
-body.is-desktop .mini-progress { left: 0; right: 0; bottom: auto; top: 50%; height: 8px; border-radius: 4px; transform: translateY(-50%) scaleY(0.5); transform-origin: 50% 50%; }
-body.is-desktop .mini-scrub:hover .mini-progress, body.is-desktop .mini-scrub.is-scrubbing .mini-progress { transform: translateY(-50%) scaleY(0.75); }
-body.is-desktop .mini-thumb { top: 50%; bottom: auto; left: calc(5px + (100% - 10px) * var(--mp)); margin: -5px 0 0 -5px; }
+body.is-desktop .mini-main { cursor: pointer; }
+body.is-desktop .mini-time { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); margin-left: 6px; }
+body.is-desktop #mp-time-cur { margin-right: 4px; }
+body.is-desktop #mp-time-tot { margin-left: 0; margin-right: 8px; }
+body.is-desktop #mp-time-tot::before { content: "/\00a0"; }
+body.is-desktop .mini-right { gap: 2px; }
+body.is-desktop .mini-scrub:hover .mini-progress { transform: scaleY(0.5); }
 body.is-desktop .mini-scrub:hover .mini-thumb { opacity: 1; transform: scale(1); }
-body.is-desktop .mini-right { grid-column: 3; justify-content: flex-end; align-items: center; gap: 2px; }
 .mini-ctrl { width: 40px; height: 40px; color: var(--text-2); background: none; border: 0; box-shadow: none; cursor: pointer; transition: color 0.2s, background-color 0.2s, transform 0.15s var(--ease-out); }
 .mini-ctrl:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
 .mini-ctrl:active { transform: scale(0.92); }
 .mini-ctrl[aria-pressed="true"] { color: var(--liked); }
-.mini-vol { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
+.mini-vol { display: flex; align-items: center; gap: 2px; margin-left: 4px; }
 .mini-vol .vol-off { display: none; }
 .mini-vol .is-muted .vol-on { display: none; }
 .mini-vol .is-muted .vol-off { display: block; }
-.vol-slider { -webkit-appearance: none; appearance: none; width: 96px; height: 28px; background: transparent; cursor: pointer; --v: 100%; }
+.vol-slider { -webkit-appearance: none; appearance: none; width: 92px; height: 28px; background: transparent; cursor: pointer; --v: 100%; }
 .vol-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--text) 0 var(--v), rgba(255, 255, 255, 0.22) var(--v) 100%); }
 .vol-slider::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.22); }
 .vol-slider::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--text); }
