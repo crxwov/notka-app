@@ -1483,6 +1483,39 @@
     if (mix.length < 8) shuffled([...known.values()]).forEach((t) => { if (!seen.has(t.id)) { seen.add(t.id); mix.push(t); } });
     return mix.slice(0, 50);
   }
+  // Leaving a mix for something else keeps its place: coming back goes on
+  // with the same queue, from the same track and the same second. Kept per
+  // mix («мой микс», each mood), for a few days, in this device's storage.
+  const MIX_RESUME_KEY = "notka_mix_resume";
+  const MIX_RESUME_DAYS = 3;
+  let mixResume = {};
+  try { mixResume = JSON.parse(localStorage.getItem(MIX_RESUME_KEY) || "{}") || {}; } catch (e) { mixResume = {}; }
+  let lastMixSave = 0;
+  function saveMixResume() {
+    if (!currentMixKey || !currentTrack || !currentQueue.length) return;
+    lastMixSave = Date.now();
+    mixResume[currentMixKey] = {
+      at: lastMixSave,
+      queue: currentQueue.slice(0, 120),
+      trackId: currentTrack.id,
+      position: Math.floor(audio.currentTime || 0),
+      context: currentContextLabel,
+    };
+    const keys = Object.keys(mixResume).sort((a, b) => mixResume[b].at - mixResume[a].at);
+    keys.slice(8).forEach((k) => delete mixResume[k]);
+    try { localStorage.setItem(MIX_RESUME_KEY, JSON.stringify(mixResume)); } catch (e) { /* storage full or blocked: the place is just not kept */ }
+  }
+  function mixResumeFor(key) {
+    const r = mixResume[key];
+    if (!r || !r.queue || !r.queue.length || Date.now() - r.at > MIX_RESUME_DAYS * 86400000) return null;
+    const track = r.queue.find((t) => t.id === r.trackId);
+    return track ? { track, queue: r.queue, position: r.position || 0, context: r.context } : null;
+  }
+  function resumeMix(key, saved) {
+    shuffleOn = false;
+    playTrack(saved.track, saved.queue, { mymix: true, source: "mix", mixKey: key, context: saved.context || undefined, startAt: saved.position });
+  }
+
   let mixExtending = false;
   async function extendMixIfNeeded() {
     if (currentSource !== "mix" || mixExtending || !currentTrack) return;
@@ -1503,13 +1536,19 @@
   async function startMymix(openPlayer) {
     const known = knownTracks();
     if (!known.size) { showToast("Отметь пару треков сердцем или собери плейлист — и микс подберёт похожее"); return; }
+    const saved = mixResumeFor("mymix");
+    if (saved) {
+      resumeMix("mymix", saved);
+      if (openPlayer) showScreen("player");
+      return;
+    }
     const card = $("mymix-card");
     card.classList.add("is-building");
     let mix;
     try { mix = await buildMix(); } finally { card.classList.remove("is-building"); }
     if (!mix.length) { showToast("Не получилось собрать микс, попробуй ещё раз"); return; }
     shuffleOn = false;
-    playTrack(mix[0], mix, { mymix: true, source: "mix" });
+    playTrack(mix[0], mix, { mymix: true, source: "mix", mixKey: "mymix" });
     if (openPlayer) showScreen("player");
   }
   // «Под настроение»: the mix grown from the listener's own music. Three
@@ -1561,6 +1600,15 @@
   let moodBuilding = false;
   async function startMoodMix(key, picked) {
     if (moodBuilding) return;
+    if (hasPlus() || FREE_MOODS.has(key)) {
+      const saved = mixResumeFor(`mood:${key}`);
+      if (saved) {
+        haptic("success");
+        resumeMix(`mood:${key}`, saved);
+        if (currentScreen === "mood") goBack();
+        return;
+      }
+    }
     moodBuilding = true;
     const screen = $("screen-mood");
     screen.classList.add("is-picking");
@@ -1583,7 +1631,7 @@
     if (!/^ru_/.test(key)) eventNote("mood", key);
     if (hasPlus() || FREE_MOODS.has(key)) {
       // from here on it goes on like «Мой микс»: more of the same is added as it plays
-      playTrack(tracks[0], tracks, { mymix: true, source: "mix", context: `Мой микс · ${MOODS[key]}` });
+      playTrack(tracks[0], tracks, { mymix: true, source: "mix", mixKey: `mood:${key}`, context: `Мой микс · ${MOODS[key]}` });
     } else {
       const taste = tracks.slice(0, 3);
       playTrack(taste[0], taste, { source: "mood-taste", context: `${MOODS[key]} · проба` });
@@ -4673,6 +4721,7 @@
   let originalQueue = [];
   let currentQueueIndex = -1;
   let mymixActive = false;
+  let currentMixKey = null; // which mix the queue is (see saveMixResume), null outside a mix
   let currentContextLabel = "Нотка";
   let isLoading = false;
   let isStarting = false; // between a tap and the first sound of that track
@@ -4759,6 +4808,8 @@
     card.classList.toggle("playing", current && !audio.paused);
     $("mymix-sub").textContent = current
       ? `${currentTrack.title || "Без названия"} · ${currentTrack.artist || ""}`
+      : mixResumeFor("mymix")
+        ? `Продолжить: ${mixResumeFor("mymix").track.title || "Без названия"} · ${mixResumeFor("mymix").track.artist || ""}`
       : state.favorites.length || state.playlists.length
         ? "Похожее на твои любимые треки и плейлисты"
         : "Отметь треки сердцем — и микс подберёт похожее";
@@ -4833,6 +4884,8 @@
 
   async function playTrack(track, queue, opts) {
     opts = opts || {};
+    // leaving a mix for something else: keep its place
+    if (currentMixKey && !opts.keepQueue && opts.mixKey !== currentMixKey) saveMixResume();
     const token = ++playToken;
     if (resolveAbort) resolveAbort.abort();
     resolveAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -4847,6 +4900,7 @@
     if (!opts.keepQueue) {
       mymixActive = !!opts.mymix;
       currentSource = opts.source || null;
+      currentMixKey = opts.mixKey || null;
     }
     // Where this track is playing "from" — shown in the full-player header
     // ("Мой микс" / an album or playlist name / "Поиск"…). When neither is
@@ -4892,6 +4946,7 @@
       // those links are tied to the IP that resolved them (this computer),
       // so a phone hitting them over the internet gets cut off mid-stream.
       audio.src = `${API_BASE_URL}/stream?${trackQuery(track)}`;
+      if (opts.startAt > 2) audio.addEventListener("loadedmetadata", () => { try { audio.currentTime = opts.startAt; } catch (e) { /* starts over */ } }, { once: true });
       await audio.play();
       if (token !== playToken) return;
       rememberRecent(track);
@@ -5893,6 +5948,7 @@
     renderProgress((audio.currentTime / dur) * 100, audio.currentTime);
     $("player-time-total").textContent = formatDuration(dur);
     const now = Date.now();
+    if (currentMixKey && !isStarting && now - lastMixSave > 8000) saveMixResume();
     if ("mediaSession" in navigator && navigator.mediaSession.setPositionState && now - lastPositionSync > 4000) {
       lastPositionSync = now;
       try { navigator.mediaSession.setPositionState({ duration: dur, position: Math.min(audio.currentTime, dur), playbackRate: 1 }); } catch (e) { /* ignore */ }
