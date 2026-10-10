@@ -970,6 +970,45 @@
     if (e.key === "Escape" && openOverlays.length) closeOverlay(openOverlays[openOverlays.length - 1]);
   });
 
+  // A mouse has no sideways swipe: a shelf under the pointer gets arrows.
+  const shelfArrows = ["left", "right"].map((dir) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `shelf-arrow shelf-arrow-${dir}`;
+    b.setAttribute("aria-label", dir === "left" ? "Назад" : "Вперёд");
+    b.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"}"/></svg>`;
+    document.body.appendChild(b);
+    return b;
+  });
+  let arrowShelf = null;
+  let arrowHideTimer = 0;
+  function placeShelfArrows() {
+    const s = arrowShelf;
+    if (!s || !isDesktop() || !s.isConnected || s.offsetParent === null) { shelfArrows.forEach((b) => b.classList.remove("is-on")); return; }
+    const r = s.getBoundingClientRect();
+    const cardH = Math.min(r.height, 170);
+    const top = r.top + Math.max(0, (cardH - 40) / 2);
+    const canL = s.scrollLeft > 4, canR = s.scrollLeft + s.clientWidth < s.scrollWidth - 4;
+    shelfArrows[0].style.cssText = `left:${Math.round(r.left + 6)}px;top:${Math.round(top)}px`;
+    shelfArrows[1].style.cssText = `left:${Math.round(r.right - 46)}px;top:${Math.round(top)}px`;
+    shelfArrows[0].classList.toggle("is-on", canL);
+    shelfArrows[1].classList.toggle("is-on", canR);
+  }
+  shelfArrows.forEach((b, i) => b.addEventListener("click", () => {
+    if (!arrowShelf) return;
+    arrowShelf.scrollBy({ left: (i ? 1 : -1) * Math.round(arrowShelf.clientWidth * 0.85), behavior: "smooth" });
+    setTimeout(placeShelfArrows, 450);
+  }));
+  document.addEventListener("mouseover", (e) => {
+    if (!isDesktop() || !e.target.closest) return;
+    const s = e.target.closest(".shelf");
+    clearTimeout(arrowHideTimer);
+    if (s) { arrowShelf = s; placeShelfArrows(); return; }
+    if (e.target.closest(".shelf-arrow")) return;
+    arrowHideTimer = setTimeout(() => { arrowShelf = null; placeShelfArrows(); }, 250);
+  });
+  document.addEventListener("scroll", () => { if (arrowShelf) placeShelfArrows(); }, true);
+
   // Keys on a computer: space plays or pauses, ←/→ seek by 5 seconds
   // (with Shift: previous / next track). Not while typing or on a control
   // that uses these keys itself.
@@ -1092,14 +1131,14 @@
     main.addEventListener("pointerdown", (e) => {
       lpFired = false;
       startX = e.clientX; startY = e.clientY;
-      if (action !== "more") return;
+      if (action !== "more" || e.pointerType === "mouse") return;
       lpTimer = setTimeout(() => { lpFired = true; haptic("medium"); openTrackMenu(track); }, 480);
     });
     main.addEventListener("pointermove", (e) => {
       if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) cancelLp();
     });
     ["pointerup", "pointercancel", "pointerleave"].forEach((ev) => main.addEventListener(ev, cancelLp));
-    main.addEventListener("contextmenu", (e) => e.preventDefault());
+    main.addEventListener("contextmenu", (e) => { e.preventDefault(); if (action === "more") openTrackMenu(track); });
     main.addEventListener("click", (e) => {
       if (lpFired) { e.preventDefault(); lpFired = false; return; }
       if (opts.onMain) { opts.onMain(btnOf(li)); return; }
@@ -5784,6 +5823,7 @@
   const progressThumb = $("player-progress-thumb");
   const miniProgress = $("mp-progress");
   const miniScrub = $("mp-scrub");
+  const miniTime = $("mp-time");
 
   let isScrubbing = false;
 
@@ -5943,6 +5983,7 @@
     progressTrack.setAttribute("aria-valuenow", String(Math.round(p)));
     progressTrack.setAttribute("aria-valuetext", formatDuration(seconds));
     $("player-time-current").textContent = formatDuration(seconds);
+    if (miniTime && document.body.classList.contains("is-desktop")) miniTime.textContent = `${formatDuration(seconds)} / ${formatDuration(effectiveDuration())}`;
   }
   function resetProgress(track) {
     renderProgress(0, 0);
@@ -6057,7 +6098,7 @@
       if (cache[trackId]) { setGain(cache[trackId], true); return; }
       setGain(1, true);
       timer = setInterval(() => {
-        if (audio.paused || audio.volume < 0.99 || trackId !== (currentTrack && currentTrack.id)) return; // during a fade the level isn't the track's own
+        if (audio.paused || audio.volume < userVolume * 0.99 || trackId !== (currentTrack && currentTrack.id)) return; // during a fade the level isn't the track's own
         analyser.getFloatTimeDomainData(buf);
         let s = 0;
         for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
@@ -6081,13 +6122,34 @@
 
   // «Плавный переход»: fade in at the start, fade out at the end
   const volumeWorks = (() => { try { const p = document.createElement("audio"); p.volume = 0.5; return Math.abs(p.volume - 0.5) < 0.01; } catch (e) { return false; } })();
+  // the listener's own level (the computer's bar); a fade works under it
+  let userVolume = 1;
+  try { const v = parseFloat(localStorage.getItem("notka_volume")); if (v >= 0 && v <= 1) userVolume = v; } catch (e) { /* storage may be blocked */ }
   function applyFade(t, dur) {
     if (!volumeWorks) return;
     const f = Store.getSetting("crossfade") || 0;
-    if (!f || !dur) { if (audio.volume !== 1) audio.volume = 1; return; }
+    if (!f || !dur) { if (audio.volume !== userVolume) audio.volume = userVolume; return; }
     const v = Math.max(0, Math.min(1, t / f, (dur - t) / f));
-    audio.volume = Math.max(0.02, v);
+    audio.volume = Math.max(0.02, v) * userVolume;
   }
+  function setUserVolume(v, remember) {
+    userVolume = Math.max(0, Math.min(1, v));
+    if (volumeWorks) audio.volume = userVolume;
+    if (remember) { try { localStorage.setItem("notka_volume", String(userVolume)); } catch (e) { /* ignore */ } }
+    $("mp-vol").value = String(Math.round(userVolume * 100));
+    $("mp-vol").style.setProperty("--v", `${Math.round(userVolume * 100)}%`);
+    $("mp-mute-btn").classList.toggle("is-muted", userVolume === 0);
+    $("mp-mute-btn").setAttribute("aria-label", userVolume === 0 ? "Включить звук" : "Выключить звук");
+  }
+  let volumeBeforeMute = 0.8;
+  $("mp-vol").addEventListener("input", (e) => { setUserVolume(e.target.value / 100, true); if (userVolume > 0) volumeBeforeMute = userVolume; });
+  $("mp-mute-btn").addEventListener("click", () => {
+    if (userVolume > 0) { volumeBeforeMute = userVolume; setUserVolume(0, true); } else setUserVolume(volumeBeforeMute || 0.8, true);
+  });
+  setUserVolume(userVolume, false);
+  $("mp-prev-btn").addEventListener("click", () => playAdjacent(-1));
+  $("mp-next-btn").addEventListener("click", () => playAdjacent(1));
+  $("mp-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
 
   audio.addEventListener("timeupdate", () => {
     recordListening();

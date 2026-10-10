@@ -283,3 +283,61 @@ body.is-desktop .home-top { justify-content: flex-end; }
    wide window it stuck out as a hazy rectangle with hard edges, so there it
    is just part of the page */
 body.is-desktop .search-head { position: static; margin: 0; padding: 0 0 12px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask: none; mask: none; }
+
+/* ----- the bar at the bottom: previous / next, time, volume, queue ----- */
+.mini-desk { display: none; }
+body.is-desktop .mini-player { gap: 6px; }
+body.is-desktop .mini-desk { display: flex; align-items: center; flex: 0 0 auto; }
+.mini-ctrl { width: 40px; height: 40px; color: var(--text-2); background: none; border: 0; box-shadow: none; cursor: pointer; transition: color 0.2s, background-color 0.2s, transform 0.15s var(--ease-out); }
+.mini-ctrl:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
+.mini-ctrl:active { transform: scale(0.92); }
+.mini-time { min-width: 104px; justify-content: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); margin: 0 6px; }
+.mini-vol { gap: 2px; margin-right: 2px; }
+.mini-vol .vol-off { display: none; }
+.mini-vol .is-muted .vol-on { display: none; }
+.mini-vol .is-muted .vol-off { display: block; }
+.vol-slider { -webkit-appearance: none; appearance: none; width: 96px; height: 28px; background: transparent; cursor: pointer; --v: 100%; }
+.vol-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--text) 0 var(--v), rgba(255, 255, 255, 0.22) var(--v) 100%); }
+.vol-slider::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.22); }
+.vol-slider::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--text); }
+.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.vol-slider::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.mini-play { order: 0; }
+body.is-desktop .mini-player { padding-right: 14px; }
+
+/* ----- arrows over a shelf under the mouse ----- */
+.shelf-arrow { position: fixed; z-index: 6; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; color: var(--text); background: rgba(20, 12, 24, 0.72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 8px 20px -6px rgba(0, 0, 0, 0.6); opacity: 0; pointer-events: none; transform: scale(0.85); transition: opacity 0.18s, transform 0.18s var(--ease-out); cursor: pointer; }
+.shelf-arrow.is-on { opacity: 1; pointer-events: auto; transform: none; }
+.shelf-arrow:hover { background: rgba(60, 30, 56, 0.9); }
+body:not(.is-desktop) .shelf-arrow { display: none; }
+
+/* ----- a mouse: a visible scrollbar, hover, and a wider artist / album page ----- */
+body.is-desktop .screen { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; }
+body.is-desktop .screen::-webkit-scrollbar { display: block; width: 10px; }
+body.is-desktop .screen::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+body.is-desktop .screen::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.34); background-clip: padding-box; }
+body.is-desktop .screen::-webkit-scrollbar-track { background: transparent; }
+@media (hover: hover) {
+  body.is-desktop .track-row { border-radius: 14px; transition: background-color 0.15s; }
+  body.is-desktop .track-row:hover { background: rgba(255, 255, 255, 0.07); }
+  body.is-desktop .shelf-card, body.is-desktop .playlist-card { cursor: pointer; }
+  body.is-desktop .shelf-card:hover .cover, body.is-desktop .playlist-card:hover .cover { transform: translateY(-3px); }
+  body.is-desktop .shelf-card .cover, body.is-desktop .playlist-card .cover { transition: transform 0.25s var(--ease-out), box-shadow 0.25s; }
+}
+body.is-desktop #screen-artist .hero, body.is-desktop #screen-album .hero {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  column-gap: 32px;
+  align-content: end;
+  justify-items: start;
+  align-items: end;
+  text-align: left;
+  padding: 8px 0 28px;
+}
+body.is-desktop #screen-artist .hero .cover-lg, body.is-desktop #screen-album .hero .cover-lg { grid-column: 1; grid-row: 1 / span 6; width: 232px; height: 232px; margin: 0; align-self: end; }
+body.is-desktop .hero > :not(.cover-lg) { grid-column: 2; }
+body.is-desktop .hero-title { font-size: 44px; line-height: 1.05; letter-spacing: -0.035em; text-align: left; text-wrap: balance; }
+body.is-desktop .hero-actions { justify-content: flex-start; width: auto; max-width: none; margin-top: 18px; }
+body.is-desktop .hero-actions .pill-btn { flex: 0 0 auto; min-width: 168px; }
+
+body.is-desktop .hero-link { padding-left: 0; margin-top: 6px; }
