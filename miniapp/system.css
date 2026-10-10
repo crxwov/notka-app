@@ -80,25 +80,27 @@
   mask-image: linear-gradient(180deg, transparent 0, #000 22%, #000 46%, transparent 80%);
 }
 .ps-deck {
-  position: absolute; left: 50%; top: 18px; width: 640px;
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
-  transform: translateX(-50%) perspective(620px) rotateX(58deg);
+  position: absolute; left: 50%; top: 4px; width: 780px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+  transform: translateX(-50%) perspective(640px) rotateX(58deg) rotateZ(-9deg);
   transform-origin: 50% 0;
-  opacity: 0.62;
+  opacity: 0.7;
 }
 .ps-tile {
-  position: relative; display: flex; align-items: center; gap: 10px; height: 62px; padding: 8px 10px 12px 8px; border-radius: 16px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 26%, #2b2138), color-mix(in srgb, var(--c-deep) 40%, #17111f));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 14px 24px -14px rgba(0, 0, 0, 0.7);
+  position: relative; display: flex; align-items: center; gap: 12px; height: 72px; padding: 9px 12px 14px 9px; border-radius: 18px;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.26) 0, rgba(255, 255, 255, 0.06) 38%, rgba(255, 255, 255, 0.02) 62%, rgba(255, 255, 255, 0.12) 100%),
+    linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 30%, rgba(60, 40, 80, 0.72)), color-mix(in srgb, var(--c-deep) 40%, rgba(24, 16, 34, 0.78)));
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 -10px 18px -10px rgba(255, 255, 255, 0.12), 0 18px 28px -14px rgba(0, 0, 0, 0.75);
 }
 .ps-tile:nth-child(n+19) { display: none; }
-.ps-cover { display: block; width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; background: var(--surface-2) center / cover; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.ps-cover { display: block; width: 52px; height: 52px; flex-shrink: 0; border-radius: 12px; background: var(--surface-2) center / cover; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
 .ps-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.ps-meta b { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-meta em { font-style: normal; font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-play { width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
-.ps-play svg { width: 14px; height: 14px; }
-.ps-bar { position: absolute; left: 62px; right: 10px; bottom: 7px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.ps-meta b { font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-meta em { font-style: normal; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-play { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
+.ps-play svg { width: 16px; height: 16px; }
+.ps-bar { position: absolute; left: 73px; right: 12px; bottom: 8px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
 .ps-bar u { display: block; height: 100%; border-radius: 3px; background: var(--c-warm); }
 
 /* план: выбор срока и сама карточка */
@@ -483,12 +485,54 @@ body.is-desktop .plus-bar::before { display: none; }
 /* the Plus header on a computer: a wider canvas of four columns, the title centred over it */
 body.is-desktop #screen-plus .plus-hero { padding-top: 200px; text-align: center; }
 body.is-desktop #screen-plus .plus-showcase { height: 350px; }
-body.is-desktop #screen-plus .ps-deck { width: 1240px; grid-template-columns: repeat(4, minmax(0, 1fr)); top: 14px; gap: 12px; transform: translateX(-50%) perspective(760px) rotateX(58deg); }
-body.is-desktop #screen-plus .ps-tile { height: 76px; padding: 10px 14px 14px 10px; border-radius: 20px; gap: 12px; }
-body.is-desktop #screen-plus .ps-cover { width: 54px; height: 54px; border-radius: 12px; }
-body.is-desktop #screen-plus .ps-meta b { font-size: 15px; }
-body.is-desktop #screen-plus .ps-meta em { font-size: 13px; }
-body.is-desktop #screen-plus .ps-play { width: 36px; height: 36px; }
-body.is-desktop #screen-plus .ps-play svg { width: 17px; height: 17px; }
-body.is-desktop #screen-plus .ps-bar { left: 74px; right: 14px; bottom: 9px; }
+body.is-desktop #screen-plus .ps-deck { width: 1560px; grid-template-columns: repeat(4, minmax(0, 1fr)); top: -4px; gap: 14px; transform: translateX(-50%) perspective(820px) rotateX(58deg) rotateZ(-9deg); }
+body.is-desktop #screen-plus .ps-tile { height: 92px; padding: 12px 16px 17px 12px; border-radius: 24px; gap: 14px; }
+body.is-desktop #screen-plus .ps-cover { width: 66px; height: 66px; border-radius: 15px; }
+body.is-desktop #screen-plus .ps-meta b { font-size: 18px; }
+body.is-desktop #screen-plus .ps-meta em { font-size: 15px; }
+body.is-desktop #screen-plus .ps-play { width: 44px; height: 44px; }
+body.is-desktop #screen-plus .ps-play svg { width: 20px; height: 20px; }
+body.is-desktop #screen-plus .ps-bar { left: 92px; right: 16px; bottom: 11px; height: 4px; }
 body.is-desktop #screen-plus .ps-tile:nth-child(n+19) { display: flex; }
+
+/* ----- «Нотка Плюс»: more glass, an even row of atmospheres, a promo code that can be seen ----- */
+.plan-card {
+  background:
+    radial-gradient(120% 70% at 12% 0%, color-mix(in srgb, var(--c-mid) 38%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03) 42%),
+    rgba(26, 18, 36, 0.62);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: inset 0 1.5px 0.5px rgba(255, 255, 255, 0.38), inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 30px 60px -26px rgba(0, 0, 0, 0.7);
+}
+.plan-opt { background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.plan-opt.is-on { background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 2px var(--c-warm); }
+.tm-list li { background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.pd-chips .chip { background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.pd-chips .chip.active { background: var(--btn-light); box-shadow: 0 6px 18px -8px rgba(255, 255, 255, 0.5); }
+
+/* atmospheres: equal cards, none enlarged, the picked one only outlined, nothing cut off */
+.pd-atmo { padding: 6px; align-items: start; }
+.pd-atmo.demo-seasons .atmo-card, .pd-atmo.demo-seasons .atmo-card.is-on { transform: none; opacity: 0.78; }
+.pd-atmo.demo-seasons .atmo-card.is-on { opacity: 1; }
+.pd-atmo.demo-seasons .atmo-view { height: 140px; outline-offset: 3px; }
+.pd-atmo .at-name { text-align: center; margin-top: 2px; }
+body.is-desktop .pd-atmo { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+body.is-desktop .pd-atmo.demo-seasons .atmo-view { height: 190px; }
+
+/* the promo code: a button, not a grey line */
+.plus-promo-link {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 420px; height: 52px; margin: 18px auto 6px;
+  border-radius: 999px; font-size: 15.5px; font-weight: 700; color: var(--text);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.34), inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 14px 26px -16px rgba(0, 0, 0, 0.7);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  transition: transform 0.2s var(--ease-out), background-color 0.2s;
+}
+.plus-promo-link::before {
+  content: ""; width: 20px; height: 20px; flex: 0 0 auto; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 1 0-6V6H3Z'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 1 0-6V6H3Z'/></svg>") center / contain no-repeat;
+}
+.plus-promo-link:active { transform: scale(0.98); }
+@media (hover: hover) { .plus-promo-link:hover { background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1)); } }
