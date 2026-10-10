@@ -2160,7 +2160,10 @@ body.no-tabbar .mini-player { bottom: calc(var(--sab) + 14px); }
 .mini-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-artist { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-play { width: 44px; height: 44px; }
-.mini-progress { position: absolute; left: 18px; right: 18px; bottom: 0; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+/* a strip along the bottom edge: the thin line is only what is seen, the strip is what the finger hits */
+.mini-scrub { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; z-index: 2; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
+.mini-progress { position: absolute; left: 18px; right: 18px; bottom: 0; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; transition: height 0.15s var(--ease-out); }
+.mini-scrub.is-scrubbing .mini-progress { height: 6px; background: rgba(255, 255, 255, 0.2); }
 .mini-progress span { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--now); }
 
 .tabbar {

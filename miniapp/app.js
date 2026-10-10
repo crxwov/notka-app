@@ -5930,6 +5930,35 @@
   }
   progressTrack.addEventListener("pointerup", endScrub);
   progressTrack.addEventListener("pointercancel", () => { isScrubbing = false; progressTrack.classList.remove("is-scrubbing"); });
+  // the same seek from the mini player's bottom edge
+  const miniScrub = $("mp-scrub");
+  const MINI_INSET = 18; // the visible line is inset from the strip's ends
+  function miniPct(e) {
+    const r = miniScrub.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (e.clientX - r.left - MINI_INSET) / Math.max(1, r.width - MINI_INSET * 2)));
+  }
+  miniScrub.addEventListener("pointerdown", (e) => {
+    if (!effectiveDuration()) return;
+    e.stopPropagation();
+    isScrubbing = true;
+    miniScrub.classList.add("is-scrubbing");
+    miniScrub.setPointerCapture(e.pointerId);
+    renderScrubPosition(miniPct(e));
+  });
+  miniScrub.addEventListener("pointermove", (e) => {
+    if (isScrubbing && miniScrub.classList.contains("is-scrubbing")) renderScrubPosition(miniPct(e));
+  });
+  miniScrub.addEventListener("pointerup", (e) => {
+    if (!miniScrub.classList.contains("is-scrubbing")) return;
+    miniScrub.classList.remove("is-scrubbing");
+    isScrubbing = false;
+    const dur = effectiveDuration();
+    if (dur) audio.currentTime = miniPct(e) * dur;
+    haptic("light");
+  });
+  miniScrub.addEventListener("pointercancel", () => { isScrubbing = false; miniScrub.classList.remove("is-scrubbing"); });
+  miniScrub.addEventListener("click", (e) => e.stopPropagation());
+
   progressTrack.addEventListener("keydown", (e) => {
     const dur = effectiveDuration();
     if (!dur) return;
