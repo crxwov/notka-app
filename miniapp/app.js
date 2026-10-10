@@ -561,15 +561,24 @@
     const BINS = 18;
     const bins = Array.from({ length: BINS }, () => ({ w: 0, x: 0, y: 0, s: 0, l: 0 }));
     const vbins = Array.from({ length: BINS }, () => ({ w: 0, x: 0, y: 0, s: 0, l: 0 }));
-    let total = 0, chroma = 0, vivid = 0, gx = 0, gy = 0;
+    // by area: what actually fills the cover (a small loud accent does not decide the mood)
+    const abins = Array.from({ length: BINS }, () => ({ w: 0, x: 0, y: 0, s: 0, l: 0 }));
+    let total = 0, chroma = 0, vivid = 0, gx = 0, gy = 0, sumL = 0;
     const lights = [];
     for (let i = 0; i < data.length; i += 4) {
       if (data[i + 3] < 128) continue;
       const [h, s, l] = rgbToHsl(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255);
       total++;
+      sumL += l;
       lights.push([h, s, l]);
       if (s < 0.2 || l < 0.1 || l > 0.92) continue;
       chroma++;
+      {
+        const wa = (s + 0.2) * Math.sqrt(1 - Math.abs(2 * l - 1));
+        const ab = abins[Math.floor(h / (360 / BINS)) % BINS];
+        const ra = (h * Math.PI) / 180;
+        ab.w += wa; ab.x += Math.cos(ra) * wa; ab.y += Math.sin(ra) * wa; ab.s += s * wa; ab.l += l * wa;
+      }
       // saturation squared: a small vivid accent beats a large muted area
       const w = s * s * Math.sqrt(1 - Math.abs(2 * l - 1));
       const bi = Math.floor(h / (360 / BINS)) % BINS;
@@ -612,17 +621,17 @@
       };
     }
 
-    const colors = bins
+    const colors = abins
       .filter((b) => b.w > 0)
       .map((b) => ({ w: b.w, h: (Math.atan2(b.y, b.x) * 180 / Math.PI + 360) % 360, s: b.s / b.w, l: b.l / b.w }))
       .sort((a, b) => b.w - a.w);
     const picks = [colors[0]];
     for (const c of colors) {
       if (picks.length >= 3) break;
-      if (c.w < colors[0].w * 0.08) break;
-      if (picks.every((p) => hueDist(p.h, c.h) >= 28)) picks.push(c);
+      if (c.w < colors[0].w * 0.12) break;
+      if (picks.every((p) => hueDist(p.h, c.h) >= 30)) picks.push(c);
     }
-    const [a, b = { ...a, h: (a.h + 24) % 360 }, c3] = picks;
+    const [a, b = { ...a, h: (a.h + 24) % 360, s: a.s * 0.9 }, c3] = picks;
     // the darkest chromatic tones of the cover become the deep layer
     const darks = lights.filter((p) => p[1] > 0.15 && p[2] < 0.45).sort((p, q) => p[2] - q[2]).slice(0, Math.max(6, Math.floor(total * 0.15)));
     let deepH = c3 ? c3.h : b.h, deepS = c3 ? c3.s : b.s;
@@ -632,13 +641,17 @@
       deepH = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
       deepS = ds / darks.length;
     }
-    // softened: the cover's colours are kept, but calmer and less contrasty, so a neon or acid cover
-    // gives a pleasant light, not a glaring one
+    // the vibe: how light the cover is as a whole, and how colourful. A dark, moody cover gives
+    // a deep, quiet light; a light, airy one a light and gentle light; a loud one is calmed.
+    const tone = clamp(sumL / total, 0.16, 0.8);
+    const vivid2 = clamp(a.s, 0.2, 1);
+    const calm = vivid2 > 0.75 ? 0.72 : vivid2 > 0.5 ? 0.8 : 0.9; // the louder the cover, the more it is calmed
+    const warmL = clamp(0.5 + (tone - 0.5) * 0.75, 0.45, 0.68);
     return {
-      core: hsl(a.h, clamp(a.s * 0.6, 0.3, 0.56), 0.88),
-      warm: hsl(a.h, clamp(a.s * 0.76, 0.36, 0.64), clamp(a.l, 0.54, 0.66)),
-      mid: hsl(b.h, clamp(b.s * 0.72, 0.3, 0.58), clamp(b.l, 0.44, 0.58)),
-      deep: hsl(deepH, clamp(deepS * 0.78, 0.26, 0.58), 0.3),
+      core: hsl(a.h, clamp(a.s * 0.55, 0.26, 0.5), clamp(0.77 + tone * 0.17, 0.8, 0.92)),
+      warm: hsl(a.h, clamp(a.s * calm, 0.26, 0.62), warmL),
+      mid: hsl(b.h, clamp(b.s * calm * 0.95, 0.24, 0.58), clamp(warmL - 0.1, 0.36, 0.56)),
+      deep: hsl(deepH, clamp(deepS * 0.78, 0.24, 0.56), clamp(0.13 + tone * 0.28, 0.16, 0.34)),
     };
   }
 
