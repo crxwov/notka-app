@@ -3212,6 +3212,7 @@
     $("plus-cassette-artist").textContent = track ? track.artist || "" : "в Нотке Плюс";
     fillPlusLive();
     fillPlusShowcase();
+    fillPlusPanelCovers();
     planBarVisit();
     syncPlusUI();
     $("plus-bar").classList.remove("is-dismissed"); // плашка возвращается при каждом заходе
@@ -3269,32 +3270,126 @@
     }, { root: $("screen-plus"), threshold: 0.35 }).observe(document.querySelector(".plan-card"));
   }
 
-  // шапка страницы Плюса: настоящие карточки твоих треков и мини-плеер
-  const PLUS_DEMO_TRACKS = [
-    { title: "Yellow", artist: "Coldplay" }, { title: "Creep", artist: "Radiohead" }, { title: "Blinding Lights", artist: "The Weeknd" },
-    { title: "Dancing Queen", artist: "ABBA" }, { title: "Smells Like Teen Spirit", artist: "Nirvana" }, { title: "Shape of You", artist: "Ed Sheeran" },
-    { title: "Believer", artist: "Imagine Dragons" }, { title: "Numb", artist: "Linkin Park" }, { title: "Bad Guy", artist: "Billie Eilish" },
+  // Real covers for the Plus page: the header's deck of glass cards and the
+  // example lists in the panels. A cover is looked up once through the same
+  // search the app uses, then kept on this device.
+  const PLUS_COVERS_KEY = "notka_plus_covers_v1";
+  let plusCoverCache = {};
+  try { plusCoverCache = JSON.parse(localStorage.getItem(PLUS_COVERS_KEY) || "{}") || {}; } catch (e) { plusCoverCache = {}; }
+  const plusCoverPending = new Map();
+  function savePlusCovers() {
+    try { localStorage.setItem(PLUS_COVERS_KEY, JSON.stringify(plusCoverCache)); } catch (e) { /* kept for this session only */ }
+  }
+  function plusCoverFor(query, artistHint) {
+    const key = query.trim().toLowerCase();
+    if (plusCoverCache[key]) return Promise.resolve(plusCoverCache[key]);
+    if (plusCoverPending.has(key)) return plusCoverPending.get(key);
+    const p = (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}&limit=12`);
+        if (!res.ok) return null;
+        const list = ((await res.json()).results || []).filter((t) => t.artwork);
+        const hint = (artistHint || "").toLowerCase().split(/\s+/)[0];
+        const hit = hint ? list.find((t) => (t.artist || "").toLowerCase().split(/[,&]/)[0].includes(hint)) : list[0];
+        if (!hit) return null;
+        const rec = { title: hit.title, artist: hit.artist, artwork: hit.artwork };
+        plusCoverCache[key] = rec;
+        savePlusCovers();
+        return rec;
+      } catch (e) {
+        return null;
+      } finally {
+        plusCoverPending.delete(key);
+      }
+    })();
+    plusCoverPending.set(key, p);
+    return p;
+  }
+  const PLUS_DECK_QUERIES = [
+    ["The Weeknd Blinding Lights", "The Weeknd"], ["Кино Группа крови", "Кино"], ["Dua Lipa Houdini", "Dua"],
+    ["Coldplay Yellow", "Coldplay"], ["Imagine Dragons Believer", "Imagine"], ["Billie Eilish lovely", "Billie"], ["Nirvana Smells Like Teen Spirit", "Nirvana"],
+    ["Linkin Park Numb", "Linkin"], ["Ed Sheeran Shape of You", "Ed"],
   ];
-  function fillPlusShowcase() {
-    const seen = new Set(), list = [];
-    const add = (t) => { if (t && t.title && t.artwork && !seen.has(t.id) && list.length < 9) { seen.add(t.id); list.push(t); } };
+  const cssUrl = (u) => `url("${String(u).replace(/"/g, "%22")}")`;
+
+  // the header: an even row of glass cards, the middle one larger, the rest turned away
+  let plusDeckTracks = [];
+  let plusDeckCenter = 0;
+  let plusDeckTimer = 0;
+  function renderPlusDeck() {
+    const deck = $("ps-deck");
+    const n = plusDeckTracks.length;
+    if (!deck || !n) return;
+    if (deck.children.length !== n) {
+      deck.textContent = "";
+      plusDeckTracks.forEach((t) => {
+        const card = document.createElement("span");
+        card.className = "ps-card";
+        card.innerHTML = '<span class="ps-cover"></span><b></b><em></em>';
+        card.querySelector(".ps-cover").style.backgroundImage = cssUrl(hiResArtwork(t.artwork));
+        card.querySelector("b").textContent = t.title || "";
+        card.querySelector("em").textContent = t.artist || "";
+        deck.appendChild(card);
+      });
+    }
+    [...deck.children].forEach((card, i) => {
+      let d = (((i - plusDeckCenter) % n) + n) % n;
+      if (d > n / 2) d -= n;
+      card.dataset.d = Math.abs(d) <= 2 ? String(d) : "x";
+    });
+  }
+  async function fillPlusShowcase() {
+    const seen = new Set(), mine = [];
+    const add = (t) => {
+      if (!t || !t.title || !t.artwork) return;
+      const key = t.artwork;
+      if (seen.has(key) || mine.length >= 4) return;
+      seen.add(key);
+      mine.push({ title: t.title, artist: t.artist, artwork: t.artwork });
+    };
     if (currentTrack) add(currentTrack);
     (state.favorites || []).forEach(add);
     (state.recent || []).forEach(add);
-    (state.playlists || []).forEach((p) => Object.values(p.tracksCache || {}).forEach(add));
-    const pool = list.length >= 5 ? list : list.concat(PLUS_DEMO_TRACKS.slice(0, 9 - list.length));
-    const field = $("ps-field");
-    field.textContent = "";
-    for (let i = 0; i < 18; i++) {
-      const t = pool[(i * 4) % pool.length] || pool[i % pool.length];
-      const card = document.createElement("i");
-      card.innerHTML = '<span class="ps-cover"></span><span class="ps-meta"><b></b><em></em></span><span class="ps-play"><svg><use href="#' + (i % 3 === 1 ? "i-play" : "i-pause") + '"/></svg></span><span class="ps-bar"><u></u></span>';
-      card.querySelector("b").textContent = t.title;
-      card.querySelector("em").textContent = t.artist || "";
-      card.querySelector("u").style.width = 18 + ((i * 29) % 65) + "%";
-      if (t.artwork) card.querySelector(".ps-cover").style.backgroundImage = `url("${hiResArtwork(t.artwork).replace(/"/g, "%22")}")`;
-      field.appendChild(card);
+    plusDeckTracks = mine.slice();
+    plusDeckCenter = 0;
+    renderPlusDeck();
+    clearInterval(plusDeckTimer);
+    plusDeckTimer = setInterval(() => {
+      if (currentScreen !== "plus") { clearInterval(plusDeckTimer); plusDeckTimer = 0; return; }
+      if (plusDeckTracks.length > 1) { plusDeckCenter = (plusDeckCenter + 1) % plusDeckTracks.length; renderPlusDeck(); }
+    }, 3200);
+    // fill up to seven with well-known tracks, with their real covers
+    const found = await Promise.all(PLUS_DECK_QUERIES.map(([q, a]) => plusCoverFor(q, a)));
+    for (const rec of found) {
+      if (!rec || plusDeckTracks.length >= 7 || seen.has(rec.artwork)) continue;
+      seen.add(rec.artwork);
+      plusDeckTracks.push(rec);
     }
+    if (plusDeckTracks.length !== (document.getElementById("ps-deck") || { children: [] }).children.length) renderPlusDeck();
+  }
+
+  // the example lists in the panels («Машина времени», «Настроение»): real covers instead of coloured squares
+  let plusPanelCoversDone = false;
+  async function fillPlusPanelCovers() {
+    const rows = [...document.querySelectorAll("#plus-panels .tm-list li")].filter((li) => li.querySelector(".cv"));
+    const todo = rows.filter((li) => !li.dataset.cover);
+    if (!todo.length) return;
+    let next = 0;
+    const worker = async () => {
+      while (next < todo.length) {
+        const li = todo[next++];
+        const title = (li.querySelector("b") || {}).textContent || "";
+        const artist = (li.querySelector("em") || {}).textContent || "";
+        const rec = await plusCoverFor(`${artist} ${title}`, artist);
+        if (!rec) continue;
+        const cv = li.querySelector(".cv");
+        cv.style.backgroundImage = cssUrl(hiResArtwork(rec.artwork));
+        cv.style.backgroundSize = "cover";
+        cv.style.backgroundPosition = "center";
+        li.dataset.cover = "1";
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
   }
 
   // ============================================================

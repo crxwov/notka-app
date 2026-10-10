@@ -71,25 +71,28 @@
 .plan-buy[hidden] { display: none; }
 .plus-bar.is-covered { display: none; }
 
-/* шапка Плюса: наклонённая куча плееров с настоящими треками лежит позади заголовка */
+/* шапка Плюса: ровный ряд стеклянных карточек с настоящими обложками; средняя крупнее, боковые в перспективе */
 #screen-plus { isolation: isolate; }
-.plus-hero { padding-top: 150px; }
-.plus-showcase { position: absolute; left: 0; right: 0; top: 0; height: 290px; overflow: hidden; pointer-events: none; z-index: -1; }
-.ps-mask { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(180deg, #000 0, #000 40%, transparent 100%); mask-image: linear-gradient(180deg, #000 0, #000 40%, transparent 100%); }
-.ps-field { position: absolute; left: 50%; top: -70px; width: 640px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; transform: translateX(-50%) rotate(-14deg); opacity: 0.24; }
-.ps-field > i { position: relative; display: flex; align-items: center; gap: 10px; padding: 11px 12px 17px 11px; border-radius: var(--radius-m); background: linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 30%, #2a2037), #1c1627); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
-.ps-field > i:nth-child(3n+2) { margin-top: 40px; }
-.ps-field > i:nth-child(3n) { margin-top: -22px; }
-.ps-cover { display: block; width: 42px; height: 42px; flex-shrink: 0; border-radius: var(--radius-s); background: linear-gradient(150deg, var(--c-warm), var(--c-mid) 60%, var(--c-deep)) center / cover; }
-.ps-field > i:nth-child(3n+2) .ps-cover { background-image: linear-gradient(210deg, var(--c-mid), var(--c-deep)); }
-.ps-field > i:nth-child(3n) .ps-cover { background-image: linear-gradient(120deg, var(--c-core), var(--c-warm)); }
-.ps-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.ps-meta b { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-meta em { font-style: normal; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-play { width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
-.ps-play svg { width: 16px; height: 16px; }
-.ps-bar { position: absolute; left: 11px; right: 12px; bottom: 7px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
-.ps-bar u { display: block; height: 100%; border-radius: 3px; background: var(--c-warm); }
+.plus-hero { padding-top: 196px; }
+.plus-showcase { position: absolute; left: 0; right: 0; top: 0; height: 200px; overflow: hidden; pointer-events: none; z-index: -1; }
+.ps-deck { position: absolute; left: 50%; top: 26px; width: 0; height: 0; perspective: 900px; }
+.ps-card {
+  position: absolute; left: -56px; top: 0; width: 112px; padding: 6px 6px 9px; border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.07));
+  -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24), 0 26px 44px -20px rgba(0, 0, 0, 0.75);
+  opacity: 0; transform: scale(0.6); z-index: 1;
+  transition: transform 0.9s var(--ease-out), opacity 0.7s var(--ease-out);
+  will-change: transform, opacity;
+}
+.ps-card[data-d="0"]  { opacity: 1; transform: scale(1.08); z-index: 5; }
+.ps-card[data-d="1"]  { opacity: 0.94; transform: translateX(100px) rotateY(-26deg) scale(0.88); z-index: 4; }
+.ps-card[data-d="-1"] { opacity: 0.94; transform: translateX(-100px) rotateY(26deg) scale(0.88); z-index: 4; }
+.ps-card[data-d="2"]  { opacity: 0.58; transform: translateX(176px) rotateY(-34deg) scale(0.72); z-index: 3; }
+.ps-card[data-d="-2"] { opacity: 0.58; transform: translateX(-176px) rotateY(34deg) scale(0.72); z-index: 3; }
+.ps-cover { display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; background: var(--surface-2) center / cover; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.ps-card b { display: block; margin-top: 8px; font-size: 12.5px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-card em { display: block; margin-top: 1px; font-style: normal; font-size: 11px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* план: выбор срока и сама карточка */
 .plan-card { position: relative; padding: 22px 16px 18px; border-radius: var(--radius-l); background: radial-gradient(120% 70% at 12% 0%, color-mix(in srgb, var(--c-mid) 34%, transparent), transparent 70%), linear-gradient(180deg, #221a2f, #151019); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 30px 60px -28px color-mix(in srgb, var(--c-mid) 80%, #000); }
@@ -439,12 +442,9 @@ body.is-desktop .mood-genre { padding: 22px 10px 18px; font-size: 18px; }
 body.is-desktop .mood-genre i { width: 60px; height: 60px; }
 
 /* «Нотка Плюс» on a computer: a centred header and a larger drum (the JS spaces the items by --pw-k) */
-body.is-desktop #screen-plus { --pw-k: 1.3; }
-body.is-desktop #screen-plus .plus-hero { padding-top: 96px; text-align: center; }
+body.is-desktop #screen-plus { --pw-k: 1.12; }
 body.is-desktop #screen-plus .plus-brand { justify-content: center; }
 body.is-desktop #screen-plus .plus-title { font-size: 48px; text-align: center; }
-body.is-desktop #screen-plus .plus-showcase { height: 300px; }
-body.is-desktop #screen-plus .ps-field { width: 1000px; top: -60px; }
 body.is-desktop #screen-plus .pw { height: calc(226px * var(--pw-k) + 132px); margin-top: 12px; }
 body.is-desktop #screen-plus .pw-track { height: calc(196px * var(--pw-k)); perspective: 1000px; }
 body.is-desktop #screen-plus .pw-item { width: calc(156px * var(--pw-k)); height: calc(156px * var(--pw-k)); margin: calc(-78px * var(--pw-k)) 0 0 calc(-78px * var(--pw-k)); }
@@ -472,3 +472,16 @@ body.is-desktop #screen-plus .plus-hero::before {
 
 /* the dark fade above the bar was a strip with hard sides on a wide page; the bar is a card of its own here */
 body.is-desktop .plus-bar::before { display: none; }
+
+/* the Plus header on a computer: the deck is larger and the title is centred below it */
+body.is-desktop #screen-plus .plus-hero { padding-top: 214px; text-align: center; }
+body.is-desktop #screen-plus .plus-showcase { height: 230px; }
+body.is-desktop #screen-plus .ps-deck { top: 30px; }
+body.is-desktop #screen-plus .ps-card { left: -72px; width: 144px; padding: 8px 8px 11px; border-radius: 20px; }
+body.is-desktop #screen-plus .ps-cover { border-radius: 14px; }
+body.is-desktop #screen-plus .ps-card b { font-size: 14px; margin-top: 10px; }
+body.is-desktop #screen-plus .ps-card em { font-size: 12.5px; }
+body.is-desktop #screen-plus .ps-card[data-d="1"]  { transform: translateX(130px) rotateY(-26deg) scale(0.88); }
+body.is-desktop #screen-plus .ps-card[data-d="-1"] { transform: translateX(-130px) rotateY(26deg) scale(0.88); }
+body.is-desktop #screen-plus .ps-card[data-d="2"]  { transform: translateX(228px) rotateY(-34deg) scale(0.72); }
+body.is-desktop #screen-plus .ps-card[data-d="-2"] { transform: translateX(-228px) rotateY(34deg) scale(0.72); }

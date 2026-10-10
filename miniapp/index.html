@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=129" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=63" />
+<link rel="stylesheet" href="system.css?v=66" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -745,7 +745,7 @@
   <!-- ============ НОТКА ПЛЮС ============ -->
   <main class="screen" id="screen-plus" hidden>
     <div class="plus-showcase" id="plus-showcase" aria-hidden="true">
-      <div class="ps-mask"><div class="ps-field" id="ps-field"></div></div>
+      <div class="ps-deck" id="ps-deck"></div>
     </div>
     <header class="bar">
       <button class="round-btn round-glass back-btn" id="plus-back-btn" type="button" aria-label="Назад"><svg width="22" height="22" aria-hidden="true"><use href="#i-back"/></svg></button>
@@ -762,17 +762,15 @@
         <button class="pw-item" type="button" style="--a:#FF7A33;--b:#FFC15A" aria-label="Машина времени"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><mask id="pm1"><rect width="120" height="120" fill="#fff"/><path d="M60 36V60L78 71" fill="none" stroke="#000" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></mask><circle cx="60" cy="60" r="41" fill="url(#pwg)" mask="url(#pm1)"/><path d="M14.1 27.9A56 56 0 0 1 92.1 14.1" fill="none" stroke="url(#pwg)" stroke-width="8" stroke-linecap="round"/><path d="M6.4 38.4L10.6 20.8L24.6 31.6Z" fill="url(#pwg)" stroke="url(#pwg)" stroke-width="4" stroke-linejoin="round"/></svg></span></button>
         <button class="pw-item" type="button" style="--a:#35C6EE;--b:#8A8CFF" aria-label="Атмосферы"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M84 8A54 54 0 1 0 112 90 44 44 0 0 1 84 8Z" fill="url(#pwg)"/><path d="M96 22Q98.5 33.5 110 36Q98.5 38.5 96 50Q93.5 38.5 82 36Q93.5 33.5 96 22Z" fill="url(#pwg)"/><circle cx="108" cy="64" r="5" fill="url(#pwg)"/></svg></span></button>
         <button class="pw-item" type="button" style="--a:#FF4FA0;--b:#FF9A5C" aria-label="Настроение"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><mask id="pm2"><rect width="120" height="120" fill="#fff"/><circle cx="41" cy="48" r="8" fill="#000"/><circle cx="79" cy="48" r="8" fill="#000"/><path d="M34 72Q60 100 86 72" fill="none" stroke="#000" stroke-width="9" stroke-linecap="round"/></mask><circle cx="60" cy="60" r="52" fill="url(#pwg)" mask="url(#pm2)"/></svg></span></button>
-        <button class="pw-item" type="button" style="--a:#FF4E6D;--b:#FFA07A" aria-label="Друг Нотки"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><mask id="pm3"><rect width="120" height="120" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="11" stroke-linejoin="round"><circle cx="38" cy="42" r="20"/><path d="M4 114V104A34 34 0 0 1 72 104V114Z"/></g></mask><g mask="url(#pm3)" fill="url(#pwg)"><circle cx="84" cy="34" r="16"/><path d="M54 100V92A30 30 0 0 1 114 92V100Z"/></g><circle cx="38" cy="42" r="20" fill="url(#pwg)"/><path d="M4 114V104A34 34 0 0 1 72 104V114Z" fill="url(#pwg)"/></svg></span></button>
         <button class="pw-item" type="button" style="--a:#8B5CFF;--b:#D29BFF" aria-label="Темы плеера"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><mask id="pm4"><rect width="120" height="120" fill="#fff"/><circle cx="36" cy="50" r="9" fill="#000"/><circle cx="60" cy="31" r="9" fill="#000"/><circle cx="85" cy="46" r="9" fill="#000"/><circle cx="38" cy="78" r="9" fill="#000"/><circle cx="86" cy="90" r="15" fill="#000"/></mask><path d="M60 8C90 8 114 30 114 60C114 76 104 80 94 78C84 76 76 82 80 96C82 106 74 112 60 112C30 112 6 90 6 60C6 30 30 8 60 8Z" fill="url(#pwg)" mask="url(#pm4)"/></svg></span></button>
         <button class="pw-item" type="button" style="--a:#2FD3A8;--b:#8CF0D2" aria-label="Перевод текста"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><mask id="pm5"><rect width="120" height="120" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="16" stroke-linejoin="round"><rect x="6" y="48" width="62" height="52" rx="22"/><path d="M20 96L12 114L38 98Z"/></g><path d="M58 32H96M58 46H84" stroke="#000" stroke-width="7" stroke-linecap="round"/></mask><g mask="url(#pm5)" fill="url(#pwg)"><rect x="38" y="12" width="76" height="62" rx="24"/><path d="M90 68L104 88L76 72Z"/></g><mask id="pm6"><rect width="120" height="120" fill="#fff"/><path d="M24 70H50M24 83H40" stroke="#000" stroke-width="7" stroke-linecap="round"/></mask><g mask="url(#pm6)" fill="url(#pwg)"><rect x="6" y="48" width="62" height="52" rx="22"/><path d="M20 96L12 114L38 98Z"/></g></svg></span></button>
         <button class="pw-item" type="button" style="--a:#FFC94D;--b:#FF8A4C" aria-label="Твои итоги"><span class="pw-art"><svg viewBox="0 0 120 120" aria-hidden="true"><g stroke="url(#pwg)" stroke-width="15" stroke-linecap="round"><path d="M60 8V22M60 98V112M8 60H22M98 60H112M23.2 23.2L33.1 33.1M86.9 86.9L96.8 96.8M96.8 23.2L86.9 33.1M33.1 86.9L23.2 96.8"/></g><circle cx="60" cy="60" r="29" fill="url(#pwg)"/></svg></span></button>
       </div>
-      <div class="pw-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="pw-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <div class="pw-copies" aria-live="polite">
         <div class="pw-copy"><h2 class="pw-name">Машина времени</h2><p class="pw-desc">Что ты слушал неделю, месяц или три месяца назад. Тот день можно включить целиком.</p></div>
         <div class="pw-copy"><h2 class="pw-name">Атмосферы</h2><p class="pw-desc">Осень, зима, весна, дождь и звёздная ночь по всей Нотке.</p></div>
         <div class="pw-copy"><h2 class="pw-name">Настроение</h2><p class="pw-desc">«Мой микс» подстраивается под бодрое, спокойное, рабочее или грустное.</p></div>
-        <div class="pw-copy"><h2 class="pw-name">Друг Нотки</h2><p class="pw-desc">Значок рядом с твоим именем. Растёт, пока ты слушаешь.</p></div>
         <div class="pw-copy"><h2 class="pw-name">Темы плеера</h2><p class="pw-desc">Винил, кассета или диск с обложкой того, что играет.</p></div>
         <div class="pw-copy"><h2 class="pw-name">Перевод текста <span class="tag tag-soon">скоро</span></h2><p class="pw-desc">Строки песни на русском рядом с оригиналом.</p></div>
         <div class="pw-copy"><h2 class="pw-name">Твои итоги</h2><p class="pw-desc">Месяц и всё время в карточках, которыми можно поделиться.</p></div>
@@ -799,11 +797,6 @@
       <section class="pd" data-keys="bright,calm,work,sad" aria-label="Настроение">
         <div class="pd-stage pd-swap pd-mood"><div class="v is-on" data-v="bright" style="--m1:var(--c-warm);--m2:var(--c-mid)"><div class="md-head"><span class="md-orb"></span><div><p class="md-kicker">Мой микс</p><h3 class="md-name">Бодрое</h3></div></div><ul class="tm-list"><li><i class="cv" style="--h:30"></i><span><b>Happy</b><em>Pharrell Williams</em></span></li><li><i class="cv" style="--h:330"></i><span><b>Dance Monkey</b><em>Tones and I</em></span></li><li><i class="cv" style="--h:8"></i><span><b>Don't Stop Me Now</b><em>Queen</em></span></li></ul></div><div class="v" data-v="calm" style="--m1:var(--c-core);--m2:var(--c-deep)"><div class="md-head"><span class="md-orb"></span><div><p class="md-kicker">Мой микс</p><h3 class="md-name">Спокойное</h3></div></div><ul class="tm-list"><li><i class="cv" style="--h:190"></i><span><b>Weightless</b><em>Marconi Union</em></span></li><li><i class="cv" style="--h:214"></i><span><b>Holocene</b><em>Bon Iver</em></span></li><li><i class="cv" style="--h:250"></i><span><b>Teardrop</b><em>Massive Attack</em></span></li></ul></div><div class="v" data-v="work" style="--m1:var(--c-mid);--m2:var(--c-deep)"><div class="md-head"><span class="md-orb"></span><div><p class="md-kicker">Мой микс</p><h3 class="md-name">Для работы</h3></div></div><ul class="tm-list"><li><i class="cv" style="--h:262"></i><span><b>Time</b><em>Hans Zimmer</em></span></li><li><i class="cv" style="--h:230"></i><span><b>Nuvole Bianche</b><em>Ludovico Einaudi</em></span></li><li><i class="cv" style="--h:280"></i><span><b>Experience</b><em>Ludovico Einaudi</em></span></li></ul></div><div class="v" data-v="sad" style="--m1:color-mix(in srgb, var(--c-deep) 62%, #6F86B8);--m2:color-mix(in srgb, var(--c-deep) 55%, #000)"><div class="md-head"><span class="md-orb"></span><div><p class="md-kicker">Мой микс</p><h3 class="md-name">Грустное</h3></div></div><ul class="tm-list"><li><i class="cv" style="--h:220"></i><span><b>Hurt</b><em>Johnny Cash</em></span></li><li><i class="cv" style="--h:240"></i><span><b>Mad World</b><em>Gary Jules</em></span></li><li><i class="cv" style="--h:12"></i><span><b>Кукушка</b><em>Кино</em></span></li></ul></div></div>
         <div class="pd-chips"><button class="chip active" type="button" data-k="bright">Бодрое</button><button class="chip" type="button" data-k="calm">Спокойное</button><button class="chip" type="button" data-k="work">Работа</button><button class="chip" type="button" data-k="sad">Грусть</button></div>
-      </section>
-
-      <section class="pd" data-keys="l1,l2,l3" aria-label="Друг Нотки">
-        <div class="pd-stage pd-swap pd-friend"><div class="v is-on" data-v="l1" style="--s:44px;--lv:0.22"><div class="fr-av"><span class="fr-initial">Н</span><span class="fr-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 3.2v11.1a3.4 3.4 0 1 1-2.2-3.2V6.4L9.6 7.5v9.6a3.4 3.4 0 1 1-2.2-3.2V5.2l9.2-2Z" fill="currentColor"/></svg></span></div><p class="fr-hours">1 час с Ноткой</p><div class="fr-bar"><i></i></div><p class="fr-text">Только начал: значок совсем маленький.</p></div><div class="v" data-v="l2" style="--s:58px;--lv:0.6"><div class="fr-av"><span class="fr-initial">Н</span><span class="fr-badge has-ring"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 3.2v11.1a3.4 3.4 0 1 1-2.2-3.2V6.4L9.6 7.5v9.6a3.4 3.4 0 1 1-2.2-3.2V5.2l9.2-2Z" fill="currentColor"/></svg></span></div><p class="fr-hours">10 часов с Ноткой</p><div class="fr-bar"><i></i></div><p class="fr-text">Появилось кольцо. Значок заметен.</p></div><div class="v" data-v="l3" style="--s:72px;--lv:1"><div class="fr-av"><span class="fr-initial">Н</span><span class="fr-badge has-ring"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 3.2v11.1a3.4 3.4 0 1 1-2.2-3.2V6.4L9.6 7.5v9.6a3.4 3.4 0 1 1-2.2-3.2V5.2l9.2-2Z" fill="currentColor"/></svg><i class="sp s1"></i><i class="sp s2"></i><i class="sp s3"></i></span></div><p class="fr-hours">100 часов с Ноткой</p><div class="fr-bar"><i></i></div><p class="fr-text">Значок с искрами: ты свой в Нотке.</p></div></div>
-        <div class="pd-chips"><button class="chip active" type="button" data-k="l1">1 час</button><button class="chip" type="button" data-k="l2">10 часов</button><button class="chip" type="button" data-k="l3">100 часов</button></div>
       </section>
 
       <section class="pd pd-themes" aria-label="Темы плеера">
@@ -1297,6 +1290,6 @@
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=3"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=123"></script>
+<script src="app.js?v=125"></script>
 </body>
 </html>
