@@ -425,3 +425,15 @@ body.is-desktop .mix-sub { max-width: 56ch; font-size: 16px; }
 /* a narrower window: the bar gives up its extras so nothing runs into the buttons */
 @media (max-width: 1180px) { body.is-desktop .vol-slider { display: none; } }
 @media (max-width: 1000px) { body.is-desktop .mini-right .mini-time { display: none; } }
+
+/* «Нотка Плюс»: one readable column (plans and prices were stretched across the whole window) */
+body.is-desktop #screen-plus { --pad-x: max(40px, calc((100vw - var(--side) - 760px) / 2)); }
+
+/* «Под настроение»: the lights are bigger and have room, not phone-sized specks in a wide empty field */
+body.is-desktop #screen-mood { --pad-x: max(40px, calc((100vw - var(--side) - 1000px) / 2)); }
+body.is-desktop .mood-orb { width: calc(var(--s) * 1.5); height: calc(var(--s) * 1.5); font-size: 20px; }
+body.is-desktop .mood-orb .orb-plus { height: 22px; font-size: 12px; padding: 0 9px; }
+body.is-desktop .mood-cloud.is-live { height: clamp(460px, 62vh, 620px); margin-left: 0; margin-right: 0; }
+body.is-desktop .mood-genres { gap: 14px; }
+body.is-desktop .mood-genre { padding: 22px 10px 18px; font-size: 18px; }
+body.is-desktop .mood-genre i { width: 60px; height: 60px; }
