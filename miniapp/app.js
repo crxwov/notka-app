@@ -5387,7 +5387,7 @@
     });
     lyricsList.appendChild(frag);
     lyricsBox.scrollTop = 0;
-    syncLyrics(true);
+    syncLyrics(true, true);
   }
 
   async function loadLyrics() {
@@ -5421,7 +5421,27 @@
     renderLyrics(data);
   }
 
-  function syncLyrics(jump) {
+  // The text glides: the new line rises to its place along an eased curve (not the
+  // browser's stock smooth scroll, which starts and stops abruptly), and the
+  // lines around it fade and grow by their distance from the sung one.
+  let lyricsGlide = 0;
+  function glideLyrics(to, instant) {
+    cancelAnimationFrame(lyricsGlide);
+    const from = lyricsBox.scrollTop, dist = to - from;
+    if (instant || Math.abs(dist) < 2) { lyricsBox.scrollTop = to; return; }
+    const ms = clamp(520 + Math.abs(dist) * 0.55, 620, 1150);
+    const t0 = performance.now();
+    const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+    const startedTouch = lyricsTouchedAt;
+    const step = (now) => {
+      if (lyricsTouchedAt !== startedTouch) return; // a hand took over: leave the text alone
+      const k = Math.min(1, (now - t0) / ms);
+      lyricsBox.scrollTop = from + dist * ease(k);
+      if (k < 1) lyricsGlide = requestAnimationFrame(step);
+    };
+    lyricsGlide = requestAnimationFrame(step);
+  }
+  function syncLyrics(jump, instant) {
     if (!lyricsOpen || !lyricsData || !lyricsData.synced || currentScreen !== "player") return;
     const lines = lyricsData.lines;
     const t = audio.currentTime + 0.25; // light a line a touch early, as the ear expects
@@ -5433,11 +5453,15 @@
     for (let k = 0; k < items.length; k++) {
       items[k].classList.toggle("is-active", k === i);
       items[k].classList.toggle("is-past", k < i);
+      // how bright a line is depends on how far it is from the sung one
+      const d = k - i;
+      const lo = k === i ? 1 : d < 0 ? Math.max(0.2, 0.42 + d * 0.06) : Math.max(0.26, 0.58 - d * 0.08);
+      items[k].style.setProperty("--lo", lo.toFixed(2));
     }
     // don't pull the text away from someone who is scrolling it by hand or picking lines
     if (quotePicking || (!jump && Date.now() - lyricsTouchedAt < 3000)) return;
     const top = i < 0 ? 0 : Math.max(0, items[i].offsetTop - lyricsBox.clientHeight * 0.3);
-    lyricsBox.scrollTo({ top, behavior: jump ? "auto" : "smooth" });
+    glideLyrics(top, instant);
   }
 
   function setLyricsOpen(on) {
@@ -5447,7 +5471,7 @@
     if (!on) endQuotePick();
     $("player-lyrics-btn").setAttribute("aria-pressed", on ? "true" : "false");
     syncPrism();
-    if (on) { loadLyrics(); syncLyrics(true); }
+    if (on) { loadLyrics(); syncLyrics(true, true); }
   }
   $("player-lyrics-btn").addEventListener("click", () => { haptic("light"); setLyricsOpen(!lyricsOpen); });
   ["touchstart", "wheel"].forEach((type) => lyricsBox.addEventListener(type, () => { lyricsTouchedAt = Date.now(); }, { passive: true }));

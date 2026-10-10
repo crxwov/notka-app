@@ -536,3 +536,14 @@ body.is-desktop .pd-atmo.demo-seasons .atmo-view { height: 190px; }
 }
 .plus-promo-link:active { transform: scale(0.98); }
 @media (hover: hover) { .plus-promo-link:hover { background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1)); } }
+
+/* the text: lines change smoothly: their brightness and size ease over (the scroll itself is eased in the script) */
+.lyrics-lines.is-synced .lyrics-line {
+  transform-origin: 0 55%;
+  transform: scale(0.93);
+  transition: opacity 0.75s var(--ease-out), transform 0.8s var(--ease-out), text-shadow 0.8s var(--ease-out), background-color 0.2s var(--ease-out);
+  will-change: opacity, transform;
+}
+.lyrics-lines.is-synced .lyrics-line.is-active { transform: scale(1); }
+.lyrics-lines.is-synced:not(.is-picking) .lyrics-line { opacity: var(--lo, 0.5); }
+.lyrics-lines.is-synced:not(.is-picking) .lyrics-line:active { opacity: 0.7; }
