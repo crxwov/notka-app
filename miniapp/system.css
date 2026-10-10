@@ -455,3 +455,20 @@ body.is-desktop #screen-plus .pw-desc { max-width: 480px; font-size: 17px; }
 
 /* the background light belongs to the page, not to the whole window: on a computer its centre is the middle of the content (right of the side panel) and it is larger for a wide window */
 body.is-desktop .light-group { left: calc(50% + var(--side) / 2); --size: min(64vw, 920px); }
+
+/* the glow behind the Plus header was a box the width of the phone's column (with its colours hung to the sides): on a computer it spans the page and is centred on the title */
+body.is-desktop #screen-plus .plus-hero::before {
+  left: calc(-1 * var(--pad-x));
+  right: calc(-1 * var(--pad-x));
+  top: -120px;
+  height: 540px;
+  background:
+    radial-gradient(34% 46% at 33% 36%, rgba(234, 115, 250, 0.24), transparent 72%),
+    radial-gradient(34% 46% at 67% 40%, rgba(254, 26, 124, 0.2), transparent 72%),
+    radial-gradient(42% 50% at 50% 52%, rgba(250, 156, 143, 0.18), transparent 74%);
+  -webkit-mask-image: linear-gradient(#000 40%, transparent);
+  mask-image: linear-gradient(#000 40%, transparent);
+}
+
+/* the dark fade above the bar was a strip with hard sides on a wide page; the bar is a card of its own here */
+body.is-desktop .plus-bar::before { display: none; }
