@@ -35,5 +35,21 @@ await mouse("mouseReleased", x2, g.y);
 await b.sleep(600);
 const p2 = await at();
 check("dragging to 20% seeks there", Math.abs(p2 / dur - 0.2) < 0.06, `pos ${p2.toFixed(1)}`);
+await b.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }).catch(() => {});
+const shot = await b.send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: g.y - 70, width: 390, height: 90, scale: 2 } });
+(await import("node:fs")).writeFileSync("_tmp/mini.png", Buffer.from(shot.data, "base64"));
+// higher in the strip: a drag seeks, a plain tap opens the player
+const yHigh = g.y - 18;
+const x3 = g.l + 18 + (g.w - 36) * 0.5, x4 = g.l + 18 + (g.w - 36) * 0.9;
+await mouse("mousePressed", x3, yHigh);
+for (let i = 1; i <= 8; i++) { await mouse("mouseMoved", x3 + ((x4 - x3) * i) / 8, yHigh); await b.sleep(15); }
+await mouse("mouseReleased", x4, yHigh);
+await b.sleep(600);
+const p3 = await at();
+check("a sideways drag higher in the strip seeks", Math.abs(p3 / dur - 0.9) < 0.06, `pos ${p3.toFixed(1)}`);
+check("...and does not open the player", await b.eval("document.body.dataset.screen !== 'player'"));
+await mouse("mousePressed", x3, yHigh); await mouse("mouseReleased", x3, yHigh);
+await b.sleep(900);
+check("a plain tap higher in the strip opens the player", await b.eval("document.body.dataset.screen === 'player'"));
 console.log(bad ? "FAILED" : "ALL PASS");
 process.exit(bad ? 1 : 0);

@@ -5571,6 +5571,7 @@
   const progressFill = $("player-progress-fill");
   const progressThumb = $("player-progress-thumb");
   const miniProgress = $("mp-progress");
+  const miniScrub = $("mp-scrub");
 
   let isScrubbing = false;
 
@@ -5726,6 +5727,7 @@
     progressFill.style.width = `${p}%`;
     progressThumb.style.left = `${p}%`;
     miniProgress.style.width = `${p}%`;
+    miniScrub.style.setProperty("--mp", (p / 100).toFixed(4));
     playerCassette.style.setProperty("--p", (p / 100).toFixed(3)); // the tape moves from reel to reel
     progressTrack.setAttribute("aria-valuenow", String(Math.round(p)));
     progressTrack.setAttribute("aria-valuetext", formatDuration(seconds));
@@ -5930,34 +5932,45 @@
   }
   progressTrack.addEventListener("pointerup", endScrub);
   progressTrack.addEventListener("pointercancel", () => { isScrubbing = false; progressTrack.classList.remove("is-scrubbing"); });
-  // the same seek from the mini player's bottom edge
-  const miniScrub = $("mp-scrub");
+  // the same seek from the mini player's bottom edge. A touch low in the
+  // strip (on the line itself) seeks at once; higher up it seeks only when
+  // dragged sideways, so a plain tap there still opens the player.
   const MINI_INSET = 18; // the visible line is inset from the strip's ends
+  const MINI_LINE_ZONE = 16; // px from the bottom edge that count as «on the line»
+  let miniGrab = null;
   function miniPct(e) {
     const r = miniScrub.getBoundingClientRect();
     return Math.min(1, Math.max(0, (e.clientX - r.left - MINI_INSET) / Math.max(1, r.width - MINI_INSET * 2)));
   }
-  miniScrub.addEventListener("pointerdown", (e) => {
-    if (!effectiveDuration()) return;
-    e.stopPropagation();
+  function miniStart() {
+    if (!miniGrab || miniGrab.on) return;
+    miniGrab.on = true;
     isScrubbing = true;
     miniScrub.classList.add("is-scrubbing");
-    miniScrub.setPointerCapture(e.pointerId);
-    renderScrubPosition(miniPct(e));
+    haptic("select");
+  }
+  miniScrub.addEventListener("pointerdown", (e) => {
+    const r = miniScrub.getBoundingClientRect();
+    miniGrab = { id: e.pointerId, x: e.clientX, on: false, dead: !effectiveDuration() };
+    try { miniScrub.setPointerCapture(e.pointerId); } catch (err) { /* works without capture too */ }
+    if (!miniGrab.dead && r.bottom - e.clientY <= MINI_LINE_ZONE) { miniStart(); renderScrubPosition(miniPct(e)); }
   });
   miniScrub.addEventListener("pointermove", (e) => {
-    if (isScrubbing && miniScrub.classList.contains("is-scrubbing")) renderScrubPosition(miniPct(e));
+    if (!miniGrab || miniGrab.dead || e.pointerId !== miniGrab.id) return;
+    if (!miniGrab.on && Math.abs(e.clientX - miniGrab.x) > 8) miniStart();
+    if (miniGrab.on) renderScrubPosition(miniPct(e));
   });
   miniScrub.addEventListener("pointerup", (e) => {
-    if (!miniScrub.classList.contains("is-scrubbing")) return;
+    const g = miniGrab;
+    miniGrab = null;
+    if (!g) return;
     miniScrub.classList.remove("is-scrubbing");
+    if (!g.on) { $("mini-open-btn").click(); return; } // a plain tap above the line opens the player
     isScrubbing = false;
     const dur = effectiveDuration();
     if (dur) audio.currentTime = miniPct(e) * dur;
-    haptic("light");
   });
-  miniScrub.addEventListener("pointercancel", () => { isScrubbing = false; miniScrub.classList.remove("is-scrubbing"); });
-  miniScrub.addEventListener("click", (e) => e.stopPropagation());
+  miniScrub.addEventListener("pointercancel", () => { miniGrab = null; isScrubbing = false; miniScrub.classList.remove("is-scrubbing"); });
 
   progressTrack.addEventListener("keydown", (e) => {
     const dur = effectiveDuration();
