@@ -38,38 +38,63 @@
   //    it steps back to a window by itself, so the taskbar and other
   //    programs are reachable, and widens again when focus is back;
   //  - leaving it by the button is remembered: then it stays a window.
-  const canFullscreen = !!(tg && tgAtLeast("8.0") && tg.requestFullscreen && tg.exitFullscreen && ["tdesktop", "macos", "unigram"].includes(tg.platform));
-  const FULLSCREEN_KEY = "notka_fullscreen";
+  const MOBILE_OR_WEB = ["android", "android_x", "ios", "weba", "webk"];
+  const onComputerClient = !!(tg && tg.platform && !MOBILE_OR_WEB.includes(tg.platform));
+  const canFullscreen = !!(onComputerClient && tgAtLeast("8.0") && tg.requestFullscreen && tg.exitFullscreen);
+  const FULLSCREEN_KEY = "notka_fullscreen_v2";
   let wantFullscreen = true;
   try { wantFullscreen = localStorage.getItem(FULLSCREEN_KEY) !== "0"; } catch (e) { /* storage may be blocked */ }
   let steppedBack = false; // we left fullscreen only because focus went elsewhere
   let fullscreenFailed = false;
+  let lastFullscreenAt = Date.now(); // the window itself blinks focus while it changes mode
+  let enterTries = 0;
   function enterFullscreen() {
     if (!canFullscreen || fullscreenFailed || tg.isFullscreen) return;
+    lastFullscreenAt = Date.now();
+    enterTries++;
     try { tg.requestFullscreen(); } catch (e) { fullscreenFailed = true; }
   }
   function setFullscreen(on) {
     if (!canFullscreen) return;
     wantFullscreen = on;
     steppedBack = false;
+    lastFullscreenAt = Date.now();
     try { localStorage.setItem(FULLSCREEN_KEY, on ? "1" : "0"); } catch (e) { /* ignore */ }
     try { on ? tg.requestFullscreen() : tg.exitFullscreen(); } catch (e) { /* ignore */ }
   }
   if (canFullscreen) {
-    if (wantFullscreen) enterFullscreen();
+    if (wantFullscreen) {
+      enterFullscreen();
+      // a client may not have been ready the first time, or wants a touch first
+      setTimeout(() => { if (wantFullscreen && !tg.isFullscreen && enterTries < 3) enterFullscreen(); }, 1200);
+      window.addEventListener("pointerdown", function once() {
+        window.removeEventListener("pointerdown", once, true);
+        if (wantFullscreen && !tg.isFullscreen && !steppedBack) enterFullscreen();
+      }, true);
+    }
     if (tg.onEvent) tg.onEvent("fullscreenFailed", () => { fullscreenFailed = true; });
+    if (tg.onEvent) tg.onEvent("fullscreenChanged", () => { lastFullscreenAt = Date.now(); });
     let blurTimer = 0;
     window.addEventListener("blur", () => {
       clearTimeout(blurTimer);
       blurTimer = setTimeout(() => {
         if (document.hasFocus() || !wantFullscreen || !tg.isFullscreen) return;
+        if (Date.now() - lastFullscreenAt < 2500) return; // that was the mode change, not the listener leaving
         steppedBack = true;
+        lastFullscreenAt = Date.now();
         try { tg.exitFullscreen(); } catch (e) { /* ignore */ }
-      }, 250);
+      }, 300);
     });
     window.addEventListener("focus", () => {
       clearTimeout(blurTimer);
       if (steppedBack && wantFullscreen) { steppedBack = false; enterFullscreen(); }
+    });
+  } else if (onComputerClient && tg.requestFullscreen === undefined) {
+    // an old Telegram on a computer: say so once instead of silently staying small
+    window.addEventListener("load", () => {
+      let told = false;
+      try { told = localStorage.getItem("notka_fs_told") === "1"; localStorage.setItem("notka_fs_told", "1"); } catch (e) { /* ignore */ }
+      if (!told) setTimeout(() => showToast("Полный экран работает в новом Telegram. Обнови Telegram Desktop"), 2500);
     });
   }
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
