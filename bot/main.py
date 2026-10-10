@@ -1,8 +1,12 @@
 import asyncio
+import hashlib
 import os
 import re
 import logging
 import time
+from urllib.parse import quote, urlencode
+
+import httpx
 
 from dotenv import load_dotenv
 
@@ -14,6 +18,9 @@ from aiogram.types import (
     FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InlineQuery,
+    InlineQueryResultAudio,
+    InlineQueryResultsButton,
     MenuButtonWebApp,
     Message,
     ReplyKeyboardRemove,
@@ -177,6 +184,73 @@ async def main() -> None:
             + (f", действует {valid_days} дн." if valid_days else "")
             + f"\n\nСсылка для рекламы (код вводится сам):\nhttps://t.me/{me.username}?start=promo_{code}"
         )
+
+    # ---- inline mode: «@notka_app_bot название» in any chat. The results are
+    # the songs themselves; the picked one lands in the chat as music. ----
+    backend = f"http://127.0.0.1:{os.environ.get('PORT', '8080')}"
+    public_base = re.sub(r"/app/?$", "", config.miniapp_url.split("?", 1)[0]).rstrip("/")
+    warmed: dict[str, float] = {}
+    warm_tasks: set[asyncio.Task] = set()
+
+    async def warm(source: str, source_id: str, title: str, artist: str) -> None:
+        key = f"{source}:{source_id}"
+        if time.time() - warmed.get(key, 0) < 600:
+            return
+        warmed[key] = time.time()
+        if len(warmed) > 500:
+            for old in sorted(warmed, key=warmed.get)[:250]:
+                warmed.pop(old, None)
+        try:
+            async with httpx.AsyncClient(timeout=240) as client:
+                await client.get(
+                    f"{backend}/inline-warm/{quote(source)}/{quote(source_id)}",
+                    params={"t": title, "a": artist},
+                )
+        except Exception:
+            warmed.pop(key, None)
+
+    @dp.inline_query()
+    async def handle_inline(query: InlineQuery) -> None:
+        text = (query.query or "").strip()
+        open_button = InlineQueryResultsButton(text="Открыть Нотку", web_app=WebAppInfo(url=config.miniapp_url))
+        if len(text) < 2:
+            await query.answer([], button=open_button, cache_time=5, is_personal=False)
+            return
+        found: list[dict] = []
+        try:
+            async with httpx.AsyncClient(timeout=25) as client:
+                res = await client.get(f"{backend}/search", params={"q": text, "limit": 12})
+                if res.status_code == 200:
+                    found = res.json().get("results") or []
+        except Exception:
+            logger.exception("Inline search failed")
+        items = []
+        picks = []
+        for track in found:
+            source, source_id = track.get("source"), track.get("sourceId")
+            duration = int(track.get("duration") or 0)
+            if not source or not source_id or duration > 900:  # a quarter of an hour: the file would be too big
+                continue
+            title = (track.get("title") or "Без названия")[:120]
+            artist = (track.get("artist") or "")[:120]
+            url = f"{public_base}/inline/{quote(source)}/{quote(source_id)}.mp3?" + urlencode({"t": title, "a": artist})
+            items.append(
+                InlineQueryResultAudio(
+                    id=hashlib.sha1(f"{source}:{source_id}".encode()).hexdigest()[:40],
+                    audio_url=url,
+                    title=title,
+                    performer=artist or None,
+                    audio_duration=duration or None,
+                )
+            )
+            picks.append((source, source_id, title, artist))
+            if len(items) >= 10:
+                break
+        await query.answer(items, cache_time=300, is_personal=False, button=open_button)
+        for source, source_id, title, artist in picks[:2]:
+            task = asyncio.create_task(warm(source, source_id, title, artist))
+            warm_tasks.add(task)
+            task.add_done_callback(warm_tasks.discard)
 
     @dp.message()
     async def handle_other(message: Message) -> None:

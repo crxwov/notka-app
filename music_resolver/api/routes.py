@@ -20,7 +20,7 @@ from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
 from music_resolver.services import events_store, mood_mix, plus_store, sync_store
 from music_resolver.services.playlist_import import read_playlist
-from music_resolver.utils.remux import defragment, defragment_all
+from music_resolver.utils.remux import defragment, defragment_all, ffmpeg_exe
 
 # Some CDNs (incl. googlevideo.com) reject requests with no/odd User-Agent.
 _UPSTREAM_USER_AGENT = (
@@ -63,7 +63,7 @@ def _prune_cache() -> None:
             # leftovers of a download that was cut off; a live one is younger
             if now - stat.st_mtime > 3600:
                 path.unlink(missing_ok=True)
-        elif path.suffix == ".bin":
+        elif path.suffix in (".bin", ".mp3"):
             entries.append((stat.st_mtime, stat.st_size, path))
     total = sum(size for _, size, _ in entries)
     for _, size, path in sorted(entries):
@@ -237,6 +237,73 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         # file after a backend update, so the WebView must not replay its own
         # old copy.
         return FileResponse(data_path, media_type=mime, headers={"cache-control": "no-store"})
+
+    # ---- inline mode: «@бот запрос» in any chat puts the song itself into it.
+    # Telegram takes the file from an address and wants an ordinary MP3, so the
+    # downloaded audio is converted once and kept next to it. ----
+    mp3_locks: dict[str, asyncio.Lock] = {}
+    mp3_slots = asyncio.Semaphore(2)  # converting is heavy for a small server
+
+    async def mp3_for(source: str, source_id: str, title: str = "", artist: str = "") -> Path:
+        path, mime = await audio_file(source, source_id)
+        if mime.split(";", 1)[0].strip().lower() in ("audio/mpeg", "audio/mp3"):
+            return path
+        out = path.with_suffix(".mp3")
+        try:
+            if out.stat().st_size > 0:
+                os.utime(out)
+                return out
+        except OSError:
+            pass
+        exe = ffmpeg_exe()
+        if not exe:
+            raise AppError(ErrorCode.RESOLVE_FAILED, "Audio conversion is not available")
+        lock = mp3_locks.setdefault(out.name, asyncio.Lock())
+        async with lock:
+            try:
+                if out.stat().st_size > 0:
+                    return out
+            except OSError:
+                pass
+            tmp = out.with_name(f"{out.stem}.part-{uuid.uuid4().hex}.mp3")
+            cmd = [exe, "-y", "-v", "error", "-i", str(path), "-vn", "-map_metadata", "-1",
+                   "-c:a", "libmp3lame", "-b:a", "192k", "-id3v2_version", "3"]
+            if title:
+                cmd += ["-metadata", f"title={title[:120]}"]
+            if artist:
+                cmd += ["-metadata", f"artist={artist[:120]}"]
+            cmd.append(str(tmp))
+            try:
+                async with mp3_slots:
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
+                    )
+                    await asyncio.wait_for(proc.communicate(), timeout=240)
+                if proc.returncode != 0 or not tmp.exists() or tmp.stat().st_size == 0:
+                    raise AppError(ErrorCode.RESOLVE_FAILED, "Could not convert the track")
+                tmp.replace(out)
+            finally:
+                tmp.unlink(missing_ok=True)
+        await asyncio.to_thread(_prune_cache)
+        return out
+
+    def _inline_ids_ok(source: str, source_id: str) -> bool:
+        return bool(re.fullmatch(r"[a-z_]{3,20}", source) and re.fullmatch(r"[A-Za-z0-9_.\-]{3,64}", source_id))
+
+    @router.api_route("/inline/{source}/{source_id}.mp3", methods=["GET", "HEAD"])
+    async def inline_audio(source: str, source_id: str, t: str = "", a: str = ""):
+        if not _inline_ids_ok(source, source_id):
+            return Response(status_code=404)
+        path = await mp3_for(source, source_id, t, a)
+        return FileResponse(path, media_type="audio/mpeg", headers={"cache-control": "public, max-age=86400"})
+
+    @router.get("/inline-warm/{source}/{source_id}")
+    async def inline_warm(source: str, source_id: str, t: str = "", a: str = "") -> dict:
+        # called by the bot for the first results of a query, so that by the time one is picked it is ready
+        if not _inline_ids_ok(source, source_id):
+            return {"ok": False}
+        await mp3_for(source, source_id, t, a)
+        return {"ok": True}
 
     @router.get("/health")
     async def health() -> dict[str, str]:
