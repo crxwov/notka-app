@@ -341,3 +341,20 @@ body.is-desktop .hero-actions { justify-content: flex-start; width: auto; max-wi
 body.is-desktop .hero-actions .pill-btn { flex: 0 0 auto; min-width: 168px; }
 
 body.is-desktop .hero-link { padding-left: 0; margin-top: 6px; }
+
+/* ----- the player, its text, the statistics, on a wide window ----- */
+/* the player takes the whole window (so its dimming layer has no edge at the panel); its column stays right of the panel */
+body.is-desktop .screen-player { left: 0; padding-left: calc(var(--side) + var(--pad-x)); }
+body.is-desktop .player-art-wrap { width: min(100%, 760px); margin-left: auto; margin-right: auto; }
+/* the text: the empty tail below the last line was a percentage of the width, which on a wide window ran over the title and the buttons */
+body.is-desktop .lyrics { padding-bottom: 30vh; }
+body.is-desktop .lyrics-lines.is-synced .lyrics-line { font-size: 34px; }
+/* statistics: the figures on the left, the poster of the artist at the side instead of a picture the width of the window */
+body.is-desktop #stats-body { display: grid; grid-template-columns: minmax(0, 1fr) 380px; column-gap: 48px; row-gap: 0; align-items: start; grid-template-rows: auto auto 1fr; }
+body.is-desktop #stats-body > .stats-big { grid-column: 1; grid-row: 1; }
+body.is-desktop #stats-body > .stats-facts { grid-column: 1; grid-row: 2; }
+body.is-desktop #stats-body > .stats-poster-wrap { grid-column: 2; grid-row: 1 / span 3; margin: 22px 0 34px; }
+body.is-desktop #stats-body > .block { grid-column: 1 / -1; }
+
+/* settings-like pages read better in a narrower column */
+body.is-desktop #screen-profile, body.is-desktop #screen-account, body.is-desktop #screen-sound, body.is-desktop #screen-about { --pad-x: max(40px, calc((100vw - var(--side) - 760px) / 2)); }
