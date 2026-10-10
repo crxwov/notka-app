@@ -406,8 +406,10 @@ body.is-desktop.lyrics-open .ctrl-play { width: 64px; height: 64px; }
 body.is-desktop.lyrics-open .player-title { font-size: 20px; }
 body.is-desktop.lyrics-open .player-artist { font-size: 15px; }
 
-body.is-desktop.lyrics-open .player-meta-text { flex: 0 1 auto; }
-body.is-desktop.lyrics-open .player-meta { gap: 16px; justify-self: start; }
+/* a long title shrinks to its column and ends in an ellipsis; it never runs under the buttons */
+body.is-desktop.lyrics-open .player-meta-text { flex: 0 1 auto; min-width: 0; }
+body.is-desktop.lyrics-open .player-meta { gap: 16px; justify-self: stretch; min-width: 0; max-width: 100%; }
+body.is-desktop.lyrics-open .player-meta-text .player-title, body.is-desktop.lyrics-open .player-meta-text .player-artist { max-width: 100%; }
 
 /* the home page on a computer: the greeting is the page's heading, the avatar sits on its line */
 body.is-desktop #screen-home .home-top { position: absolute; top: calc(var(--sat) + 26px); right: var(--pad-x); z-index: 2; margin: 0; }
