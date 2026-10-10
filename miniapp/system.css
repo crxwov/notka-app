@@ -278,3 +278,8 @@ body.is-desktop .side-foot { display: flex; flex-direction: column; gap: 2px; fl
 
 body.is-desktop .home-top .brand { display: none; } /* the side panel carries the brand */
 body.is-desktop .home-top { justify-content: flex-end; }
+
+/* the search header's blurred dark backing is cut for a phone's width; on a
+   wide window it stuck out as a hazy rectangle with hard edges, so there it
+   is just part of the page */
+body.is-desktop .search-head { position: static; margin: 0; padding: 0 0 12px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask: none; mask: none; }
