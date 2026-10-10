@@ -452,3 +452,6 @@ body.is-desktop #screen-plus .pw-dots { top: calc(200px * var(--pw-k)); }
 body.is-desktop #screen-plus .pw-copies { top: calc(226px * var(--pw-k) + 6px); height: 130px; }
 body.is-desktop #screen-plus .pw-name { font-size: 38px; }
 body.is-desktop #screen-plus .pw-desc { max-width: 480px; font-size: 17px; }
+
+/* the background light belongs to the page, not to the whole window: on a computer its centre is the middle of the content (right of the side panel) and it is larger for a wide window */
+body.is-desktop .light-group { left: calc(50% + var(--side) / 2); --size: min(64vw, 920px); }
