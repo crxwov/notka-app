@@ -293,7 +293,7 @@ body.is-desktop .screen::-webkit-scrollbar-track { background: transparent; }
   body.is-desktop .shelf-card:hover .cover, body.is-desktop .playlist-card:hover .cover { transform: translateY(-3px); }
   body.is-desktop .shelf-card .cover, body.is-desktop .playlist-card .cover { transition: transform 0.25s var(--ease-out), box-shadow 0.25s; }
 }
-body.is-desktop #screen-artist .hero, body.is-desktop #screen-album .hero {
+body.is-desktop :is(#screen-artist, #screen-album, #screen-favorites, #screen-playlist) .hero {
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
   column-gap: 32px;
@@ -303,8 +303,10 @@ body.is-desktop #screen-artist .hero, body.is-desktop #screen-album .hero {
   text-align: left;
   padding: 8px 0 28px;
 }
-body.is-desktop #screen-artist .hero .cover-lg, body.is-desktop #screen-album .hero .cover-lg { grid-column: 1; grid-row: 1 / span 6; width: 232px; height: 232px; margin: 0; align-self: end; }
-body.is-desktop .hero > :not(.cover-lg) { grid-column: 2; }
+body.is-desktop :is(#screen-artist, #screen-album, #screen-favorites) .hero > .cover-lg,
+body.is-desktop #screen-playlist .hero > .cover-edit-wrap { grid-column: 1; grid-row: 1 / span 6; width: 232px; height: 232px; margin: 0; align-self: end; }
+body.is-desktop #screen-playlist .hero .cover-lg { width: 232px; height: 232px; margin: 0; }
+body.is-desktop :is(#screen-artist, #screen-album, #screen-favorites, #screen-playlist) .hero > :not(.cover-lg):not(.cover-edit-wrap) { grid-column: 2; }
 body.is-desktop .hero-title { font-size: 44px; line-height: 1.05; letter-spacing: -0.035em; text-align: left; text-wrap: balance; }
 body.is-desktop .hero-actions { justify-content: flex-start; width: auto; max-width: none; margin-top: 18px; }
 body.is-desktop .hero-actions .pill-btn { flex: 0 0 auto; min-width: 168px; }
@@ -419,3 +421,7 @@ body.is-desktop #screen-home .avatar-btn:hover .avatar { box-shadow: inset 0 0 0
 body.is-desktop .home-greet { font-size: 40px; line-height: 1.1; font-weight: 800; letter-spacing: -0.035em; color: var(--text); margin: 0 72px 6px 0; }
 
 body.is-desktop .mix-sub { max-width: 56ch; font-size: 16px; }
+
+/* a narrower window: the bar gives up its extras so nothing runs into the buttons */
+@media (max-width: 1180px) { body.is-desktop .vol-slider { display: none; } }
+@media (max-width: 1000px) { body.is-desktop .mini-right .mini-time { display: none; } }
