@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -18,7 +20,7 @@ from music_resolver.errors import AppError, ErrorCode
 from music_resolver.models import AlbumResponse, ArtistResponse, ResolveResponse, SearchResponse
 from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
-from music_resolver.services import events_store, mood_mix, plus_store, sync_store
+from music_resolver.services import admin_stats, events_store, metrics, mood_mix, plus_store, sync_store
 from music_resolver.services.playlist_import import read_playlist
 from music_resolver.utils.remux import defragment, defragment_all, ffmpeg_exe
 
@@ -291,11 +293,107 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         return bool(re.fullmatch(r"[a-z_]{3,20}", source) and re.fullmatch(r"[A-Za-z0-9_.\-]{3,64}", source_id))
 
     @router.api_route("/inline/{source}/{source_id}.mp3", methods=["GET", "HEAD"])
-    async def inline_audio(source: str, source_id: str, t: str = "", a: str = ""):
+    async def inline_audio(request: Request, source: str, source_id: str, t: str = "", a: str = ""):
         if not _inline_ids_ok(source, source_id):
             return Response(status_code=404)
         path = await mp3_for(source, source_id, t, a)
+        if request.method == "GET":
+            metrics.count("inline_send")
         return FileResponse(path, media_type="audio/mpeg", headers={"cache-control": "public, max-age=86400"})
+
+    # ---- the admin site: /admin, behind a password ----
+    admin_page = Path(__file__).resolve().parent.parent.parent / "admin" / "index.html"
+    admin_fails: dict[str, list[float]] = {}
+
+    def _admin_key() -> bytes | None:
+        password = os.environ.get("ADMIN_PASSWORD", "").strip()
+        if len(password) < 8:
+            return None  # no password set: the site stays closed
+        return hashlib.sha256((password + "|" + os.environ.get("BOT_TOKEN", "")).encode()).digest()
+
+    def _admin_sign(exp: int) -> str:
+        key = _admin_key() or b""
+        return f"{exp}.{hmac.new(key, str(exp).encode(), hashlib.sha256).hexdigest()}"
+
+    def _admin_ok(request: Request) -> bool:
+        if _admin_key() is None:
+            return False
+        value = request.cookies.get("notka_admin", "")
+        exp, _, mac = value.partition(".")
+        try:
+            if int(exp) < time.time():
+                return False
+        except ValueError:
+            return False
+        return hmac.compare_digest(value, _admin_sign(int(exp)))
+
+    def _client_ip(request: Request) -> str:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        return (forwarded.split(",")[0].strip() or (request.client.host if request.client else "?"))
+
+    @router.get("/admin")
+    @router.get("/admin/")
+    async def admin_home():
+        return FileResponse(admin_page, media_type="text/html", headers={"cache-control": "no-store"})
+
+    @router.post("/admin/login")
+    async def admin_login(request: Request):
+        key = _admin_key()
+        if key is None:
+            return JSONResponse({"error": {"code": "CLOSED"}}, status_code=503)
+        ip = _client_ip(request)
+        now = time.time()
+        fails = [t for t in admin_fails.get(ip, []) if now - t < 900]
+        if len(fails) >= 6:
+            return JSONResponse({"error": {"code": "TOO_MANY"}}, status_code=429)
+        try:
+            body = await request.json()
+            given = str(body.get("password") or "")
+        except ValueError:
+            given = ""
+        want = os.environ.get("ADMIN_PASSWORD", "").strip()
+        if not hmac.compare_digest(given.encode(), want.encode()):
+            admin_fails[ip] = fails + [now]
+            return JSONResponse({"error": {"code": "WRONG"}}, status_code=401)
+        exp = int(now + 7 * 86400)
+        response = JSONResponse({"ok": True})
+        response.set_cookie("notka_admin", _admin_sign(exp), max_age=7 * 86400, httponly=True, secure=True, samesite="strict", path="/")
+        return response
+
+    @router.post("/admin/logout")
+    async def admin_logout():
+        response = JSONResponse({"ok": True})
+        response.delete_cookie("notka_admin", path="/")
+        return response
+
+    @router.get("/admin/api/summary")
+    async def admin_summary(request: Request):
+        if not _admin_ok(request):
+            return JSONResponse({"error": {"code": "LOGIN"}}, status_code=401)
+        data = await asyncio.to_thread(admin_stats.summary)
+        return JSONResponse(data, headers={"cache-control": "no-store"})
+
+    # ---- the bot (same machine, no forwarding header) reports counters and asks for the summary ----
+    def _internal_ok(request: Request) -> bool:
+        if request.headers.get("x-forwarded-for"):
+            return False
+        token = os.environ.get("BOT_TOKEN", "")
+        want = hashlib.sha256(("internal|" + token).encode()).hexdigest()[:24]
+        return bool(token) and hmac.compare_digest(request.headers.get("x-internal", ""), want)
+
+    @router.post("/internal/metric")
+    async def internal_metric(request: Request, name: str = Query(..., max_length=24)):
+        if not _internal_ok(request):
+            return JSONResponse({"error": {"code": "NO"}}, status_code=403)
+        if re.fullmatch(r"[a-z_]{2,24}", name):
+            metrics.count(name)
+        return {"ok": True}
+
+    @router.get("/internal/summary")
+    async def internal_summary(request: Request):
+        if not _internal_ok(request):
+            return JSONResponse({"error": {"code": "NO"}}, status_code=403)
+        return await asyncio.to_thread(admin_stats.summary)
 
     @router.get("/inline-warm/{source}/{source_id}")
     async def inline_warm(source: str, source_id: str, t: str = "", a: str = "") -> dict:
@@ -314,6 +412,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         q: str = Query(..., min_length=1),
         limit: int = Query(default=None, ge=1, le=50),
     ) -> SearchResponse:
+        metrics.count("search")
         return await service.search(q, limit=limit or settings.search_limit)
 
     # ---- artists for the search screen: names with photos. Search itself
@@ -336,6 +435,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     # Spotify / Yandex Music / Apple Music / YouTube link ----
     @router.get("/import")
     async def import_playlist(url: str = Query(..., min_length=8, max_length=600)) -> dict:
+        metrics.count("import")
         return await read_playlist(url, youtube_music_provider=service.manager.get("youtube_music"))
 
     # ---- «Нотка Плюс»: who has it, and promo codes. The listener is
@@ -358,6 +458,8 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             body = {}
         if not isinstance(body, dict):
             body = {}
+        device = body.get("device") if isinstance(body.get("device"), dict) else {}
+        metrics.touch_user(user_id, metrics.profile_from_init_data(x_telegram_init_data), device.get("id"))
         try:
             return await asyncio.to_thread(sync_store.exchange, user_id, body)
         except sync_store.TooBig:
@@ -385,7 +487,9 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         except (ValueError, AttributeError):
             code = ""
         try:
-            return plus_store.redeem(user_id, code)
+            result = plus_store.redeem(user_id, code)
+            metrics.count("promo")
+            return result
         except plus_store.PromoError as exc:
             return JSONResponse({"error": {"code": exc.reason}}, status_code=400)
 
@@ -521,6 +625,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         source: str | None = Query(default=None),
         id: str | None = Query(default=None),
     ) -> dict:
+        metrics.count("lyrics")
         provider = service.manager.get("youtube_music") if source == "youtube_music" and id else None
         return await find_lyrics(title, artist, duration, youtube_music_provider=provider, video_id=id)
 
@@ -534,6 +639,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             body = await request.json()
         except ValueError:
             body = {}
+        metrics.count("mood")
         key = str(body.get("key") or "")
         seeds = [s for s in (body.get("seeds") or [])[:40] if isinstance(s, dict) and s.get("source") and s.get("id")]
         artists = [str(a)[:80] for a in (body.get("artists") or [])[:60] if isinstance(a, str)]
@@ -572,6 +678,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     @router.get("/prepare")
     async def prepare(source: str = Query(..., min_length=1), id: str = Query(..., min_length=1)) -> dict[str, bool]:
         await audio_file(source, id)
+        metrics.count("play")  # one per started track: the app asks for this once for each
         return {"ready": True}
 
     # ---- «Скачать»: the cached audio as a named file ----

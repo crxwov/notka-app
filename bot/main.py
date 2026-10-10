@@ -188,6 +188,7 @@ async def main() -> None:
     # ---- inline mode: «@notka_app_bot название» in any chat. The results are
     # the songs themselves; the picked one lands in the chat as music. ----
     backend = f"http://127.0.0.1:{os.environ.get('PORT', '8080')}"
+    internal_headers = {"x-internal": hashlib.sha256(("internal|" + os.environ.get("BOT_TOKEN", "")).encode()).hexdigest()[:24]}
     public_base = re.sub(r"/app/?$", "", config.miniapp_url.split("?", 1)[0]).rstrip("/")
     warmed: dict[str, float] = {}
     warm_tasks: set[asyncio.Task] = set()
@@ -219,6 +220,10 @@ async def main() -> None:
         found: list[dict] = []
         try:
             async with httpx.AsyncClient(timeout=25) as client:
+                try:
+                    await client.post(f"{backend}/internal/metric", params={"name": "inline"}, headers=internal_headers)
+                except Exception:
+                    pass
                 res = await client.get(f"{backend}/search", params={"q": text, "limit": 12})
                 if res.status_code == 200:
                     found = res.json().get("results") or []
@@ -251,6 +256,33 @@ async def main() -> None:
             task = asyncio.create_task(warm(source, source_id, title, artist))
             warm_tasks.add(task)
             task.add_done_callback(warm_tasks.discard)
+
+    # ---- «/stats»: the owner's quick summary in the chat (the full one is on the admin site) ----
+    @dp.message(Command("stats"))
+    async def handle_stats(message: Message) -> None:
+        if message.from_user.id not in admin_ids:
+            await message.answer("Не понял команду. Жми /start, чтобы открыть Нотку.")
+            return
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                res = await client.get(f"{backend}/internal/summary", headers=internal_headers)
+            data = res.json()
+            c = data["cards"]
+            counters = data.get("counters") or {}
+            today = lambda name: (counters.get(name) or [0])[-1]
+            await message.answer(
+                "📊 Нотка сейчас\n\n"
+                f"Людей всего: {c['users']}\n"
+                f"Сегодня: {c['dau']} · за неделю: {c['wau']} · за месяц: {c['mau']}\n"
+                f"Новых за 7 дней: {c['new_7d']}\n"
+                f"На Плюсе сейчас: {c['plus_active']} (всего было {c['plus_ever']})\n"
+                f"Часов прослушано: {c['hours']} · прослушиваний: {c['plays']}\n\n"
+                f"Сегодня: открытий {today('opens')}, поисков {today('search')}, треков {today('play')}, "
+                f"inline {today('inline')}, переносов {today('import')}"
+            )
+        except Exception:
+            logger.exception("Could not build the stats")
+            await message.answer("Не получилось собрать статистику, попробуй позже.")
 
     @dp.message()
     async def handle_other(message: Message) -> None:

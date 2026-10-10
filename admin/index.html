@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Нотка · панель</title>
+<style>
+  :root {
+    --bg: #14090f; --bg2: #1d0e18; --card: rgba(255, 255, 255, 0.055); --line: rgba(255, 255, 255, 0.1);
+    --text: #fbeee8; --text2: #c9aeb0; --text3: #a98f94;
+    --rose: #ff4d8d; --peach: #ffb08e; --powder: #ffe9df; --ok: #7ee2a8; --warn: #ffd37a;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--bg); color: var(--text); font: 15px/1.45 "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { min-height: 100vh; background:
+      radial-gradient(900px 500px at 70% -10%, rgba(255, 77, 141, 0.18), transparent 70%),
+      radial-gradient(700px 400px at 0% 20%, rgba(255, 176, 142, 0.1), transparent 70%), var(--bg); }
+  button, input { font: inherit; color: inherit; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 22px 20px 70px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+  .brand { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+  .brand small { font-size: 13px; font-weight: 600; color: var(--text3); margin-left: 8px; letter-spacing: 0; }
+  .btn { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; cursor: pointer; transition: background 0.2s; }
+  .btn:hover { background: rgba(255, 255, 255, 0.1); }
+  .btn.primary { background: linear-gradient(135deg, var(--rose), #ff7a5c); border: 0; font-weight: 700; color: #fff; }
+  .muted { color: var(--text2); }
+  /* login */
+  #login { max-width: 360px; margin: 18vh auto 0; text-align: center; }
+  #login h1 { font-size: 28px; letter-spacing: -0.03em; margin-bottom: 6px; }
+  #login input { width: 100%; margin: 18px 0 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); outline: none; }
+  #login input:focus { border-color: var(--rose); }
+  #login .err { color: #ff8a9a; min-height: 20px; margin-bottom: 8px; font-size: 14px; }
+  /* cards */
+  .grid { display: grid; gap: 14px; }
+  .cards { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); margin-bottom: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 16px 14px; backdrop-filter: blur(10px); }
+  .card .v { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+  .card .l { color: var(--text2); font-size: 13px; margin-top: 4px; }
+  .card .s { color: var(--text3); font-size: 12px; margin-top: 2px; }
+  h2 { font-size: 17px; letter-spacing: -0.01em; margin: 28px 0 12px; }
+  .two { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+  .panel h3 { font-size: 14px; color: var(--text2); font-weight: 600; margin-bottom: 10px; }
+  svg { display: block; width: 100%; height: auto; }
+  .bar { fill: var(--rose); } .bar2 { fill: var(--peach); } .bar3 { fill: #b88cff; }
+  .axis { fill: var(--text3); font-size: 10px; }
+  /* tables */
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th { color: var(--text2); font-weight: 600; font-size: 12.5px; cursor: pointer; user-select: none; position: sticky; top: 0; background: #241220; }
+  th.on { color: var(--peach); }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.1); }
+  .pill.plus { background: rgba(255, 77, 141, 0.25); color: #ffc2d8; }
+  .pill.ok { background: rgba(126, 226, 168, 0.18); color: var(--ok); }
+  .name { font-weight: 600; }
+  .search { width: 100%; max-width: 360px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); outline: none; margin-bottom: 10px; }
+  .list { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  .list li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .list li:last-child { border-bottom: 0; }
+  .list b { font-weight: 600; } .list span { color: var(--text2); white-space: nowrap; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 8px; font-size: 12.5px; color: var(--text2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .note { color: var(--text3); font-size: 12.5px; margin-top: 18px; }
+  @media (max-width: 640px) { .card .v { font-size: 25px; } .wrap { padding: 14px 12px 60px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section id="login" hidden>
+    <h1>Нотка</h1>
+    <p class="muted">Панель владельца</p>
+    <input id="pw" type="password" placeholder="Пароль" autocomplete="current-password" />
+    <p class="err" id="err"></p>
+    <button class="btn primary" id="go" type="button" style="width: 100%; padding: 12px">Войти</button>
+  </section>
+
+  <div id="app" hidden>
+    <header class="top">
+      <div class="brand">Нотка <small id="stamp"></small></div>
+      <div style="display: flex; gap: 8px">
+        <button class="btn" id="refresh" type="button">Обновить</button>
+        <button class="btn" id="out" type="button">Выйти</button>
+      </div>
+    </header>
+
+    <div class="grid cards" id="cards"></div>
+
+    <h2>По дням, последние 30</h2>
+    <div class="grid two">
+      <div class="panel"><h3>Активные люди в день</h3><div id="ch-dau"></div></div>
+      <div class="panel"><h3>Новые люди в день</h3><div id="ch-new"></div></div>
+      <div class="panel"><h3>Минут прослушано в день</h3><div id="ch-min"></div></div>
+      <div class="panel"><h3>Прослушиваний в день</h3><div id="ch-plays"></div></div>
+    </div>
+
+    <h2>Что делают в приложении</h2>
+    <div class="grid two" id="feat"></div>
+
+    <h2>Что слушают</h2>
+    <div class="grid two">
+      <div class="panel"><h3>Топ исполнителей (минуты)</h3><ul class="list" id="top-artists"></ul></div>
+      <div class="panel"><h3>Топ треков (прослушивания)</h3><ul class="list" id="top-tracks"></ul></div>
+    </div>
+
+    <h2>Люди</h2>
+    <input class="search" id="q" placeholder="Поиск по имени, @нику или номеру" />
+    <div class="scroll"><table id="tbl"></table></div>
+
+    <h2>Промокоды</h2>
+    <div class="scroll"><table id="codes"></table></div>
+
+    <p class="note">Данные: аккаунты, у которых Нотка открывалась через Telegram. «Активен» — был в приложении в этот день (по московскому времени). Минуты и прослушивания собираются со всех устройств человека.</p>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("ru-RU"));
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ago = (ts) => {
+  if (!ts) return "—";
+  const d = Math.max(0, Date.now() / 1000 - ts);
+  if (d < 90) return "только что";
+  if (d < 3600) return Math.round(d / 60) + " мин назад";
+  if (d < 86400) return Math.round(d / 3600) + " ч назад";
+  if (d < 86400 * 30) return Math.round(d / 86400) + " дн назад";
+  return new Date(ts * 1000).toLocaleDateString("ru-RU");
+};
+const dateOf = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "2-digit" }) : "—");
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (res.status === 401) throw new Error("login");
+  if (!res.ok) throw new Error("http " + res.status);
+  return res.json();
+}
+
+/* ---- charts: plain SVG bars ---- */
+function bars(values, days, cls = "bar", height = 130) {
+  const W = 600, H = height, pad = 20, n = values.length;
+  const max = Math.max(1, ...values);
+  const bw = (W - pad) / n;
+  let svg = `<svg viewBox="0 0 ${W} ${H + 20}" role="img">`;
+  svg += `<line x1="${pad}" y1="${H}" x2="${W}" y2="${H}" stroke="rgba(255,255,255,.12)"/>`;
+  values.forEach((v, i) => {
+    const h = Math.round((v / max) * (H - 18));
+    const x = pad + i * bw + 2;
+    svg += `<rect class="${cls}" x="${x.toFixed(1)}" y="${H - h}" width="${(bw - 4).toFixed(1)}" height="${h}" rx="3"><title>${days[i]}: ${fmt(v)}</title></rect>`;
+  });
+  svg += `<text class="axis" x="0" y="12">${fmt(max)}</text>`;
+  svg += `<text class="axis" x="${pad}" y="${H + 14}">${days[0].slice(5)}</text><text class="axis" x="${W}" y="${H + 14}" text-anchor="end">${days[n - 1].slice(5)}</text>`;
+  return svg + "</svg>";
+}
+function line(values, days, color) {
+  const W = 300, H = 56, n = values.length, max = Math.max(1, ...values);
+  const pts = values.map((v, i) => `${((i / Math.max(1, n - 1)) * W).toFixed(1)},${(H - 4 - (v / max) * (H - 10)).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" points="${pts}"/></svg>`;
+}
+
+const FEATURES = {
+  opens: ["Открытия приложения", "#ff4d8d"], search: ["Поиски", "#ffb08e"], play: ["Запуски треков", "#b88cff"],
+  lyrics: ["Тексты песен", "#7ee2a8"], mood: ["Миксы «Под настроение»", "#ffd37a"], import: ["Переносы плейлистов", "#6ec6ff"],
+  inline: ["Inline-запросы бота", "#ff8fb1"], inline_send: ["Песен отправлено в чаты", "#ffa47a"], promo: ["Активации промокодов", "#9be59b"],
+};
+
+let DATA = null, sortKey = "last_seen", sortDir = -1;
+const COLS = [
+  ["name", "Человек", false], ["last_seen", "Был", true], ["first_seen", "Пришёл", true], ["opens", "Заходов", true],
+  ["active_days", "Дней", true], ["minutes", "Минут", true], ["plays", "Плеев", true], ["favorites", "Любимых", true],
+  ["playlists", "Плейлистов", true], ["devices", "Устройств", true], ["plus_active", "Плюс", false],
+];
+
+function drawTable() {
+  const q = $("q").value.trim().toLowerCase();
+  let rows = DATA.users.filter((r) => !q || `${r.name} ${r.username} ${r.id}`.toLowerCase().includes(q));
+  rows = rows.slice().sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    if (typeof x === "string" || typeof y === "string") return String(x || "").localeCompare(String(y || ""), "ru") * sortDir;
+    return ((x || 0) - (y || 0)) * sortDir;
+  });
+  const head = COLS.map(([k, t, num]) => `<th class="${num ? "num" : ""} ${k === sortKey ? "on" : ""}" data-k="${k}">${t}${k === sortKey ? (sortDir < 0 ? " ↓" : " ↑") : ""}</th>`).join("");
+  const body = rows.map((r) => {
+    const who = esc(r.name || "—") + (r.username ? ` <span class="muted">@${esc(r.username)}</span>` : "") + ` <span class="muted" style="font-size:12px">${esc(r.id)}</span>`;
+    const plus = r.plus_active ? `<span class="pill plus">Плюс до ${dateOf(r.plus_until)}</span>` : r.plus_until ? `<span class="pill">был</span>` : "";
+    const tag = r.in_events ? ` <span class="pill ok" title="участвует в событиях">события</span>` : "";
+    return `<tr><td class="name">${who}${tag}</td><td class="num">${ago(r.last_seen)}</td><td class="num">${dateOf(r.first_seen)}</td>
+      <td class="num">${fmt(r.opens)}</td><td class="num">${fmt(r.active_days)}</td><td class="num">${fmt(r.minutes)}</td><td class="num">${fmt(r.plays)}</td>
+      <td class="num">${fmt(r.favorites)}</td><td class="num">${fmt(r.playlists)}</td><td class="num">${fmt(r.devices)}</td><td>${plus}</td></tr>`;
+  }).join("");
+  $("tbl").innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="11" class="muted">Никого не найдено</td></tr>`}</tbody>`;
+  $("tbl").querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
+    const k = th.dataset.k;
+    if (k === sortKey) sortDir = -sortDir; else { sortKey = k; sortDir = -1; }
+    drawTable();
+  }));
+}
+
+function render(d) {
+  DATA = d;
+  const c = d.cards;
+  $("stamp").textContent = "обновлено " + new Date(d.generated * 1000).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const cards = [
+    [c.users, "людей всего", `из них с синхронизацией: ${c.with_account_sync}`],
+    [c.dau, "активны сегодня", ""], [c.wau, "за неделю", ""], [c.mau, "за месяц", ""],
+    [c.new_7d, "новых за 7 дней", `за 30 дней: ${c.new_30d}`],
+    [c.returning, "возвращались", "были больше чем в один день"],
+    [c.plus_active, "на Плюсе сейчас", `всего было: ${c.plus_ever}`],
+    [c.hours, "часов прослушано", `в среднем ${c.avg_minutes_active_week} мин на активного за неделю`],
+    [c.plays, "прослушиваний", ""],
+    [c.favorites, "любимых треков", `плейлистов: ${c.playlists}`],
+  ];
+  $("cards").innerHTML = cards.map(([v, l, s]) => `<div class="card"><div class="v">${fmt(v)}</div><div class="l">${l}</div>${s ? `<div class="s">${s}</div>` : ""}</div>`).join("");
+  $("ch-dau").innerHTML = bars(d.series.dau, d.series.days, "bar");
+  $("ch-new").innerHTML = bars(d.series.new, d.series.days, "bar2");
+  $("ch-min").innerHTML = bars(d.series.minutes, d.series.days, "bar3");
+  $("ch-plays").innerHTML = bars(d.series.plays, d.series.days, "bar");
+  const feat = Object.keys(FEATURES).filter((k) => d.counters[k]);
+  $("feat").innerHTML = feat.length ? feat.map((k) => {
+    const arr = d.counters[k], total = arr.reduce((a, b) => a + b, 0);
+    return `<div class="panel"><h3>${FEATURES[k][0]}</h3><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:24px">${fmt(arr[arr.length - 1])}</b><span class="muted">сегодня · за 30 дней: ${fmt(total)}</span></div>${line(arr, d.series.days, FEATURES[k][1])}</div>`;
+  }).join("") : `<div class="panel muted">Счётчики начнут копиться с этого момента: сюда попадут открытия, поиски, запуски треков и остальное.</div>`;
+  $("top-artists").innerHTML = d.top_artists.map((a) => `<li><b>${esc(a.name)}</b><span>${fmt(a.minutes)} мин · ${fmt(a.plays)} раз</span></li>`).join("") || `<li class="muted">Пока нет данных</li>`;
+  $("top-tracks").innerHTML = d.top_tracks.map((t) => `<li><b>${esc(t.title || "")} <span style="font-weight:400">— ${esc(t.artist || "")}</span></b><span>${fmt(t.plays)} раз</span></li>`).join("") || `<li class="muted">Пока нет данных</li>`;
+  drawTable();
+  $("codes").innerHTML = `<thead><tr><th>Код</th><th class="num">Дней Плюса</th><th class="num">Активаций</th><th class="num">Лимит</th><th>Статус</th></tr></thead><tbody>` +
+    (d.codes.map((x) => `<tr><td class="name">${esc(x.code)}</td><td class="num">${fmt(x.days)}</td><td class="num">${fmt(x.used)}</td><td class="num">${fmt(x.limit)}</td><td>${x.off ? "выключен" : x.used >= x.limit ? "исчерпан" : "действует"}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Промокодов нет</td></tr>`) + `</tbody>`;
+}
+
+async function load() {
+  try {
+    const d = await api("/admin/api/summary");
+    $("login").hidden = true; $("app").hidden = false;
+    render(d);
+  } catch (e) {
+    if (e.message === "login") { $("app").hidden = true; $("login").hidden = false; $("pw").focus(); }
+    else { $("app").hidden = false; $("stamp").textContent = "не получилось загрузить, попробуй обновить"; }
+  }
+}
+async function login() {
+  $("err").textContent = "";
+  try {
+    const res = await fetch("/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: $("pw").value }) });
+    if (res.status === 429) { $("err").textContent = "Слишком много попыток. Подожди 15 минут."; return; }
+    if (res.status === 503) { $("err").textContent = "Панель закрыта: на сервере не задан пароль."; return; }
+    if (!res.ok) { $("err").textContent = "Неверный пароль"; return; }
+    $("pw").value = "";
+    load();
+  } catch (e) { $("err").textContent = "Нет связи с сервером"; }
+}
+$("go").addEventListener("click", login);
+$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+$("refresh").addEventListener("click", load);
+$("out").addEventListener("click", async () => { await fetch("/admin/logout", { method: "POST" }); load(); });
+$("q").addEventListener("input", () => DATA && drawTable());
+load();
+setInterval(() => { if (!$("app").hidden && document.visibilityState === "visible") load(); }, 120000);
+</script>
+</body>
+</html>
