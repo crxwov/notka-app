@@ -46,6 +46,7 @@ const settle = (b, ms = 5000) => b.sleep(ms);
 // device A: the phone, with its own favourites, a playlist and 10 minutes of listening
 const A = await device("A", 9410, {
   favorites: [T(1), T(2)],
+  recent: [Object.assign(T(1), { at: 1000 })],
   playlists: [{ id: "pl_a", name: "С телефона", trackIds: ["youtube_music:t1"], tracksCache: { "youtube_music:t1": T(1) } }],
   listens: { seconds: 600, plays: 5, tracks: { "youtube_music:t1": { track: T(1), plays: 5, seconds: 600 } }, artists: { "Артист": { seconds: 600, plays: 5 } }, days: {} },
 });
@@ -54,6 +55,7 @@ await settle(A, 6000);
 // device B: the computer, joins the account with its own data
 const B = await device("B", 9411, {
   favorites: [T(3)],
+  recent: [Object.assign(T(3), { at: 2000 })],
   playlists: [{ id: "pl_b", name: "С компьютера", trackIds: [], tracksCache: {} }],
   listens: { seconds: 120, plays: 1, tracks: { "youtube_music:t3": { track: T(3), plays: 1, seconds: 120 } }, artists: { "Артист": { seconds: 120, plays: 1 } }, days: {} },
 });
@@ -62,6 +64,8 @@ const bFavs = await favIds(B);
 check("the computer got the phone's favourites and kept its own", bFavs.join() === "youtube_music:t1,youtube_music:t2,youtube_music:t3", bFavs.join());
 const bState = await state(B);
 check("the computer got the phone's playlist and kept its own", bState.playlists.map((p) => p.id).sort().join() === "pl_a,pl_b", bState.playlists.map((p) => p.id).join());
+const bRecent = (await state(B)).recent.map((t) => t.id).join();
+check("«Недавнее» on the computer holds both devices' plays, the later first", bRecent === "youtube_music:t3,youtube_music:t1", bRecent);
 const bTotal = await B.eval("(() => { const s = JSON.parse(localStorage.getItem('notka_state_v2')); const r = s.remoteListens || {}; return (s.listens.seconds || 0) + (r.seconds || 0); })()");
 check("the stats of the two devices add up (600 + 120)", Math.round(bTotal) === 720, String(bTotal));
 
@@ -71,6 +75,8 @@ await A.eval("(async () => { Object.defineProperty(document, 'visibilityState', 
 await settle(A, 6000);
 const aFavs = await favIds(A);
 check("the phone got the computer's favourite", aFavs.join() === "youtube_music:t1,youtube_music:t2,youtube_music:t3", aFavs.join());
+const aRecent = (await state(A)).recent.map((t) => t.id).join();
+check("«Недавнее» on the phone holds both too", aRecent === "youtube_music:t3,youtube_music:t1", aRecent);
 const aTotal = await A.eval("(() => { const s = JSON.parse(localStorage.getItem('notka_state_v2')); const r = s.remoteListens || {}; return (s.listens.seconds || 0) + (r.seconds || 0); })()");
 check("the phone sees the same total stats", Math.round(aTotal) === 720, String(aTotal));
 

@@ -307,6 +307,21 @@
     } catch (e) { return "tmp" + Math.random().toString(36).slice(2, 8); }
   })();
 
+  // «Недавнее» from two devices: all the tracks, the most recently played first
+  function mergeRecent(a, b) {
+    const best = new Map();
+    [...(a || []), ...(b || [])].forEach((t, i) => {
+      if (!t || !t.id) return;
+      const at = t.at || 0;
+      const cur = best.get(t.id);
+      if (!cur || at > (cur.t.at || 0)) best.set(t.id, { t, i });
+    });
+    return [...best.values()]
+      .sort((x, y) => (y.t.at || 0) - (x.t.at || 0) || x.i - y.i)
+      .slice(0, 20)
+      .map((x) => x.t);
+  }
+
   let listensRev = 0, listensViewRev = -1, listensViewCache = null;
   function mergeListens(a, b) {
     const out = { seconds: (a.seconds || 0) + (b.seconds || 0), plays: (a.plays || 0) + (b.plays || 0), tracks: {}, artists: {}, days: {} };
@@ -382,10 +397,7 @@
       r.followedArtists.forEach((n) => { if (!have.has(n)) state.followedArtists.push(n); });
       state.followedMeta = Object.assign({}, r.followedMeta || {}, state.followedMeta || {});
     }
-    if (Array.isArray(r.recent)) {
-      const seen = new Set(state.recent.map((t) => t.id));
-      state.recent = state.recent.concat(r.recent.filter((t) => t && !seen.has(t.id))).slice(0, 30);
-    }
+    if (Array.isArray(r.recent)) state.recent = mergeRecent(state.recent, r.recent);
     if (r.settings && typeof r.settings === "object") state.settings = Object.assign({}, state.settings, r.settings);
     if (!state.accountName && r.accountName) state.accountName = r.accountName;
     if (!state.accountAvatar && r.accountAvatar) state.accountAvatar = r.accountAvatar;
@@ -399,6 +411,15 @@
     const shared = res.shared || {}, ts = res.ts || {};
     SYNC_KEYS.forEach((k) => {
       if (!(k in shared)) return;
+      if (k === "recent" && Array.isArray(shared.recent)) {
+        // the history of both devices: united. If this one had plays the account lacks, it goes back up.
+        const merged = mergeRecent(state.recent, shared.recent);
+        const same = JSON.stringify(merged.map((t) => t.id)) === JSON.stringify(shared.recent.map((t) => t.id));
+        if (JSON.stringify(merged) !== JSON.stringify(state.recent)) { state.recent = merged; syncSnap.recent = snapOf("recent"); changed = true; }
+        state.syncTs.recent = same ? Math.max(ts.recent || 0, state.syncTs.recent || 0) : Date.now();
+        if (!same) setTimeout(() => scheduleSync(1500), 0);
+        return;
+      }
       if ((ts[k] || 0) > (state.syncTs[k] || 0)) {
         state[k] = shared[k];
         state.syncTs[k] = ts[k];
@@ -1672,7 +1693,8 @@
   // «Недавнее»: the last tracks that actually started playing.
   function rememberRecent(track) {
     const recent = state.recent || (state.recent = []);
-    state.recent = [slimTrack(track)].concat(recent.filter((t) => t.id !== track.id)).slice(0, 20);
+    // `at` — when it was played: that is how the histories of two devices are put in one order
+    state.recent = [Object.assign(slimTrack(track), { at: Date.now() })].concat(recent.filter((t) => t.id !== track.id)).slice(0, 20);
     persist();
     if (currentScreen === "home") renderRecent();
   }
