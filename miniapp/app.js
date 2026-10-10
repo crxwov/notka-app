@@ -1530,7 +1530,9 @@
         progress(`${item.artist ? item.artist + " — " : ""}${item.title}`);
       }
     };
-    await Promise.all([worker(), worker(), worker()]);
+    // a long playlist needs many searches: more of them at a time (a thousand at three at a time takes minutes)
+    const lanes = wanted.length > 150 ? 6 : 3;
+    await Promise.all(Array.from({ length: lanes }, () => worker()));
     if (run !== importRun) return; // the window was closed: nothing is created
 
     // stopped half-way: what was found so far is still kept
