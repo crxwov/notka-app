@@ -31,8 +31,20 @@
   // On a computer Telegram opens a Mini App in a small window; ask for the
   // whole screen (Bot API 8.0). Older clients just keep the window, which
   // the layout handles too.
-  if (tg && tgAtLeast("8.0") && tg.requestFullscreen && !tg.isFullscreen && ["tdesktop", "macos", "unigram"].includes(tg.platform)) {
+  // Fullscreen covers the whole screen (the Windows taskbar too) and has no
+  // window buttons, so it is the listener's choice: a button in the side
+  // panel, remembered, Esc leaves it. The window is the default.
+  const canFullscreen = !!(tg && tgAtLeast("8.0") && tg.requestFullscreen && tg.exitFullscreen && ["tdesktop", "macos", "unigram"].includes(tg.platform));
+  const FULLSCREEN_KEY = "notka_fullscreen";
+  let wantFullscreen = false;
+  try { wantFullscreen = localStorage.getItem(FULLSCREEN_KEY) === "1"; } catch (e) { /* storage may be blocked */ }
+  if (canFullscreen && wantFullscreen && !tg.isFullscreen) {
     try { tg.requestFullscreen(); } catch (e) { /* stays in the window */ }
+  }
+  function setFullscreen(on) {
+    if (!canFullscreen) return;
+    try { localStorage.setItem(FULLSCREEN_KEY, on ? "1" : "0"); } catch (e) { /* ignore */ }
+    try { on ? tg.requestFullscreen() : tg.exitFullscreen(); } catch (e) { /* ignore */ }
   }
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
   const hasTgBack = !!(tg && tg.BackButton && tgAtLeast("6.1"));
@@ -737,6 +749,50 @@
     album: (p) => (p.track ? openAlbumScreen(p.track, true) : openAlbumById(p.source, p.albumId, p.title, p.artist, true)),
   };
 
+  // The side panel's own content (computer layout): the liked tracks,
+  // playlists, followed artists, the profile, the fullscreen switch.
+  function renderSidebar() {
+    if (!$("side-extra")) return;
+    $("side-fav-count").textContent = state.favorites.length ? String(state.favorites.length) : "";
+    const item = (label, coverUrl, seed, round, onClick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "side-item";
+      const c = document.createElement("span");
+      c.className = "cover side-cover" + (round ? " cover-round" : "");
+      setCoverEl(c, coverUrl, seed);
+      const n = document.createElement("span");
+      n.className = "side-name";
+      n.textContent = label;
+      b.appendChild(c);
+      b.appendChild(n);
+      b.addEventListener("click", onClick);
+      return b;
+    };
+    const pl = $("side-playlists");
+    pl.innerHTML = "";
+    $("side-pl-label").hidden = !state.playlists.length;
+    state.playlists.forEach((p) => pl.appendChild(item(p.name, playlistCoverUrl(p), p.id, false, () => openPlaylist(p.id))));
+    const fl = $("side-follows");
+    fl.innerHTML = "";
+    $("side-follow-label").hidden = !state.followedArtists.length;
+    state.followedArtists.forEach((name) => {
+      const meta = state.followedMeta[name] || {};
+      fl.appendChild(item(name, meta.photo, name, true, () => openArtistScreen(name, [], { artistId: meta.artistId, source: meta.source })));
+    });
+    renderAvatarInto("side-avatar", "side-initial");
+    $("side-name").textContent = displayName();
+    $("side-fs-btn").hidden = !canFullscreen;
+    $("side-fs-label").textContent = tg && tg.isFullscreen ? "Выйти из полного экрана" : "На весь экран";
+  }
+  $("side-fav-btn").addEventListener("click", () => showScreen("favorites"));
+  $("side-profile-btn").addEventListener("click", () => showScreen("profile"));
+  $("side-fs-btn").addEventListener("click", () => setFullscreen(!(tg && tg.isFullscreen)));
+  if (tg && tg.onEvent) tg.onEvent("fullscreenChanged", renderSidebar);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && tg && tg.isFullscreen && !openOverlays.length) setFullscreen(false);
+  });
+
   // A wide window (Telegram Desktop, a browser) gets the computer layout:
   // the tabs become a side panel, the mini player a bar at the bottom.
   const DESKTOP_MIN_WIDTH = 900;
@@ -754,6 +810,7 @@
     const desk = isDesktop();
     const showTabs = desk ? !["splash", "onboarding"].includes(currentScreen) : TAB_SCREENS.has(currentScreen);
     const showMini = !!currentTrack && !NO_MINI_SCREENS.has(currentScreen);
+    if (desk) renderSidebar();
     bottomNav.hidden = !showTabs;
     miniPlayer.hidden = !showMini;
     document.body.classList.toggle("no-tabbar", !showTabs);
@@ -2113,6 +2170,7 @@
   // LIBRARY («Моё»)
   // ============================================================
   function renderLibrary() {
+    if (isDesktop()) renderSidebar();
     $("library-fav-count").textContent = pluralTracks(state.favorites.length);
     const grid = $("playlists-grid");
     grid.innerHTML = "";

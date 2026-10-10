@@ -218,7 +218,7 @@ body.quote-sheet-open .quote-bar { display: none; }
    The tabs become a side panel, the mini player a bar at the bottom,
    the content a wide column. A phone is not touched by any of this.
    ========================================================== */
-body.is-desktop { --side: 248px; }
+body.is-desktop { --side: 268px; }
 body.is-desktop:is([data-screen="splash"], [data-screen="onboarding"]) { --side: 0px; }
 body.is-desktop .app { max-width: none; margin: 0; }
 body.is-desktop .screen {
@@ -255,3 +255,26 @@ body.is-desktop .mini-main { cursor: pointer; }
 /* the full player on a computer: one centred column, a larger cover */
 body.is-desktop .screen-player > :not(.player-prism):not(.player-art-wrap) { width: min(100%, 600px); margin-left: auto; margin-right: auto; }
 body.is-desktop .player-art { max-height: min(54vh, 480px); }
+
+/* the side panel: brand, sections, then what is yours, then the profile */
+.side-brand, .side-extra, .side-foot { display: none; }
+body.is-desktop .side-brand { display: flex; align-items: center; gap: 10px; padding: 6px 12px 16px; flex: 0 0 auto; }
+body.is-desktop .side-extra { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; gap: 2px; margin-top: 10px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); overflow-y: auto; scrollbar-width: none; }
+body.is-desktop .side-extra::-webkit-scrollbar { display: none; }
+body.is-desktop .side-foot { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.side-scroll { display: flex; flex-direction: column; gap: 2px; }
+.side-label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); padding: 14px 12px 6px; }
+.side-item { display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 10px 0 8px; border-radius: 14px; color: var(--text-2); font-size: 14.5px; font-weight: 600; text-align: left; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+.side-item:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.side-item:active { transform: scale(0.98); }
+.side-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-count { font-style: normal; font-size: 12.5px; font-weight: 600; color: var(--text-3); }
+.side-ic { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: rgba(255, 255, 255, 0.08); }
+.side-ic-heart { color: #fff; background: linear-gradient(135deg, var(--c-warm), var(--c-mid)); }
+.side-cover { width: 32px; height: 32px; border-radius: 10px; }
+.side-cover.cover-round { border-radius: 50%; }
+.side-profile .avatar { width: 32px; height: 32px; font-size: 14px; flex: 0 0 auto; }
+.side-profile .side-name { color: var(--text); }
+
+body.is-desktop .home-top .brand { display: none; } /* the side panel carries the brand */
+body.is-desktop .home-top { justify-content: flex-end; }

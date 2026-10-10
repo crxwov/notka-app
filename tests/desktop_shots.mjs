@@ -7,7 +7,7 @@ const W = +(process.argv[2] || 1440), H = +(process.argv[3] || 900);
 const b = await launch({ dir: "C:/Users/leksik/Documents/Notka/tests/shots", port: 9381, width: W, height: H });
 await b.send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: false });
 const found = ((await (await fetch(`${BASE}/search?q=${encodeURIComponent("Кино Группа крови")}`)).json()).results || []).filter((t) => t.artwork && t.source === "youtube_music");
-const seed = { favorites: found.slice(0, 8), recent: found.slice(0, 6), playlists: [], onboardingSeenV2: true, settings: {} };
+const seed = { favorites: found.slice(0, 8), recent: found.slice(0, 6), playlists: [{ id: "p1", name: "Для дороги", description: "", trackIds: found.slice(0, 3).map((t) => t.id), createdAt: 1 }, { id: "p2", name: "Вечер", description: "", trackIds: [], createdAt: 2 }], tracks: Object.fromEntries(found.slice(0, 8).map((t) => [t.id, t])), onboardingSeenV2: true, settings: {} };
 await b.goto(`${BASE}/health`);
 await b.eval(`localStorage.clear(); localStorage.setItem("notka_state_v2", ${JSON.stringify(JSON.stringify(seed))}); true`);
 await b.goto(`${BASE}/app/`);
