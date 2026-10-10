@@ -592,11 +592,12 @@
       const v = vbins.filter((b) => b.w > 0).sort((a, b) => b.w - a.w)[0];
       const h = (Math.atan2(v.y, v.x) * 180 / Math.PI + 360) % 360;
       const s = v.s / v.w, l = v.l / v.w;
+      // softened: a cover's loudest colour is calmed, not copied
       return {
-        core: hsl(h, clamp(s, 0.6, 1), 0.86),
-        warm: hsl(h, clamp(s * 1.1, 0.65, 0.98), clamp(l, 0.46, 0.58)),
-        mid: hsl(h, clamp(s, 0.55, 0.9), 0.4),
-        deep: hsl(h, 0.4, 0.2),
+        core: hsl(h, clamp(s * 0.6, 0.34, 0.55), 0.88),
+        warm: hsl(h, clamp(s * 0.74, 0.4, 0.62), clamp(l, 0.54, 0.64)),
+        mid: hsl(h, clamp(s * 0.68, 0.34, 0.56), 0.42),
+        deep: hsl(h, 0.3, 0.22),
       };
     }
 
@@ -631,11 +632,13 @@
       deepH = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
       deepS = ds / darks.length;
     }
+    // softened: the cover's colours are kept, but calmer and less contrasty, so a neon or acid cover
+    // gives a pleasant light, not a glaring one
     return {
-      core: hsl(a.h, clamp(a.s, 0.55, 1), 0.87),
-      warm: hsl(a.h, clamp(a.s * 1.15, 0.45, 0.96), clamp(a.l, 0.5, 0.64)),
-      mid: hsl(b.h, clamp(b.s * 1.1, 0.4, 0.92), clamp(b.l, 0.45, 0.6)),
-      deep: hsl(deepH, clamp(deepS, 0.35, 0.85), 0.34),
+      core: hsl(a.h, clamp(a.s * 0.6, 0.3, 0.56), 0.88),
+      warm: hsl(a.h, clamp(a.s * 0.76, 0.36, 0.64), clamp(a.l, 0.54, 0.66)),
+      mid: hsl(b.h, clamp(b.s * 0.72, 0.3, 0.58), clamp(b.l, 0.44, 0.58)),
+      deep: hsl(deepH, clamp(deepS * 0.78, 0.26, 0.58), 0.3),
     };
   }
 
