@@ -28,6 +28,12 @@
       console.warn("Telegram WebApp init failed", e);
     }
   }
+  // On a computer Telegram opens a Mini App in a small window; ask for the
+  // whole screen (Bot API 8.0). Older clients just keep the window, which
+  // the layout handles too.
+  if (tg && tgAtLeast("8.0") && tg.requestFullscreen && !tg.isFullscreen && ["tdesktop", "macos", "unigram"].includes(tg.platform)) {
+    try { tg.requestFullscreen(); } catch (e) { /* stays in the window */ }
+  }
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
   const hasTgBack = !!(tg && tg.BackButton && tgAtLeast("6.1"));
   if (hasTgBack) document.body.classList.add("tg-back");
@@ -731,14 +737,29 @@
     album: (p) => (p.track ? openAlbumScreen(p.track, true) : openAlbumById(p.source, p.albumId, p.title, p.artist, true)),
   };
 
+  // A wide window (Telegram Desktop, a browser) gets the computer layout:
+  // the tabs become a side panel, the mini player a bar at the bottom.
+  const DESKTOP_MIN_WIDTH = 900;
+  const desktopQuery = window.matchMedia ? window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH}px)`) : null;
+  const isDesktop = () => !!desktopQuery && desktopQuery.matches;
+  function syncDesktop() { document.body.classList.toggle("is-desktop", isDesktop()); }
+  syncDesktop();
+  if (desktopQuery) {
+    const onChange = () => { syncDesktop(); updateDock(); };
+    if (desktopQuery.addEventListener) desktopQuery.addEventListener("change", onChange);
+    else if (desktopQuery.addListener) desktopQuery.addListener(onChange);
+  }
+
   function updateDock() {
-    const showTabs = TAB_SCREENS.has(currentScreen);
+    const desk = isDesktop();
+    const showTabs = desk ? !["splash", "onboarding"].includes(currentScreen) : TAB_SCREENS.has(currentScreen);
     const showMini = !!currentTrack && !NO_MINI_SCREENS.has(currentScreen);
     bottomNav.hidden = !showTabs;
     miniPlayer.hidden = !showMini;
     document.body.classList.toggle("no-tabbar", !showTabs);
     let dock = 0;
-    if (showTabs && showMini) dock = 160;
+    if (desk) dock = showMini ? 108 : 0;
+    else if (showTabs && showMini) dock = 160;
     else if (showTabs) dock = 84;
     else if (showMini) dock = 86;
     document.documentElement.style.setProperty("--dock", `${dock}px`);
@@ -835,6 +856,29 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && openOverlays.length) closeOverlay(openOverlays[openOverlays.length - 1]);
+  });
+
+  // Keys on a computer: space plays or pauses, ←/→ seek by 5 seconds
+  // (with Shift: previous / next track). Not while typing or on a control
+  // that uses these keys itself.
+  document.addEventListener("keydown", (e) => {
+    if (!currentTrack || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if (typing || openOverlays.length) return;
+    if (e.code === "Space") {
+      if (t && /^(BUTTON|A)$/.test(t.tagName)) return;
+      e.preventDefault();
+      togglePlayPause();
+    } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      if (t && t.getAttribute && t.getAttribute("role") === "slider") return;
+      e.preventDefault();
+      if (e.shiftKey) { playAdjacent(e.key === "ArrowRight" ? 1 : -1); return; }
+      const dur = effectiveDuration();
+      if (!dur) return;
+      const to = audio.currentTime + (e.key === "ArrowRight" ? 5 : -5);
+      audio.currentTime = Math.max(0, Math.min(dur - 1, to));
+    }
   });
 
   // Telegram's own back button: closes the top sheet, otherwise steps back

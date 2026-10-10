@@ -212,3 +212,46 @@ body.quote-sheet-open .quote-bar { display: none; }
 .swipe-in-left { animation: swipe-in-left 0.4s var(--ease-out) both; }
 .screen-player { -webkit-user-select: none; user-select: none; }
 .screen-player img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
+
+/* ==========================================================
+   COMPUTER LAYOUT — a window from 900px wide (Telegram Desktop, a browser).
+   The tabs become a side panel, the mini player a bar at the bottom,
+   the content a wide column. A phone is not touched by any of this.
+   ========================================================== */
+body.is-desktop { --side: 248px; }
+body.is-desktop:is([data-screen="splash"], [data-screen="onboarding"]) { --side: 0px; }
+body.is-desktop .app { max-width: none; margin: 0; }
+body.is-desktop .screen {
+  left: var(--side);
+  --pad-x: max(40px, calc((100vw - var(--side) - 1120px) / 2));
+  padding: calc(var(--sat) + 28px) var(--pad-x) calc(var(--dock) + var(--sab) + 32px);
+}
+body.is-desktop .tabbar {
+  left: 16px;
+  right: auto;
+  width: calc(var(--side) - 32px);
+  top: calc(var(--sat) + 16px);
+  bottom: calc(var(--sab) + 16px);
+  height: auto;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 14px 10px;
+  border-radius: 28px;
+}
+body.is-desktop .tab { flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 14px; height: 48px; padding: 0 16px; font-size: 15px; border-radius: 16px; cursor: pointer; }
+body.is-desktop .tab:hover:not(.active) { background: rgba(255, 255, 255, 0.07); color: var(--text); }
+body.is-desktop .mini-player,
+body.is-desktop.no-tabbar .mini-player {
+  --bar-x: max(16px, calc((100vw - var(--side) - 920px) / 2));
+  left: calc(var(--side) + var(--bar-x));
+  right: var(--bar-x);
+  bottom: calc(var(--sab) + 16px);
+  height: 76px;
+  padding: 12px 18px 18px;
+}
+body.is-desktop .mini-main { cursor: pointer; }
+
+/* the full player on a computer: one centred column, a larger cover */
+body.is-desktop .screen-player > :not(.player-prism):not(.player-art-wrap) { width: min(100%, 600px); margin-left: auto; margin-right: auto; }
+body.is-desktop .player-art { max-height: min(54vh, 480px); }
