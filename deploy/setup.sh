@@ -18,6 +18,10 @@ apt-get install -y python3 python3-venv python3-pip curl ca-certificates gnupg d
 
 # Caddy: сам получает и продлевает https-сертификат для домена
 if ! command -v caddy >/dev/null 2>&1; then
+  # новые Ubuntu содержат Caddy в своём репозитории; внешний — запасной путь
+  apt-get install -y caddy || true
+fi
+if ! command -v caddy >/dev/null 2>&1; then
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
   apt-get update -y
