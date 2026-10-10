@@ -870,7 +870,7 @@
     miniPlayer.hidden = !showMini;
     document.body.classList.toggle("no-tabbar", !showTabs);
     let dock = 0;
-    if (desk) dock = showMini ? 108 : 0;
+    if (desk) dock = showMini ? 124 : 0;
     else if (showTabs && showMini) dock = 160;
     else if (showTabs) dock = 84;
     else if (showMini) dock = 86;
@@ -5033,6 +5033,8 @@
     const on = !!currentTrack && Store.isFavorite(currentTrack.id);
     $("player-fav-btn").setAttribute("aria-pressed", on ? "true" : "false");
     $("player-fav-btn").setAttribute("aria-label", on ? "Убрать из любимого" : "В любимое");
+    $("mp-fav-btn").setAttribute("aria-pressed", on ? "true" : "false");
+    $("mp-fav-btn").setAttribute("aria-label", on ? "Убрать из любимого" : "В любимое");
   }
 
   function setMediaSession(track) {
@@ -5823,7 +5825,8 @@
   const progressThumb = $("player-progress-thumb");
   const miniProgress = $("mp-progress");
   const miniScrub = $("mp-scrub");
-  const miniTime = $("mp-time");
+  const miniTimeCur = $("mp-time-cur");
+  const miniTimeTot = $("mp-time-tot");
 
   let isScrubbing = false;
 
@@ -5983,7 +5986,10 @@
     progressTrack.setAttribute("aria-valuenow", String(Math.round(p)));
     progressTrack.setAttribute("aria-valuetext", formatDuration(seconds));
     $("player-time-current").textContent = formatDuration(seconds);
-    if (miniTime && document.body.classList.contains("is-desktop")) miniTime.textContent = `${formatDuration(seconds)} / ${formatDuration(effectiveDuration())}`;
+    if (document.body.classList.contains("is-desktop")) {
+      miniTimeCur.textContent = formatDuration(seconds);
+      miniTimeTot.textContent = formatDuration(effectiveDuration());
+    }
   }
   function resetProgress(track) {
     renderProgress(0, 0);
@@ -6150,6 +6156,12 @@
   $("mp-prev-btn").addEventListener("click", () => playAdjacent(-1));
   $("mp-next-btn").addEventListener("click", () => playAdjacent(1));
   $("mp-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
+  $("mp-fav-btn").addEventListener("click", () => $("player-fav-btn").click());
+  $("mp-lyrics-btn").addEventListener("click", () => {
+    if (!currentTrack) return;
+    showScreen("player");
+    if (!lyricsOpen) $("player-lyrics-btn").click();
+  });
 
   audio.addEventListener("timeupdate", () => {
     recordListening();
@@ -6209,12 +6221,14 @@
   // the same seek from the mini player's bottom edge. A touch low in the
   // strip (on the line itself) seeks at once; higher up it seeks only when
   // dragged sideways, so a plain tap there still opens the player.
-  const MINI_INSET = 21; // where the dot sits at 0 %: the line starts at 10px, the dot is 12px wide
+  // how far from the strip's ends the dot sits at 0 % and 100 % (from the stylesheet: it differs between the phone's strip and the computer's bar)
+  const miniInset = () => parseFloat(getComputedStyle(miniScrub).getPropertyValue("--tl")) || 21;
   const MINI_LINE_ZONE = 20; // px from the bottom edge that count as «on the line»
   let miniGrab = null;
   function miniPct(e) {
     const r = miniScrub.getBoundingClientRect();
-    return Math.min(1, Math.max(0, (e.clientX - r.left - MINI_INSET) / Math.max(1, r.width - MINI_INSET * 2)));
+    const inset = miniInset();
+    return Math.min(1, Math.max(0, (e.clientX - r.left - inset) / Math.max(1, r.width - inset * 2)));
   }
   function miniStart() {
     if (!miniGrab || miniGrab.on) return;
@@ -6227,7 +6241,7 @@
     const r = miniScrub.getBoundingClientRect();
     miniGrab = { id: e.pointerId, x: e.clientX, on: false, dead: !effectiveDuration() };
     try { miniScrub.setPointerCapture(e.pointerId); } catch (err) { /* works without capture too */ }
-    if (!miniGrab.dead && r.bottom - e.clientY <= MINI_LINE_ZONE) { miniStart(); renderScrubPosition(miniPct(e)); }
+    if (!miniGrab.dead && (isDesktop() || r.bottom - e.clientY <= MINI_LINE_ZONE)) { miniStart(); renderScrubPosition(miniPct(e)); }
   });
   miniScrub.addEventListener("pointermove", (e) => {
     if (!miniGrab || miniGrab.dead || e.pointerId !== miniGrab.id) return;

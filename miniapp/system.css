@@ -241,16 +241,6 @@ body.is-desktop .tabbar {
 }
 body.is-desktop .tab { flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 14px; height: 48px; padding: 0 16px; font-size: 15px; border-radius: 16px; cursor: pointer; }
 body.is-desktop .tab:hover:not(.active) { background: rgba(255, 255, 255, 0.07); color: var(--text); }
-body.is-desktop .mini-player,
-body.is-desktop.no-tabbar .mini-player {
-  --bar-x: max(16px, calc((100vw - var(--side) - 920px) / 2));
-  left: calc(var(--side) + var(--bar-x));
-  right: var(--bar-x);
-  bottom: calc(var(--sab) + 16px);
-  height: 76px;
-  padding: 12px 18px 18px;
-}
-body.is-desktop .mini-main { cursor: pointer; }
 
 /* the full player on a computer: one centred column, a larger cover */
 body.is-desktop .screen-player > :not(.player-prism):not(.player-art-wrap) { width: min(100%, 600px); margin-left: auto; margin-right: auto; }
@@ -283,27 +273,6 @@ body.is-desktop .home-top { justify-content: flex-end; }
    wide window it stuck out as a hazy rectangle with hard edges, so there it
    is just part of the page */
 body.is-desktop .search-head { position: static; margin: 0; padding: 0 0 12px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask: none; mask: none; }
-
-/* ----- the bar at the bottom: previous / next, time, volume, queue ----- */
-.mini-desk { display: none; }
-body.is-desktop .mini-player { gap: 6px; }
-body.is-desktop .mini-desk { display: flex; align-items: center; flex: 0 0 auto; }
-.mini-ctrl { width: 40px; height: 40px; color: var(--text-2); background: none; border: 0; box-shadow: none; cursor: pointer; transition: color 0.2s, background-color 0.2s, transform 0.15s var(--ease-out); }
-.mini-ctrl:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
-.mini-ctrl:active { transform: scale(0.92); }
-.mini-time { min-width: 104px; justify-content: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); margin: 0 6px; }
-.mini-vol { gap: 2px; margin-right: 2px; }
-.mini-vol .vol-off { display: none; }
-.mini-vol .is-muted .vol-on { display: none; }
-.mini-vol .is-muted .vol-off { display: block; }
-.vol-slider { -webkit-appearance: none; appearance: none; width: 96px; height: 28px; background: transparent; cursor: pointer; --v: 100%; }
-.vol-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--text) 0 var(--v), rgba(255, 255, 255, 0.22) var(--v) 100%); }
-.vol-slider::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.22); }
-.vol-slider::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--text); }
-.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
-.vol-slider::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
-.mini-play { order: 0; }
-body.is-desktop .mini-player { padding-right: 14px; }
 
 /* ----- arrows over a shelf under the mouse ----- */
 .shelf-arrow { position: fixed; z-index: 6; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; color: var(--text); background: rgba(20, 12, 24, 0.72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 8px 20px -6px rgba(0, 0, 0, 0.6); opacity: 0; pointer-events: none; transform: scale(0.85); transition: opacity 0.18s, transform 0.18s var(--ease-out); cursor: pointer; }
@@ -358,3 +327,96 @@ body.is-desktop #stats-body > .block { grid-column: 1 / -1; }
 
 /* settings-like pages read better in a narrower column */
 body.is-desktop #screen-profile, body.is-desktop #screen-account, body.is-desktop #screen-sound, body.is-desktop #screen-about { --pad-x: max(40px, calc((100vw - var(--side) - 760px) / 2)); }
+
+/* ==========================================================
+   THE BAR AT THE BOTTOM (computer): track on the left, transport and a
+   wide seek line in the middle, the rest on the right. It is a bar of its
+   own, not a pill floating over the content; the content ends above it.
+   ========================================================== */
+.mini-center, .mini-transport, .mini-seek { display: contents; } /* a phone: the same row as before */
+.mini-desk { display: none; }
+.mini-scrub { --tl: 21px; }
+body.is-desktop .mini-desk { display: flex; }
+body.is-desktop .mini-player.glass,
+body.is-desktop.no-tabbar .mini-player.glass {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(340px, 600px) minmax(200px, 1fr);
+  align-items: center;
+  column-gap: 28px;
+  left: var(--side);
+  right: 16px;
+  bottom: calc(var(--sab) + 16px);
+  height: 88px;
+  padding: 0 22px;
+  border-radius: 22px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)), rgba(20, 12, 24, 0.9);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+}
+body.is-desktop .mini-main { grid-column: 1; gap: 14px; cursor: pointer; min-width: 0; }
+body.is-desktop .mini-main .cover { width: 56px; height: 56px; border-radius: 12px; }
+body.is-desktop .mini-title { font-size: 15.5px; }
+body.is-desktop .mini-center { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+body.is-desktop .mini-transport { display: flex; align-items: center; justify-content: center; gap: 14px; }
+body.is-desktop .mini-play { width: 44px; height: 44px; }
+body.is-desktop .mini-seek { display: flex; align-items: center; gap: 10px; width: 100%; }
+body.is-desktop .mini-time { flex: 0 0 auto; width: 40px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); }
+body.is-desktop #mp-time-cur { justify-content: flex-end; }
+body.is-desktop .mini-scrub { --tl: 5px; position: relative; inset: auto; flex: 1; min-width: 0; height: 22px; z-index: 1; }
+body.is-desktop .mini-progress { left: 0; right: 0; bottom: auto; top: 50%; height: 8px; border-radius: 4px; transform: translateY(-50%) scaleY(0.5); transform-origin: 50% 50%; }
+body.is-desktop .mini-scrub:hover .mini-progress, body.is-desktop .mini-scrub.is-scrubbing .mini-progress { transform: translateY(-50%) scaleY(0.75); }
+body.is-desktop .mini-thumb { top: 50%; bottom: auto; left: calc(5px + (100% - 10px) * var(--mp)); margin: -5px 0 0 -5px; }
+body.is-desktop .mini-scrub:hover .mini-thumb { opacity: 1; transform: scale(1); }
+body.is-desktop .mini-right { grid-column: 3; justify-content: flex-end; align-items: center; gap: 2px; }
+.mini-ctrl { width: 40px; height: 40px; color: var(--text-2); background: none; border: 0; box-shadow: none; cursor: pointer; transition: color 0.2s, background-color 0.2s, transform 0.15s var(--ease-out); }
+.mini-ctrl:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
+.mini-ctrl:active { transform: scale(0.92); }
+.mini-ctrl[aria-pressed="true"] { color: var(--liked); }
+.mini-vol { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
+.mini-vol .vol-off { display: none; }
+.mini-vol .is-muted .vol-on { display: none; }
+.mini-vol .is-muted .vol-off { display: block; }
+.vol-slider { -webkit-appearance: none; appearance: none; width: 96px; height: 28px; background: transparent; cursor: pointer; --v: 100%; }
+.vol-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--text) 0 var(--v), rgba(255, 255, 255, 0.22) var(--v) 100%); }
+.vol-slider::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.22); }
+.vol-slider::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--text); }
+.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.vol-slider::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+
+/* ==========================================================
+   THE LYRICS (computer): nothing but the words — the side panel steps
+   aside and the text takes nearly the whole window.
+   ========================================================== */
+body.is-desktop.lyrics-open { --side: 0px; }
+body.is-desktop.lyrics-open .tabbar { display: none; }
+body.is-desktop.lyrics-open .screen-player { --pad-x: max(48px, calc((100vw - 1180px) / 2)); }
+body.is-desktop.lyrics-open .player-art-wrap { width: 100%; }
+body.is-desktop.lyrics-open .lyrics { padding-top: 40px; }
+body.is-desktop.lyrics-open .lyrics-lines.is-synced .lyrics-line { font-size: clamp(34px, 3.4vw, 52px); }
+body.is-desktop.lyrics-open .lyrics-lines:not(.is-synced) .lyrics-line { font-size: clamp(26px, 2.4vw, 34px); }
+
+/* the lyrics: the controls fold into one slim row at the bottom (track left, transport and seek in the middle, buttons right) */
+body.is-desktop.lyrics-open .screen-player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 560px) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "bar bar bar" "lyr lyr lyr" "meta ctrl foot" "meta scrub foot" "meta times foot";
+  column-gap: 32px;
+  padding-bottom: calc(var(--sab) + 22px);
+}
+body.is-desktop.lyrics-open .screen-player > :not(.player-prism) { width: auto; margin-left: 0; margin-right: 0; }
+body.is-desktop.lyrics-open .player-bar { grid-area: bar; }
+body.is-desktop.lyrics-open .player-art-wrap { grid-area: lyr; min-height: 0; }
+body.is-desktop.lyrics-open .player-meta { grid-area: meta; align-self: center; margin: 0; }
+body.is-desktop.lyrics-open .player-controls { grid-area: ctrl; margin: 6px 0 0; gap: 20px; }
+body.is-desktop.lyrics-open .scrub { grid-area: scrub; }
+body.is-desktop.lyrics-open .scrub-times { grid-area: times; }
+body.is-desktop.lyrics-open .player-foot { grid-area: foot; align-self: center; justify-content: flex-end; gap: 10px; }
+body.is-desktop.lyrics-open .ctrl { width: 52px; height: 52px; }
+body.is-desktop.lyrics-open .ctrl-play { width: 64px; height: 64px; }
+body.is-desktop.lyrics-open .player-title { font-size: 20px; }
+body.is-desktop.lyrics-open .player-artist { font-size: 15px; }
+
+body.is-desktop.lyrics-open .player-meta-text { flex: 0 1 auto; }
+body.is-desktop.lyrics-open .player-meta { gap: 16px; justify-self: start; }
