@@ -3312,60 +3312,47 @@
   ];
   const cssUrl = (u) => `url("${String(u).replace(/"/g, "%22")}")`;
 
-  // the header: an even row of glass cards, the middle one larger, the rest turned away
+  // the header: a canvas of horizontal mini players laid out evenly over the
+  // whole width and seen in perspective, as if they lay on a table
   let plusDeckTracks = [];
-  let plusDeckCenter = 0;
-  let plusDeckTimer = 0;
+  const PLUS_PLANE_TILES = 24; // 4 columns x 6 rows; a phone shows the first 18 (3 x 6)
   function renderPlusDeck() {
-    const deck = $("ps-deck");
+    const plane = $("ps-deck");
     const n = plusDeckTracks.length;
-    if (!deck || !n) return;
-    if (deck.children.length !== n) {
-      deck.textContent = "";
-      plusDeckTracks.forEach((t) => {
-        const card = document.createElement("span");
-        card.className = "ps-card";
-        card.innerHTML = '<span class="ps-cover"></span><b></b><em></em>';
-        card.querySelector(".ps-cover").style.backgroundImage = cssUrl(hiResArtwork(t.artwork));
-        card.querySelector("b").textContent = t.title || "";
-        card.querySelector("em").textContent = t.artist || "";
-        deck.appendChild(card);
-      });
+    if (!plane || !n) return;
+    plane.textContent = "";
+    for (let i = 0; i < PLUS_PLANE_TILES; i++) {
+      const t = plusDeckTracks[(i * 5) % n];
+      const tile = document.createElement("span");
+      tile.className = "ps-tile";
+      tile.innerHTML = '<span class="ps-cover"></span><span class="ps-meta"><b></b><em></em></span><span class="ps-play"><svg><use href="#' + (i % 3 === 1 ? "i-play" : "i-pause") + '"/></svg></span><span class="ps-bar"><u></u></span>';
+      tile.querySelector(".ps-cover").style.backgroundImage = cssUrl(hiResArtwork(t.artwork));
+      tile.querySelector("b").textContent = t.title || "";
+      tile.querySelector("em").textContent = t.artist || "";
+      tile.querySelector("u").style.width = 16 + ((i * 37) % 68) + "%";
+      plane.appendChild(tile);
     }
-    [...deck.children].forEach((card, i) => {
-      let d = (((i - plusDeckCenter) % n) + n) % n;
-      if (d > n / 2) d -= n;
-      card.dataset.d = Math.abs(d) <= 2 ? String(d) : "x";
-    });
   }
   async function fillPlusShowcase() {
-    const seen = new Set(), mine = [];
+    const seen = new Set(), pool = [];
     const add = (t) => {
-      if (!t || !t.title || !t.artwork) return;
-      const key = t.artwork;
-      if (seen.has(key) || mine.length >= 4) return;
-      seen.add(key);
-      mine.push({ title: t.title, artist: t.artist, artwork: t.artwork });
+      if (!t || !t.title || !t.artwork || seen.has(t.artwork) || pool.length >= 6) return;
+      seen.add(t.artwork);
+      pool.push({ title: t.title, artist: t.artist, artwork: t.artwork });
     };
     if (currentTrack) add(currentTrack);
     (state.favorites || []).forEach(add);
     (state.recent || []).forEach(add);
-    plusDeckTracks = mine.slice();
-    plusDeckCenter = 0;
-    renderPlusDeck();
-    clearInterval(plusDeckTimer);
-    plusDeckTimer = setInterval(() => {
-      if (currentScreen !== "plus") { clearInterval(plusDeckTimer); plusDeckTimer = 0; return; }
-      if (plusDeckTracks.length > 1) { plusDeckCenter = (plusDeckCenter + 1) % plusDeckTracks.length; renderPlusDeck(); }
-    }, 3200);
-    // fill up to seven with well-known tracks, with their real covers
+    plusDeckTracks = pool.slice();
+    if (plusDeckTracks.length >= 5) renderPlusDeck();
+    // fill up with well-known tracks and their real covers (looked up once, then kept)
     const found = await Promise.all(PLUS_DECK_QUERIES.map(([q, a]) => plusCoverFor(q, a)));
     for (const rec of found) {
-      if (!rec || plusDeckTracks.length >= 7 || seen.has(rec.artwork)) continue;
+      if (!rec || plusDeckTracks.length >= 13 || seen.has(rec.artwork)) continue;
       seen.add(rec.artwork);
       plusDeckTracks.push(rec);
     }
-    if (plusDeckTracks.length !== (document.getElementById("ps-deck") || { children: [] }).children.length) renderPlusDeck();
+    renderPlusDeck();
   }
 
   // the example lists in the panels («Машина времени», «Настроение»): real covers instead of coloured squares
