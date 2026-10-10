@@ -2974,7 +2974,12 @@
     const dots = [...root.querySelectorAll(".pw-dots i")];
     const shows = panels ? panels.items.map((c) => c.el) : [];
     const n = items.length;
-    const STEP = 128; // сколько пикселей пальца на один пункт
+    // на компьютере барабан крупнее: коэффициент берётся из стилей (--pw-k, на телефоне 1)
+    let k = 1;
+    const syncScale = () => { k = parseFloat(getComputedStyle(root).getPropertyValue("--pw-k")) || 1; };
+    syncScale();
+    window.addEventListener("resize", () => { syncScale(); render(); });
+    const STEP = () => 128 * k; // сколько пикселей пальца на один пункт
     let pos = 0, target = 0, vel = 0, raf = 0, last = 0, active = -1, drag = null, quiet = false, wheelAt = 0;
     const wrap = (d) => ((((d + n / 2) % n) + n) % n) - n / 2;
     const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
@@ -2983,16 +2988,16 @@
       const cur = ((Math.round(pos) % n) + n) % n;
       for (let i = 0; i < n; i++) {
         const d = wrap(i - pos), ad = Math.abs(d), sg = Math.sign(d);
-        const x = sg * (ad <= 1 ? ad * 128 : 128 + (ad - 1) * 78);
+        const x = k * sg * (ad <= 1 ? ad * 128 : 128 + (ad - 1) * 78);
         const s = ad <= 1 ? 1 - ad * 0.38 : Math.max(0.26, 0.62 - (ad - 1) * 0.22);
         const el = items[i];
-        el.style.transform = `translate3d(${x.toFixed(1)}px,0,${(-Math.min(ad, 2) * 120).toFixed(0)}px) rotateY(${(sg * Math.min(ad, 1.5) * 34).toFixed(1)}deg) scale(${s.toFixed(3)})`;
+        el.style.transform = `translate3d(${x.toFixed(1)}px,0,${(-Math.min(ad, 2) * 120 * k).toFixed(0)}px) rotateY(${(sg * Math.min(ad, 1.5) * 34).toFixed(1)}deg) scale(${s.toFixed(3)})`;
         el.style.opacity = ad > 2.7 ? "0" : String(clamp(1 - ad * 0.4).toFixed(3));
         el.style.visibility = ad > 2.7 ? "hidden" : "visible";
         el.style.zIndex = String(10 - Math.round(ad * 3));
         const ca = clamp(1 - ad * 1.8);
         copies[i].style.opacity = ca.toFixed(3);
-        copies[i].style.transform = `translate3d(${(d * 46).toFixed(1)}px,0,0)`;
+        copies[i].style.transform = `translate3d(${(d * 46 * k).toFixed(1)}px,0,0)`;
         copies[i].style.visibility = ca > 0.01 ? "visible" : "hidden";
         if (shows[i]) {
           const pa = clamp(1 - ad * 2.2);
@@ -3038,7 +3043,7 @@
         drag.moved = true; root.classList.add("is-drag");
         try { root.setPointerCapture(e.pointerId); } catch (err) { /* already released */ }
       }
-      const np = drag.p0 - dx / STEP, dtm = Math.max(1, e.timeStamp - drag.t);
+      const np = drag.p0 - dx / STEP(), dtm = Math.max(1, e.timeStamp - drag.t);
       drag.v = 0.7 * drag.v + 0.3 * ((np - pos) / dtm * 1000);
       pos = np; drag.t = e.timeStamp; render();
     });
@@ -3068,7 +3073,7 @@
     render();
     return {
       // при открытии экрана барабан сам подъезжает на место
-      intro() { quiet = true; pos = -1.8; target = 0; vel = 0; active = -1; render(); quiet = false; kick(); },
+      intro() { syncScale(); quiet = true; pos = -1.8; target = 0; vel = 0; active = -1; render(); quiet = false; kick(); },
     };
   }
   const plusPanels = setupPlusPanels();
