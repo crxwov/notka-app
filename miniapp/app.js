@@ -5,7 +5,7 @@
       : "http://localhost:8080";
   const STORAGE_KEY = "notka_state_v2";
   const playerCassette = document.querySelector(".player-art-wrap .cassette");
-  const BG_COLOR = "#0C0A12";
+  const BG_COLOR = "#1A0B16";
 
   // ============================================================
   // Telegram WebApp integration (safe no-op outside Telegram)
@@ -370,10 +370,14 @@
 
   // Covers without artwork get a small piece of the light, tinted by
   // the item's name so neighbouring rows don't all look identical.
-  const BRAND_HUES = [14, 24, 34, 336, 348, 6, 318];
+  // The colours are the light's variables, not fixed values, so such a cover
+  // follows the theme and the playing track's light; the name only moves the
+  // highlight around.
   function fallbackCover(seed) {
-    const h = BRAND_HUES[hashString(seed) % BRAND_HUES.length];
-    return `radial-gradient(circle at 34% 30%, hsl(${(h + 20) % 360} 90% 90%) 0 8%, hsl(${h} 76% 62%) 36%, hsl(${(h + 340) % 360} 50% 52%) 64%, hsl(310 40% 22%) 100%)`;
+    const n = hashString(seed);
+    const x = 22 + (n % 5) * 14;
+    const y = 20 + (Math.floor(n / 5) % 4) * 12;
+    return `radial-gradient(circle at ${x}% ${y}%, var(--c-core) 0 8%, var(--c-warm) 36%, var(--c-mid) 64%, var(--c-deep) 100%)`;
   }
 
   function setCoverEl(el, url, seed) {
@@ -650,7 +654,7 @@
 
   function brandPaletteFor(seed) {
     const h = BRAND_HUES[hashString(seed) % BRAND_HUES.length];
-    return { core: hsl(h, 0.9, 0.9), warm: hsl(h, 0.76, 0.62), mid: hsl((h + 340) % 360, 0.5, 0.52), deep: "#47204E" };
+    return { core: hsl(h, 0.9, 0.9), warm: hsl(h, 0.76, 0.62), mid: hsl((h + 340) % 360, 0.5, 0.52), deep: "#44112F" };
   }
 
   let artUrlShown = null;
@@ -668,7 +672,7 @@
 
   // What the playing track gives the light. «Оформление» can put a chosen
   // palette or one pinned cover in its place (see paintLight).
-  const DEFAULT_PALETTE = { core: "#FFE2D2", warm: "#EE905A", mid: "#CF5A68", deep: "#47204E" };
+  const DEFAULT_PALETTE = { core: "#FFE9DF", warm: "#FFA6B8", mid: "#FF4FA0", deep: "#44112F" };
   let trackLight = { palette: null, art: null };
 
   async function lightForTrack(track) {
@@ -1732,8 +1736,37 @@
   let debounceTimer = null;
   let lastSearchResults = null; // raw track results from backend, for the active query
   let lastSearchArtists = null; // artists (with photos) found for the same query
+  let lastSearchQuery = "";
   let searchTab = "all"; // all | tracks | artists | albums
   let searchToken = 0;
+
+  // A spelling-proof key for comparing a typed name with an artist's name:
+  // «тревис скотт», «travis scott» and «trevis skot» all become «trvskt».
+  // Vowels, spaces and doubled letters are dropped, Cyrillic is
+  // transliterated, so a half-typed «тревис ск» is a prefix of the key.
+  const TRANSLIT = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "j", з: "z", и: "i", й: "i", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "z", ч: "c", ш: "s", щ: "s", ъ: "", ы: "i", ь: "", э: "e", ю: "u", я: "a" };
+  function looseKey(text) {
+    let s = String(text || "").toLowerCase().replace(/[а-яё]/g, (ch) => TRANSLIT[ch] || "");
+    s = s.replace(/ph/g, "f").replace(/ck/g, "k").replace(/sh|ch|zh|kh/g, (m) => m[0]).replace(/c/g, "k").replace(/x/g, "ks").replace(/w/g, "v");
+    s = s.replace(/[^a-z0-9]/g, "").replace(/[aeiouyh]/g, "");
+    return s.replace(/(.)\1+/g, "$1");
+  }
+  // The artist the query is evidently about («тревис ск» → Travis Scott), or null.
+  function intentArtist() {
+    const q = looseKey(lastSearchQuery);
+    if (q.length < 3 || !lastSearchArtists || !lastSearchArtists.length) return null;
+    const exact = lastSearchArtists.find((a) => looseKey(a.name) === q);
+    if (exact) return exact;
+    return lastSearchArtists.find((a) => looseKey(a.name).startsWith(q)) || null;
+  }
+  // Tracks of the intended artist go first; the rest keep their order.
+  function rankByIntent(tracks, artist) {
+    if (!artist) return tracks;
+    const key = looseKey(artist.name);
+    const mine = [], rest = [];
+    tracks.forEach((t) => (looseKey(t.artist || "") === key ? mine : rest).push(t));
+    return mine.length ? mine.concat(rest) : tracks;
+  }
 
   function showSearchState(id) {
     SEARCH_STATES.forEach((sid) => { $(sid).hidden = sid !== id; });
@@ -1837,6 +1870,11 @@
     });
     const seen = new Set(found.map((a) => norm(a.name)));
     found.sort((a, b) => (b.tracks.length ? 1 : 0) - (a.tracks.length ? 1 : 0));
+    const intent = intentArtist();
+    if (intent) {
+      const i = found.findIndex((a) => a.artistId === intent.id);
+      if (i > 0) found.unshift(found.splice(i, 1)[0]);
+    }
     return found.concat(groups.filter((g) => !seen.has(norm(g.name))));
   }
   function artistRow(group, tracks) {
@@ -1883,9 +1921,12 @@
   }
 
   function renderFilteredResults() {
-    if (!lastSearchResults) return;
-    const tracks = lastSearchResults;
-    if (!tracks.length) { showSearchState("search-state-empty-results"); return; }
+    const intent = intentArtist();
+    // the tracks are still on their way, but the artist the query names is
+    // already known: show him at once, the rest joins when it arrives
+    if (!lastSearchResults && !intent) return;
+    const tracks = rankByIntent(lastSearchResults || [], intent);
+    if (lastSearchResults && !tracks.length && !intent) { showSearchState("search-state-empty-results"); return; }
 
     stateResults.innerHTML = "";
     const trackRows = (list) => list.map((t) => buildTrackRow(t, { queue: tracks, context: "Поиск" }));
@@ -1896,12 +1937,22 @@
     } else if (searchTab === "albums") {
       stateResults.appendChild(resultsSection(null, groupByAlbum(tracks).map(albumRow)));
     } else {
-      stateResults.appendChild(resultsSection("Треки", trackRows(tracks.slice(0, 8))));
-      const artists = searchArtists(tracks).slice(0, 3);
-      if (artists.length) stateResults.appendChild(resultsSection("Исполнители", artists.map((g) => artistRow(g, tracks))));
+      // «Все»: when the query is an artist's name, he comes first, then his
+      // tracks and albums; otherwise tracks lead as before
+      const artistsSection = () => {
+        const artists = searchArtists(tracks).slice(0, intent ? 1 : 3);
+        if (artists.length) stateResults.appendChild(resultsSection(intent ? "Исполнитель" : "Исполнители", artists.map((g) => artistRow(g, tracks))));
+      };
+      if (intent) artistsSection();
+      // with a named artist, «Треки» holds his tracks; the stray matches go to the end
+      const own = intent ? tracks.filter((t) => looseKey(t.artist || "") === looseKey(intent.name)) : [];
+      const head = own.length >= 3 ? own.slice(0, 8) : tracks.slice(0, 8);
+      const tail = tracks.filter((t) => !head.includes(t));
+      if (head.length) stateResults.appendChild(resultsSection("Треки", trackRows(head)));
+      if (!intent) artistsSection();
       const albums = groupByAlbum(tracks).filter((a) => a.albumId).slice(0, 3);
       if (albums.length) stateResults.appendChild(resultsSection("Альбомы", albums.map(albumRow)));
-      if (tracks.length > 8) stateResults.appendChild(resultsSection("Ещё треки", trackRows(tracks.slice(8))));
+      if (tail.length) stateResults.appendChild(resultsSection("Ещё треки", trackRows(tail)));
     }
     showSearchState("search-state-results");
   }
@@ -1911,29 +1962,36 @@
     if (!query.trim()) {
       document.body.classList.remove("search-loading");
       lastSearchResults = null;
+      lastSearchArtists = null;
       showSearchState("search-state-empty");
       return;
     }
     showSearchState("search-state-loading");
     document.body.classList.add("search-loading");
     lastSearchArtists = null;
+    lastSearchResults = null;
+    lastSearchQuery = query;
     // artists are looked up alongside the tracks; they are an addition, so
-    // the results don't wait for them long and never fail because of them
+    // the results don't wait for them long and never fail because of them.
+    // If the query is an artist's name, he is shown as soon as he is found.
     const artistsReady = fetch(`${API_BASE_URL}/artists?q=${encodeURIComponent(query)}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (token === searchToken && data) lastSearchArtists = data.results || []; })
+      .then((data) => {
+        if (token !== searchToken || !data) return;
+        lastSearchArtists = data.results || [];
+        renderFilteredResults();
+      })
       .catch(() => {});
     try {
       const url = `${API_BASE_URL}/search?q=${encodeURIComponent(query)}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      await Promise.race([artistsReady, new Promise((done) => setTimeout(done, 1200))]);
+      await Promise.race([artistsReady, new Promise((done) => setTimeout(done, 800))]);
       if (token !== searchToken) return; // a newer query already won
       document.body.classList.remove("search-loading");
       lastSearchResults = data.results || [];
       renderFilteredResults();
-      if (!lastSearchArtists) artistsReady.then(() => { if (token === searchToken && lastSearchArtists && lastSearchResults) renderFilteredResults(); });
     } catch (err) {
       if (token !== searchToken) return;
       document.body.classList.remove("search-loading");
@@ -1946,7 +2004,7 @@
   searchInput.addEventListener("input", () => {
     searchClear.hidden = searchInput.value.length === 0;
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => runSearch(searchInput.value), 350);
+    debounceTimer = setTimeout(() => runSearch(searchInput.value), 250);
   });
   searchInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { clearTimeout(debounceTimer); runSearch(searchInput.value); searchInput.blur(); }
@@ -3088,9 +3146,13 @@
     if (key === "atmo") return value === "none" || !!ATMOS[value];
     return value === "track" || value === "pinned" || (typeof value === "string" && value.startsWith("preset:") && !!LIGHT_PRESETS[value.slice(7)]);
   }
+  // Seasonal atmospheres (Halloween, New Year…) wear only their own event page and the try-on screen.
+  // Everywhere else the app keeps the brand look: rose and peach light on the plum ground.
+  const SEASONS_ONLY_ON_EVENT_PAGE = true;
   function lookValue(key) {
     if (key === "atmo" && currentScreen === "event" && eventById(currentEventId)) return eventById(currentEventId).atmo;
     if (key in lookTried) return lookTried[key];
+    if (key === "atmo" && SEASONS_ONLY_ON_EVENT_PAGE && currentScreen !== "look") return LOOK_DEFAULTS.atmo;
     const saved = Store.getSetting(key);
     return lookKnown(key, saved) && lookAllowed(key, saved) ? saved : LOOK_DEFAULTS[key];
   }
@@ -3103,7 +3165,7 @@
     if (mode.startsWith("preset:")) { palette = LIGHT_PRESETS[mode.slice(7)].palette; art = null; }
     else if (mode === "pinned" && pinnedLight()) { palette = pinnedLight().palette; art = pinnedLight().artwork; }
     const atmo = lookValue("atmo");
-    if (atmo !== "none") { palette = atmoPalette(atmo); art = null; } // the season's own light
+    if (atmo !== "none") { palette = atmoPalette(atmo); art = null; } // the season's own light (only on its event page)
     showArtUnderLight(art || null);
     applyPalette(palette);
   }
@@ -4028,8 +4090,8 @@
     const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
     const top = mk("div", "rcp-top");
     const brand = mk("span", "rcp-brand");
-    brand.innerHTML = '<svg aria-hidden="true"><use href="#i-note-mono"/></svg>';
-    brand.appendChild(document.createTextNode("Нотка"));
+    brand.innerHTML = '<svg aria-hidden="true"><use href="#logo-note"/></svg>';
+    brand.appendChild(document.createTextNode("нотка"));
     top.append(brand, mk("span", "rcp-pill", card.kicker));
     el.appendChild(top);
     if (card.type === "minutes") {
@@ -4159,21 +4221,21 @@
   function themeColors() {
     const css = getComputedStyle(document.documentElement);
     const col = (n, d) => (css.getPropertyValue(n) || d).trim() || d;
-    return { core: col("--c-core", "#FFE2D2"), warm: col("--c-warm", "#EE905A"), mid: col("--c-mid", "#CF5A68"), deep: col("--c-deep", "#47204E") };
+    return { core: col("--c-core", "#FFE9DF"), warm: col("--c-warm", "#FFA6B8"), mid: col("--c-mid", "#FF4FA0"), deep: col("--c-deep", "#44112F") };
   }
-  // логотип Нотки для картинок: нота с шаром
+  // логотип Нотки для картинок: знак из двух модулей (прямоугольник и четверть круга)
+  const LOGO_PATHS = [new Path2D("M120 120C86.8629 120 60 93.1371 60 60V0H120V120Z"), new Path2D("M0 120H60V60C60 26.8629 33.1371 0 0 0V120Z")];
   function drawLogo(ctx, x, y, size, color) {
     ctx.save();
     ctx.translate(x, y);
-    const k = size / 24;
+    const k = size / 120;
     ctx.scale(k, k);
     ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(9, 16.6, 5.2, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = color; ctx.lineWidth = 2.3; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.beginPath(); ctx.moveTo(13.8, 16.6); ctx.lineTo(13.8, 3.4); ctx.bezierCurveTo(16.4, 3.9, 19, 5.6, 19.7, 9); ctx.stroke();
+    LOGO_PATHS.forEach((p) => ctx.fill(p));
     ctx.restore();
   }
   const SHARE_FONT = "Onest, system-ui, -apple-system, sans-serif";
+  const BRAND_FONT = "Unbounded, Onest, system-ui, sans-serif";
   // вертикальная плашка из стекла, как в карточках с цитатами
   function glassPlate(ctx, x, y, w, h, r, strong) {
     roundPath(ctx, x, y, w, h, r);
@@ -4181,7 +4243,7 @@
     ctx.strokeStyle = strong ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.24)"; ctx.lineWidth = 2.5; ctx.stroke();
   }
   async function renderRecapImage(card, index) {
-    try { await document.fonts.load("800 100px Onest"); } catch (e) { /* the system font is fine */ }
+    try { await document.fonts.load("800 100px Onest"); await document.fonts.load("700 46px Unbounded"); } catch (e) { /* the system font is fine */ }
     const W = 1080, H = 1350, F = SHARE_FONT;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
@@ -4197,7 +4259,9 @@
     // метка и подпись периода
     drawLogo(ctx, pad, 76, 60, "rgba(255,255,255,0.92)");
     ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.font = `800 44px ${F}`;
-    ctx.fillText("Нотка", pad + 76, 124);
+    ctx.font = `700 46px ${BRAND_FONT}`; try { ctx.letterSpacing = "-2px"; } catch (e) { /* the plain spacing is fine */ }
+    ctx.fillText("нотка", pad + 76, 126);
+    try { ctx.letterSpacing = "0px"; } catch (e) { /* ok */ }
     ctx.font = `700 40px ${F}`;
     const kick = cutText(ctx, card.kicker, 520);
     const kw = ctx.measureText(kick).width + 64;
@@ -4240,7 +4304,7 @@
       const dx = 690, dy = 1400, dr = 640;
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 70; ctx.shadowOffsetY = 24;
-      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, dr + 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1a0b16"; ctx.beginPath(); ctx.arc(dx, dy, dr + 12, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       ctx.save();
       ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.clip();
@@ -4278,16 +4342,39 @@
     return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
   }
 
-  // отправка картинки: только сама картинка, без подписи
+  // отправка картинки: только сама картинка, без подписи.
+  // На телефоне открывается системное «Поделиться»; там, где его нет (компьютер, Telegram Desktop),
+  // показываем картинку с кнопками «Скачать» и «Скопировать».
+  let lastShareBlob = null, lastShareName = "notka.png";
   async function shareImageBlob(blob, name) {
     const file = new File([blob], name, { type: "image/png" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file] }); haptic("success"); return; }
       catch (e) { if (e && e.name === "AbortError") return; /* else show the picture below */ }
     }
+    lastShareBlob = blob; lastShareName = name;
     $("recap-preview").src = URL.createObjectURL(blob);
     openOverlay("recap-modal");
   }
+  $("recap-modal-download").addEventListener("click", () => {
+    if (!lastShareBlob) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(lastShareBlob);
+    a.download = lastShareName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast("Картинка сохранена");
+  });
+  $("recap-modal-copy").addEventListener("click", async () => {
+    if (!lastShareBlob) return;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": lastShareBlob })]);
+      showToast("Скопировано. Вставь в чат");
+    } catch (e) {
+      showToast("Не получилось скопировать, нажми «Скачать»");
+    }
+  });
   $("recap-share-btn").addEventListener("click", async () => {
     const btn = $("recap-share-btn");
     if (btn.disabled) return;
@@ -4392,7 +4479,7 @@
     return t === String(str) ? t : t.trimEnd() + "…";
   }
   async function renderQuoteImage(track, lines, style) {
-    try { await document.fonts.load("800 100px Onest"); } catch (e) { /* the system font is fine */ }
+    try { await document.fonts.load("800 100px Onest"); await document.fonts.load("700 46px Unbounded"); } catch (e) { /* the system font is fine */ }
     const W = 1080, H = 1350, F = SHARE_FONT;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
@@ -4405,7 +4492,7 @@
     try { pal = art ? await paletteFromArtwork(track.artwork) : null; } catch (e) { pal = null; }
     pal = pal || th;
     const deep = rgbOf(pal.deep), warm = rgbOf(pal.warm), mid = rgbOf(pal.mid), core = rgbOf(pal.core);
-    const night = [12, 10, 18];
+    const night = [26, 11, 22];
     // фон: тёмный и живой свет, как в самой Нотке
     ctx.fillStyle = rgba(mixRgb(deep, night, 0.6), 1); ctx.fillRect(0, 0, W, H);
     if (style === "light") { glowAt(ctx, 160, 260, 760, warm, 0.8); glowAt(ctx, 960, 700, 720, mid, 0.65); glowAt(ctx, 560, 90, 420, core, 0.35); }
@@ -4414,7 +4501,9 @@
     // метка Нотки
     drawLogo(ctx, pad, 76, 60, "rgba(255,255,255,0.92)");
     ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = `800 44px ${F}`;
-    ctx.fillText("Нотка", pad + 76, 124);
+    ctx.font = `700 46px ${BRAND_FONT}`; try { ctx.letterSpacing = "-2px"; } catch (e) { /* the plain spacing is fine */ }
+    ctx.fillText("нотка", pad + 76, 126);
+    try { ctx.letterSpacing = "0px"; } catch (e) { /* ok */ }
 
     if (style === "light") {
       // как текст в плеере Нотки: слева, поющаяся строка горит и чуть крупнее, соседние приглушены
@@ -4482,7 +4571,7 @@
       const dx = 690, dy = 1390, dr = 630;
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 70; ctx.shadowOffsetY = 24;
-      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, dr + 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1a0b16"; ctx.beginPath(); ctx.arc(dx, dy, dr + 12, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       ctx.save();
       ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.clip();
@@ -4496,7 +4585,7 @@
       ctx.restore();
       ctx.fillStyle = rgba(warm, 1); ctx.beginPath(); ctx.arc(dx, dy, 92, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(dx, dy, 92, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = "#0c0a12"; ctx.beginPath(); ctx.arc(dx, dy, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1a0b16"; ctx.beginPath(); ctx.arc(dx, dy, 16, 0, Math.PI * 2); ctx.fill();
       // тонарм
       const ax = 985, ay = 850, hx = 790, hy = 1215;
       ctx.save();
@@ -5938,9 +6027,8 @@
       splash.classList.add("is-leaving");
       setTimeout(() => {
         splash.classList.remove("is-leaving");
-        if (viaLink) Store.markOnboardingSeen();
-        if (Store.isOnboardingSeen()) showScreen("home", { replace: true });
-        else showScreen("onboarding", { replace: true });
+        Store.markOnboardingSeen();
+        showScreen("home", { replace: true });
         openDeepLink();
       }, 450);
     });

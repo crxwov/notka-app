@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<meta name="theme-color" content="#0C0A12" />
+<meta name="theme-color" content="#1A0B16" />
 <title>Нотка</title>
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
 <!-- Telegram's embedded webview (especially Telegram Desktop) caches
@@ -13,10 +13,10 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=112" />
-<link rel="stylesheet" href="atmosphere.css?v=7" />
+<link rel="stylesheet" href="styles.css?v=120" />
+<link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=32" />
+<link rel="stylesheet" href="system.css?v=33" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -36,10 +36,9 @@
       <stop offset="1" style="stop-color: var(--c-deep); stop-opacity: 0"/>
     </radialGradient>
   </defs>
-  <symbol id="logo-note" viewBox="0 0 24 24">
-    <circle cx="9" cy="16.6" r="7.4" fill="url(#g-halo)"/>
-    <circle cx="9" cy="16.6" r="4.6" fill="url(#g-orb)"/>
-    <path d="M13.6 16.6V3.4c2.6.5 5.2 2.2 5.9 5.6" fill="none" stroke="#F4EFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+  <symbol id="logo-note" viewBox="0 0 120 120">
+    <path d="M120 120C86.8629 120 60 93.1371 60 60V0H120V120Z" fill="currentColor"/>
+    <path d="M0 120H60V60C60 26.8629 33.1371 0 0 0V120Z" fill="currentColor"/>
   </symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.6 12 4l8 6.6V19a1 1 0 0 1-1 1h-4.2v-5.4H9.2V20H5a1 1 0 0 1-1-1v-8.4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m20 20-4.2-4.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
@@ -103,8 +102,8 @@
   <!-- ============ SPLASH ============ -->
   <main class="screen screen-splash" id="screen-splash" aria-label="Нотка загружается">
     <div class="splash-center">
-      <span class="splash-mark glass-note" aria-hidden="true"><i class="gn-body"></i><i class="gn-shine"></i><svg class="gn-rim" viewBox="0 0 24 24"><defs><linearGradient id="gn-rim-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset="0.45" stop-color="#fff" stop-opacity="0.25"/><stop offset="0.8" stop-color="#fff" stop-opacity="0.15"/><stop offset="1" stop-color="#fff" stop-opacity="0.7"/></linearGradient><mask id="gn-rim-m" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><circle cx="8.8" cy="16.4" r="5" fill="#fff"/><path d="M13.8 16.4V3.3c2.7.5 5.3 2.3 6 5.8" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8.8" cy="16.4" r="4.55" fill="#000"/><path d="M13.8 16.4V3.3c2.7.5 5.3 2.3 6 5.8" fill="none" stroke="#000" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><rect width="24" height="24" fill="url(#gn-rim-g)" mask="url(#gn-rim-m)"/></svg></span>
-      <p class="splash-word">Нотка</p>
+      <span class="splash-mark glass-note" aria-hidden="true"><i class="gn-body"></i><i class="gn-shine"></i><svg class="gn-rim" viewBox="0 0 120 120"><defs><linearGradient id="gn-rim-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset="0.45" stop-color="#fff" stop-opacity="0.3"/><stop offset="0.8" stop-color="#fff" stop-opacity="0.18"/><stop offset="1" stop-color="#fff" stop-opacity="0.75"/></linearGradient></defs><g fill="none" stroke="url(#gn-rim-g)" stroke-width="1.6" stroke-linejoin="round"><path d="M120 120C86.8629 120 60 93.1371 60 60V0H120V120Z"/><path d="M0 120H60V60C60 26.8629 33.1371 0 0 0V120Z"/></g></svg></span>
+      <p class="splash-word">нотка</p>
     </div>
   </main>
 
@@ -124,7 +123,7 @@
     <header class="home-top">
       <div class="brand">
         <svg width="34" height="34" aria-hidden="true"><use href="#logo-note"/></svg>
-        <span>Нотка</span>
+        <span>нотка</span>
       </div>
       <button class="avatar-btn" id="home-avatar-btn" type="button" aria-label="Профиль">
         <span class="avatar avatar-sm" id="home-avatar"><span id="home-initial">Н</span></span>
@@ -1213,9 +1212,13 @@
   <div id="recap-modal" class="modal-anim" role="dialog" aria-modal="true" aria-labelledby="recap-modal-title">
     <div class="modal">
       <p class="sheet-title" id="recap-modal-title">Твоя карточка</p>
-      <p class="modal-text">Нажми на картинку и удерживай, чтобы сохранить или отправить.</p>
+      <p class="modal-text">Скачай картинку или скопируй и вставь в чат. На телефоне можно нажать на неё и удерживать.</p>
       <img class="rcp-preview" id="recap-preview" alt="Карточка итогов" />
-      <div class="modal-actions">
+      <div class="modal-actions modal-actions-stack">
+        <div class="modal-actions modal-actions-row" style="margin-top:0">
+          <button class="pill-btn pill-quiet" id="recap-modal-copy" type="button">Скопировать</button>
+          <button class="pill-btn pill-quiet" id="recap-modal-download" type="button">Скачать</button>
+        </div>
         <button class="pill-btn pill-primary" id="recap-modal-close" type="button">Готово</button>
       </div>
     </div>
@@ -1267,6 +1270,6 @@
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=3"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=93"></script>
+<script src="app.js?v=106"></script>
 </body>
 </html>

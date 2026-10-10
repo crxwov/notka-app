@@ -74,6 +74,12 @@
         ],
         "createdAt": "2026-09-30T21:16:23.740Z",
         "reason": "user confirmed direction «Живой свет»: glowing light is the product's signature (splash halo, mix button ring)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "unbounded",
+        "createdAt": "2026-10-08T20:45:12.427Z",
+        "reason": "Unbounded is the new brand wordmark/heading face in the approved брендбук; the old DESIGN.md predates the rebrand and still lists only Onest"
       }
     ]
   }

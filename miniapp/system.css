@@ -148,7 +148,7 @@
 .rcp-card[data-v="3"] { background: radial-gradient(100% 60% at 0% 100%, color-mix(in srgb, var(--c-warm) 74%, transparent), transparent 62%), radial-gradient(90% 60% at 100% 10%, color-mix(in srgb, var(--c-mid) 66%, transparent), transparent 62%), color-mix(in srgb, var(--c-deep) 40%, #0c0a12); }
 .rcp-card > * { position: relative; z-index: 1; }
 .rcp-top { position: absolute; top: 18px; left: 20px; right: 18px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rcp-brand { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; letter-spacing: -0.01em; }
+.rcp-brand { display: flex; align-items: center; gap: 8px; font-family: "Unbounded", "Onest", system-ui, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.04em; }
 .rcp-brand svg { width: 20px; height: 20px; }
 .rcp-pill { max-width: 62%; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24); }
 .rcp-num { font-size: clamp(76px, 25vw, 108px); line-height: 0.9; font-weight: 800; letter-spacing: -0.055em; font-variant-numeric: tabular-nums; text-shadow: 0 4px 28px rgba(0, 0, 0, 0.3); }

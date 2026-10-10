@@ -436,19 +436,27 @@ class YoutubeMusicProvider:
 
     def _search_artists_sync(self, query: str, limit: int) -> list[dict]:
         found: list[dict] = []
-        for item in self._client().search(query, filter="artists", limit=limit) or []:
-            name = (item.get("artist") or "").strip()
-            browse_id = item.get("browseId")
-            if not name or not browse_id:
-                continue
-            found.append(
-                {
-                    "id": browse_id,
-                    "source": "youtube_music",
-                    "name": name,
-                    "photo": _best_thumbnail_url(item.get("thumbnails")),
-                }
-            )
+        # While a name is still being typed («тревис ск») the search finds
+        # nobody; the words typed so far («тревис») find the artist, and
+        # the app picks the one the whole query fits.
+        words = query.split()
+        attempts = [query] + [" ".join(words[:n]) for n in range(len(words) - 1, 0, -1)]
+        for attempt in attempts:
+            for item in self._client().search(attempt, filter="artists", limit=limit) or []:
+                name = (item.get("artist") or "").strip()
+                browse_id = item.get("browseId")
+                if not name or not browse_id:
+                    continue
+                found.append(
+                    {
+                        "id": browse_id,
+                        "source": "youtube_music",
+                        "name": name,
+                        "photo": _best_thumbnail_url(item.get("thumbnails")),
+                    }
+                )
+            if found:
+                break
         return found[:limit]
 
     async def mood_tracks(

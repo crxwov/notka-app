@@ -1,0 +1,12 @@
+import { launch } from "./cdp.mjs";
+import { pathToFileURL } from "node:url";
+import path from "node:path";
+const [,, html, out, w="1920", h="1080", wait="2500"] = process.argv;
+const b = await launch({ dir: path.resolve("_tmp"), width: +w, height: +h });
+await b.send("Emulation.setDeviceMetricsOverride", { width: +w, height: +h, deviceScaleFactor: 1, mobile: false });
+await b.goto(pathToFileURL(path.resolve(html)).href);
+await b.sleep(+wait);
+const r = await b.send("Page.captureScreenshot", { format: "png" });
+(await import("node:fs")).writeFileSync(out, Buffer.from(r.data, "base64"));
+console.log(b.errors.slice(0,3).join("|") || "ok");
+await b.close();

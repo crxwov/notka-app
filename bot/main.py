@@ -11,6 +11,7 @@ load_dotenv()
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
+    FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     MenuButtonWebApp,
@@ -24,6 +25,27 @@ from music_resolver.services import plus_store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("notka.bot")
+
+
+# Welcome banner (Для бота/welcome.jpg): sent with /start. After the first send Telegram
+# gives a file_id, which is reused so the picture is not uploaded again.
+WELCOME_BANNER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Для бота", "welcome.jpg")
+_banner_file_id: str | None = None
+
+
+async def send_welcome(message: Message, text: str, keyboard: InlineKeyboardMarkup) -> None:
+    global _banner_file_id
+    if os.path.exists(WELCOME_BANNER):
+        try:
+            sent = await message.answer_photo(
+                _banner_file_id or FSInputFile(WELCOME_BANNER), caption=text, reply_markup=keyboard
+            )
+            if not _banner_file_id and sent.photo:
+                _banner_file_id = sent.photo[-1].file_id
+            return
+        except Exception:
+            logger.exception("Could not send the welcome banner, falling back to text")
+    await message.answer(text, reply_markup=keyboard)
 
 
 def build_open_app_inline_keyboard(miniapp_url: str) -> InlineKeyboardMarkup:
@@ -49,6 +71,14 @@ async def main() -> None:
         )
     except Exception:
         logger.exception("Could not set the menu button")
+
+    try:
+        await bot.set_my_description(
+            "Нотка — музыка прямо в Телеграме. Ищи любой трек и включай его, не выходя из чата. Нажми «Старт», чтобы открыть."
+        )
+        await bot.set_my_short_description("Музыка прямо в Telegram")
+    except Exception:
+        logger.exception("Could not set the bot description")
 
     @dp.message(CommandStart())
     async def handle_start(message: Message) -> None:
