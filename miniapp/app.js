@@ -5726,7 +5726,6 @@
     const p = Math.max(0, Math.min(100, pct));
     progressFill.style.width = `${p}%`;
     progressThumb.style.left = `${p}%`;
-    miniProgress.style.width = `${p}%`;
     miniScrub.style.setProperty("--mp", (p / 100).toFixed(4));
     playerCassette.style.setProperty("--p", (p / 100).toFixed(3)); // the tape moves from reel to reel
     progressTrack.setAttribute("aria-valuenow", String(Math.round(p)));
@@ -5935,7 +5934,7 @@
   // the same seek from the mini player's bottom edge. A touch low in the
   // strip (on the line itself) seeks at once; higher up it seeks only when
   // dragged sideways, so a plain tap there still opens the player.
-  const MINI_INSET = 18; // the visible line is inset from the strip's ends
+  const MINI_INSET = 16; // where the dot sits at 0 %: the line starts at 10px, the dot is 12px wide
   const MINI_LINE_ZONE = 20; // px from the bottom edge that count as «on the line»
   let miniGrab = null;
   function miniPct(e) {

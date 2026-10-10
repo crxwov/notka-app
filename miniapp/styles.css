@@ -2149,7 +2149,7 @@ body.lyrics-open .player-art { opacity: 0; transform: scale(0.8); filter: blur(1
   align-items: center;
   gap: 8px;
   height: 76px;
-  padding: 0 10px 14px 10px; /* the bottom band is the seek line's own, nothing else goes there */
+  padding: 10px 10px 22px 10px; /* one 10px margin all round; the 12px under the content is the seek line's own band */
   border-radius: 22px;
   overflow: hidden;
   animation: screen-in 0.4s var(--ease-out) both;
@@ -2161,10 +2161,11 @@ body.no-tabbar .mini-player { bottom: calc(var(--sab) + 14px); }
 .mini-artist { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-play { width: 44px; height: 44px; position: relative; z-index: 3; }
 /* a strip along the bottom edge: the thin line is only what is seen, the strip is what the finger hits */
-.mini-scrub { --mp: 0; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; z-index: 2; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
-.mini-progress { position: absolute; left: 18px; right: 18px; bottom: 8px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); overflow: hidden; transform: scaleY(0.5); transform-origin: 50% 100%; transition: transform 0.15s var(--ease-out); }
-.mini-thumb { position: absolute; bottom: 4.5px; left: calc(18px + (100% - 36px) * var(--mp)); width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--now); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(0, 0, 0, 0.4); transition: transform 0.15s var(--ease-out); pointer-events: none; }
-.mini-scrub.is-scrubbing .mini-thumb { transform: scale(1.25); }
+.mini-scrub { --mp: 0; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; z-index: 2; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
+.mini-progress { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.18); overflow: hidden; transform: scaleY(0.5); transform-origin: 50% 100%; transition: transform 0.15s var(--ease-out); }
+.mini-progress #mp-progress { width: calc(5px + (100% - 10px) * var(--mp)); border-radius: 4px; }
+.mini-thumb { position: absolute; bottom: 6px; left: calc(10px + 6px + (100% - 32px) * var(--mp)); width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--now); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(0, 0, 0, 0.35); transition: transform 0.15s var(--ease-out); pointer-events: none; }
+.mini-scrub.is-scrubbing .mini-thumb { transform: scale(1.2); }
 .mini-scrub.is-scrubbing .mini-progress { transform: scaleY(1); background: rgba(255, 255, 255, 0.2); }
 .mini-progress span { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--now); }
 
