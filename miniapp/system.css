@@ -337,24 +337,27 @@ body.is-desktop #screen-profile, body.is-desktop #screen-account, body.is-deskto
 .mini-desk { display: none; }
 .mini-scrub { --tl: 21px; }
 body.is-desktop .mini-desk { display: flex; align-items: center; flex: 0 0 auto; }
+/* three zones: the track on the left, the transport exactly in the middle, the rest on the right */
 body.is-desktop .mini-player,
 body.is-desktop.no-tabbar .mini-player {
   --bar-x: max(40px, calc((100vw - var(--side) - 1120px) / 2)); /* the edges of the page's column */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: 16px;
   left: calc(var(--side) + var(--bar-x));
   right: var(--bar-x);
   bottom: calc(var(--sab) + 16px);
-  gap: 6px;
   padding-right: 14px;
 }
-body.is-desktop .mini-main { cursor: pointer; }
-body.is-desktop .mini-time { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); margin-left: 6px; }
-body.is-desktop #mp-time-cur { margin-right: 4px; }
-body.is-desktop #mp-time-tot { margin-left: 0; margin-right: 8px; }
-body.is-desktop #mp-time-tot::before { content: "/\00a0"; }
-body.is-desktop .mini-right { gap: 2px; }
+body.is-desktop .mini-main { grid-column: 1; cursor: pointer; }
+body.is-desktop .mini-transport { grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 10px; }
+body.is-desktop .mini-right { grid-column: 3; justify-content: flex-end; align-items: center; gap: 2px; min-width: 0; }
+body.is-desktop .mini-time { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); opacity: 0.85; white-space: nowrap; }
+body.is-desktop #mp-time-cur::after { content: "\00a0/\00a0"; }
+body.is-desktop #mp-time-tot { margin-right: 10px; }
 body.is-desktop .mini-scrub:hover .mini-progress { transform: scaleY(0.5); }
 body.is-desktop .mini-scrub:hover .mini-thumb { opacity: 1; transform: scale(1); }
-.mini-ctrl { width: 40px; height: 40px; color: var(--text-2); background: none; border: 0; box-shadow: none; cursor: pointer; transition: color 0.2s, background-color 0.2s, transform 0.15s var(--ease-out); }
+.mini-ctrl { width: 40px; height: 40px; color: var(--text); background: none; border: 0; box-shadow: none; cursor: pointer; transition: color 0.2s, background-color 0.2s, transform 0.15s var(--ease-out); }
 .mini-ctrl:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
 .mini-ctrl:active { transform: scale(0.92); }
 .mini-ctrl[aria-pressed="true"] { color: var(--liked); }

@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=129" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=49" />
+<link rel="stylesheet" href="system.css?v=51" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -974,14 +974,12 @@
         <button class="round-btn mini-desk mini-ctrl" id="mp-next-btn" type="button" aria-label="Следующий трек"><svg width="20" height="20" aria-hidden="true"><use href="#i-next"/></svg></button>
       </div>
       <div class="mini-seek">
-        <span class="mini-desk mini-time" id="mp-time-cur">0:00</span>
         <span class="mini-scrub" id="mp-scrub" role="slider" aria-label="Позиция в треке" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="mini-progress"><span id="mp-progress"></span></span><span class="mini-thumb" aria-hidden="true"></span></span>
-        <span class="mini-desk mini-time" id="mp-time-tot">0:00</span>
       </div>
     </div>
     <div class="mini-right mini-desk">
+      <span class="mini-time" id="mp-time-cur">0:00</span><span class="mini-time" id="mp-time-tot">0:00</span>
       <button class="round-btn mini-ctrl" id="mp-fav-btn" type="button" aria-label="В любимое" aria-pressed="false"><svg class="ic-off" width="20" height="20" aria-hidden="true"><use href="#i-heart"/></svg><svg class="ic-on" width="20" height="20" aria-hidden="true"><use href="#i-heart-fill"/></svg></button>
-      <button class="round-btn mini-ctrl" id="mp-lyrics-btn" type="button" aria-label="Текст песни"><svg width="20" height="20" aria-hidden="true"><use href="#i-lyrics"/></svg></button>
       <button class="round-btn mini-ctrl" id="mp-queue-btn" type="button" aria-label="Очередь"><svg width="20" height="20" aria-hidden="true"><use href="#i-queue"/></svg></button>
       <span class="mini-vol"><button class="round-btn mini-ctrl" id="mp-mute-btn" type="button" aria-label="Выключить звук"><svg class="vol-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg><svg class="vol-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button><input class="vol-slider" id="mp-vol" type="range" min="0" max="100" step="1" value="100" aria-label="Громкость" /></span>
     </div>
@@ -1299,6 +1297,6 @@
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=3"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=121"></script>
+<script src="app.js?v=122"></script>
 </body>
 </html>

@@ -6157,11 +6157,6 @@
   $("mp-next-btn").addEventListener("click", () => playAdjacent(1));
   $("mp-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
   $("mp-fav-btn").addEventListener("click", () => $("player-fav-btn").click());
-  $("mp-lyrics-btn").addEventListener("click", () => {
-    if (!currentTrack) return;
-    showScreen("player");
-    if (!lyricsOpen) $("player-lyrics-btn").click();
-  });
 
   audio.addEventListener("timeupdate", () => {
     recordListening();
