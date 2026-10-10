@@ -408,3 +408,12 @@ body.is-desktop.lyrics-open .player-artist { font-size: 15px; }
 
 body.is-desktop.lyrics-open .player-meta-text { flex: 0 1 auto; }
 body.is-desktop.lyrics-open .player-meta { gap: 16px; justify-self: start; }
+
+/* the home page on a computer: the greeting is the page's heading, the avatar sits on its line */
+body.is-desktop #screen-home .home-top { position: absolute; top: calc(var(--sat) + 26px); right: var(--pad-x); z-index: 2; margin: 0; }
+body.is-desktop #screen-home .avatar-btn { width: 52px; height: 52px; }
+body.is-desktop #screen-home .avatar-btn .avatar { width: 48px; height: 48px; font-size: 20px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
+body.is-desktop #screen-home .avatar-btn:hover .avatar { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4); }
+body.is-desktop .home-greet { font-size: 40px; line-height: 1.1; font-weight: 800; letter-spacing: -0.035em; color: var(--text); margin: 0 72px 6px 0; }
+
+body.is-desktop .mix-sub { max-width: 56ch; font-size: 16px; }
