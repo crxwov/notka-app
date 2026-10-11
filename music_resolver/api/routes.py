@@ -301,6 +301,50 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             metrics.count("inline_send")
         return FileResponse(path, media_type="audio/mpeg", headers={"cache-control": "public, max-age=86400"})
 
+    # ---- «Слушать в чате»: the bot sends the track to the listener's own chat.
+    # Telegram's own player keeps playing with the phone locked or the app
+    # minimized, which a Mini App's player cannot promise. ----
+    to_chat_last: dict[int, float] = {}
+
+    @router.post("/to-chat")
+    async def to_chat(
+        source: str = Query(..., min_length=3, max_length=20),
+        id: str = Query(..., min_length=3, max_length=64),
+        t: str = Query(default="", max_length=160),
+        a: str = Query(default="", max_length=160),
+        x_telegram_init_data: str = Header(default=""),
+    ) -> dict:
+        user_id = plus_store.verify_init_data(x_telegram_init_data)
+        if not user_id:
+            return JSONResponse({"ok": False, "reason": "telegram"}, status_code=401)
+        if not _inline_ids_ok(source, id):
+            return JSONResponse({"ok": False, "reason": "id"}, status_code=400)
+        now = time.time()
+        if now - to_chat_last.get(user_id, 0) < 3:  # one send per few seconds is plenty
+            return JSONResponse({"ok": False, "reason": "busy"}, status_code=429)
+        to_chat_last[user_id] = now
+        token = os.environ.get("BOT_TOKEN", "").strip()
+        if not token:
+            return JSONResponse({"ok": False, "reason": "bot"}, status_code=503)
+        path = await mp3_for(source, id, t, a)
+        name = re.sub(r'[\\/:*?"<>|]+', " ", f"{a} - {t}".strip(" -"))[:100].strip() or "track"
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                with open(path, "rb") as fh:
+                    res = await client.post(
+                        f"https://api.telegram.org/bot{token}/sendAudio",
+                        data={"chat_id": str(user_id), "title": t[:120], "performer": a[:120]},
+                        files={"audio": (f"{name}.mp3", fh, "audio/mpeg")},
+                    )
+            body = res.json()
+        except Exception:
+            return JSONResponse({"ok": False, "reason": "send"}, status_code=502)
+        if not body.get("ok"):
+            # the person never opened the bot's chat (or blocked it): the app says so
+            return JSONResponse({"ok": False, "reason": "chat"}, status_code=409)
+        metrics.count("to_chat")
+        return {"ok": True}
+
     # ---- the admin site: /admin, behind a password ----
     admin_page = Path(__file__).resolve().parent.parent.parent / "admin" / "index.html"
     admin_fails: dict[str, list[float]] = {}
