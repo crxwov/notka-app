@@ -97,6 +97,22 @@
       if (!told) setTimeout(() => showToast("Полный экран работает в новом Telegram. Обнови Telegram Desktop"), 2500);
     });
   }
+  // Окно Нотки на компьютере не в фокусе (игра, браузер, другая программа): через 4 секунды замораживаем
+  // фоновый свет и анимации, чтобы музыка в фоне не отбирала кадры у соседних программ. Вернулся мышью
+  // или фокусом: всё оживает сразу. Звук и ход трека не затрагиваются.
+  if (onComputerClient) {
+    const root = document.documentElement;
+    let idleTimer = 0;
+    const setIdle = (on) => {
+      if (root.classList.contains("app-idle") === on) return;
+      root.classList.toggle("app-idle", on);
+      document.dispatchEvent(new CustomEvent("notka:idle", { detail: { idle: on } }));
+    };
+    const arm = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (!document.hasFocus()) setIdle(true); }, 4000); };
+    window.addEventListener("blur", arm);
+    window.addEventListener("focus", () => { clearTimeout(idleTimer); setIdle(false); });
+    document.addEventListener("pointermove", () => { if (root.classList.contains("app-idle")) { setIdle(false); arm(); } }, { passive: true });
+  }
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
   const hasTgBack = !!(tg && tg.BackButton && tgAtLeast("6.1"));
   if (hasTgBack) document.body.classList.add("tg-back");
@@ -110,35 +126,52 @@
     } catch (e) { /* haptics are a nicety */ }
   }
 
-  // слабые телефоны: сами замеряем плавность и при тормозах выключаем дорогое размытие фона
+  // слабые телефоны: сами замеряем плавность и при тормозах выключаем дорогое размытие фона.
+  // Режим хранится на устройстве: "auto" (по замеру), "lite" (включён вручную), "full" (выключен вручную).
   function perfGuard() {
     const root = document.documentElement;
     const KEY = "notka_perf";
-    const AUTO_LITE = false;
-    let saved = "";
-    try { saved = localStorage.getItem(KEY) || ""; } catch (e) { /* storage may be blocked */ }
-    // автоматический облегчённый режим пока выключен (AUTO_LITE = false), в том числе старая отметка из памяти
-    if (AUTO_LITE && saved === "lite") root.classList.add("perf-lite");
+    const MODE_KEY = "notka_perf_mode";
+    const read = (k) => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } };
+    const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* storage may be blocked */ } };
+    let mode = read(MODE_KEY) || "auto";
+    if (mode === "lite" || (mode === "auto" && read(KEY) === "lite")) root.classList.add("perf-lite");
     let probing = false;
+    let tries = 0;
     function probe() {
-      if (!AUTO_LITE || probing || root.classList.contains("perf-lite")) return;
+      if (mode !== "auto" || probing || root.classList.contains("perf-lite") || tries >= 3) return;
+      if (document.hidden) { setTimeout(probe, 4000); return; }
       probing = true;
+      tries += 1;
       const dts = [];
       let last = 0;
       const tick = (t) => {
-        if (last) dts.push(t - last);
+        // кадр после паузы вкладки (или свёрнутого окна) не считаем: он не про тормоза
+        if (last && t - last < 250) dts.push(t - last);
         last = t;
-        if (dts.length < 50) { requestAnimationFrame(tick); return; }
+        if (dts.length < 60) { requestAnimationFrame(tick); return; }
         probing = false;
         dts.sort((a, b) => a - b);
-        if (dts[dts.length >> 1] > 26) { // медиана дольше 26 мс: меньше ~38 кадров в секунду
+        // медиана дольше 26 мс: меньше ~38 кадров в секунду
+        if (dts[dts.length >> 1] > 26) {
           root.classList.add("perf-lite");
-          try { localStorage.setItem(KEY, "lite"); } catch (e) { /* storage may be blocked */ }
+          write(KEY, "lite");
+          document.dispatchEvent(new CustomEvent("notka:perf", { detail: { lite: true, auto: true } }));
+        } else if (tries < 3) {
+          setTimeout(probe, 15000); // повторный замер уже под нагрузкой (плеер, список, свет)
         }
       };
       requestAnimationFrame(tick);
     }
-    setTimeout(probe, 2500);
+    setTimeout(probe, 3000);
+    probe.isLite = () => root.classList.contains("perf-lite");
+    probe.mode = () => mode;
+    probe.set = (lite) => {
+      mode = lite ? "lite" : "full";
+      write(MODE_KEY, mode);
+      write(KEY, lite ? "lite" : "");
+      root.classList.toggle("perf-lite", !!lite);
+    };
     return probe;
   }
   const perfProbe = perfGuard();
@@ -931,7 +964,7 @@
     // the rays burst from behind the cover — with the lyrics open there is no cover
     // …and only the standard player has the square cover they are drawn around
     const on = currentScreen === "player" && document.body.classList.contains("is-playing") && !document.body.classList.contains("lyrics-open")
-      && (document.body.dataset.playerTheme || "standard") === "standard";
+      && (document.body.dataset.playerTheme || "standard") === "standard" && !isMinimal();
     if (on) {
       if (!ensurePrism()) return;
       requestAnimationFrame(placePrism);
@@ -3148,6 +3181,34 @@
     loudness.refresh();
   });
   $("sound-back-btn").addEventListener("click", goBack);
+
+  // «Лёгкий режим»: меньше размытия и анимаций для слабых телефонов
+  function renderPerfSwitch() {
+    const mn = $("toggle-minimal");
+    if (mn) mn.setAttribute("aria-checked", isMinimal() ? "true" : "false");
+    const sw = $("toggle-lite");
+    if (!sw) return;
+    const lite = perfProbe.isLite();
+    sw.setAttribute("aria-checked", lite ? "true" : "false");
+    const sub = $("lite-sub");
+    if (sub) sub.textContent = lite && perfProbe.mode() === "auto"
+      ? "Включился сам: Нотка тормозила на этом телефоне"
+      : "Меньше размытия и анимаций: плавнее и меньше греется";
+  }
+  document.addEventListener("notka:perf", renderPerfSwitch);
+  $("toggle-minimal").addEventListener("click", () => {
+    const on = $("toggle-minimal").getAttribute("aria-checked") !== "true";
+    Store.setSetting("minimal", on);
+    haptic("select");
+    applyLook();
+  });
+  $("toggle-lite").addEventListener("click", () => {
+    const on = $("toggle-lite").getAttribute("aria-checked") !== "true";
+    perfProbe.set(on);
+    haptic("select");
+    renderPerfSwitch();
+    showToast(on ? "Лёгкий режим включён" : "Лёгкий режим выключен");
+  });
   $("crossfade-slider").addEventListener("input", (e) => {
     const val = parseInt(e.target.value, 10) || 0;
     Store.setSetting("crossfade", val);
@@ -3742,10 +3803,14 @@
     else if (mode === "pinned" && pinnedLight()) { palette = pinnedLight().palette; art = pinnedLight().artwork; }
     const atmo = lookValue("atmo");
     if (atmo !== "none") { palette = atmoPalette(atmo); art = null; } // the season's own light (only on its event page)
+    if (isMinimal()) art = null; // минимализм: ровный фон без размытой обложки под светом
     showArtUnderLight(art || null);
     applyPalette(palette);
   }
+  // «Минимализм»: ровный тёмный фон без света и атмосфер (в духе Spotify). Бесплатный, хранится в настройках.
+  const isMinimal = () => !!Store.getSetting("minimal");
   function applyLook() {
+    document.documentElement.classList.toggle("minimal", isMinimal());
     const theme = lookValue("playerTheme");
     document.body.dataset.playerTheme = theme;
     document.body.dataset.bg = lookValue("bgPattern");
@@ -3756,7 +3821,7 @@
     // every setting is also an attribute of the body, for the style sheet to answer
     Object.keys(document.body.dataset).filter((k) => /^atmo[A-Z]/.test(k)).forEach((k) => delete document.body.dataset[k]);
     Object.entries(atmoSet).forEach(([k, v]) => { document.body.dataset["atmo" + k[0].toUpperCase() + k.slice(1)] = v; });
-    if (window.Atmosphere) Atmosphere.set(atmo, atmoSet);
+    if (window.Atmosphere) Atmosphere.set(isMinimal() ? "none" : atmo, isMinimal() ? {} : atmoSet);
     document.querySelectorAll("#atmo-stage .atmo-card").forEach((c) => { c.classList.toggle("is-on", c.dataset.atmo === atmo); c.setAttribute("aria-pressed", c.dataset.atmo === atmo ? "true" : "false"); });
     renderAtmoOptions(atmo, atmoSet);
     paintLight();
@@ -3957,6 +4022,7 @@
     });
     $("look-covers-title").hidden = covers.children.length === 0;
     applyLook();
+    renderPerfSwitch();
     revealIn("screen-look", true);
     // the theme that is on stands in view
     const on = stage.querySelector(".look-slide.is-on");

@@ -547,3 +547,19 @@ body.is-desktop .pd-atmo.demo-seasons .atmo-view { height: 190px; }
 .lyrics-lines.is-synced .lyrics-line.is-active { transform: scale(1); }
 .lyrics-lines.is-synced:not(.is-picking) .lyrics-line { opacity: var(--lo, 0.5); }
 .lyrics-lines.is-synced:not(.is-picking) .lyrics-line:active { opacity: 0.7; }
+
+/* окно на компьютере не в фокусе: фоновые анимации замирают (см. idle-guard в app.js) */
+html.app-idle *, html.app-idle *::before, html.app-idle *::after { animation-play-state: paused !important; }
+
+/* «Минимализм»: ровный тёмный фон, как в Spotify. Свет, атмосферы и лучи плеера убраны, стекло без размытия */
+html.minimal { --bg: #121212; }
+html.minimal .light { background: #121212; }
+html.minimal .light-art, html.minimal .light-group, html.minimal .light-spill, html.minimal .light-grain,
+html.minimal #atmo-back, html.minimal #atmo-front, html.minimal #player-prism { display: none !important; }
+html.minimal .light::before, html.minimal .light::after { content: none !important; }
+html.minimal .glass, html.minimal .round-glass, html.minimal .field, html.minimal .search-head, html.minimal .sheet, html.minimal .modal, html.minimal .plus-bar {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html.minimal .glass, html.minimal .round-glass, html.minimal .field { background: rgba(255, 255, 255, 0.07); }
+html.minimal .search-head { background: rgba(18, 18, 18, 0.96); }
+html.minimal .sheet, html.minimal .modal { background-color: #1c1c1c; }

@@ -13,10 +13,10 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=130" />
+<link rel="stylesheet" href="styles.css?v=131" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=70" />
+<link rel="stylesheet" href="system.css?v=73" />
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-screen="splash">
@@ -687,6 +687,15 @@
     <p class="look-note" id="look-note" data-reveal>Всё, кроме стандартного, — в Нотке Плюс. Без неё можно включить на минуту и посмотреть.</p>
 
     <section class="look-sec" data-reveal>
+      <div class="group">
+        <div class="group-row">
+          <span class="group-label">Минимализм<span class="group-sub">Ровный тёмный фон без света и анимаций</span></span>
+          <button class="switch" id="toggle-minimal" type="button" role="switch" aria-checked="false" aria-label="Минимализм"><span></span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="look-sec" data-reveal>
       <h2 class="look-h">Атмосфера</h2>
       <div class="atmo-stage" id="atmo-stage"></div>
       <div class="atmo-opts" id="atmo-opts"></div>
@@ -734,6 +743,15 @@
     <section class="look-sec" data-reveal>
       <h2 class="look-h">Узор света</h2>
       <div class="pattern-opts" id="look-patterns"></div>
+    </section>
+
+    <section class="look-sec" data-reveal>
+      <div class="group">
+        <div class="group-row">
+          <span class="group-label">Лёгкий режим<span class="group-sub" id="lite-sub">Меньше размытия и анимаций: плавнее и меньше греется</span></span>
+          <button class="switch" id="toggle-lite" type="button" role="switch" aria-checked="false" aria-label="Лёгкий режим"><span></span></button>
+        </div>
+      </div>
     </section>
 
     <div class="look-try" id="look-try" hidden>
@@ -1286,10 +1304,10 @@
 <input type="file" accept="image/*" id="avatar-file-input" hidden>
 
 <script src="config.js?v=2"></script>
-<script src="prism.js?v=2"></script>
+<script src="prism.js?v=3"></script>
 <script src="shredder.js?v=4"></script>
-<script src="atmosphere.js?v=3"></script>
+<script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=132"></script>
+<script src="app.js?v=135"></script>
 </body>
 </html>
