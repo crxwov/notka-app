@@ -6110,6 +6110,28 @@
     renderArtistShell(artistName);
     showScreen("artist", isBack ? { replace: true } : { params: { artistName, contextTracks, meta } });
 
+    // a track without its own artist id (it came from SoundCloud when YouTube Music was slow, or
+    // from an old list): find the artist by name, so the page still gets albums and the full list
+    if (!(meta.artistId && meta.source)) {
+      try {
+        const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), 12000) : 0;
+        let data = null;
+        try {
+          const res = await fetch(`${API_BASE_URL}/artists?q=${encodeURIComponent(artistName)}&limit=5`, ctrl ? { signal: ctrl.signal } : undefined);
+          data = res.ok ? await res.json() : null;
+        } finally { clearTimeout(timer); }
+        if (token !== artistToken) return;
+        const want = artistName.trim().toLowerCase();
+        const hit = ((data && data.results) || []).find((a) => (a.name || "").trim().toLowerCase() === want);
+        if (hit && hit.id && hit.source) {
+          meta = Object.assign({}, meta, { artistId: hit.id, source: hit.source });
+          currentArtistMeta.artistId = hit.id;
+          currentArtistMeta.source = hit.source;
+        }
+      } catch (e) { /* the page falls back to what the search finds */ }
+    }
+
     if (meta.artistId && meta.source) {
       try {
         const base = `${API_BASE_URL}/artist?source=${encodeURIComponent(meta.source)}&id=${encodeURIComponent(meta.artistId)}`;
