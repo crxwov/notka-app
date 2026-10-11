@@ -6113,7 +6113,10 @@
     if (meta.artistId && meta.source) {
       try {
         const url = `${API_BASE_URL}/artist?source=${encodeURIComponent(meta.source)}&id=${encodeURIComponent(meta.artistId)}`;
-        const res = await fetch(url);
+        const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), 25000) : 0;
+        let res;
+        try { res = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined); } finally { clearTimeout(timer); }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const artist = await res.json();
         if (token !== artistToken) return; // another artist was opened meanwhile
@@ -6151,6 +6154,19 @@
     renderArtistFallbackTracks(artistName, tracks);
   }
   $("artist-back-btn").addEventListener("click", goBack);
+  {
+    const pa = $("player-artist");
+    pa.setAttribute("role", "link");
+    pa.tabIndex = 0;
+    const openFromPlayer = () => {
+      const t = currentTrack;
+      if (!t || !t.artist) return;
+      haptic("light");
+      openArtistScreen(t.artist, currentQueue.length ? currentQueue : [t], { artistId: t.artistId, source: t.source });
+    };
+    pa.addEventListener("click", openFromPlayer);
+    pa.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFromPlayer(); } });
+  }
   $("artist-play-btn").addEventListener("click", () => {
     if (!currentArtistTracks.length) { showToast("Нет треков"); return; }
     playOrToggle(`artist:${$("artist-name").textContent}`, currentArtistTracks, $("artist-name").textContent);

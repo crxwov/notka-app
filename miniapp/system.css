@@ -563,3 +563,7 @@ html.minimal .glass, html.minimal .round-glass {
     linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.07) 100%),
     linear-gradient(125deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
 }
+/* имя исполнителя под названием в плеере открывает его страницу */
+#player-artist { cursor: pointer; width: fit-content; max-width: 100%; transition: color 0.15s, opacity 0.15s; }
+#player-artist:hover { color: var(--text); }
+#player-artist:active { opacity: 0.6; }

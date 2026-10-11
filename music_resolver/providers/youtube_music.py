@@ -149,6 +149,9 @@ def map_artist_album_summary(entry: dict, release_type: str = "album") -> AlbumS
     )
 
 
+ARTIST_SONGS_LIMIT = 60
+
+
 def map_artist(artist_id: str, raw: dict, client=None) -> ArtistInfo:
     """Map ytmusicapi get_artist(channelId) raw dict to ArtistInfo. Never raises on missing keys.
 
@@ -166,14 +169,43 @@ def map_artist(artist_id: str, raw: dict, client=None) -> ArtistInfo:
 
     songs = raw.get("songs") or {}
     song_entries = songs.get("results") or []
-    if client is not None and songs.get("browseId"):
-        try:
-            full_playlist = client.get_playlist(songs["browseId"], limit=None)
-            full_tracks = full_playlist.get("tracks") if isinstance(full_playlist, dict) else None
-            if full_tracks:
-                song_entries = full_tracks
-        except Exception as exc:
-            print(f"[artist:{artist_id}] full song list fetch failed, using preview: {exc}")
+    album_section = raw.get("albums") or {}
+    singles_section = raw.get("singles") or {}
+
+    # Four independent YouTube requests (the full song list, the full album
+    # list, the full singles list and the albums search) used to run one
+    # after another and took ~18 s on a cold artist. They do not depend on
+    # each other, so they run side by side now; each one that fails just
+    # leaves its preview in place. The song list is capped: the page shows
+    # the top tracks, not a whole 300-track catalogue.
+    jobs: dict = {}
+    if client is not None:
+        if songs.get("browseId"):
+            jobs["songs"] = lambda: client.get_playlist(songs["browseId"], limit=ARTIST_SONGS_LIMIT)
+        if album_section.get("params"):
+            jobs["albums"] = lambda: client.get_artist_albums(
+                album_section.get("browseId") or artist_id, album_section["params"]
+            )
+        if singles_section.get("params"):
+            jobs["singles"] = lambda: client.get_artist_albums(
+                singles_section.get("browseId") or artist_id, singles_section["params"]
+            )
+        if name:
+            jobs["search"] = lambda: client.search(name, filter="albums", limit=50)
+    fetched: dict = {}
+    if jobs:
+        with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+            futures = {key: pool.submit(fn) for key, fn in jobs.items()}
+            for key, future in futures.items():
+                try:
+                    fetched[key] = future.result(timeout=20)
+                except Exception as exc:
+                    print(f"[artist:{artist_id}] {key} fetch failed, using preview: {exc}")
+
+    full_playlist = fetched.get("songs")
+    full_tracks = full_playlist.get("tracks") if isinstance(full_playlist, dict) else None
+    if full_tracks:
+        song_entries = full_tracks
 
     top_tracks: list[TrackCandidate] = []
     for song in song_entries:
@@ -186,50 +218,18 @@ def map_artist(artist_id: str, raw: dict, client=None) -> ArtistInfo:
     # the wrong one used to fail silently and always fall back to the short
     # preview, which is why the discography never grew past a handful of
     # albums.
-    album_section = raw.get("albums") or {}
     album_entries = album_section.get("results") or []
-    print(
-        f"[artist:{artist_id}] albums section: preview={len(album_entries)} "
-        f"browseId={album_section.get('browseId')!r} params={'yes' if album_section.get('params') else 'no'}"
-    )
-    if client is not None and album_section.get("params"):
-        try:
-            full_albums = client.get_artist_albums(
-                album_section.get("browseId") or artist_id, album_section["params"]
-            )
-            print(f"[artist:{artist_id}] full album fetch returned {len(full_albums or [])} entries")
-            if full_albums:
-                album_entries = full_albums
-        except Exception as exc:
-            print(f"[artist:{artist_id}] full album list fetch failed, using preview: {exc}")
-    print(
-        f"[artist:{artist_id}] album_entries titles: "
-        + ", ".join(f"{e.get('title')!r}({e.get('year')})" for e in album_entries)
-    )
+    full_albums = fetched.get("albums")
+    if full_albums:
+        album_entries = full_albums
 
     # "singles" (EPs/singles the artist released) come back the same shape
     # as "albums" but in a separate section — merge them in too, since from
     # a listener's perspective they belong on the same shelf.
-    singles_section = raw.get("singles") or {}
     single_entries = singles_section.get("results") or []
-    print(
-        f"[artist:{artist_id}] singles section: preview={len(single_entries)} "
-        f"browseId={singles_section.get('browseId')!r} params={'yes' if singles_section.get('params') else 'no'}"
-    )
-    if client is not None and singles_section.get("params"):
-        try:
-            full_singles = client.get_artist_albums(
-                singles_section.get("browseId") or artist_id, singles_section["params"]
-            )
-            print(f"[artist:{artist_id}] full singles fetch returned {len(full_singles or [])} entries")
-            if full_singles:
-                single_entries = full_singles
-        except Exception as exc:
-            print(f"[artist:{artist_id}] full singles list fetch failed, using preview: {exc}")
-    print(
-        f"[artist:{artist_id}] single_entries titles: "
-        + ", ".join(f"{e.get('title')!r}({e.get('year')})" for e in single_entries)
-    )
+    full_singles = fetched.get("singles")
+    if full_singles:
+        single_entries = full_singles
 
     # For some (usually major-label / "verified") artist channels, YouTube
     # Music's own artist page just doesn't expose a full discography at
@@ -246,20 +246,12 @@ def map_artist(artist_id: str, raw: dict, client=None) -> ArtistInfo:
     # is what we use to sort it onto the right shelf below.
     search_entries: list[tuple[dict, str]] = []
     if client is not None and name:
-        try:
-            hits = client.search(name, filter="albums", limit=50) or []
-        except Exception as exc:
-            print(f"[artist:{artist_id}] search fallback (albums) failed: {exc}")
-            hits = []
+        hits = fetched.get("search") or []
         matched = [
             h
             for h in hits
             if any((a.get("id") == artist_id or a.get("name") == name) for a in (h.get("artists") or []))
         ]
-        print(
-            f"[artist:{artist_id}] search fallback (albums): {len(hits)} hits, {len(matched)} matched artist: "
-            + ", ".join(f"{h.get('title')!r}({h.get('year')},{h.get('type')})" for h in matched)
-        )
         search_entries.extend(
             (h, "single" if (h.get("type") or "").lower() in {"single", "ep"} else "album") for h in matched
         )
@@ -410,11 +402,11 @@ class YoutubeMusicProvider:
                 # Hard deadline so a misbehaving catalog source can never
                 # hang the page — worst case it just falls back to
                 # YouTube's own (possibly incomplete) album list.
-                catalog_albums = await asyncio.wait_for(catalog.albums_for_artist_name(info.name), timeout=8.0)
+                catalog_albums = await asyncio.wait_for(catalog.albums_for_artist_name(info.name), timeout=4.0)
                 if catalog_albums:
                     info = info.model_copy(update={"albums": catalog_albums})
             except asyncio.TimeoutError:
-                print(f"[artist:{artist_id}] catalog discography lookup timed out (>8s), keeping YouTube data")
+                print(f"[artist:{artist_id}] catalog discography lookup timed out (>4s), keeping YouTube data")
             except Exception as exc:
                 print(f"[artist:{artist_id}] catalog discography lookup failed, keeping YouTube data: {exc}")
         return info
