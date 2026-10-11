@@ -149,7 +149,49 @@ def map_artist_album_summary(entry: dict, release_type: str = "album") -> AlbumS
     )
 
 
+class _RetryingClient:
+    """YTMusic with quick retries.
+
+    From a datacenter address Google now and then answers a request with a
+    «Sorry…» page (HTTP 403) after a 8-10 s pause; the next request goes
+    through in half a second. So every call has a short timeout (set on the
+    session) and a transient failure is simply repeated, instead of the
+    listener waiting ten seconds and getting SoundCloud results without
+    albums or artists.
+    """
+
+    def __init__(self, inner, attempts: int = 3):
+        self._inner = inner
+        self._attempts = attempts
+
+    @staticmethod
+    def _transient(exc: Exception) -> bool:
+        import requests
+
+        return isinstance(exc, (ValueError, requests.exceptions.RequestException))
+
+    def __getattr__(self, name):
+        attr = getattr(self._inner, name)
+        if name.startswith("_") or not callable(attr):
+            return attr
+
+        def call(*args, **kwargs):
+            last: Exception | None = None
+            for attempt in range(self._attempts):
+                try:
+                    return attr(*args, **kwargs)
+                except Exception as exc:  # noqa: BLE001
+                    last = exc
+                    if not self._transient(exc) or attempt == self._attempts - 1:
+                        raise
+                    time.sleep(0.15 * (attempt + 1))
+            raise last  # pragma: no cover
+
+        return call
+
+
 ARTIST_SONGS_LIMIT = 60
+YTM_REQUEST_TIMEOUT = 4.0  # seconds for one request to YouTube Music
 ARTIST_FETCH_DEADLINE = 7.0  # seconds for all side requests of an artist page together
 
 
@@ -654,7 +696,16 @@ class YoutubeMusicProvider:
                         }
                     if self.settings.ytmusic_location:
                         kwargs["location"] = self.settings.ytmusic_location
-                    self._ytmusic = YTMusic(**kwargs)
+                    import functools
+
+                    import requests
+
+                    # a short timeout: a good answer takes under a second, a
+                    # throttled one hangs for ten — better to ask again
+                    session = requests.Session()
+                    session.request = functools.partial(session.request, timeout=YTM_REQUEST_TIMEOUT)  # type: ignore[method-assign]
+                    kwargs["requests_session"] = session
+                    self._ytmusic = _RetryingClient(YTMusic(**kwargs))
         return self._ytmusic
 
     def _search_sync(self, query: str, limit: int) -> list[TrackCandidate]:
