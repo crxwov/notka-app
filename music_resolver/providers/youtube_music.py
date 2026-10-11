@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout, as_completed
 import re
 import time
 import random
@@ -150,6 +150,7 @@ def map_artist_album_summary(entry: dict, release_type: str = "album") -> AlbumS
 
 
 ARTIST_SONGS_LIMIT = 60
+ARTIST_FETCH_DEADLINE = 7.0  # seconds for all side requests of an artist page together
 
 
 def map_artist(artist_id: str, raw: dict, client=None) -> ArtistInfo:
@@ -194,13 +195,24 @@ def map_artist(artist_id: str, raw: dict, client=None) -> ArtistInfo:
             jobs["search"] = lambda: client.search(name, filter="albums", limit=50)
     fetched: dict = {}
     if jobs:
-        with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
-            futures = {key: pool.submit(fn) for key, fn in jobs.items()}
-            for key, future in futures.items():
+        # YouTube sometimes answers a datacenter address with junk and each
+        # such request then takes 5-8 s to give up. One shared deadline: what
+        # has not arrived by then is dropped (the preview stays) and the
+        # page opens instead of waiting for the slowest request.
+        pool = ThreadPoolExecutor(max_workers=len(jobs))
+        futures = {pool.submit(fn): key for key, fn in jobs.items()}
+        try:
+            for future in as_completed(futures, timeout=ARTIST_FETCH_DEADLINE):
+                key = futures[future]
                 try:
-                    fetched[key] = future.result(timeout=20)
+                    fetched[key] = future.result()
                 except Exception as exc:
                     print(f"[artist:{artist_id}] {key} fetch failed, using preview: {exc}")
+        except FuturesTimeout:
+            late = [futures[f] for f in futures if not f.done()]
+            print(f"[artist:{artist_id}] {', '.join(late)} not ready in {ARTIST_FETCH_DEADLINE}s, using preview")
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     full_playlist = fetched.get("songs")
     full_tracks = full_playlist.get("tracks") if isinstance(full_playlist, dict) else None
