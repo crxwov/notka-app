@@ -567,3 +567,14 @@ html.minimal .glass, html.minimal .round-glass {
 #player-artist { cursor: pointer; width: fit-content; max-width: 100%; transition: color 0.15s, opacity 0.15s; }
 #player-artist:hover { color: var(--text); }
 #player-artist:active { opacity: 0.6; }
+/* минимализм: меню «…», окна и активная вкладка без цвета трека */
+html.minimal .sheet, html.minimal .modal {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02) 40%),
+    linear-gradient(135deg, rgba(32, 32, 32, 0.92), rgba(22, 22, 22, 0.95));
+}
+html.minimal .tab.active { background: rgba(255, 255, 255, 0.12); }
+
+/* ПК: знак и слово на экране открытия крупнее (в окне 900+ px 96 px терялись) */
+body.is-desktop .splash-mark { width: clamp(190px, 24vmin, 320px); height: clamp(190px, 24vmin, 320px); }
+body.is-desktop .splash-word { margin-top: clamp(34px, 4vmin, 52px); font-size: clamp(50px, 6.4vmin, 84px); }
