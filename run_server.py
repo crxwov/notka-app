@@ -75,7 +75,8 @@ def tell_owner(text: str) -> None:
 def restart_warp() -> None:
     """The free WARP proxy sometimes loses its link to Cloudflare; restarting it usually helps."""
     try:
-        subprocess.run(["systemctl", "restart", "warp-proxy"], timeout=30, check=False)
+        # the app runs as the unprivileged user "notka"; a sudoers rule allows exactly this command
+        subprocess.run(["sudo", "-n", "systemctl", "restart", "warp-proxy"], timeout=30, check=False)
     except Exception as exc:
         print(f"[watchdog] could not restart warp-proxy: {exc!r}", flush=True)
 
