@@ -6112,26 +6112,36 @@
 
     if (meta.artistId && meta.source) {
       try {
-        const url = `${API_BASE_URL}/artist?source=${encodeURIComponent(meta.source)}&id=${encodeURIComponent(meta.artistId)}`;
-        const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
-        const timer = ctrl ? setTimeout(() => ctrl.abort(), 25000) : 0;
-        let res;
-        try { res = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined); } finally { clearTimeout(timer); }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const artist = await res.json();
+        const base = `${API_BASE_URL}/artist?source=${encodeURIComponent(meta.source)}&id=${encodeURIComponent(meta.artistId)}`;
+        // the request can never hang for good: after the limit the page falls back to the search-based one
+        const getArtist = async (fast, ms) => {
+          const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+          const timer = ctrl ? setTimeout(() => ctrl.abort(), ms) : 0;
+          try {
+            const res = await fetch(fast ? `${base}&fast=1` : base, ctrl ? { signal: ctrl.signal } : undefined);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+          } finally { clearTimeout(timer); }
+        };
+        const paint = (artist) => {
+          currentArtistTracks = artist.topTracks || [];
+          currentArtistMeta.photo = artist.photo || null;
+          // an iTunes artist comes back as its fuller YouTube Music page
+          if (artist.id && artist.source) { currentArtistMeta.artistId = artist.id; currentArtistMeta.source = artist.source; }
+          $("artist-name").textContent = artist.name || artistName;
+          setCoverEl($("artist-avatar"), artist.photo, artistName);
+          $("artist-listeners").textContent = artist.subscribers || `${pluralTracks(currentArtistTracks.length)} в Нотке`;
+          const list = $("artist-tracks");
+          list.innerHTML = "";
+          currentArtistTracks.slice(0, 8).forEach((t) => list.appendChild(buildTrackRow(t, { queue: currentArtistTracks, context: artist.name || artistName })));
+          renderArtistAlbumsRow(artist.albums || [], artist.source || meta.source);
+          updateSourceButtons();
+        };
+        // first the short page (about a second), then the full one replaces it by itself
+        const quick = await getArtist(true, 20000);
         if (token !== artistToken) return; // another artist was opened meanwhile
-        currentArtistTracks = artist.topTracks || [];
-        currentArtistMeta.photo = artist.photo || null;
-        // an iTunes artist comes back as its fuller YouTube Music page
-        if (artist.id && artist.source) { currentArtistMeta.artistId = artist.id; currentArtistMeta.source = artist.source; }
-        $("artist-name").textContent = artist.name || artistName;
-        setCoverEl($("artist-avatar"), artist.photo, artistName);
-        $("artist-listeners").textContent = artist.subscribers || `${pluralTracks(currentArtistTracks.length)} в Нотке`;
-        const list = $("artist-tracks");
-        list.innerHTML = "";
-        currentArtistTracks.slice(0, 8).forEach((t) => list.appendChild(buildTrackRow(t, { queue: currentArtistTracks, context: artist.name || artistName })));
-        renderArtistAlbumsRow(artist.albums || [], artist.source || meta.source);
-        updateSourceButtons();
+        paint(quick);
+        getArtist(false, 40000).then((full) => { if (token === artistToken) paint(full); }).catch((e) => console.warn("artist: full page not loaded", e));
         return;
       } catch (e) {
         if (token !== artistToken) return;

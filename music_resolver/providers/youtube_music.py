@@ -406,8 +406,10 @@ class YoutubeMusicProvider:
     async def get_album(self, album_id: str) -> AlbumInfo:
         return await asyncio.to_thread(self._get_album_sync, album_id)
 
-    async def get_artist(self, artist_id: str) -> ArtistInfo:
-        info = await asyncio.to_thread(self._get_artist_sync, artist_id)
+    async def get_artist(self, artist_id: str, fast: bool = False) -> ArtistInfo:
+        info = await asyncio.to_thread(self._get_artist_sync, artist_id, fast)
+        if fast:
+            return info
         catalog = self._catalog_provider
         if catalog is not None and getattr(catalog, "configured", False):
             try:
@@ -676,7 +678,7 @@ class YoutubeMusicProvider:
         except Exception as exc:
             raise AppError(ErrorCode.RESOLVE_FAILED, "Failed to parse album metadata") from exc
 
-    def _get_artist_sync(self, artist_id: str) -> ArtistInfo:
+    def _get_artist_sync(self, artist_id: str, fast: bool = False) -> ArtistInfo:
         client = self._client()
         try:
             raw = client.get_artist(artist_id)
@@ -685,6 +687,6 @@ class YoutubeMusicProvider:
         if not raw:
             raise AppError(ErrorCode.ARTIST_NOT_FOUND, "Artist was not found")
         try:
-            return map_artist(artist_id, raw, client=client)
+            return map_artist(artist_id, raw, client=None if fast else client)
         except Exception as exc:
             raise AppError(ErrorCode.RESOLVE_FAILED, "Failed to parse artist metadata") from exc

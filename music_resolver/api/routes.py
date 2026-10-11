@@ -568,8 +568,9 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     async def artist(
         source: str | None = Query(default=None),
         id: str | None = Query(default=None),
+        fast: bool = Query(default=False),
     ) -> ArtistResponse:
-        info = await service.get_artist(source, id)
+        info = await service.get_artist(source, id, fast=fast)
         return ArtistResponse(**info.model_dump(by_alias=True))
 
     @router.get("/stream")

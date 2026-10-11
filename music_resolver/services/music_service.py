@@ -1,3 +1,4 @@
+import inspect
 from datetime import datetime, timezone
 
 from music_resolver.cache.ttl import TTLCache
@@ -74,7 +75,7 @@ class MusicService:
         self.album_cache.set(key, response)
         return response
 
-    async def get_artist(self, source: str | None, artist_id: str | None) -> ArtistInfo:
+    async def get_artist(self, source: str | None, artist_id: str | None, fast: bool = False) -> ArtistInfo:
         source = (source or "").strip()
         artist_id = (artist_id or "").strip()
         if not source or not artist_id:
@@ -89,6 +90,17 @@ class MusicService:
         cached = self.artist_cache.get(key)
         if cached:
             return cached
+
+        # «fast»: only the artist's own page (a few top songs and the first
+        # albums), in about a second; the app then asks for the full one.
+        if fast and "fast" in inspect.signature(get_artist).parameters:
+            fast_key = f"artist-fast:{source}:{artist_id}"
+            cached = self.artist_cache.get(fast_key)
+            if cached:
+                return cached
+            response = await get_artist(artist_id, fast=True)
+            self.artist_cache.set(fast_key, response)
+            return response
 
         response = await get_artist(artist_id)
         self.artist_cache.set(key, response)
