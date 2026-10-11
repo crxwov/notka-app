@@ -1090,7 +1090,7 @@
     renderAvatarInto("side-avatar", "side-initial");
     $("side-name").textContent = displayName();
     $("side-fs-btn").hidden = !canFullscreen;
-    $("side-fs-label").textContent = tg && tg.isFullscreen ? "Свернуть в окно" : "На весь экран";
+    $("side-fs-label").textContent = tg && tg.isFullscreen ? "Свернуть в окно · Esc" : "На весь экран · F11";
     $("side-close-btn").hidden = !canFullscreen;
   }
   $("side-fav-btn").addEventListener("click", () => showScreen("favorites"));
@@ -1103,6 +1103,19 @@
     else if (e.key === "F11") { e.preventDefault(); setFullscreen(!tg.isFullscreen); }
   });
   $("side-close-btn").addEventListener("click", () => { try { tg.close(); } catch (e) { /* not in Telegram */ } });
+  // один раз на компьютере: как развернуть Нотку на весь экран и вернуть обратно
+  if (canFullscreen) {
+    let told = false;
+    try { told = localStorage.getItem("notka_fs_hint") === "1"; } catch (e) { /* ignore */ }
+    if (!told) {
+      setTimeout(() => {
+        if (!isDesktop() || currentScreen === "splash") return;
+        try { localStorage.setItem("notka_fs_hint", "1"); } catch (e) { /* ignore */ }
+        if (tg.isFullscreen) { showToast("Esc или F11 сворачивают Нотку обратно в окно"); return; }
+        showToast("F11 разворачивает Нотку на весь экран", { action: "Развернуть", onAction: () => setFullscreen(true) });
+      }, 7000);
+    }
+  }
 
   // A wide window (Telegram Desktop, a browser) gets the computer layout:
   // the tabs become a side panel, the mini player a bar at the bottom.
