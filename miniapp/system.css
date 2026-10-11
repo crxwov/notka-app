@@ -557,12 +557,6 @@ html.minimal .light { background: #121212; }
 html.minimal .light-art, html.minimal .light-group, html.minimal .light-spill, html.minimal .light-grain,
 html.minimal #atmo-back, html.minimal #atmo-front, html.minimal #player-prism { display: none !important; }
 html.minimal .light::before, html.minimal .light::after { content: none !important; }
-/* на ровном чёрном стекло не красится в цвета обложки (бурое/оливковое): нейтральный лёгкий тон, размытие и блики те же */
-html.minimal .glass, html.minimal .round-glass {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.07) 100%),
-    linear-gradient(125deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
-}
 /* имя исполнителя под названием в плеере открывает его страницу */
 #player-artist { cursor: pointer; width: fit-content; max-width: 100%; transition: color 0.15s, opacity 0.15s; }
 #player-artist:hover { color: var(--text); }
@@ -578,3 +572,29 @@ html.minimal .tab.active { background: rgba(255, 255, 255, 0.12); }
 /* ПК: знак и слово на экране открытия крупнее (в окне 900+ px 96 px терялись) */
 body.is-desktop .splash-mark { width: clamp(190px, 24vmin, 320px); height: clamp(190px, 24vmin, 320px); }
 body.is-desktop .splash-word { margin-top: clamp(34px, 4vmin, 52px); font-size: clamp(50px, 6.4vmin, 84px); }
+/* свечение вокруг играющей обложки в «Недавнем» больше не обрезается краями полки: запас внутри, компенсация полями */
+#home-recent { padding: 14px 24px 40px; margin: -14px -24px -36px; scroll-padding-inline: 24px; }
+
+/* шапка Плюса: чёткие плееры (слабая перспектива: у сильной ближний ряд растягивался в 1.8 раза и мылился),
+   свет по цветам играющего трека, края полотна и затемнения над плашкой не обрезаются */
+#screen-plus .ps-deck { transform: translateX(-50%) perspective(2400px) rotateX(58deg) rotateZ(-9deg); }
+body.is-desktop #screen-plus .ps-deck { transform: translateX(-50%) perspective(4800px) rotateX(58deg) rotateZ(-9deg); }
+#screen-plus .plus-showcase {
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 22%, #000 46%, transparent 80%), linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(180deg, transparent 0, #000 22%, #000 46%, transparent 80%), linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+  mask-composite: intersect;
+}
+.plus-hero::before {
+  background:
+    radial-gradient(58% 60% at 18% 40%, color-mix(in srgb, var(--c-mid) 38%, transparent), transparent 70%),
+    radial-gradient(52% 56% at 86% 55%, color-mix(in srgb, var(--c-warm) 32%, transparent), transparent 70%),
+    radial-gradient(46% 50% at 52% 70%, color-mix(in srgb, var(--c-core) 24%, transparent), transparent 72%);
+}
+body.is-desktop #screen-plus .plus-hero::before {
+  background:
+    radial-gradient(34% 46% at 33% 36%, color-mix(in srgb, var(--c-mid) 34%, transparent), transparent 72%),
+    radial-gradient(34% 46% at 67% 40%, color-mix(in srgb, var(--c-warm) 30%, transparent), transparent 72%),
+    radial-gradient(42% 50% at 50% 52%, color-mix(in srgb, var(--c-core) 22%, transparent), transparent 74%);
+}
+.plus-bar::before { left: -20px; right: -20px; top: -56px; height: 56px; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.8) 85%); }
