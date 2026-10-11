@@ -3241,149 +3241,23 @@
     showToast(on ? "Предпросмотр «Нотки Плюс» включён — смотри в профиле" : "Предпросмотр «Нотки Плюс» выключен");
   });
   $("menu-plus").addEventListener("click", () => showScreen("plus"));
-  // витрина под барабаном: у каждой функции своя, внутри переключаются варианты (сами и по тапу)
-  function setupPlusPanels() {
-    const panels = [...document.querySelectorAll("#plus-panels .pd")];
-    const ctl = panels.map((p) => {
-      const keys = (p.dataset.keys || "").split(",").filter(Boolean);
-      const stage = p.querySelector(".pd-stage");
-      const chipBox = p.querySelectorAll(".pd-chips .chip");
-      let idx = 0, timer = 0, hold = 0;
-      const set = (k) => {
-        idx = Math.max(0, keys.indexOf(k));
-        stage.querySelectorAll(".v").forEach((v) => v.classList.toggle("is-on", v.dataset.v === k));
-        chipBox.forEach((c) => {
-          const on = c.dataset.k === k;
-          c.classList.toggle("active", on);
-          if (on && c.dataset.p) stage.style.setProperty("--p", c.dataset.p);
-        });
-      };
-      chipBox.forEach((c) => c.addEventListener("click", () => { set(c.dataset.k); hold = Date.now() + 9000; haptic("select"); }));
-      return {
-        el: p,
-        start() {
-          if (!keys.length || timer) return;
-          timer = setInterval(() => { if (Date.now() > hold) set(keys[(idx + 1) % keys.length]); }, 3400);
-        },
-        stop() { clearInterval(timer); timer = 0; },
-      };
+  // страница Плюса: переключатели внутри карточек-примеров (неделя / месяц, настроение)
+  function setupPlusPage() {
+    document.querySelectorAll("#plus-panels .px-seg").forEach((seg) => {
+      if (seg.id === "plus-stage-tabs") return; // у тем плеера свой обработчик ниже
+      const card = seg.closest(".px-card");
+      seg.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-k]");
+        if (!btn) return;
+        seg.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === btn));
+        card.querySelectorAll(".v").forEach((v) => v.classList.toggle("is-on", v.dataset.v === btn.dataset.k));
+        haptic("select");
+      });
     });
-    return { items: ctl, activate(i) { ctl.forEach((c, k) => (k === i ? c.start() : c.stop())); } };
   }
-
-  // «барабан» функций Плюса: пункты едут мимо, соседние уходят в перспективу, за активным меняется цвет и витрина
-  function setupPlusWheel(panels) {
-    const root = $("plus-wheel");
-    if (!root) return null;
-    const items = [...root.querySelectorAll(".pw-item")];
-    const copies = [...root.querySelectorAll(".pw-copy")];
-    const dots = [...root.querySelectorAll(".pw-dots i")];
-    const shows = panels ? panels.items.map((c) => c.el) : [];
-    const n = items.length;
-    // на компьютере барабан крупнее: коэффициент берётся из стилей (--pw-k, на телефоне 1)
-    let k = 1;
-    const syncScale = () => { k = parseFloat(getComputedStyle(root).getPropertyValue("--pw-k")) || 1; };
-    syncScale();
-    window.addEventListener("resize", () => { syncScale(); render(); });
-    const STEP = () => 128 * k; // сколько пикселей пальца на один пункт
-    let pos = 0, target = 0, vel = 0, raf = 0, last = 0, active = -1, drag = null, quiet = false, wheelAt = 0;
-    const wrap = (d) => ((((d + n / 2) % n) + n) % n) - n / 2;
-    const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
-
-    function render() {
-      const cur = ((Math.round(pos) % n) + n) % n;
-      for (let i = 0; i < n; i++) {
-        const d = wrap(i - pos), ad = Math.abs(d), sg = Math.sign(d);
-        const x = k * sg * (ad <= 1 ? ad * 128 : 128 + (ad - 1) * 78);
-        const s = ad <= 1 ? 1 - ad * 0.38 : Math.max(0.26, 0.62 - (ad - 1) * 0.22);
-        const el = items[i];
-        el.style.transform = `translate3d(${x.toFixed(1)}px,0,${(-Math.min(ad, 2) * 120 * k).toFixed(0)}px) rotateY(${(sg * Math.min(ad, 1.5) * 34).toFixed(1)}deg) scale(${s.toFixed(3)})`;
-        el.style.opacity = ad > 2.7 ? "0" : String(clamp(1 - ad * 0.4).toFixed(3));
-        el.style.visibility = ad > 2.7 ? "hidden" : "visible";
-        el.style.zIndex = String(10 - Math.round(ad * 3));
-        const ca = clamp(1 - ad * 1.8);
-        copies[i].style.opacity = ca.toFixed(3);
-        copies[i].style.transform = `translate3d(${(d * 46 * k).toFixed(1)}px,0,0)`;
-        copies[i].style.visibility = ca > 0.01 ? "visible" : "hidden";
-        if (shows[i]) {
-          const pa = clamp(1 - ad * 2.2);
-          shows[i].style.opacity = pa.toFixed(3);
-          shows[i].style.transform = `translate3d(${(d * 60).toFixed(1)}px,0,0)`;
-          shows[i].style.display = pa > 0.01 ? "flex" : "none";
-          shows[i].style.pointerEvents = ad < 0.3 ? "auto" : "none";
-        }
-      }
-      if (cur !== active) {
-        active = cur;
-        items.forEach((el, i) => { el.classList.toggle("is-on", i === cur); el.tabIndex = i === cur ? 0 : -1; el.setAttribute("aria-current", i === cur ? "true" : "false"); });
-        dots.forEach((el, i) => el.classList.toggle("is-on", i === cur));
-        shows.forEach((el, i) => el.classList.toggle("is-active", i === cur));
-        if (panels) panels.activate(cur);
-        if (!quiet) haptic("select");
-      }
-    }
-    function frame(t) {
-      const dt = Math.min(0.034, (t - last) / 1000 || 0.016); last = t;
-      if (!drag) {
-        const k = 130, c = 2 * Math.sqrt(k) * 0.98; // пружина без отскока
-        vel += (k * (target - pos) - c * vel) * dt; pos += vel * dt;
-        if (Math.abs(target - pos) < 0.0006 && Math.abs(vel) < 0.002) { pos = target; vel = 0; render(); raf = 0; return; }
-      }
-      render(); raf = requestAnimationFrame(frame);
-    }
-    const kick = () => { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } };
-    const goTo = (i) => { target = Math.round(pos) + wrap(i - Math.round(pos)); kick(); };
-    const stepBy = (dir) => { target = Math.round(target) + dir; kick(); };
-
-    let tapBlock = false;
-    root.addEventListener("pointerdown", (e) => {
-      if (e.button) return;
-      drag = { id: e.pointerId, x0: e.clientX, p0: pos, t: e.timeStamp, v: 0, moved: false };
-      vel = 0;
-    });
-    root.addEventListener("pointermove", (e) => {
-      if (!drag || e.pointerId !== drag.id) return;
-      const dx = e.clientX - drag.x0;
-      if (!drag.moved) {
-        if (Math.abs(dx) < 6) return;
-        drag.moved = true; root.classList.add("is-drag");
-        try { root.setPointerCapture(e.pointerId); } catch (err) { /* already released */ }
-      }
-      const np = drag.p0 - dx / STEP(), dtm = Math.max(1, e.timeStamp - drag.t);
-      drag.v = 0.7 * drag.v + 0.3 * ((np - pos) / dtm * 1000);
-      pos = np; drag.t = e.timeStamp; render();
-    });
-    const end = (e) => {
-      if (!drag || e.pointerId !== drag.id) return;
-      const d = drag; drag = null; root.classList.remove("is-drag");
-      if (d.moved) {
-        tapBlock = true; setTimeout(() => { tapBlock = false; }, 0);
-        const v = clamp(d.v, -6, 6);
-        target = Math.round(pos + v * 0.2); vel = v * 0.35;
-      } else target = Math.round(target);
-      kick();
-    };
-    root.addEventListener("pointerup", end);
-    root.addEventListener("pointercancel", end);
-    items.forEach((el, i) => el.addEventListener("click", () => { if (!tapBlock) goTo(i); }));
-    root.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); stepBy(1); }
-      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); stepBy(-1); }
-    });
-    root.addEventListener("wheel", (e) => {
-      if (Math.abs(e.deltaX) < 14 || Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
-      e.preventDefault();
-      if (e.timeStamp - wheelAt > 260) { wheelAt = e.timeStamp; stepBy(Math.sign(e.deltaX)); }
-    }, { passive: false });
-
-    render();
-    return {
-      // при открытии экрана барабан сам подъезжает на место
-      intro() { syncScale(); quiet = true; pos = -1.8; target = 0; vel = 0; active = -1; render(); quiet = false; kick(); },
-    };
-  }
-  const plusPanels = setupPlusPanels();
-  const plusWheel = setupPlusWheel(plusPanels);
+  setupPlusPage();
+  const plusAtmoBtn = $("plus-atmo-btn");
+  if (plusAtmoBtn) plusAtmoBtn.addEventListener("click", () => showScreen("look"));
 
   // настоящие цифры слушателя и его инициал для витрин «Итоги» и «Друг Нотки»
   function fillPlusLive() {
@@ -3396,6 +3270,8 @@
       const w = document.querySelector(`#plus-panels [data-word="${k}"]`);
       if (w) w.textContent = n ? (k === "minutes" ? plural(n, ...words[k]) + " с Ноткой" : plural(n, ...words[k])) : "пока тихо, начни слушать";
     });
+    const pxStats = $("px-stats");
+    if (pxStats) pxStats.classList.toggle("is-empty", !vals.minutes && !vals.tracks && !vals.artists);
     const initial = ($("profile-initial") && $("profile-initial").textContent) || "Н";
     document.querySelectorAll("#plus-panels .fr-initial").forEach((el) => { el.textContent = initial; });
     document.querySelectorAll("#plus-panels [data-ago]").forEach((el) => {
@@ -3518,12 +3394,10 @@
     $("plus-cassette-artist").textContent = track ? track.artist || "" : "в Нотке Плюс";
     fillPlusLive();
     fillPlusShowcase();
-    fillPlusPanelCovers();
     planBarVisit();
     syncPlusUI();
     $("plus-bar").classList.remove("is-dismissed"); // плашка возвращается при каждом заходе
     revealIn("screen-plus", true);
-    if (plusWheel) plusWheel.intro();
     setTimeout(perfProbe, 1800);
     clearInterval(plusStageTimer);
     plusStageTimer = setInterval(() => {
@@ -3621,23 +3495,27 @@
   // the header: a canvas of horizontal mini players laid out evenly over the
   // whole width and seen in perspective, as if they lay on a table
   let plusDeckTracks = [];
-  const PLUS_PLANE_TILES = 24; // 4 columns x 6 rows; a phone shows the first 18 (3 x 6)
-  function renderPlusDeck() {
-    const plane = $("ps-deck");
-    const n = plusDeckTracks.length;
-    if (!plane || !n) return;
-    plane.textContent = "";
-    for (let i = 0; i < PLUS_PLANE_TILES; i++) {
-      const t = plusDeckTracks[(i * 5) % n];
-      const tile = document.createElement("span");
-      tile.className = "ps-tile";
-      tile.innerHTML = '<span class="ps-cover"></span><span class="ps-meta"><b></b><em></em></span><span class="ps-play"><svg><use href="#' + (i % 3 === 1 ? "i-play" : "i-pause") + '"/></svg></span><span class="ps-bar"><u></u></span>';
-      tile.querySelector(".ps-cover").style.backgroundImage = cssUrl(hiResArtwork(t.artwork));
-      tile.querySelector("b").textContent = t.title || "";
-      tile.querySelector("em").textContent = t.artist || "";
-      tile.querySelector("u").style.width = 16 + ((i * 37) % 68) + "%";
-      plane.appendChild(tile);
-    }
+  // примеры на странице Плюса: настоящие карточки с настоящими обложками (свои треки слушателя, затем известные)
+  function renderPlusPage() {
+    const pool = plusDeckTracks;
+    const n = pool.length;
+    if (!n) return;
+    const at = (i) => pool[((i % n) + n) % n];
+    const fillRow = (li, t) => {
+      li.querySelector(".px-cv").style.backgroundImage = cssUrl(hiResArtwork(t.artwork));
+      li.querySelector("b").textContent = t.title || "";
+      li.querySelector("em").textContent = t.artist || "";
+    };
+    document.querySelectorAll("#px-stack .px-mini").forEach((el, i) => {
+      fillRow(el, at(i));
+      el.querySelector("u").style.width = [58, 34, 76][i] + "%";
+    });
+    const sets = { week: [0, 1, 2], month: [3, 4, 5], quarter: [6, 7, 8], bright: [0, 3, 6], calm: [1, 4, 7], work: [2, 5, 8], sad: [3, 6, 0] };
+    document.querySelectorAll("#plus-panels .px-views .v").forEach((v) => {
+      const idx = sets[v.dataset.v];
+      if (!idx) return;
+      v.querySelectorAll(".px-row").forEach((li, j) => fillRow(li, at(idx[j])));
+    });
   }
   async function fillPlusShowcase() {
     const seen = new Set(), pool = [];
@@ -3650,7 +3528,7 @@
     (state.favorites || []).forEach(add);
     (state.recent || []).forEach(add);
     plusDeckTracks = pool.slice();
-    if (plusDeckTracks.length >= 5) renderPlusDeck();
+    if (plusDeckTracks.length >= 5) renderPlusPage();
     // fill up with well-known tracks and their real covers (looked up once, then kept)
     const found = await Promise.all(PLUS_DECK_QUERIES.map(([q, a]) => plusCoverFor(q, a)));
     for (const rec of found) {
@@ -3658,31 +3536,7 @@
       seen.add(rec.artwork);
       plusDeckTracks.push(rec);
     }
-    renderPlusDeck();
-  }
-
-  // the example lists in the panels («Машина времени», «Настроение»): real covers instead of coloured squares
-  let plusPanelCoversDone = false;
-  async function fillPlusPanelCovers() {
-    const rows = [...document.querySelectorAll("#plus-panels .tm-list li")].filter((li) => li.querySelector(".cv"));
-    const todo = rows.filter((li) => !li.dataset.cover);
-    if (!todo.length) return;
-    let next = 0;
-    const worker = async () => {
-      while (next < todo.length) {
-        const li = todo[next++];
-        const title = (li.querySelector("b") || {}).textContent || "";
-        const artist = (li.querySelector("em") || {}).textContent || "";
-        const rec = await plusCoverFor(`${artist} ${title}`, artist);
-        if (!rec) continue;
-        const cv = li.querySelector(".cv");
-        cv.style.backgroundImage = cssUrl(hiResArtwork(rec.artwork));
-        cv.style.backgroundSize = "cover";
-        cv.style.backgroundPosition = "center";
-        li.dataset.cover = "1";
-      }
-    };
-    await Promise.all([worker(), worker(), worker(), worker()]);
+    renderPlusPage();
   }
 
   // ============================================================
