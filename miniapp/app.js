@@ -5467,9 +5467,27 @@
     else audio.pause();
   }
 
+  // Плейлист, любимое, альбом, исполнитель не кончаются: по порядку идут сначала, вперемешку
+  // перемешиваются заново. «Мой микс» дополняется похожими сам; поиск и «Недавнее» просто останавливаются.
+  function loopFinishedQueue() {
+    if (!currentTrack || !currentSource || currentSource === "mix" || originalQueue.length < 2) return false;
+    let next;
+    if (shuffleOn) {
+      next = shuffled(originalQueue);
+      if (next[0].id === currentTrack.id) next.push(next.shift()); // тот же трек подряд не ставим
+    } else {
+      next = originalQueue.slice();
+    }
+    currentQueue = next;
+    playTrack(next[0], next, { keepQueue: true });
+    renderQueueSheet();
+    return true;
+  }
+
   function playAdjacent(delta, opts) {
     opts = opts || {};
     if (!currentQueue.length || currentQueueIndex < 0) return;
+    if (delta > 0 && currentQueueIndex >= currentQueue.length - 1 && repeatMode !== "all" && loopFinishedQueue()) return;
     let nextIndex = currentQueueIndex + delta;
     if (nextIndex >= currentQueue.length && repeatMode === "all") nextIndex = 0;
     if (nextIndex < 0 && delta < 0 && audio.currentTime > 3) { audio.currentTime = 0; return; }
@@ -6331,6 +6349,7 @@
     }
     const hasNext = currentQueueIndex >= 0 && currentQueueIndex < currentQueue.length - 1;
     if (hasNext || (repeatMode === "all" && currentQueue.length)) { playAdjacent(1, { auto: true }); return; }
+    if (loopFinishedQueue()) return;
     // The queue is over: rewind, so ▶ plays this track again from the top.
     try { audio.currentTime = 0; } catch (e) { /* not seekable yet */ }
     updateMymixCardUI();
