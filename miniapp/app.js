@@ -3358,8 +3358,8 @@
     renderFriendBadge();
     $("plus-bar").classList.toggle("is-active", on);
     $("plus-bar").classList.toggle("is-real", real);
-    $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать бесплатно";
-    $("plan-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";
+    $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать";
+    $("plan-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать бесплатно";
     $("plan-buy-btn").hidden = real;
     $("plan-state").hidden = !on;
     $("plan-state").textContent = real ? `Плюс включён до ${longDate(plusUntil())}` : "Плюс включён в режиме предпросмотра. Оплата не списывалась.";
@@ -3367,7 +3367,7 @@
       ? `Плюс включён до ${longDate(plusUntil())}`
       : on
       ? "Плюс включён в режиме предпросмотра. Оплата не списывалась."
-      : `Потом ${PLUS_PLANS[plusPlan].then}. Отмена в любой момент.`;
+      : `Потом ${PLUS_PLANS[plusPlan].then}`;
   }
   $("plus-bar-close").addEventListener("click", () => {
     haptic("light");
@@ -3447,7 +3447,7 @@
   if ("IntersectionObserver" in window) {
     new IntersectionObserver((entries) => {
       $("plus-bar").classList.toggle("is-covered", entries.some((e) => e.isIntersecting));
-    }, { root: $("screen-plus"), threshold: 0.35 }).observe(document.querySelector(".plan-card"));
+    }, { root: $("screen-plus"), threshold: 0.6 }).observe($("plan-buy-btn"));
   }
 
   // Real covers for the Plus page: the header's deck of glass cards and the
