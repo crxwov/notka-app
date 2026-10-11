@@ -5843,28 +5843,6 @@
     closeOverlay("track-menu-sheet");
     if (trackMenuTrack) shareTrack(trackMenuTrack);
   });
-  // «Слушать в чате»: бот присылает трек в этот чат; встроенный плеер Telegram играет и со свёрнутым приложением
-  async function sendTrackToChat(track) {
-    if (!(tg && tg.initData)) { showToast("Это работает внутри Telegram"); return; }
-    showToast("Отправляю трек в чат с ботом…");
-    try {
-      const q = new URLSearchParams({ source: track.source, id: track.sourceId, t: track.title || "", a: track.artist || "" });
-      const res = await fetch(`${API_BASE_URL}/to-chat?${q}`, { method: "POST", headers: { "X-Telegram-Init-Data": tg.initData } });
-      const body = await res.json().catch(() => ({}));
-      if (res.ok && body.ok) {
-        haptic("success");
-        showToast("Трек в чате с ботом. Включи его там, и он будет играть в фоне");
-      } else if (body.reason === "busy") showToast("Подожди пару секунд");
-      else if (body.reason === "chat") showToast("Нажми «Начать» в чате с ботом и попробуй снова");
-      else showToast("Не получилось отправить, попробуй ещё раз");
-    } catch (e) {
-      showToast("Нет связи с сервером");
-    }
-  }
-  $("menu-track-tochat").addEventListener("click", () => {
-    closeOverlay("track-menu-sheet");
-    if (trackMenuTrack) sendTrackToChat(trackMenuTrack);
-  });
   $("menu-track-download").addEventListener("click", () => {
     closeOverlay("track-menu-sheet");
     if (trackMenuTrack) downloadTracks([trackMenuTrack]);
