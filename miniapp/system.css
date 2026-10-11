@@ -557,3 +557,9 @@ html.minimal .light { background: #121212; }
 html.minimal .light-art, html.minimal .light-group, html.minimal .light-spill, html.minimal .light-grain,
 html.minimal #atmo-back, html.minimal #atmo-front, html.minimal #player-prism { display: none !important; }
 html.minimal .light::before, html.minimal .light::after { content: none !important; }
+/* на ровном чёрном стекло не красится в цвета обложки (бурое/оливковое): нейтральный лёгкий тон, размытие и блики те же */
+html.minimal .glass, html.minimal .round-glass {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.07) 100%),
+    linear-gradient(125deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+}
