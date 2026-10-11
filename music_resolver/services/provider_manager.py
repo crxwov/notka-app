@@ -6,9 +6,14 @@ from music_resolver.errors import AppError, ErrorCode
 from music_resolver.models import ResolvedTrack, TrackCandidate
 from music_resolver.providers.base import MusicProvider
 from music_resolver.services.matcher import rank_candidates
+from music_resolver.services.proxy_guard import proxy_guard
 from music_resolver.utils.logging import log_provider_result
 
 logger = logging.getLogger(__name__)
+
+# The whole search (all fallbacks together) never waits longer than this:
+# four sources at 15 s each used to leave the app spinning for a minute.
+SEARCH_DEADLINE = 22.0
 
 
 class ProviderManager:
@@ -26,11 +31,16 @@ class ProviderManager:
 
         errors: list[str] = []
         empty_seen = False
+        began = time.perf_counter()
         for index, provider in enumerate(self.providers):
+            remaining = SEARCH_DEADLINE - (time.perf_counter() - began)
+            if remaining <= 1.0:
+                errors.append(f"{provider.name}: skipped (deadline)")
+                continue
             start = time.perf_counter()
             fallback_used = index > 0
             try:
-                results = await asyncio.wait_for(provider.search(query, limit), timeout=self.timeout)
+                results = await asyncio.wait_for(provider.search(query, limit), timeout=min(self.timeout, remaining))
                 duration_ms = int((time.perf_counter() - start) * 1000)
                 if not results:
                     empty_seen = True
@@ -54,6 +64,7 @@ class ProviderManager:
                 log_provider_result("SEARCH", provider.name, duration_ms, False, fallback_used, error="unexpected")
 
         if errors and not empty_seen and len(errors) >= len(self.providers):
+            proxy_guard.nudge()  # everything failed: maybe the proxy died
             raise AppError(ErrorCode.PROVIDER_UNAVAILABLE, "All search providers are unavailable", {"providers": errors})
         raise AppError(ErrorCode.TRACK_NOT_FOUND, "Track was not found in available providers")
 

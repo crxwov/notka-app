@@ -385,6 +385,16 @@ class YoutubeMusicProvider:
         self._ytmusic = None
         self._lock = threading.Lock()
         self._catalog_provider = None  # set via set_catalog_provider(), optional
+        from music_resolver.services.proxy_guard import proxy_guard
+
+        proxy_guard.on_switch.append(self._proxy_switched)
+
+    def _proxy_switched(self, field: str) -> None:
+        """The proxy died or came back: the client is built with the proxy
+        baked in, so it has to be built again."""
+        if field == "ytmusic_proxy" and self.settings.ytmusic_proxy != getattr(self, "_built_proxy", object()):
+            with self._lock:
+                self._ytmusic = None
 
     def set_catalog_provider(self, catalog_provider) -> None:
         """Wire in a catalog provider (currently ITunesCatalogProvider) to
@@ -705,6 +715,7 @@ class YoutubeMusicProvider:
                     session = requests.Session()
                     session.request = functools.partial(session.request, timeout=YTM_REQUEST_TIMEOUT)  # type: ignore[method-assign]
                     kwargs["requests_session"] = session
+                    self._built_proxy = self.settings.ytmusic_proxy
                     self._ytmusic = _RetryingClient(YTMusic(**kwargs))
         return self._ytmusic
 

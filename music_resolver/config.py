@@ -1,7 +1,7 @@
 import os
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
+
+from music_resolver.services.proxy_guard import probe, proxy_guard
 
 
 def _get_int(name: str, default: int) -> int:
@@ -54,17 +54,7 @@ def _usable_proxy(value: str | None) -> str | None:
         return None
     if value in _proxy_checks:
         return value if _proxy_checks[value] else None
-    # A real request through the proxy, not just a port check: a proxy can
-    # accept the TCP connection and still refuse to forward anything.
-    url = value if "://" in value else f"http://{value}"
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({"http": url, "https": url}))
-    try:
-        with opener.open("https://music.youtube.com/", timeout=8) as resp:
-            ok = resp.status < 500
-    except urllib.error.HTTPError as exc:
-        ok = exc.code < 500  # the proxy forwarded it; the site just answered oddly
-    except Exception:
-        ok = False
+    ok = probe(value)
     _proxy_checks[value] = ok
     if not ok:
         print("Прокси из .env не отвечает — работаю напрямую, без него.")
@@ -95,7 +85,7 @@ def load_settings() -> Settings:
     stream_mode = os.getenv("STREAM_RESPONSE_MODE", "proxy").strip().lower()
     if stream_mode not in {"redirect", "json", "proxy"}:
         stream_mode = "proxy"
-    return Settings(
+    settings = Settings(
         port=_get_int("PORT", 8080),
         provider_timeout=_get_float("PROVIDER_TIMEOUT", 15.0),
         cache_ttl=_get_int("CACHE_TTL", 300),
@@ -132,3 +122,12 @@ def load_settings() -> Settings:
         # proxy happens to use. See ytmusicapi's `location` parameter.
         ytmusic_location=os.getenv("YTMUSIC_LOCATION") or None,
     )
+    # The proxies are watched while the server runs: a dead one is dropped
+    # (traffic goes direct) and picked up again once it answers.
+    raw = {
+        "ytdlp_proxy": os.getenv("YTDLP_PROXY") or "",
+        "itunes_proxy": os.getenv("ITUNES_PROXY") or os.getenv("YTDLP_PROXY") or "",
+        "ytmusic_proxy": os.getenv("YTMUSIC_PROXY") or os.getenv("YTDLP_PROXY") or "",
+    }
+    proxy_guard.register(settings, raw, {value: _proxy_checks.get(value, True) for value in set(raw.values()) if value})
+    return settings
