@@ -3358,8 +3358,8 @@
     renderFriendBadge();
     $("plus-bar").classList.toggle("is-active", on);
     $("plus-bar").classList.toggle("is-real", real);
-    $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать";
-    $("plan-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать бесплатно";
+    $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";
+    $("plan-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";
     $("plan-buy-btn").hidden = real;
     $("plan-state").hidden = !on;
     $("plan-state").textContent = real ? `Плюс включён до ${longDate(plusUntil())}` : "Плюс включён в режиме предпросмотра. Оплата не списывалась.";

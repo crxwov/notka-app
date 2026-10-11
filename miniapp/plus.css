@@ -208,46 +208,27 @@ body.is-desktop #screen-plus .plus-plan-h { text-align: center; }
 
 @media (max-width: 380px) { .px-seg .chip { font-size: 13px; padding: 0 5px; } }
 
-/* ---------- плашка с ценой: компактная, яркая, в цветах трека ---------- */
+/* ---------- плашка с ценой: стекло, как мини-плеер ---------- */
 #screen-plus .plus-bar {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 14px;
-  padding: 10px 10px 10px 20px; margin: 0 0 6px; border-radius: 32px; overflow: visible;
+  display: block; padding: 10px; margin: 0 0 6px; border-radius: 28px; overflow: visible;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04) 55%),
-    linear-gradient(120deg, color-mix(in srgb, var(--c-warm) 52%, rgba(34, 22, 40, 0.9)), color-mix(in srgb, var(--c-mid) 46%, rgba(24, 16, 36, 0.92)));
-  -webkit-backdrop-filter: blur(26px) saturate(190%); backdrop-filter: blur(26px) saturate(190%);
-  box-shadow:
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.6), inset 0 0 0 0.5px rgba(255, 255, 255, 0.24),
-    0 18px 40px -14px color-mix(in srgb, var(--c-warm) 60%, rgba(0, 0, 0, 0.7)), 0 4px 14px -4px rgba(0, 0, 0, 0.5);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.07) 100%),
+    linear-gradient(125deg, color-mix(in srgb, var(--c-warm) 20%, transparent), color-mix(in srgb, var(--c-deep) 30%, transparent));
+  -webkit-backdrop-filter: blur(22px) saturate(190%) brightness(1.08); backdrop-filter: blur(22px) saturate(190%) brightness(1.08);
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.5), inset 0 -1px 1px rgba(255, 255, 255, 0.1), inset 0 0 0 0.5px rgba(255, 255, 255, 0.16), 0 12px 32px -8px rgba(4, 2, 10, 0.55);
 }
 #screen-plus .plus-bar::before { display: none; }
-#screen-plus .plus-bar-head { grid-column: 1; grid-row: 1; padding: 0; font-size: 19px; line-height: 1.15; font-weight: 800; letter-spacing: -0.025em; }
-#screen-plus .plus-bar-note { grid-column: 1; grid-row: 2; padding: 2px 0 0; font-size: 12.5px; line-height: 1.3; color: rgba(255, 255, 255, 0.72); }
+#screen-plus .plus-bar-head, #screen-plus .plus-bar-note { display: none; }
 #screen-plus .plus-buy {
-  position: relative; grid-column: 2; grid-row: 1 / span 2; width: auto; height: 52px; padding: 0 24px; border-radius: 26px; overflow: hidden;
+  position: relative; width: 100%; height: 52px; padding: 0 18px; border-radius: 22px; overflow: hidden;
   font-size: 16.5px; font-weight: 750; letter-spacing: -0.01em; white-space: nowrap;
-  box-shadow: 0 10px 22px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-#screen-plus .plus-buy::after {
-  content: ""; position: absolute; top: 0; bottom: 0; width: 46%; left: -60%; pointer-events: none;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.75), transparent);
-  transform: skewX(-18deg); animation: px-sheen 4.6s var(--ease-in-out) 1.4s infinite;
-}
-@keyframes px-sheen { 0%, 62% { left: -60%; } 100% { left: 130%; } }
 #screen-plus .plus-bar-close {
   top: -9px; right: -5px; width: 30px; height: 30px; z-index: 2; color: var(--text);
   background: rgba(24, 18, 32, 0.88); box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.28), 0 6px 14px -6px rgba(0, 0, 0, 0.7);
 }
-#screen-plus .plus-bar.is-real .plus-bar-note { grid-row: 1; grid-column: 1 / -1; padding: 6px 30px 6px 0; font-size: 16px; color: var(--text); }
-#screen-plus .plus-bar.is-active { grid-template-columns: minmax(0, 1fr) auto; }
-#screen-plus .plus-bar.is-active .plus-bar-note { grid-row: 1 / span 2; align-self: center; font-size: 15px; font-weight: 600; color: var(--text); padding: 0; }
-#screen-plus .plus-bar.is-active .plus-buy::after { display: none; }
-body.is-desktop #screen-plus .plus-bar { max-width: 640px; margin-left: auto; margin-right: auto; }
-@media (max-width: 370px) {
-  #screen-plus .plus-bar { padding-left: 16px; }
-  #screen-plus .plus-buy { padding: 0 16px; font-size: 15.5px; }
-  #screen-plus .plus-bar-head { font-size: 17.5px; }
-}
+#screen-plus .plus-bar.is-active, #screen-plus .plus-bar.is-real, #screen-plus .plus-bar.is-covered, #screen-plus .plus-bar.is-skipped, #screen-plus .plus-bar.is-dismissed { display: none; }
+body.is-desktop #screen-plus .plus-bar { max-width: 560px; margin-left: auto; margin-right: auto; }
 
 /* ---------- план: значки скидки в строке, ровные точки, спокойный заголовок ---------- */
 #screen-plus .plan-name { color: var(--text); font-size: 22px; padding-bottom: 14px; }
@@ -272,3 +253,33 @@ body.is-desktop #screen-plus .plus-bar { max-width: 640px; margin-left: auto; ma
 #screen-plus .plus-bar-note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #screen-plus .plus-bar { padding-bottom: 12px; padding-top: 12px; }
 @media (max-width: 370px) { #screen-plus .plus-bar-head { font-size: 16.5px; } }
+
+/* ---------- ровные поля: длинные названия не выталкивают строки за карточку ---------- */
+.px-views { grid-template-columns: minmax(0, 1fr); }
+.px-views > .v, .px-list, .px-row, .px-meta, .px-mix > div { min-width: 0; }
+.px-mix > div { flex: 1; }
+.px-mix-name, .px-mix-sub, .px-kicker { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.px-when { min-width: 0; }
+.px-when span { white-space: nowrap; }
+
+/* итоги: строки «число — подпись», любые цифры и слова помещаются */
+.px-stats, .px-stats.is-empty { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.px-stats .px-stat { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 14px; padding: 13px 16px; border-radius: 18px; }
+.px-stats .px-stat b { flex: none; font-size: 24px; }
+.px-stats .px-stat span { flex: 1; min-width: 0; text-align: right; font-size: 14px; color: var(--text-2); text-wrap: pretty; overflow-wrap: anywhere; }
+
+/* план: выбранный вариант чуть вырастает с мягким пружинящим ходом */
+#screen-plus .plan-opt { transform: scale(1); transition: transform 0.5s cubic-bezier(0.2, 1.5, 0.35, 1), background-color 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out); }
+#screen-plus .plan-opt.is-on { transform: scale(1.025); z-index: 1; }
+#screen-plus .plan-opt:active { transform: scale(0.985); }
+#screen-plus .plan-list { display: none; }
+#screen-plus .plan-state { margin: 10px 2px 0; font-size: 14px; color: var(--text-2); }
+#screen-plus .plan-buy { margin-top: 16px; white-space: nowrap; font-size: 16.5px; padding: 0 14px; }
+
+#screen-plus .plan-opt { gap: 10px; padding: 14px 14px; }
+#screen-plus .po-main { min-width: 0; }
+#screen-plus .po-main b, #screen-plus .po-main i, #screen-plus .po-price b, #screen-plus .po-price s { white-space: nowrap; }
+#screen-plus .po-main i { overflow: hidden; text-overflow: ellipsis; }
+#screen-plus .po-main b { font-size: 17px; }
+#screen-plus .po-badge { padding: 2px 7px; font-size: 11.5px; }
+#screen-plus .po-price { min-width: 0; }
