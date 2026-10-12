@@ -6098,6 +6098,9 @@
   let lyricsTouchedAt = 0;
 
   function renderLyrics(data) {
+    karaokeStop();
+    KARAOKE.i = -1;
+    KARAOKE.spans = [];
     $("lyrics-skeleton").hidden = true;
     lyricsData = data;
     lyricsActive = -1;
@@ -6169,6 +6172,83 @@
     };
     lyricsGlide = requestAnimationFrame(step);
   }
+  // ---- Word by word: the line being sung lights up as it is sung. The timings in the data
+  // are for whole lines, so the line's time is shared among its words by their length. ----
+  const KARAOKE = { i: -1, spans: [], times: [], raf: 0 };
+  function karaokeTimes(words, start, end) {
+    const chars = words.reduce((n, w) => n + w.length, 0);
+    // sung over most of the line's time, but not slower than a voice is
+    const sing = clamp(chars * 0.085 + 0.4, 0.8, Math.max(0.8, end - start - 0.15));
+    const weights = words.map((w) => Math.max(2, w.length) + 1);
+    const total = weights.reduce((a, b) => a + b, 0);
+    let at = start;
+    return weights.map((w) => { const from = at; at += (sing * w) / total; return [from, at]; });
+  }
+  function karaokeStop() {
+    cancelAnimationFrame(KARAOKE.raf);
+    KARAOKE.raf = 0;
+  }
+  function karaokeClear() {
+    karaokeStop();
+    if (KARAOKE.i >= 0 && lyricsData) {
+      const li = lyricsList.children[KARAOKE.i];
+      const line = lyricsData.lines[KARAOKE.i];
+      if (li && line) li.textContent = line.text;
+    }
+    KARAOKE.i = -1;
+    KARAOKE.spans = [];
+    KARAOKE.times = [];
+  }
+  function karaokeTick() {
+    KARAOKE.raf = 0;
+    if (KARAOKE.i < 0 || !lyricsOpen || currentScreen !== "player") return;
+    const now = audio.currentTime + 0.12;
+    const spans = KARAOKE.spans, times = KARAOKE.times;
+    for (let k = 0; k < spans.length; k++) {
+      const [from, to] = times[k];
+      const p = now >= to ? 1 : now <= from ? 0 : (now - from) / (to - from);
+      const el = spans[k];
+      if (el._p !== p) {
+        el._p = p;
+        el.style.setProperty("--p", p.toFixed(3));
+        el.classList.toggle("is-now", p > 0 && p < 1);
+      }
+    }
+    if (!audio.paused) KARAOKE.raf = requestAnimationFrame(karaokeTick);
+  }
+  function karaokeStart(i) {
+    karaokeClear();
+    if (i < 0 || !lyricsData || !lyricsData.synced) return;
+    const li = lyricsList.children[i];
+    const line = lyricsData.lines[i];
+    if (!li || !line || !line.text || line.text.length > 160) return;
+    const parts = line.text.split(/(\s+)/);
+    const words = parts.filter((p) => p && !/^\s+$/.test(p));
+    if (!words.length) return;
+    const next = lyricsData.lines[i + 1];
+    const end = next ? next.t : line.t + Math.max(3, line.text.length * 0.12);
+    const times = karaokeTimes(words, line.t, end);
+    const frag = document.createDocumentFragment();
+    const spans = [];
+    parts.forEach((part) => {
+      if (!part) return;
+      if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(part)); return; }
+      const sp = document.createElement("span");
+      sp.className = "kw";
+      sp.textContent = part;
+      frag.appendChild(sp);
+      spans.push(sp);
+    });
+    li.textContent = "";
+    li.appendChild(frag);
+    KARAOKE.i = i;
+    KARAOKE.spans = spans;
+    KARAOKE.times = times;
+    karaokeTick();
+  }
+  audio.addEventListener("play", () => { if (KARAOKE.i >= 0 && !KARAOKE.raf) KARAOKE.raf = requestAnimationFrame(karaokeTick); });
+  audio.addEventListener("seeked", () => { if (KARAOKE.i >= 0) karaokeTick(); });
+
   function syncLyrics(jump, instant) {
     if (!lyricsOpen || !lyricsData || !lyricsData.synced || currentScreen !== "player") return;
     const lines = lyricsData.lines;
@@ -6178,6 +6258,7 @@
     if (i === lyricsActive && !jump) return;
     lyricsActive = i;
     const items = lyricsList.children;
+    karaokeStart(i);
     for (let k = 0; k < items.length; k++) {
       items[k].classList.toggle("is-active", k === i);
       items[k].classList.toggle("is-past", k < i);
@@ -6185,6 +6266,7 @@
       const d = k - i;
       const lo = k === i ? 1 : d < 0 ? Math.max(0.2, 0.42 + d * 0.06) : Math.max(0.26, 0.58 - d * 0.08);
       items[k].style.setProperty("--lo", lo.toFixed(2));
+      items[k].style.setProperty("--bl", `${Math.min(2.2, Math.abs(d) * 0.55).toFixed(1)}px`);
     }
     // don't pull the text away from someone who is scrolling it by hand or picking lines
     if (quotePicking || (!jump && Date.now() - lyricsTouchedAt < 3000)) return;
@@ -6196,7 +6278,7 @@
     lyricsOpen = on;
     document.body.classList.toggle("lyrics-open", on);
     lyricsBox.inert = !on;
-    if (!on) endQuotePick();
+    if (!on) { endQuotePick(); karaokeClear(); lyricsActive = -1; }
     $("player-lyrics-btn").setAttribute("aria-pressed", on ? "true" : "false");
     syncPrism();
     if (on) { loadLyrics(); syncLyrics(true, true); }
