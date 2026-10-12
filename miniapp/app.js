@@ -6184,6 +6184,16 @@
     let at = start;
     return weights.map((w) => { const from = at; at += (sing * w) / total; return [from, at]; });
   }
+  // audio.currentTime moves in coarse steps (a few times a second); read as it is, the light
+  // jumps. Between two readings the time is carried on by the clock, never far past the next one.
+  const KCLOCK = { base: 0, at: 0, last: -1 };
+  function karaokeClockStep(c, reading, nowMs, paused, rate) {
+    if (reading !== c.last) { c.last = reading; c.base = reading; c.at = nowMs; }
+    if (paused) return reading;
+    const est = c.base + ((nowMs - c.at) / 1000) * (rate || 1);
+    return Math.min(est, c.base + 0.45);
+  }
+  const smoothstep = (p) => p * p * (3 - 2 * p);
   function karaokeStop() {
     cancelAnimationFrame(KARAOKE.raf);
     KARAOKE.raf = 0;
@@ -6202,11 +6212,11 @@
   function karaokeTick() {
     KARAOKE.raf = 0;
     if (KARAOKE.i < 0 || !lyricsOpen || currentScreen !== "player") return;
-    const now = audio.currentTime + 0.12;
+    const now = karaokeClockStep(KCLOCK, audio.currentTime, performance.now(), audio.paused, audio.playbackRate) + 0.1;
     const spans = KARAOKE.spans, times = KARAOKE.times;
     for (let k = 0; k < spans.length; k++) {
       const [from, to] = times[k];
-      const p = now >= to ? 1 : now <= from ? 0 : (now - from) / (to - from);
+      const p = now >= to ? 1 : now <= from ? 0 : smoothstep((now - from) / (to - from));
       const el = spans[k];
       if (el._p !== p) {
         el._p = p;
