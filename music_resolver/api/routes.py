@@ -47,6 +47,9 @@ _UPSTREAM_USER_AGENT = (
 _CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "cache" / "audio_v2"
 _CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _download_locks: dict[str, asyncio.Lock] = {}
+# At most this many tracks are downloaded at the same time (each is a yt-dlp + ffmpeg run);
+# the rest wait their turn instead of starving the whole 1-CPU server. DOWNLOAD_PARALLEL in .env.
+_download_slots = asyncio.Semaphore(max(1, int(os.environ.get("DOWNLOAD_PARALLEL") or 2)))
 
 # The cache is trimmed back under this size after each new download, least
 # recently played tracks first. Override with AUDIO_CACHE_MAX_MB in .env.
@@ -112,6 +115,23 @@ def _extension_for_mime(mime: str | None) -> str:
     }.get(mime, "audio")
 
 
+async def _download_with_ytdlp(download_to_file, source_id: str, key: str, data_path: Path, meta_path: Path) -> tuple[Path, str]:
+    try:
+        tmp_path, mime = await download_to_file(source_id, _CACHE_DIR, key)
+        tmp_path = Path(tmp_path)
+        # YouTube's m4a comes in 10-second fragments; some players
+        # (Telegram's WebView) go silent after the first one
+        await asyncio.to_thread(defragment, tmp_path)
+        tmp_path.replace(data_path)
+        meta_path.write_text(mime)
+    except AppError:
+        raise
+    except Exception as exc:
+        raise AppError(ErrorCode.RESOLVE_FAILED, "Could not download playback source") from exc
+    await asyncio.to_thread(_prune_cache)
+    return data_path, mime
+
+
 async def _ensure_cached(
     provider,
     source: str,
@@ -138,26 +158,13 @@ async def _ensure_cached(
 
         download_to_file = getattr(provider, "download_to_file", None)
         if download_to_file is not None:
+            async with _download_slots:
+                return await _download_with_ytdlp(download_to_file, source_id, key, data_path, meta_path)
             # Preferred path: let yt-dlp's own downloader fetch the track.
             # It correctly reassembles fragmented/DASH/HLS audio formats,
             # which a plain single-GET byte download of the resolved URL
             # does not — that mismatch was the root cause of tracks that
             # reported the wrong duration and went silent partway through.
-            try:
-                tmp_path, mime = await download_to_file(source_id, _CACHE_DIR, key)
-                tmp_path = Path(tmp_path)
-                # YouTube's m4a comes in 10-second fragments; some players
-                # (Telegram's WebView) go silent after the first one
-                await asyncio.to_thread(defragment, tmp_path)
-                tmp_path.replace(data_path)
-                meta_path.write_text(mime)
-            except AppError:
-                raise
-            except Exception as exc:
-                raise AppError(ErrorCode.RESOLVE_FAILED, "Could not download playback source") from exc
-            await asyncio.to_thread(_prune_cache)
-            return data_path, mime
-
         # Fallback for providers with no yt-dlp downloader hook (e.g.
         # soundcloud, whose resolved URLs are plain progressive files) —
         # stream the already-resolved URL directly.

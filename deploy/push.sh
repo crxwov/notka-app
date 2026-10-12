@@ -11,7 +11,9 @@ set -euo pipefail
 
 HOST="${1:?Укажи адрес сервера: bash deploy/push.sh 203.0.113.10}"
 KEY="${NOTKA_SSH_KEY:-$HOME/.ssh/notka_deploy}"
-SSH=(ssh -i "$KEY" -o StrictHostKeyChecking=accept-new "root@$HOST")
+# the server's sshd listens on 5463 (the standard 22 is closed); NOTKA_SSH_PORT overrides
+PORT="${NOTKA_SSH_PORT:-5463}"
+SSH=(ssh -p "$PORT" -i "$KEY" -o StrictHostKeyChecking=accept-new "root@$HOST")
 
 cd "$(dirname "$0")/.."
 
