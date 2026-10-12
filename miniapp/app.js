@@ -982,16 +982,61 @@
     return { core: hsl(h, 0.9, 0.9), warm: hsl(h, 0.76, 0.62), mid: hsl((h + 340) % 360, 0.5, 0.52), deep: "#44112F" };
   }
 
+  // The cover under the light is only ever seen as a haze. A big picture blurred by 72px
+  // is what made weak phones freeze for seconds on every track change, so the cover is
+  // shrunk to a dozen pixels first and the browser stretches that — the same haze,
+  // for almost nothing. If the picture can't be read (no CORS), the old way is the fallback.
+  const tinyArtCache = new Map();
+  function tinyArt(url) {
+    if (tinyArtCache.has(url)) return Promise.resolve(tinyArtCache.get(url));
+    return new Promise((resolve) => {
+      const img = new Image();
+      let done = false;
+      const finish = (val) => {
+        if (done) return;
+        done = true;
+        if (val) {
+          if (tinyArtCache.size > 40) tinyArtCache.delete(tinyArtCache.keys().next().value);
+          tinyArtCache.set(url, val);
+        }
+        resolve(val);
+      };
+      const timer = setTimeout(() => finish(null), 6000);
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        clearTimeout(timer);
+        try {
+          // two steps down (not one) so the small picture is an average, not a few sharp samples
+          const step = document.createElement("canvas");
+          step.width = step.height = 96;
+          step.getContext("2d").drawImage(img, 0, 0, 96, 96);
+          const tiny = document.createElement("canvas");
+          tiny.width = tiny.height = 12;
+          tiny.getContext("2d").drawImage(step, 0, 0, 12, 12);
+          finish(tiny.toDataURL("image/jpeg", 0.72));
+        } catch (e) {
+          finish(null);
+        }
+      };
+      img.onerror = () => { clearTimeout(timer); finish(null); };
+      img.src = url;
+    });
+  }
+
   let artUrlShown = null;
   function showArtUnderLight(url) {
     if (!lightArt || url === artUrlShown) return;
     artUrlShown = url;
     document.body.classList.toggle("has-art", !!url);
     lightArt.classList.remove("is-shown");
-    setTimeout(() => {
+    setTimeout(async () => {
       if (artUrlShown !== url) return;
-      lightArt.style.backgroundImage = url ? `url("${url.replace(/"/g, "%22")}")` : "";
-      if (url) requestAnimationFrame(() => lightArt.classList.add("is-shown"));
+      if (!url) { lightArt.style.backgroundImage = ""; return; }
+      const tiny = await tinyArt(url);
+      if (artUrlShown !== url) return;
+      lightArt.classList.toggle("is-raw", !tiny);
+      lightArt.style.backgroundImage = `url("${(tiny || url).replace(/"/g, "%22")}")`;
+      requestAnimationFrame(() => lightArt.classList.add("is-shown"));
     }, 450);
   }
 
