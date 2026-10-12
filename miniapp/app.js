@@ -113,7 +113,17 @@
     window.addEventListener("focus", () => { clearTimeout(idleTimer); setIdle(false); });
     document.addEventListener("pointermove", () => { if (root.classList.contains("app-idle")) { setIdle(false); arm(); } }, { passive: true });
   }
-  const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  // who is listening: Telegram's own object, and when a client leaves it empty, the same
+  // thing read from the launch parameters in the address (initData carries the user too)
+  const tgUser = (() => {
+    const direct = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+    if (direct) return direct;
+    try {
+      const fromData = (raw) => { const u = new URLSearchParams(raw || "").get("user"); return u ? JSON.parse(u) : null; };
+      const hash = new URLSearchParams(window.location.hash.slice(1)).get("tgWebAppData");
+      return fromData(tg && tg.initData) || fromData(hash) || null;
+    } catch (e) { return null; }
+  })();
   const hasTgBack = !!(tg && tg.BackButton && tgAtLeast("6.1"));
   if (hasTgBack) document.body.classList.add("tg-back");
 
@@ -1286,6 +1296,42 @@
   }
   document.querySelectorAll(".sheet-anim, .modal-anim").forEach((el) => {
     el.addEventListener("click", (e) => { if (e.target === el) closeOverlay(el.id); });
+  });
+
+  // A sheet is put away by pulling its handle (or its title) down, as in any phone app.
+  document.querySelectorAll(".sheet-anim > .sheet").forEach((sheet) => {
+    const overlay = sheet.parentElement;
+    let drag = null;
+    sheet.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (!e.target.closest(".sheet-handle, .sheet-head, .sheet-title")) return;
+      drag = { id: e.pointerId, y: e.clientY, dy: 0, t: performance.now() };
+      try { sheet.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+    });
+    sheet.addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag.dy = Math.max(0, e.clientY - drag.y);
+      sheet.style.transition = "none";
+      sheet.style.transform = `translateY(${drag.dy}px)`;
+    });
+    const end = (e) => {
+      if (!drag || (e && e.pointerId !== drag.id)) return;
+      const d = drag;
+      drag = null;
+      const speed = d.dy / Math.max(1, performance.now() - d.t); // px per ms
+      if (d.dy > 110 || (d.dy > 36 && speed > 0.5)) {
+        sheet.style.transition = "transform 0.22s ease-out";
+        sheet.style.transform = "translateY(110%)";
+        closeOverlay(overlay.id);
+        setTimeout(() => { sheet.style.transition = ""; sheet.style.transform = ""; }, 420);
+      } else {
+        sheet.style.transition = "transform 0.25s var(--ease-out)";
+        sheet.style.transform = "";
+        setTimeout(() => { sheet.style.transition = ""; }, 280);
+      }
+    };
+    sheet.addEventListener("pointerup", end);
+    sheet.addEventListener("pointercancel", end);
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && openOverlays.length) closeOverlay(openOverlays[openOverlays.length - 1]);
@@ -3016,7 +3062,7 @@
 
   function renderProfile() {
     $("profile-name").textContent = displayName();
-    $("profile-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : "Вход через Telegram";
+    $("profile-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : (tgUser ? "Telegram" : "Открой Нотку из Telegram, чтобы войти");
     renderAvatarInto("profile-avatar-btn", "profile-initial");
 
     // цифры слушателя прямо на профиле; тап открывает статистику
@@ -3618,7 +3664,11 @@
     rose: { name: "Роза", palette: { core: "#FFE1EC", warm: "#FF6FA3", mid: "#C94BD6", deep: "#5B2A9E" } },
     neon: { name: "Неон", palette: { core: "#E8FFF9", warm: "#2CF5C2", mid: "#9B5CFF", deep: "#2A1A8F" } },
     gold: { name: "Золото", palette: { core: "#FFF3C9", warm: "#FFC24B", mid: "#FF7A3D", deep: "#7A2E1E" } },
-    mono: { name: "Серебро", palette: { core: "#FFFFFF", warm: "#C9C4D6", mid: "#8E88A0", deep: "#3B3650" } },
+    mono: { name: "Серебро", palette: { core: "#FFFFFF", warm: "#C9C4D6", mid: "#8E88A0", deep: "#3B3650" }, free: true },
+    // спокойные цвета без Плюса: для тех, у кого розовый режет глаза
+    graphite: { name: "Графит", palette: { core: "#E4E6EA", warm: "#9AA0AB", mid: "#5F6672", deep: "#23262D" }, free: true },
+    midnight: { name: "Полночь", palette: { core: "#D5E0F2", warm: "#5F7FB8", mid: "#3A4F86", deep: "#141C34" }, free: true },
+    moss: { name: "Мох", palette: { core: "#DDE8DA", warm: "#7FA386", mid: "#4A6E5B", deep: "#16261F" }, free: true },
   };
   const BG_PATTERNS = { light: "Свет", prism: "Призма", aurora: "Сияние", horizon: "Горизонт", lava: "Лава" };
   // light: "track" | "preset:<id>" | "pinned" (the palette and cover are in lightPinned)
@@ -3691,7 +3741,8 @@
     if (!a.loot) return hasPlus();
     return ownsItem("atmo_" + id) || (plusPreview() && hasPlus());
   }
-  const lookAllowed = (key, value) => value === LOOK_DEFAULTS[key] || (key === "atmo" ? atmoOwned(value) : hasPlus());
+  const freeLight = (v) => typeof v === "string" && v.startsWith("preset:") && !!(LIGHT_PRESETS[v.slice(7)] || {}).free;
+  const lookAllowed = (key, value) => value === LOOK_DEFAULTS[key] || (key === "atmo" ? atmoOwned(value) : (key === "light" && freeLight(value)) || hasPlus());
   const LOOK_TRY_MS = 60000;
   let lookTried = {}; // what is switched on for a try, without Плюс
   let lookTryTimer = null;
@@ -5302,6 +5353,7 @@
   let resolveAbort = null;
   let failStreak = 0;
   let shuffleOn = false;
+  const queuedIds = new Set(); // tracks put in the queue by hand (see queueTrack)
   let currentSource = null; // "fav" | "pl:<id>" | "album:<title>" | "artist:<name>" | "mix"
 
   // A list's «Слушать» plays it in order; pressed again it pauses/resumes.
@@ -5468,6 +5520,7 @@
     currentTrackId = track.id;
     currentTrack = track;
     if (!opts.keepQueue) {
+      queuedIds.clear();
       originalQueue = queue && queue.length ? queue.slice() : [track];
       currentQueue = shuffleOn ? withShuffledTail(originalQueue, track) : originalQueue.slice();
     }
@@ -5533,6 +5586,14 @@
     } catch (err) {
       if (token !== playToken || (err && err.name === "AbortError")) return;
       console.error(err);
+      // a source answers «no» now and then for one request: the same track once more,
+      // before it is given up on and skipped
+      if (!opts.retried && !(err && err.code === "TRACK_NOT_FOUND")) {
+        await new Promise((r) => setTimeout(r, 1200));
+        if (token !== playToken) return;
+        playTrack(track, currentQueue, { keepQueue: true, retried: true, altTried: opts.altTried, startAt: opts.startAt });
+        return;
+      }
       isStarting = false;
       setLoading(false);
       setPlaying(false);
@@ -5940,6 +6001,34 @@
   });
   syncModeButtons();
 
+  // «Играть следующим» / «В конец очереди»: добавленное встаёт сразу после играющего,
+  // в том порядке, в каком его добавляли (второе «следующим» идёт после первого).
+  function queueTrack(track, atEnd) {
+    if (!track) return;
+    if (!currentTrack || !currentQueue.length) {
+      queuedIds.clear();
+      playTrack(track, [track], { context: "Очередь" });
+      return;
+    }
+    if (track.id === currentTrack.id) { showToast("Этот трек уже играет"); return; }
+    const had = currentQueue.findIndex((t) => t.id === track.id);
+    if (had >= 0) currentQueue.splice(had, 1); // not twice in the queue
+    currentQueueIndex = currentQueue.findIndex((t) => t.id === currentTrack.id);
+    let pos;
+    if (atEnd) pos = currentQueue.length;
+    else {
+      pos = currentQueueIndex + 1;
+      while (pos < currentQueue.length && queuedIds.has(currentQueue[pos].id)) pos++;
+    }
+    currentQueue.splice(pos, 0, track);
+    queuedIds.add(track.id);
+    preparedId = null;
+    prepareNextTrack();
+    renderQueueSheet();
+    haptic("success");
+    showToast(atEnd ? "Добавлено в конец очереди" : "Сыграет следующим");
+  }
+
   function renderQueueSheet() {
     const list = $("queue-list");
     if (!list) return;
@@ -5981,6 +6070,14 @@
     showToast(on ? "Добавлено в любимое" : "Убрано из любимого");
     syncPlayerFav();
     refreshCurrentScreen();
+  });
+  $("menu-track-next").addEventListener("click", () => {
+    closeOverlay("track-menu-sheet");
+    if (trackMenuTrack) queueTrack(trackMenuTrack, false);
+  });
+  $("menu-track-queue").addEventListener("click", () => {
+    closeOverlay("track-menu-sheet");
+    if (trackMenuTrack) queueTrack(trackMenuTrack, true);
   });
   $("menu-track-share").addEventListener("click", () => {
     closeOverlay("track-menu-sheet");
@@ -6650,6 +6747,12 @@
     }
   });
   audio.addEventListener("ended", finishCurrentTrack);
+  // Telegram freezes a page it has put away: «ended» may come late or not at all. On the way
+  // back the player is put in line with what the sound did.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !currentTrack || isStarting) return;
+    if (audio.ended) finishCurrentTrack();
+  });
 
   // Scrubbing: works both as a tap-to-seek and a drag-to-seek (pointer
   // events cover mouse, touch and pen in one handler, which is what makes
