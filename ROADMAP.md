@@ -15,14 +15,14 @@ Fix what real users reported after the app was dropped into the uwc'29 chat (130
 | 3 | Background lag on track change (v148), pattern-card lag (v150), tab re-click animation (v150) | done, deployed; not confirmed on real phones |
 | 4 | Lyric card saving through Telegram `downloadFile` (v149) | done, deployed; not confirmed on Samsung |
 | 5 | Queue («play next», «add to end»), sheet swipe-down, track retry, calm free light colors, name fallback (v151) | done, committed `32051f2`; NOT deployed |
-| 5b | Sync visibility (v152, deployed); search history + taste ranking (v153); data notice + product analytics `/analytics` with opt-out (v154); own «Мой микс» algorithm `miniapp/mix.js` (v155) | committed; v153-v155 NOT deployed |
+| 5b | Sync visibility (v152, deployed); search history + taste ranking (v153); data notice + product analytics `/analytics` with opt-out (v154); own «Мой микс» algorithm `miniapp/mix.js` (v155, deployed); track profiles (sound via ReccoBeats, genres via MusicBrainz) + mood ranking `track_profile.py` (v156), see `MOOD_RESEARCH.md` | v156 committed, NOT deployed |
 | 6 | Device-dependent layout bugs: Samsung nav bar overlap, sheet vs full-screen open, mini-mode paddings, shaking header | blocked: needs screen recordings |
 | 7 | iPhone download failure | blocked: needs error details from the reporter (Eva) |
 | 8 | Albums assembled from singles/features | not started; root cause is YouTube Music data, needs design |
 | 9 | Product wishes (language wave, similar songs, profile customization, release-date filter, year recap, APK) | waiting for owner decisions |
 
 ## Current State
-Branch `plus-wheel-and-perf`. Live app is v152. v153-v155 (search history, taste ranking, data notice, analytics, own mix algorithm) are committed, not deployed.
+Branch `plus-wheel-and-perf`. Live app is v155. v156 (track profiles + mood ranking) is committed, not deployed.
 
 ## Findings and Decisions
 - Yandex API refuses non-Russian IPs. Fix: `YANDEX_PROXY` in `/opt/notka/app/.env` (proxys.io shared IPv4, 30 days, expires ~2026-11-11). Fallback relay kept in `deploy/yandex_relay*`.
@@ -30,6 +30,8 @@ Branch `plus-wheel-and-perf`. Live app is v152. v153-v155 (search history, taste
 - Domain purchase postponed by owner (hackov: server IP is visible).
 - The agent cannot write to the server over ssh in auto mode. Deploy is always the owner running `bash deploy/push.sh 94.156.179.229` via the `!` prefix.
 - "вовчик" is a classmate (regular user), not a coder. "ск" in chats means SoundCloud, not VK.
+
+- Owner chose (2026-10-12) to send 30 s audio excerpts of played tracks to ReccoBeats for mood analysis. Their terms were not read; lawyer to check. Kill switch: `NOTKA_NO_PROFILING=1`.
 
 ## Issues and Failed Attempts
 - ssh to the server was briefly dropped after one deploy; app stayed healthy. Watch for repeat.
@@ -46,7 +48,7 @@ Import checked on the live server for Spotify, Yandex, Apple, Deezer, SoundCloud
 - Owner decisions for stage 9.
 
 ## Next Action
-1. Owner deploys: `! bash deploy/push.sh 94.156.179.229`; then verify served version 155, `/analytics` returns 401 without login, and the admin counters `sync_*`, `an_events` appear.
+1. Owner deploys: `! bash deploy/push.sh 94.156.179.229`; then verify served version 156 and `GET /profile?source=youtube_music&id=<id>&artist=<name>` after a few plays, `/analytics` returns 401 without login, and the admin counters `sync_*`, `an_events` appear.
 2. Ask reporters (adeline, Степан, Eva) for recordings/details for stages 6-7.
 
 ## Resume Context

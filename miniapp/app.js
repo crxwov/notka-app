@@ -2173,6 +2173,26 @@
     if (currentQueueIndex < currentQueue.length - 3) return;
     mixExtending = true;
     try {
+      if (/^mood:/.test(currentMixKey || "")) {
+        // the mood stays: a new set for the same mood, without what is already in the queue
+        const moodKey = currentMixKey.slice(5);
+        const res = await fetch(`${API_BASE_URL}/mood`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(Object.assign({ key: moodKey }, tasteProfile())),
+        });
+        if (res.ok) {
+          const have = new Set(currentQueue.map((t) => t.id));
+          const more = ((await res.json()).results || []).filter((t) => !have.has(t.id));
+          if (more.length && currentMixKey === `mood:${moodKey}`) {
+            currentQueue.push(...more);
+            originalQueue.push(...more);
+            renderQueueSheet();
+            prepareNextTrack();
+          }
+        }
+        return;
+      }
       const known = knownTracks();
       const inQueue = new Set(currentQueue.map((t) => t.id));
       // the next part grows from what was heard on in this session (and the track now playing)
@@ -2243,7 +2263,7 @@
     const seed = (t) => {
       if (!t || !t.source || !t.sourceId || taken.has(t.id) || seeds.length >= 40) return;
       taken.add(t.id);
-      seeds.push({ source: t.source, id: t.sourceId });
+      seeds.push({ source: t.source, id: t.sourceId, artist: String(t.artist || "").slice(0, 80) });
     };
     state.favorites.forEach(seed);
     Object.values(listensView().tracks).sort((a, b) => b.plays - a.plays || b.seconds - a.seconds).forEach((x) => seed(x.track));
@@ -5886,7 +5906,7 @@
       // The backend downloads the track (or finds it already on disk) and
       // only then says "ready" — so a track that can't be played comes
       // back as an error with a reason, not as a silent player.
-      const res = await fetch(`${API_BASE_URL}/prepare?${trackQuery(track)}`, resolveAbort ? { signal: resolveAbort.signal } : undefined);
+      const res = await fetch(`${API_BASE_URL}/prepare?${prepareQuery(track)}`, resolveAbort ? { signal: resolveAbort.signal } : undefined);
       if (token !== playToken) return;
       if (!res.ok) {
         let code = null;
@@ -5961,6 +5981,10 @@
   function trackQuery(track) {
     return `source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}`;
   }
+  // the same, with what the server needs to remember how the track sounds (once, in the background)
+  function prepareQuery(track) {
+    return `${trackQuery(track)}&title=${encodeURIComponent((track.title || "").slice(0, 160))}&artist=${encodeURIComponent((track.artist || "").slice(0, 160))}&duration=${Math.round(track.duration || 0)}`;
+  }
 
   // While a track plays, the backend gets the next one ready, so the
   // switch between tracks doesn't wait for a download.
@@ -5969,7 +5993,7 @@
     const next = currentQueue[currentQueueIndex + 1];
     if (!next || next.id === preparedId) return;
     preparedId = next.id;
-    fetch(`${API_BASE_URL}/prepare?${trackQuery(next)}`).catch(() => {});
+    fetch(`${API_BASE_URL}/prepare?${prepareQuery(next)}`).catch(() => {});
   }
 
   function withShuffledTail(queue, current) {

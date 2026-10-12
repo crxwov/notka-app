@@ -20,7 +20,7 @@ from music_resolver.errors import AppError, ErrorCode
 from music_resolver.models import AlbumResponse, ArtistResponse, ResolveResponse, SearchResponse
 from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
-from music_resolver.services import admin_stats, events_store, metrics, mood_mix, plus_store, sync_store
+from music_resolver.services import admin_stats, events_store, metrics, mood_mix, plus_store, sync_store, track_profile
 from music_resolver.services.playlist_import import read_playlist
 from music_resolver.utils.remux import defragment, defragment_all, ffmpeg_exe
 
@@ -811,10 +811,37 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     # its player at /stream (so a failure comes back as a readable error),
     # and ahead of time for the next track in the queue ----
     @router.get("/prepare")
-    async def prepare(source: str = Query(..., min_length=1), id: str = Query(..., min_length=1)) -> dict[str, bool]:
-        await audio_file(source, id)
+    async def prepare(
+        source: str = Query(..., min_length=1),
+        id: str = Query(..., min_length=1),
+        title: str = Query(default="", max_length=200),
+        artist: str = Query(default="", max_length=200),
+        duration: float | None = Query(default=None, ge=0, le=36000),
+    ) -> dict[str, bool]:
+        data_path, _mime = await audio_file(source, id)
         metrics.count("play")  # one per started track: the app asks for this once for each
+        # the track is on disk now: what it sounds like is measured once, in the background
+        if artist or title:
+            try:
+                track_profile.want_sound(f"{source}_{id}", data_path, duration, title, artist)
+            except Exception:  # never in the listener's way
+                pass
         return {"ready": True}
+
+    # ---- what Нотка knows about a track: sound, mood fit, the artist's genres ----
+    @router.get("/profile")
+    async def track_profile_view(source: str = Query(...), id: str = Query(...), artist: str = Query(default="")) -> dict:
+        key = f"{source}_{id}"
+        own = track_profile.known(key)
+        fits = {}
+        for mood in track_profile.MOODS:
+            fit, how = track_profile.fit_for(key, artist, mood)
+            fits[mood] = {"fit": fit, "from": how}
+        ak = track_profile.artist_key(artist)
+        with track_profile._lock:
+            tags = (track_profile._artists_db().get(ak) or {}).get("tags") or []
+        track_profile.want_artist(artist)
+        return {"sound": own, "moods": fits, "tags": tags, "profiled_tracks": track_profile.known_count()}
 
     # ---- «Скачать»: the cached audio as a named file ----
     @router.get("/download")

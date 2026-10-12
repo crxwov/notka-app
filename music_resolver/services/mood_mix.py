@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Callable
 
 from music_resolver.models import TrackCandidate
-from music_resolver.services import energy
+from music_resolver.services import energy, track_profile
 
 # which end of the listener's own calm-to-lively scale a mood wants, and
 # how wide a part of it: (from, to) as shares of that scale
@@ -47,6 +47,32 @@ def _artist_parts(artist: str) -> list[str]:
     return [part.strip().lower() for part in re.split(r",|&| feat\.? ", artist or "") if part.strip()]
 
 
+def _by_mood(key: str, tracks: list[TrackCandidate], seed_artists: set[str] | None = None) -> list[TrackCandidate]:
+    """Puts the tracks that suit the mood first and drops the ones that clearly do not.
+
+    A track is judged by its own sound when it has been measured, by the artist's
+    other tracks when not, and by the artist's genres as a last resort. What is not
+    known at all keeps a middle place (it may be exactly right), and the unknown
+    artists are queued to be looked up, so the next mix knows more."""
+    if key not in track_profile.MOODS or len(tracks) < 4:
+        return tracks
+    scored = []
+    for t in tracks:
+        fit, how = track_profile.fit_for(f"{t.source}_{t.source_id}", t.artist, key)
+        if how == "none":
+            track_profile.want_artist(t.artist)
+        if fit is not None and how in ("track", "artist") and fit < 0.25:
+            continue  # measured, and it is not that kind of music
+        score = fit if fit is not None else 0.45
+        if how == "tags":
+            score = min(score, 0.6)  # a genre alone is a weak reason
+        scored.append((score + random.random() * 0.12, t))
+    if len(scored) < 6:  # too strict for what there is: keep the order as it was
+        return tracks
+    scored.sort(key=lambda x: -x[0])
+    return [t for _, t in scored]
+
+
 def build(
     provider,
     key: str,
@@ -63,9 +89,9 @@ def build(
     for seed in seeds:
         vid = video_id(str(seed.get("source") or ""), str(seed.get("id") or ""))
         if vid:
-            usable.append({"key": f"{seed['source']}_{seed['id']}", "source": seed["source"], "id": seed["id"], "video": vid})
+            usable.append({"key": f"{seed['source']}_{seed['id']}", "source": seed["source"], "id": seed["id"], "video": vid, "artist": str(seed.get("artist") or "")})
     if wanted is None or len(usable) < 2:
-        return provider._mood_tracks_sync(key, limit, artists, ru_share), []
+        return _by_mood(key, provider._mood_tracks_sync(key, limit * 2, artists, ru_share))[:limit], []
 
     # 1. where each of the listener's tracks stands between calm and lively
     measured: dict[str, dict] = {}
@@ -96,6 +122,13 @@ def build(
         # too little of this listener's music has been heard through Нотка
         # to be measured yet: their taste still comes first, the mood second
         fitting = usable[:12]
+    # a seed whose own sound is known to suit the mood goes first
+    def seed_fit(seed: dict) -> float:
+        fit, how = track_profile.fit_for(seed["key"], seed.get("artist", ""), key)
+        return fit if fit is not None and how in ("track", "artist") else 0.0
+    measured_seeds = sorted((s for s in usable if seed_fit(s) >= 0.55), key=lambda s: -seed_fit(s))
+    if len(measured_seeds) >= 2:
+        fitting = measured_seeds[:12]
     picked = random.sample(fitting, min(_SEEDS, len(fitting)))
 
     # 3. what would play next after each of them
@@ -122,7 +155,7 @@ def build(
     for row in zip(*[radio + [None] * (25 - len(radio)) for radio in radios]) if radios else []:
         near.extend(track for track in row if track is not None and fresh(track))
     if len(near) < 8:
-        return provider._mood_tracks_sync(key, limit, artists, ru_share), [s["id"] for s in picked]
+        return _by_mood(key, provider._mood_tracks_sync(key, limit * 2, artists, ru_share))[:limit], [s["id"] for s in picked]
 
     # 4. from the mood's own playlists — only what is by artists already near
     neighbours = {part for track in near for part in _artist_parts(track.artist)}
@@ -133,6 +166,8 @@ def build(
         mood_pool = []
     from_mood = [t for t in mood_pool if any(part in neighbours for part in _artist_parts(t.artist)) and fresh(t)][:10]
 
+    near = _by_mood(key, near)
+    from_mood = _by_mood(key, from_mood)
     mix = near[:limit]
     for index, track in enumerate(from_mood):  # spread through the mix, not bunched at an end
         mix.insert(min(len(mix), 3 + index * 4), track)
