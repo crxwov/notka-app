@@ -23,7 +23,7 @@ Fix what real users reported after the app was dropped into the uwc'29 chat (130
 | 9 | Product wishes (language wave, similar songs, profile customization, release-date filter, year recap, APK) | waiting for owner decisions |
 
 ## Current State
-Branch `plus-wheel-and-perf`. Live app is v157 (deployed 2026-10-12 evening): track profiles + mood ranking, word-by-word lyrics, download limit.
+Branch `plus-wheel-and-perf`. Live app is v158 (deployed 2026-10-13: smooth word fill in lyrics, neutral buttons in Минимализм; before: v157): track profiles + mood ranking, word-by-word lyrics, download limit.
 
 ## Findings and Decisions
 - Yandex API refuses non-Russian IPs. Fix: `YANDEX_PROXY` in `/opt/notka/app/.env` (proxys.io shared IPv4, 30 days, expires ~2026-11-11). Fallback relay kept in `deploy/yandex_relay*`.
