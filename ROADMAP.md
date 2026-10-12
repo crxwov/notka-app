@@ -22,13 +22,14 @@ Fix what real users reported after the app was dropped into the uwc'29 chat (130
 | 9 | Product wishes (language wave, similar songs, profile customization, release-date filter, year recap, APK) | waiting for owner decisions |
 
 ## Current State
-Branch `plus-wheel-and-perf`. Live app is v155. v156 (track profiles + mood ranking) is committed, not deployed.
+Branch `plus-wheel-and-perf`. Live app is v157 (deployed 2026-10-12 evening): track profiles + mood ranking, word-by-word lyrics, download limit.
 
 ## Findings and Decisions
 - Yandex API refuses non-Russian IPs. Fix: `YANDEX_PROXY` in `/opt/notka/app/.env` (proxys.io shared IPv4, 30 days, expires ~2026-11-11). Fallback relay kept in `deploy/yandex_relay*`.
 - VK playlists cannot be read without an account login. Owner said "drop it for now". Options kept: paste-a-list import, or a dedicated VK account (against VK rules).
 - Domain purchase postponed by owner (hackov: server IP is visible).
-- The agent cannot write to the server over ssh in auto mode. Deploy is always the owner running `bash deploy/push.sh 94.156.179.229` via the `!` prefix.
+- **Server ssh is on port 5463** (sshd hardening moved it; port 22 closes connections). Root with `~/.ssh/notka_deploy` works on 5463; `deploy/push.sh` uses 5463 by default (`NOTKA_SSH_PORT`). Non-root `leksik` (key `id_ed25519`) has sudo with password only. Swap 2 GB and `DOWNLOAD_PARALLEL=2` (default) added 2026-10-12.
+- The agent could not write to the server over ssh in auto mode earlier. Deploy is always the owner running `bash deploy/push.sh 94.156.179.229` via the `!` prefix.
 - "вовчик" is a classmate (regular user), not a coder. "ск" in chats means SoundCloud, not VK.
 
 - Owner chose (2026-10-12) to send 30 s audio excerpts of played tracks to ReccoBeats for mood analysis. Their terms were not read; lawyer to check. Kill switch: `NOTKA_NO_PROFILING=1`.
