@@ -398,7 +398,20 @@
     return listensViewCache;
   }
 
-  const syncOn = () => !!(tg && tg.initData);
+  // the signed launch data: from the bridge, and when that script did not load, from the
+  // address Telegram opened the page with (#tgWebAppData=...), which carries the same string
+  const tgInitRaw = (() => {
+    try {
+      return (tg && tg.initData) || new URLSearchParams(window.location.hash.slice(1)).get("tgWebAppData") || "";
+    } catch (e) { return ""; }
+  })();
+  const syncOn = () => !!tgInitRaw;
+  // what the sync is doing, for the account screen: idle | ok | auth | big | net
+  let syncStatus = { code: "idle", at: 0 };
+  function setSyncStatus(code) {
+    syncStatus = { code, at: Date.now() };
+    try { if (typeof currentScreen !== "undefined" && currentScreen === "account") renderAccountScreen(); } catch (e) { /* not drawn yet */ }
+  }
   let syncBusy = false, syncAgain = false, syncTimer = 0, syncDeadAt = 0, syncLastAt = 0;
   function scheduleSync(ms) {
     if (!syncOn() || Date.now() < syncDeadAt) return;
@@ -408,10 +421,11 @@
   async function postSync(payload) {
     const res = await fetch(`${API_BASE_URL}/sync`, {
       method: "POST",
-      headers: { "content-type": "application/json", "X-Telegram-Init-Data": tg.initData },
+      headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitRaw },
       body: JSON.stringify(payload),
     });
-    if (res.status === 401 || res.status === 413) { syncDeadAt = Date.now() + 6 * 3600 * 1000; throw new Error("sync off"); }
+    if (res.status === 401) { syncDeadAt = Date.now() + 20 * 60 * 1000; const e = new Error("sync auth"); e.syncCode = "auth"; throw e; }
+    if (res.status === 413) { syncDeadAt = Date.now() + 2 * 3600 * 1000; const e = new Error("sync big"); e.syncCode = "big"; throw e; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
@@ -501,6 +515,7 @@
       const res = await postSync({ shared, ts, device: { id: syncDeviceId, listens: state.listens }, clear_listens: reset });
       if (reset) state.listensResetPending = false;
       syncLastAt = Date.now();
+      setSyncStatus("ok");
       if (applyRemote(res)) {
         if (typeof refreshCurrentScreen === "function") refreshCurrentScreen();
         if (typeof renderLibrary === "function") renderLibrary();
@@ -508,6 +523,7 @@
       }
     } catch (e) {
       // offline or the server is busy: the next change or the next visit tries again
+      setSyncStatus((e && e.syncCode) || "net");
     } finally {
       syncBusy = false;
       if (syncAgain) { syncAgain = false; scheduleSync(2000); }
@@ -3112,7 +3128,28 @@
     $("account-name").textContent = displayName();
     renderAvatarInto("account-avatar", "account-initial");
     const platforms = { ios: "iPhone", android: "Android", android_x: "Android", tdesktop: "Telegram Desktop", macos: "Mac", weba: "Telegram Web", webk: "Telegram Web" };
-    $("account-sessions-count").textContent = (tg && platforms[tg.platform]) || "Браузер";
+    const where = (tg && platforms[tg.platform]) || "";
+    const hhmm = (t) => new Date(t).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    let syncValue = "Включена", syncNote = "Любимое и плейлисты общие на всех устройствах";
+    if (!syncOn()) {
+      syncValue = "Выключена";
+      syncNote = "Нотка открыта не из Telegram. Открой её через бота @notka_app_bot, и всё объединится";
+    } else if (syncStatus.code === "auth") {
+      syncValue = "Не работает";
+      syncNote = "Сессия устарела. Закрой Нотку и открой её заново из Telegram. Нажми, чтобы попробовать ещё раз";
+    } else if (syncStatus.code === "big") {
+      syncValue = "Не работает";
+      syncNote = "Слишком много данных в аккаунте. Удали ненужные плейлисты, или напиши в поддержку";
+    } else if (syncStatus.code === "net") {
+      syncValue = "Нет связи";
+      syncNote = "Попробуем ещё раз сами. Нажми, чтобы проверить сейчас";
+    } else if (syncStatus.code === "ok") {
+      syncNote = `Последний раз в ${hhmm(syncStatus.at)}${where ? " · это " + where : ""}. Нажми, чтобы обновить сейчас`;
+    } else {
+      syncNote = "Проверяем…";
+    }
+    $("account-sessions-count").textContent = syncValue;
+    $("account-sync-sub").textContent = syncNote;
     const tgName = tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") : "";
     const customName = !!Store.getAccountName(), customPhoto = !!Store.getAccountAvatar();
     $("account-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : "";
@@ -3124,6 +3161,13 @@
     $("acc-lists").textContent = String(state.playlists.length);
     $("acc-follows").textContent = String(state.followedArtists.length);
   }
+  $("account-sessions-row").addEventListener("click", () => {
+    if (!syncOn()) { showToast("Открой Нотку из Telegram, чтобы включить синхронизацию"); return; }
+    syncDeadAt = 0;
+    haptic("light");
+    setSyncStatus("idle");
+    syncNow();
+  });
   $("account-row-name").addEventListener("click", () => $("account-name-row").click());
   $("account-row-photo").addEventListener("click", () => changeAccountAvatar());
   $("account-restore-tg").addEventListener("click", () => {
@@ -3398,7 +3442,7 @@
   // Real Плюс comes from the server (a promo code now, a payment later): it
   // answers for the Telegram user behind this Mini App. The last answer is
   // remembered, so the app doesn't wait for the network to look right.
-  const tgInitData = (tg && tg.initData) || "";
+  const tgInitData = tgInitRaw;
   function plusUntil() {
     try { return +localStorage.getItem("notka_plus_until") || 0; } catch (e) { return 0; }
   }
@@ -4985,11 +5029,11 @@
   // says nothing. Telegram's own «save file» does the job, but takes a link: the picture is put on
   // the server for a quarter of an hour and the link is handed over.
   async function saveImageViaTelegram(blob, name) {
-    if (!(tg && typeof tg.downloadFile === "function" && tgAtLeast("8.0") && tg.initData)) return false;
+    if (!(tg && typeof tg.downloadFile === "function" && tgAtLeast("8.0") && tgInitRaw)) return false;
     try {
       const res = await fetch(`${API_BASE_URL}/card`, {
         method: "POST",
-        headers: { "content-type": blob.type || "image/png", "X-Telegram-Init-Data": tg.initData },
+        headers: { "content-type": blob.type || "image/png", "X-Telegram-Init-Data": tgInitRaw },
         body: blob,
       });
       if (!res.ok) return false;

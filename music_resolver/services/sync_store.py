@@ -25,7 +25,7 @@ DATA_DIR = Path(os.environ.get("NOTKA_DATA_DIR") or Path(__file__).resolve().par
 _DIR = DATA_DIR / "sync"
 _LOCK = threading.Lock()
 
-MAX_BYTES = 6 * 1024 * 1024  # one account's whole state
+MAX_BYTES = 12 * 1024 * 1024  # one account's whole state (a thousand-track import is ~0.6 MB each)
 MAX_DEVICES = 8
 
 # only these keys are shared: the rest of a device's state is its own
