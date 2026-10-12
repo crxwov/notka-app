@@ -2550,3 +2550,6 @@ body[data-screen="player"] .player-only { display: block; }
   mask-image: linear-gradient(#000 45%, transparent);
 }
 .modal-actions-stack .modal-actions-row .pill-btn { flex: 1; width: auto; }
+
+/* cards of the light-pattern picker that are not on the screen stand still (see watchPatternCards) */
+.pattern-opt.is-off .pattern-thumb, .pattern-opt.is-off .pattern-thumb * { animation-play-state: paused !important; }

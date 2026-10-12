@@ -1138,8 +1138,8 @@
     $("side-fs-label").textContent = tg && tg.isFullscreen ? "Свернуть в окно · Esc" : "На весь экран · F11";
     $("side-close-btn").hidden = !canFullscreen;
   }
-  $("side-fav-btn").addEventListener("click", () => showScreen("favorites"));
-  $("side-profile-btn").addEventListener("click", () => showScreen("profile"));
+  $("side-fav-btn").addEventListener("click", () => { if (currentScreen !== "favorites") showScreen("favorites"); });
+  $("side-profile-btn").addEventListener("click", () => { if (currentScreen !== "profile") showScreen("profile"); });
   $("side-fs-btn").addEventListener("click", () => setFullscreen(!(tg && tg.isFullscreen)));
   if (tg && tg.onEvent) tg.onEvent("fullscreenChanged", renderSidebar);
   document.addEventListener("keydown", (e) => {
@@ -1249,7 +1249,14 @@
 
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (btn.dataset.tab !== currentScreen) haptic("select");
+      // the tab already open: nothing is drawn again (that restarted the screen's animation on
+      // every click) — the page just goes back to its top, as in any app
+      if (btn.dataset.tab === currentScreen) {
+        const el = screens[currentScreen];
+        if (el && el.scrollTop > 0) el.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      haptic("select");
       showScreen(btn.dataset.tab);
     });
   });
@@ -3876,9 +3883,24 @@
     const ui = '<span class="pv-ui"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d1"></i><i class="e1"></i></span>';
     box.innerHTML = Object.entries(BG_PATTERNS).map(([id, name]) => `<button class="pattern-opt" type="button" data-bg="${id}"><span class="pattern-thumb" data-bg="${id}" aria-hidden="true"><span class="pv"><span class="light-group"><span class="light-shape"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>${orbs}</span>${ui}</span></span><span class="pattern-name">${name}</span></button>`).join("");
   }
+  // Every pattern card is a small living light (several blurred, blended orbs). Seven of them
+  // moving at once, under the real light, is what froze weak phones the moment a pattern was
+  // picked. Only the cards that are on the screen move.
+  let patternWatch = null;
+  function watchPatternCards() {
+    if (patternWatch || !("IntersectionObserver" in window)) return;
+    patternWatch = new IntersectionObserver((entries) => {
+      entries.forEach((en) => en.target.classList.toggle("is-off", !en.isIntersecting));
+    }, { root: null, threshold: 0.05 });
+    document.querySelectorAll("#look-patterns .pattern-opt").forEach((el) => {
+      el.classList.add("is-off");
+      patternWatch.observe(el);
+    });
+  }
   function renderLookScreen() {
     renderAtmoStage();
     renderPatterns();
+    watchPatternCards();
     const colors = $("look-colors");
     if (!colors.children.length) {
       const swatch = (value, name, p) => {
