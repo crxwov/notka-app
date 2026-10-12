@@ -206,6 +206,57 @@ async def _deezer(kind: str, item_id: str) -> dict:
     return {"service": "deezer", "name": head.get("title") or "", "tracks": tracks}
 
 
+# ------------------------------------------------------------- SoundCloud
+# A set's page carries the player's public key and the set itself; only the
+# first few tracks come with their names, the rest are bare ids. Those are
+# asked for in batches by the same public interface the site's player uses.
+_SC_BATCH = 50
+
+
+def _sc_item(track: dict) -> dict | None:
+    meta = track.get("publisher_metadata") or {}
+    artist = meta.get("artist") or (track.get("user") or {}).get("username") or ""
+    return _item(track.get("title"), artist, track.get("duration"))
+
+
+async def _soundcloud(url: str) -> dict:
+    res = await _get(url)
+    found = re.search(r"window\.__sc_hydration\s*=\s*(\[.*?\]);\s*</script>", res.text, re.S)
+    if res.status_code != 200 or not found:
+        raise _unreadable("SoundCloud did not show this playlist")
+    try:
+        hydration = json.loads(found.group(1))
+    except ValueError as exc:
+        raise _unreadable("SoundCloud did not show this playlist") from exc
+    playlist = next((x.get("data") for x in hydration if x.get("hydratable") == "playlist"), None)
+    client_id = next((((x.get("data") or {}).get("id")) for x in hydration if x.get("hydratable") == "apiClient"), None)
+    if not isinstance(playlist, dict):
+        raise _unreadable("SoundCloud did not show this playlist")
+
+    raw = [t for t in (playlist.get("tracks") or []) if isinstance(t, dict)][:MAX_TRACKS]
+    named: dict[int, dict] = {t["id"]: t for t in raw if t.get("title") and t.get("id")}
+    missing = [t["id"] for t in raw if t.get("id") and not t.get("title")]
+    if missing and client_id:
+        async with httpx.AsyncClient(timeout=25, headers=_HEADERS) as client:
+            for i in range(0, len(missing), _SC_BATCH):
+                chunk = missing[i:i + _SC_BATCH]
+                try:
+                    r = await client.get(
+                        "https://api-v2.soundcloud.com/tracks",
+                        params={"ids": ",".join(str(x) for x in chunk), "client_id": client_id},
+                    )
+                    if r.status_code != 200:
+                        continue
+                    for t in r.json():
+                        if isinstance(t, dict) and t.get("id") and t.get("title"):
+                            named[t["id"]] = t
+                except (httpx.HTTPError, ValueError):
+                    continue
+    # the set's own order, tracks that stayed nameless (removed, private) dropped
+    tracks = [_sc_item(named[t["id"]]) for t in raw if t.get("id") in named]
+    return {"service": "soundcloud", "name": playlist.get("title") or "", "tracks": tracks}
+
+
 # ------------------------------------------------------------ Apple Music
 def _apple_items(node, out: list) -> None:
     if isinstance(node, dict):
@@ -346,6 +397,14 @@ async def read_playlist(url: str, youtube_music_provider=None) -> dict:
             if not found:
                 raise AppError(ErrorCode.INVALID_SOURCE_URL, "Not a playlist link")
             data = await _deezer(found.group(1), found.group(2))
+        elif host in {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}:
+            final = url
+            if host == "on.soundcloud.com":  # a share link: the set page is where it leads
+                final = str((await _get(url)).url)
+            final_url = urlparse(final)
+            if "/sets/" not in final_url.path:
+                raise AppError(ErrorCode.INVALID_SOURCE_URL, "Not a playlist link")
+            data = await _soundcloud(f"https://soundcloud.com{final_url.path}")
         elif host == "music.apple.com":
             if "/playlist/" in path or "/album/" in path:
                 data = await _apple(url)
