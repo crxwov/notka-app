@@ -166,6 +166,46 @@ async def _yandex(path: str, album: bool = False) -> dict:
     return {"service": "yandex", "name": result.get("title") or "", "tracks": _yandex_tracks(raw)}
 
 
+# ----------------------------------------------------------------- Deezer
+# Deezer's public catalog interface needs no account and no key. A playlist's
+# tracks come page by page; an album carries them in one answer.
+async def _deezer(kind: str, item_id: str) -> dict:
+    res = await _get(f"https://api.deezer.com/{kind}/{item_id}")
+    try:
+        head = res.json()
+    except ValueError:
+        head = None
+    if res.status_code != 200 or not isinstance(head, dict) or head.get("error"):
+        raise _unreadable("Deezer did not show this playlist")
+    if kind == "album":
+        artist = (head.get("artist") or {}).get("name") or ""
+        raw = [dict(t, _artist=artist) for t in ((head.get("tracks") or {}).get("data") or [])]
+    else:
+        raw = []
+        index = 0
+        while index < MAX_TRACKS:
+            page_res = await _get(f"https://api.deezer.com/playlist/{item_id}/tracks", params={"limit": PAGE, "index": index})
+            try:
+                page = page_res.json().get("data") or []
+            except (ValueError, AttributeError):
+                break
+            if page_res.status_code != 200 or not page:
+                break
+            raw.extend(page)
+            if len(page) < PAGE:
+                break
+            index += PAGE
+    tracks = []
+    for t in raw:
+        if not isinstance(t, dict):
+            continue
+        title = t.get("title") or ""
+        artist = (t.get("artist") or {}).get("name") or t.get("_artist") or ""
+        duration = t.get("duration")
+        tracks.append(_item(title, artist, duration * 1000 if duration else None))
+    return {"service": "deezer", "name": head.get("title") or "", "tracks": tracks}
+
+
 # ------------------------------------------------------------ Apple Music
 def _apple_items(node, out: list) -> None:
     if isinstance(node, dict):
@@ -298,6 +338,14 @@ async def read_playlist(url: str, youtube_music_provider=None) -> dict:
                 data = await _yandex(f"albums/{album.group(1)}/with-tracks", album=True)
             else:
                 raise AppError(ErrorCode.INVALID_SOURCE_URL, "Not a playlist link")
+        elif host in {"deezer.com", "link.deezer.com", "deezer.page.link", "dzr.page.link"}:
+            final = url
+            if host != "deezer.com":  # a share link: the real address is where it leads
+                final = str((await _get(url)).url)
+            found = re.search(r"/(playlist|album)/(\d+)", urlparse(final).path)
+            if not found:
+                raise AppError(ErrorCode.INVALID_SOURCE_URL, "Not a playlist link")
+            data = await _deezer(found.group(1), found.group(2))
         elif host == "music.apple.com":
             if "/playlist/" in path or "/album/" in path:
                 data = await _apple(url)

@@ -1539,7 +1539,7 @@
         let code = null;
         try { code = (await res.json()).error.code; } catch (e) { /* no readable reason */ }
         problem = code === "INVALID_SOURCE_URL"
-          ? "Это не похоже на ссылку на плейлист. Подойдут Spotify, Яндекс Музыка, Apple Music и YouTube Music."
+          ? "Это не похоже на ссылку на плейлист. Подойдут Spotify, Яндекс Музыка, Apple Music, Deezer и YouTube Music."
           : "Не получилось прочитать плейлист. Проверь, что он открыт для всех по ссылке.";
       }
     } catch (e) {
