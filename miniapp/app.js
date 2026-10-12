@@ -253,6 +253,7 @@
         sharedImports: parsed.sharedImports || {},
         recent: parsed.recent || [], // the last tracks played, newest first
         searchHistory: parsed.searchHistory || [], // what was searched and opened from search, newest first
+        skipStats: parsed.skipStats || {}, // per artist: how often a track was turned away early (s) or heard on (p); this device only
         fresh: parsed.fresh || null, // { key, at, items } — «Новое от любимых исполнителей»
         events: parsed.events || null, // { progress, items } — see «События»
         syncTs: parsed.syncTs || {}, // when each shared key last changed on this device
@@ -271,6 +272,7 @@
   const state = loadState();
   state.events = state.events || { progress: {}, items: [] };
   state.searchHistory = state.searchHistory || [];
+  state.skipStats = state.skipStats || {};
   function ownsItem(item) { return state.events.items.includes(item); }
   // Only what a row needs to be shown and played again.
   function slimTrack(t) {
@@ -2084,23 +2086,53 @@
     const rest = shuffled(pool.filter((t) => !fresh.some((f) => f.id === t.id)));
     return [...fresh, ...rest].slice(0, n);
   }
+  // ---- «Мой микс» is put together here (the rules are in mix.js); YouTube Music only says what plays nearby ----
+  const artistKeyOf = (name) => String(name || "").toLowerCase().split(/,|&| feat\.? | x /)[0].trim();
+  const sessionGood = []; // tracks of this session that were heard on: the next top-up grows from them
+  function noteListened(track, heard) {
+    if (!track) return;
+    const k = artistKeyOf(track.artist);
+    if (!k) return;
+    const e = state.skipStats[k] || (state.skipStats[k] = { s: 0, p: 0, u: 0 });
+    if (heard < 30) e.s++; else e.p++;
+    e.u = Date.now();
+    const keys = Object.keys(state.skipStats);
+    if (keys.length > 300) keys.sort((a, b) => state.skipStats[a].u - state.skipStats[b].u).slice(0, keys.length - 300).forEach((x) => delete state.skipStats[x]);
+    if (heard >= 30) { sessionGood.push(track); if (sessionGood.length > 10) sessionGood.shift(); }
+    persist(true);
+  }
+  function mixProfile() {
+    const taste = currentTaste();
+    const favIds = new Set(state.favorites.map((t) => t.id));
+    const plays = (t) => { const x = state.listens && state.listens.tracks && state.listens.tracks[t.id]; return x ? x.plays || 0 : 0; };
+    const dayAgo2 = Date.now() - 2 * 86400000;
+    return {
+      affinity: (a) => tasteOf(taste, a),
+      trackWeight: (t) => Math.min(1, (favIds.has(t.id) ? 0.5 : 0) + Math.min(0.5, plays(t) * 0.1)),
+      skips: (a) => (state.skipStats[artistKeyOf(a)] || {}).s || 0,
+      skipRate: (a) => { const e = state.skipStats[artistKeyOf(a)]; return e ? e.s / (e.s + e.p + 2) : 0; },
+      recentIds: new Set((state.recent || []).filter((t) => (t.at || 0) > dayAgo2).map((t) => t.id)),
+      allowSpam: [...knownTracks().values()].some((t) => window.NotkaMix && window.NotkaMix.SPAM.test(t.title || "")),
+    };
+  }
   async function buildMix() {
     const known = knownTracks();
-    const pool = [...known.values()].filter((t) => t.source === "youtube_music");
-    if (!pool.length) return shuffled([...known.values()]);
-    const lists = await Promise.all(pickSeeds(pool, 4).map((s) => fetchRadio(s, 25)));
+    const own = new Map(known);
+    (state.recent || []).forEach((t) => { if (!own.has(t.id)) own.set(t.id, t); });
+    const ownList = [...own.values()];
+    const seedPool = ownList.filter((t) => t.source === "youtube_music");
+    if (!seedPool.length || !window.NotkaMix) return shuffled([...known.values()]);
+    const prof = mixProfile();
+    const seeds = window.NotkaMix.pickSeeds(seedPool, (t) => 0.15 + prof.affinity(t.artist) + prof.trackWeight(t) + (prof.recentIds.has(t.id) ? 0.3 : 0), 5);
+    const lists = await Promise.all(seeds.map((s) => fetchRadio(s, 30)));
     const seen = new Set();
-    const mix = [];
-    for (let i = 0; i < 25; i++) {
-      for (const list of lists) {
-        const t = list[i];
-        if (!t || seen.has(t.id) || known.has(t.id)) continue;
-        seen.add(t.id);
-        mix.push(t);
-      }
-    }
-    if (mix.length < 8) shuffled([...known.values()]).forEach((t) => { if (!seen.has(t.id)) { seen.add(t.id); mix.push(t); } });
-    return mix.slice(0, 50);
+    const adjacent = [];
+    lists.forEach((list) => list.forEach((t) => { if (t && !seen.has(t.id) && !own.has(t.id)) { seen.add(t.id); adjacent.push(t); } }));
+    const mix = window.NotkaMix.assemble(Object.assign({ familiar: ownList, adjacent, size: 40, familiarShare: 0.4 }, prof));
+    const famIds = new Set(ownList.map((t) => t.id));
+    track("mix_built", { v: 2, n: mix.length, fam: mix.filter((t) => famIds.has(t.id)).length, adj: adjacent.length, seeds: seeds.length });
+    if (mix.length < 8) return shuffled([...known.values()]);
+    return mix;
   }
   // Leaving a mix for something else keeps its place: coming back goes on
   // with the same queue, from the same track and the same second. Kept per
@@ -2137,13 +2169,20 @@
 
   let mixExtending = false;
   async function extendMixIfNeeded() {
-    if (currentSource !== "mix" || mixExtending || !currentTrack) return;
+    if (currentSource !== "mix" || mixExtending || !currentTrack || !window.NotkaMix) return;
     if (currentQueueIndex < currentQueue.length - 3) return;
     mixExtending = true;
     try {
       const known = knownTracks();
       const inQueue = new Set(currentQueue.map((t) => t.id));
-      const more = (await fetchRadio(currentTrack, 25)).filter((t) => !inQueue.has(t.id) && !known.has(t.id));
+      // the next part grows from what was heard on in this session (and the track now playing)
+      const seeds = sessionGood.slice(-3).concat([currentTrack]).filter((t, i, a) => t && a.findIndex((x) => x.id === t.id) === i);
+      const lists = await Promise.all(seeds.map((s) => fetchRadio(s, 20)));
+      const seen = new Set();
+      const adjacent = [];
+      lists.forEach((list) => list.forEach((t) => { if (t && !seen.has(t.id) && !inQueue.has(t.id) && !known.has(t.id)) { seen.add(t.id); adjacent.push(t); } }));
+      const familiar = [...known.values(), ...(state.recent || [])].filter((t) => !inQueue.has(t.id));
+      const more = window.NotkaMix.assemble(Object.assign({ familiar, adjacent, size: 16, familiarShare: 0.3, exclude: inQueue }, mixProfile()));
       if (more.length && currentSource === "mix") {
         currentQueue.push(...more);
         originalQueue.push(...more);
@@ -5978,6 +6017,7 @@
     }
     if (delta > 0 && !opts.auto && currentTrack && audio.currentTime >= 0) {
       track("skip", { id: currentTrack.id, heard: Math.round(audio.currentTime || 0), dur: Math.round(audio.duration || currentTrack.duration || 0) });
+      noteListened(currentTrack, audio.currentTime || 0);
     }
     playTrack(currentQueue[nextIndex], currentQueue, { keepQueue: true });
   }
@@ -6859,7 +6899,7 @@
   }
 
   function finishCurrentTrack() {
-    if (currentTrack) track("complete", { id: currentTrack.id });
+    if (currentTrack) { track("complete", { id: currentTrack.id }); noteListened(currentTrack, 9999); }
     audio.pause();
     renderProgress(0, 0);
     if (sleepAfterTrack) { stopBySleep(); return; }

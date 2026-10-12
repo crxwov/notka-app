@@ -491,7 +491,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     analytics_dir = sync_store.DATA_DIR / "analytics"
     analytics_dir.mkdir(parents=True, exist_ok=True)
     analytics_batches: dict[int, list[float]] = {}
-    ANALYTICS_EVENTS = {"search_submit", "search_pick", "search_empty", "play", "skip", "complete", "play_error", "import", "ranked"}
+    ANALYTICS_EVENTS = {"search_submit", "search_pick", "search_empty", "play", "skip", "complete", "play_error", "import", "ranked", "mix_built"}
     analytics_pruned = [0.0]
 
     def _pseudonym(user_id: int) -> str:
