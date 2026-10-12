@@ -2556,3 +2556,11 @@ body[data-screen="player"] .player-only { display: block; }
 
 /* cards of the light-pattern picker that are not on the screen stand still (see watchPatternCards) */
 .pattern-opt.is-off .pattern-thumb, .pattern-opt.is-off .pattern-thumb * { animation-play-state: paused !important; }
+
+/* «Недавнее» в поиске: что искали и что открывали (как в Spotify) */
+.search-history { width: 100%; margin-top: 4px; text-align: left; }
+.search-history-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 6px; }
+.search-history-clear { font-size: 14px; font-weight: 600; color: var(--text-2); padding: 6px 4px; }
+#search-state-empty.has-history { padding-top: 8px; }
+#search-state-empty.has-history > .state-orb, #search-state-empty.has-history > .state-title, #search-state-empty.has-history > .state-sub { display: none; }
+.cover-query { display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.08); color: var(--text-2); }

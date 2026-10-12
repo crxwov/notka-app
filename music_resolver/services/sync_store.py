@@ -31,7 +31,7 @@ MAX_DEVICES = 8
 # only these keys are shared: the rest of a device's state is its own
 SHARED_KEYS = {
     "favorites", "playlists", "settings", "followedArtists", "followedMeta",
-    "playlistFlags", "accountName", "accountAvatar", "recent", "sharedImports", "onboardingSeenV2",
+    "playlistFlags", "accountName", "accountAvatar", "recent", "sharedImports", "onboardingSeenV2", "searchHistory",
 }
 
 

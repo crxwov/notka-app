@@ -252,6 +252,7 @@
         listens: parsed.listens || { seconds: 0, plays: 0, tracks: {}, artists: {} },
         sharedImports: parsed.sharedImports || {},
         recent: parsed.recent || [], // the last tracks played, newest first
+        searchHistory: parsed.searchHistory || [], // what was searched and opened from search, newest first
         fresh: parsed.fresh || null, // { key, at, items } — «Новое от любимых исполнителей»
         events: parsed.events || null, // { progress, items } — see «События»
         syncTs: parsed.syncTs || {}, // when each shared key last changed on this device
@@ -269,6 +270,7 @@
   }
   const state = loadState();
   state.events = state.events || { progress: {}, items: [] };
+  state.searchHistory = state.searchHistory || [];
   function ownsItem(item) { return state.events.items.includes(item); }
   // Only what a row needs to be shown and played again.
   function slimTrack(t) {
@@ -328,7 +330,7 @@
   //    (the first time a device joins, the lists are united, nothing is lost);
   //  - the stats add up: every device keeps its own counter, the whole is the sum.
   // ============================================================
-  const SYNC_KEYS = ["favorites", "playlists", "settings", "followedArtists", "followedMeta", "playlistFlags", "accountName", "accountAvatar", "recent", "sharedImports", "onboardingSeenV2"];
+  const SYNC_KEYS = ["favorites", "playlists", "settings", "followedArtists", "followedMeta", "playlistFlags", "accountName", "accountAvatar", "recent", "sharedImports", "onboardingSeenV2", "searchHistory"];
   const SYNC_JOINED_KEY = "notka_sync_joined_v1";
   const syncSnap = {};
   state.syncTs = state.syncTs || {};
@@ -455,6 +457,7 @@
       state.followedMeta = Object.assign({}, r.followedMeta || {}, state.followedMeta || {});
     }
     if (Array.isArray(r.recent)) state.recent = mergeRecent(state.recent, r.recent);
+    if (Array.isArray(r.searchHistory) && !(state.searchHistory || []).length) state.searchHistory = r.searchHistory;
     if (r.settings && typeof r.settings === "object") state.settings = Object.assign({}, state.settings, r.settings);
     if (!state.accountName && r.accountName) state.accountName = r.accountName;
     if (!state.accountAvatar && r.accountAvatar) state.accountAvatar = r.accountAvatar;
@@ -1225,6 +1228,7 @@
     document.body.dataset.screen = name;
     if (name === "home") renderHome();
     if (name === "library") renderLibrary();
+    if (name === "search" && typeof renderSearchHistory === "function" && !searchInput.value.trim()) renderSearchHistory();
     if (name === "favorites") renderFavoritesScreen();
     if (name === "profile") { renderProfile(); revealIn("screen-profile", true); }
     if (name === "account") { renderAccountScreen(); revealIn("screen-account", true); }
@@ -2397,8 +2401,149 @@
     return mine.length ? mine.concat(rest) : tracks;
   }
 
+  // <taste>
+  // What the listener already likes, per artist name (0..1): listening time (every device),
+  // hearts, playlists, what is followed and played lately. Used to put familiar artists first
+  // in the search; it never leaves the device (and the account's own sync).
+  function artistParts(name) {
+    return String(name || "").split(/\s*(?:,|&|\sfeat\.?\s|\sft\.?\s|\sx\s|\sи\s)\s*/i).map((p) => looseKey(p)).filter(Boolean);
+  }
+  function buildTaste(sources) {
+    const raw = new Map();
+    const add = (name, w) => artistParts(name).forEach((k) => raw.set(k, (raw.get(k) || 0) + w));
+    Object.entries(sources.listened || {}).forEach(([name, minutes]) => add(name, Math.min(3, Math.log10(1 + (minutes || 0)) * 1.5)));
+    (sources.favorites || []).forEach((t) => add(t && t.artist, 0.8));
+    (sources.followed || []).forEach((n) => add(n, 3));
+    (sources.playlistTracks || []).forEach((t) => add(t && t.artist, 0.3));
+    (sources.recent || []).forEach((t) => add(t && t.artist, 0.4));
+    const out = new Map();
+    raw.forEach((v, k) => out.set(k, v / (v + 2))); // 0..1, and a lot of listening cannot run away
+    return out;
+  }
+  function tasteOf(taste, artistName) {
+    let best = 0;
+    artistParts(artistName).forEach((k) => { const v = taste.get(k); if (v && v > best) best = v; });
+    return best;
+  }
+  // a familiar artist's tracks climb up to a dozen places; everything else keeps its order
+  function rankByTasteWith(taste, tracks) {
+    if (!taste.size || tracks.length < 2) return tracks;
+    return tracks
+      .map((t, i) => ({ t, s: i - 12 * tasteOf(taste, t.artist) }))
+      .sort((a, b) => a.s - b.s)
+      .map((x) => x.t);
+  }
+  // </taste>
+  let tasteCache = null, tasteSig = "";
+  function currentTaste() {
+    const sig = [listensRev, state.favorites.length, state.followedArtists.length, state.playlists.length, (state.recent || []).length].join("|");
+    if (tasteCache && sig === tasteSig) return tasteCache;
+    const L = listensView() || {};
+    const listened = {};
+    Object.entries(L.artists || {}).forEach(([name, a]) => { listened[name] = (a.seconds || 0) / 60; });
+    const playlistTracks = [];
+    state.playlists.forEach((p) => Object.values(p.tracksCache || {}).forEach((t) => playlistTracks.push(t)));
+    tasteCache = buildTaste({ listened, favorites: state.favorites, followed: state.followedArtists, playlistTracks, recent: (state.recent || []).slice(0, 60) });
+    tasteSig = sig;
+    return tasteCache;
+  }
+  function rankByTaste(tracks, intent) {
+    const taste = currentTaste();
+    if (!intent) return rankByTasteWith(taste, tracks);
+    // the artist the query names stays in front; the taste orders each part
+    const key = looseKey(intent.name);
+    const mine = tracks.filter((t) => looseKey(t.artist || "") === key);
+    const rest = tracks.filter((t) => looseKey(t.artist || "") !== key);
+    return rankByTasteWith(taste, mine).concat(rankByTasteWith(taste, rest));
+  }
+
+  // ---- «Недавнее»: what was searched, and what was opened from the results ----
+  const SEARCH_HISTORY_MAX = 30;
+  function historyKey(e) {
+    if (e.k === "q") return "q:" + String(e.text || "").trim().toLowerCase();
+    if (e.k === "t") return "t:" + (e.track && e.track.id);
+    if (e.k === "a") return "a:" + String(e.name || "").trim().toLowerCase();
+    return "al:" + (e.albumId || `${e.title}|${e.artist}`);
+  }
+  function rememberSearch(entry) {
+    if (!entry) return;
+    entry.at = Date.now();
+    const key = historyKey(entry);
+    state.searchHistory = [entry].concat((state.searchHistory || []).filter((e) => historyKey(e) !== key)).slice(0, SEARCH_HISTORY_MAX);
+    persist();
+  }
+  function historyRow(o) {
+    const li = document.createElement("li");
+    li.className = "track-row";
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "row-main";
+    const art = document.createElement("span");
+    art.className = "cover cover-sm" + (o.round ? " cover-round" : "") + (o.query ? " cover-query" : "");
+    if (o.query) art.innerHTML = icon("i-search", 20);
+    else setCoverEl(art, o.cover, o.seed);
+    const meta = document.createElement("span");
+    meta.className = "row-meta";
+    meta.innerHTML = `<span class="row-title">${escapeHtml(o.title)}</span><span class="row-sub">${escapeHtml(o.sub)}</span>`;
+    main.appendChild(art);
+    main.appendChild(meta);
+    main.addEventListener("click", o.onClick);
+    li.appendChild(main);
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "icon-btn row-action";
+    rm.setAttribute("aria-label", "Убрать из недавнего");
+    rm.innerHTML = icon("i-close", 20);
+    rm.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.searchHistory = (state.searchHistory || []).filter((x) => x !== o.entry);
+      persist();
+      renderSearchHistory();
+    });
+    li.appendChild(rm);
+    return li;
+  }
+  function renderSearchHistory() {
+    const box = $("search-history");
+    const list = $("search-history-list");
+    if (!box || !list) return;
+    const items = state.searchHistory || [];
+    list.innerHTML = "";
+    box.hidden = !items.length;
+    $("search-state-empty").classList.toggle("has-history", items.length > 0);
+    items.forEach((e) => {
+      let row = null;
+      if (e.k === "q") {
+        row = historyRow({ entry: e, query: true, title: e.text, sub: "Запрос", onClick: () => {
+          searchInput.value = e.text;
+          searchClear.hidden = false;
+          clearTimeout(debounceTimer);
+          runSearch(e.text);
+          rememberSearch({ k: "q", text: e.text });
+        } });
+      } else if (e.k === "t" && e.track) {
+        row = historyRow({ entry: e, cover: e.track.artwork, seed: e.track.id, title: e.track.title || "Без названия", sub: `Трек · ${e.track.artist || ""}`, onClick: () => {
+          rememberSearch({ k: "t", track: e.track });
+          playTrack(e.track, [e.track], { context: "Поиск" });
+        } });
+      } else if (e.k === "a") {
+        row = historyRow({ entry: e, round: true, cover: e.photo, seed: e.name, title: e.name, sub: "Исполнитель", onClick: () => {
+          rememberSearch({ k: "a", name: e.name, artistId: e.artistId, source: e.source, photo: e.photo });
+          openArtistScreen(e.name, [], { artistId: e.artistId, source: e.source });
+        } });
+      } else if (e.k === "al") {
+        row = historyRow({ entry: e, cover: e.cover, seed: e.albumId || e.artist, title: e.title, sub: `Альбом · ${e.artist || ""}`, onClick: () => {
+          rememberSearch({ k: "al", albumId: e.albumId, source: e.source, title: e.title, artist: e.artist, cover: e.cover });
+          if (e.albumId) openAlbumById(e.source, e.albumId, e.title, e.artist);
+        } });
+      }
+      if (row) list.appendChild(row);
+    });
+  }
+
   function showSearchState(id) {
     SEARCH_STATES.forEach((sid) => { $(sid).hidden = sid !== id; });
+    if (id === "search-state-empty") renderSearchHistory();
   }
 
   $("search-tabs").addEventListener("click", (e) => {
@@ -2498,13 +2643,16 @@
       return { name: a.name, artistId: a.id, source: a.source, photo: a.photo, tracks: own ? own.tracks : [] };
     });
     const seen = new Set(found.map((a) => norm(a.name)));
-    found.sort((a, b) => (b.tracks.length ? 1 : 0) - (a.tracks.length ? 1 : 0));
+    const taste = currentTaste();
+    found.sort((a, b) => ((b.tracks.length ? 1 : 0) + tasteOf(taste, b.name)) - ((a.tracks.length ? 1 : 0) + tasteOf(taste, a.name)));
     const intent = intentArtist();
     if (intent) {
       const i = found.findIndex((a) => a.artistId === intent.id);
       if (i > 0) found.unshift(found.splice(i, 1)[0]);
     }
-    return found.concat(groups.filter((g) => !seen.has(norm(g.name))));
+    const rest = groups.filter((g) => !seen.has(norm(g.name)));
+    rest.sort((a, b) => tasteOf(taste, b.name) - tasteOf(taste, a.name));
+    return found.concat(rest);
   }
   function artistRow(group, tracks) {
     const ownCover = group.tracks.find((t) => t.artwork);
@@ -2516,7 +2664,10 @@
       cover: group.photo || (ownCover ? ownCover.artwork : null),
       seed: group.name,
       round: true,
-      onClick: () => openArtistScreen(group.name, tracks, { artistId: group.artistId, source: group.source }),
+      onClick: () => {
+        rememberSearch({ k: "a", name: group.name, artistId: group.artistId, source: group.source, photo: group.photo || (ownCover ? ownCover.artwork : null) });
+        openArtistScreen(group.name, tracks, { artistId: group.artistId, source: group.source });
+      },
     });
   }
   function albumRow(group) {
@@ -2527,6 +2678,7 @@
       cover: group.cover,
       seed: group.albumId || group.artist,
       onClick: () => {
+        rememberSearch({ k: "al", albumId: group.albumId, source: group.source, title: group.title, artist: group.artist, cover: group.cover });
         if (group.albumId) openAlbumById(group.source, group.albumId, group.title, group.artist);
         else openAlbumScreen(group.tracks[0]);
       },
@@ -2554,7 +2706,7 @@
     // the tracks are still on their way, but the artist the query names is
     // already known: show him at once, the rest joins when it arrives
     if (!lastSearchResults && !intent) return;
-    const tracks = rankByIntent(lastSearchResults || [], intent);
+    const tracks = rankByTaste(rankByIntent(lastSearchResults || [], intent), intent);
     if (lastSearchResults && !tracks.length && !intent) { showSearchState("search-state-empty-results"); return; }
 
     stateResults.innerHTML = "";
@@ -2636,7 +2788,13 @@
     debounceTimer = setTimeout(() => runSearch(searchInput.value), 250);
   });
   searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { clearTimeout(debounceTimer); runSearch(searchInput.value); searchInput.blur(); }
+    if (e.key === "Enter") {
+      clearTimeout(debounceTimer);
+      runSearch(searchInput.value);
+      searchInput.blur();
+      const q = searchInput.value.trim();
+      if (q.length >= 2) rememberSearch({ k: "q", text: q });
+    }
   });
   searchClear.addEventListener("click", () => {
     searchInput.value = "";
@@ -2645,6 +2803,19 @@
     searchInput.focus();
   });
   $("search-retry-btn").addEventListener("click", () => runSearch(searchInput.value));
+  $("search-history-clear").addEventListener("click", () => {
+    state.searchHistory = [];
+    persist();
+    renderSearchHistory();
+    haptic("light");
+  });
+  // a track played from the results goes to «Недавнее» too
+  stateResults.addEventListener("click", (e) => {
+    const row = e.target.closest(".track-row[data-track-id]");
+    if (!row || e.target.closest(".row-action")) return;
+    const t = (lastSearchResults || []).find((x) => x.id === row.dataset.trackId);
+    if (t) rememberSearch({ k: "t", track: slimTrack(t) });
+  });
 
   // ============================================================
   // LIBRARY («Моё»)
