@@ -21,6 +21,13 @@ echo "Отправляю код..."
 git archive --format=tar HEAD | "${SSH[@]}" "mkdir -p /opt/notka/app && tar -x -C /opt/notka/app && chown -R notka:notka /opt/notka/app"
 
 echo "Ставлю зависимости и перезапускаю..."
-"${SSH[@]}" "sudo -u notka /opt/notka/venv/bin/pip install -q --upgrade pip && sudo -u notka /opt/notka/venv/bin/pip install -q -r /opt/notka/app/requirements.txt && sudo -u notka /opt/notka/venv/bin/pip install -q --upgrade yt-dlp ytmusicapi && systemctl restart notka && sleep 4 && systemctl is-active notka && curl -s http://127.0.0.1:8080/health"
+# the install step is long and has been cut by the connection before: it is tried again, then the
+# restart alone (the code is already there) so the new version never stays unstarted
+"${SSH[@]}" "sudo -u notka /opt/notka/venv/bin/pip install -q --upgrade pip && sudo -u notka /opt/notka/venv/bin/pip install -q -r /opt/notka/app/requirements.txt && sudo -u notka /opt/notka/venv/bin/pip install -q --upgrade yt-dlp ytmusicapi" \
+  || { echo "Связь оборвалась, повторяю установку..."; sleep 5; "${SSH[@]}" "sudo -u notka /opt/notka/venv/bin/pip install -q -r /opt/notka/app/requirements.txt" || echo "Установка не подтвердилась, перезапускаю с тем, что есть."; }
+for attempt in 1 2 3; do
+  "${SSH[@]}" "systemctl restart notka && sleep 4 && systemctl is-active notka && curl -s http://127.0.0.1:8080/health" && break
+  echo "Перезапуск не подтвердился (попытка $attempt), пробую ещё раз..."; sleep 6
+done
 echo
 echo "Готово."
