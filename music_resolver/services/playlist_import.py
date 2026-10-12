@@ -12,6 +12,7 @@ Apple Music's page data. A private playlist can't be read this way.
 
 import asyncio
 import json
+import os
 import re
 from urllib.parse import parse_qs, urlparse
 
@@ -46,8 +47,10 @@ def _item(title: str | None, artist: str | None, duration_ms: float | int | None
     }
 
 
-async def _get(url: str, **kwargs) -> httpx.Response:
-    async with httpx.AsyncClient(timeout=20, headers=_HEADERS, follow_redirects=True) as client:
+async def _get(url: str, headers: dict | None = None, proxy: str | None = None, **kwargs) -> httpx.Response:
+    async with httpx.AsyncClient(
+        timeout=20, headers={**_HEADERS, **(headers or {})}, follow_redirects=True, proxy=proxy
+    ) as client:
         return await client.get(url, **kwargs)
 
 
@@ -140,7 +143,16 @@ def _yandex_tracks(raw_tracks: list) -> list:
 
 
 async def _yandex(path: str, album: bool = False) -> dict:
-    res = await _get(f"https://api.music.yandex.net/{path}", params={"richTracks": "true"})
+    # Yandex answers Russian addresses only. Two ways round it, either one is optional:
+    # a relay on a Russian server (deploy/yandex_relay.py), or a Russian proxy
+    # (YANDEX_PROXY=http://user:pass@host:port, used for this call and nothing else).
+    # With neither, the call goes straight, as before.
+    relay = os.environ.get("YANDEX_RELAY_URL", "").rstrip("/")
+    proxy = os.environ.get("YANDEX_PROXY", "").strip() or None
+    if relay:
+        res = await _get(f"{relay}/{path}", headers={"x-relay-token": os.environ.get("YANDEX_RELAY_TOKEN", "")})
+    else:
+        res = await _get(f"https://api.music.yandex.net/{path}", params={"richTracks": "true"}, proxy=proxy)
     try:
         result = res.json().get("result")
     except ValueError:
