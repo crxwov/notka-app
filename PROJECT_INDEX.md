@@ -1,7 +1,7 @@
 # PROJECT_INDEX
 
 Quick structural index of `notka` for fast navigation.
-For full end-to-end technical and product documentation in Russian, see **[DOCS.md](DOCS.md)**.
+For full modular technical and product documentation in Russian, see **[docs/README.md](docs/README.md)**.
 
 ## Overview
 **Нотка (`Notka`)** is a Telegram Mini App music player (`miniapp/`) paired with an `aiogram` Telegram bot (`bot/`) and a `FastAPI` multi-provider music resolver and audio caching backend (`music_resolver/`).
@@ -57,7 +57,7 @@ For full end-to-end technical and product documentation in Russian, see **[DOCS.
 - `tests/cdp.mjs`, `tests/e2e.mjs` — Headless Chromium CDP driver and 38-assertion E2E test suite.
 
 ## Product & Design Docs
-- `DOCS.md` — Complete technical and product reference documentation (Russian).
+- `docs/README.md` — Modular technical & product documentation split by subfolder (`getting-started/`, `backend/`, `providers/`, `services/`, `bot/`, `miniapp/`, `operations/`).
 - `PRODUCT.md` — Product vision, audience, feature matrix, and roadmap.
 - `DESIGN.md` — "Живой свет" (Living Light) design system guidelines, palette, typography, and component rules.
 - `ROADMAP.md` — Operational task tracker.
