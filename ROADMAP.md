@@ -15,13 +15,14 @@ Fix what real users reported after the app was dropped into the uwc'29 chat (130
 | 3 | Background lag on track change (v148), pattern-card lag (v150), tab re-click animation (v150) | done, deployed; not confirmed on real phones |
 | 4 | Lyric card saving through Telegram `downloadFile` (v149) | done, deployed; not confirmed on Samsung |
 | 5 | Queue («play next», «add to end»), sheet swipe-down, track retry, calm free light colors, name fallback (v151) | done, committed `32051f2`; NOT deployed |
+| 5b | Sync visibility (v152, deployed); search history + taste ranking (v153); data notice + product analytics `/analytics` with opt-out (v154) | committed; v153-v154 NOT deployed |
 | 6 | Device-dependent layout bugs: Samsung nav bar overlap, sheet vs full-screen open, mini-mode paddings, shaking header | blocked: needs screen recordings |
 | 7 | iPhone download failure | blocked: needs error details from the reporter (Eva) |
 | 8 | Albums assembled from singles/features | not started; root cause is YouTube Music data, needs design |
 | 9 | Product wishes (language wave, similar songs, profile customization, release-date filter, year recap, APK) | waiting for owner decisions |
 
 ## Current State
-Branch `plus-wheel-and-perf`, HEAD `32051f2`. Live app is v150. v151 is committed locally, not pushed to the server.
+Branch `plus-wheel-and-perf`. Live app is v152. v153-v154 (search history, taste ranking, data notice, analytics) are committed, not deployed.
 
 ## Findings and Decisions
 - Yandex API refuses non-Russian IPs. Fix: `YANDEX_PROXY` in `/opt/notka/app/.env` (proxys.io shared IPv4, 30 days, expires ~2026-11-11). Fallback relay kept in `deploy/yandex_relay*`.
@@ -45,7 +46,7 @@ Import checked on the live server for Spotify, Yandex, Apple, Deezer, SoundCloud
 - Owner decisions for stage 9.
 
 ## Next Action
-1. Owner deploys v151: `! bash deploy/push.sh 94.156.179.229`; then verify the served version and the new menu rows.
+1. Owner deploys: `! bash deploy/push.sh 94.156.179.229`; then verify served version 154, `/analytics` returns 401 without login, and the admin counters `sync_*`, `an_events` appear.
 2. Ask reporters (adeline, Степан, Eva) for recordings/details for stages 6-7.
 
 ## Resume Context

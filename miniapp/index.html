@@ -13,7 +13,7 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=135" />
+<link rel="stylesheet" href="styles.css?v=136" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
 <link rel="stylesheet" href="system.css?v=79" />
@@ -486,6 +486,7 @@
       <button class="group-row" id="account-row-name" type="button"><span class="group-label">Имя</span><span class="group-value" id="acc-name-val"></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       <button class="group-row" id="account-row-photo" type="button"><span class="group-label">Фото</span><span class="group-value" id="acc-photo-val"></span><svg class="row-chevron" width="18" height="18" aria-hidden="true"><use href="#i-chevron"/></svg></button>
       <div class="group-row"><span class="group-label">Telegram</span><span class="group-value" id="acc-tg-val"></span></div>
+      <button class="group-row" id="account-analytics-row" type="button"><span class="group-label">Помогать улучшать Нотку<span class="group-sub">Какие запросы и треки работают, а какие нет. Без переписок, контактов и геолокации</span></span><span class="group-value" id="account-analytics-val">Включено</span></button>
       <button class="group-row" id="account-sessions-row" type="button"><span class="group-label">Синхронизация<span class="group-sub" id="account-sync-sub">Проверяем…</span></span><span class="group-value" id="account-sessions-count">…</span></button>
       <button class="group-row group-row-quiet" id="account-restore-tg" type="button" hidden><span class="group-label">Вернуть имя и фото из Telegram<span class="group-sub">Свои имя и фото будут убраны</span></span></button>
     </div>
@@ -1302,6 +1303,10 @@
     </div>
   </div>
 
+  <div class="data-notice" id="data-notice" role="dialog" aria-label="О данных" hidden>
+    <p>Нотка запоминает, что ты слушаешь и ищешь, чтобы подстраивать поиск и главную под тебя, и считает, какие запросы и треки работают, чтобы улучшать подборки. Это хранится на твоём устройстве и на сервере Нотки. Отключить можно в Профиль → Аккаунт.</p>
+    <button class="pill-btn" id="data-notice-ok" type="button">Понятно</button>
+  </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </div>
 
@@ -1313,6 +1318,6 @@
 <script src="shredder.js?v=4"></script>
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
-<script src="app.js?v=153"></script>
+<script src="app.js?v=154"></script>
 </body>
 </html>

@@ -485,6 +485,82 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             headers={"cache-control": "no-store"},
         )
 
+    # ---- product analytics: small events (a search that found nothing, a skip, a failed
+    # track…) that tell what to improve in search and mixes. Pseudonymous: the person is
+    # a keyed hash, not a Telegram id. Kept 60 days. The app can switch it off. ----
+    analytics_dir = sync_store.DATA_DIR / "analytics"
+    analytics_dir.mkdir(parents=True, exist_ok=True)
+    analytics_batches: dict[int, list[float]] = {}
+    ANALYTICS_EVENTS = {"search_submit", "search_pick", "search_empty", "play", "skip", "complete", "play_error", "import", "ranked"}
+    analytics_pruned = [0.0]
+
+    def _pseudonym(user_id: int) -> str:
+        key = (os.environ.get("BOT_TOKEN", "") or "notka").encode()
+        return hmac.new(key, f"analytics:{user_id}".encode(), hashlib.sha256).hexdigest()[:12]
+
+    def _clean_props(props) -> dict:
+        out: dict = {}
+        if not isinstance(props, dict):
+            return out
+        for k, v in list(props.items())[:12]:
+            if not isinstance(k, str) or len(k) > 16:
+                continue
+            if isinstance(v, bool) or isinstance(v, (int, float)):
+                out[k] = v
+            elif isinstance(v, str):
+                out[k] = v[:120]
+        return out
+
+    def _store_events(pseud: str, device: str, events: list) -> int:
+        day = time.strftime("%Y-%m-%d")
+        lines = []
+        for ev in events[:50]:
+            if not isinstance(ev, dict) or ev.get("e") not in ANALYTICS_EVENTS:
+                continue
+            try:
+                at = int(ev.get("t") or 0)
+            except (TypeError, ValueError):
+                at = 0
+            lines.append(json.dumps({"u": pseud, "d": device, "e": ev["e"], "t": at, "p": _clean_props(ev.get("p"))}, ensure_ascii=False, separators=(",", ":")))
+        if lines:
+            with (analytics_dir / f"{day}.jsonl").open("a", encoding="utf-8") as fh:
+                fh.write("\n".join(lines) + "\n")
+        now = time.time()
+        if now - analytics_pruned[0] > 6 * 3600:
+            analytics_pruned[0] = now
+            for old in analytics_dir.glob("*.jsonl"):
+                try:
+                    if now - old.stat().st_mtime > 60 * 86400:
+                        old.unlink(missing_ok=True)
+                except OSError:
+                    pass
+        return len(lines)
+
+    @router.post("/analytics")
+    async def analytics_in(request: Request, x_telegram_init_data: str = Header(default="")):
+        user_id = plus_store.verify_init_data(x_telegram_init_data)
+        if user_id is None:
+            return JSONResponse({"error": {"code": "NOT_IN_TELEGRAM"}}, status_code=401)
+        now = time.time()
+        recent = [t for t in analytics_batches.get(user_id, []) if now - t < 3600]
+        if len(recent) >= 120:
+            return JSONResponse({"error": {"code": "TOO_MANY"}}, status_code=429)
+        raw = await request.body()
+        if len(raw) > 64 * 1024:
+            return JSONResponse({"error": {"code": "TOO_BIG"}}, status_code=413)
+        try:
+            body = json.loads(raw or b"{}")
+        except ValueError:
+            return JSONResponse({"error": {"code": "BAD_JSON"}}, status_code=400)
+        events = body.get("events") if isinstance(body, dict) else None
+        if not isinstance(events, list):
+            return JSONResponse({"error": {"code": "BAD_JSON"}}, status_code=400)
+        analytics_batches[user_id] = recent + [now]
+        device = str(body.get("d") or "")[:12]
+        n = await asyncio.to_thread(_store_events, _pseudonym(user_id), device, events)
+        metrics.count("an_events", n)
+        return {"ok": True, "n": n}
+
     # ---- «Перенести плейлист»: the name and the track list behind a
     # Spotify / Yandex Music / Apple Music / YouTube link ----
     @router.get("/import")

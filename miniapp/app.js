@@ -541,6 +541,39 @@
     setInterval(() => { if (document.visibilityState === "visible" && Date.now() - syncLastAt > 90000) syncNow(); }, 30000);
   }
 
+  // ---- small product events: which searches find nothing, what is skipped, what fails ----
+  // They go to the server in batches, tied to a keyed hash and not to a name, and the switch
+  // in «Аккаунт» turns them off. Only the names of things, never the text of anything private.
+  const eventQueue = [];
+  let eventsFlushing = false;
+  function track(name, props) {
+    try {
+      if (state.settings.analyticsOff || !tgInitRaw) return;
+      eventQueue.push({ e: name, t: Date.now(), p: props || {} });
+      if (eventQueue.length >= 25) flushEvents();
+    } catch (e) { /* never in the way */ }
+  }
+  async function flushEvents() {
+    if (eventsFlushing || !eventQueue.length || !tgInitRaw || state.settings.analyticsOff) return;
+    eventsFlushing = true;
+    const batch = eventQueue.splice(0, 50);
+    try {
+      const res = await fetch(`${API_BASE_URL}/analytics`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitRaw },
+        body: JSON.stringify({ d: syncDeviceId, events: batch }),
+        keepalive: true,
+      });
+      if (res.status >= 500) eventQueue.unshift(...batch.slice(0, 25));
+    } catch (e) {
+      eventQueue.unshift(...batch.slice(0, 25));
+    } finally {
+      eventsFlushing = false;
+    }
+  }
+  setInterval(flushEvents, 30000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushEvents(); });
+
   const Store = {
     isFavorite(id) { return state.favorites.some((t) => t.id === id); },
     toggleFavorite(track) {
@@ -1712,6 +1745,7 @@
     const seen = new Set();
     tracks.forEach((t) => { if (!seen.has(t.id)) { seen.add(t.id); Store.addTrackToPlaylist(playlist.id, t); } });
     importedPlaylistId = playlist.id;
+    track("import", { svc: String(data.service || "").slice(0, 16), total: wanted.length, found: tracks.length });
     renderLibrary();
     haptic("success");
     $("import-result-title").textContent = `«${playlist.name}» в Нотке`;
@@ -2666,6 +2700,7 @@
       round: true,
       onClick: () => {
         rememberSearch({ k: "a", name: group.name, artistId: group.artistId, source: group.source, photo: group.photo || (ownCover ? ownCover.artwork : null) });
+        track("search_pick", { q: (lastSearchQuery || "").trim().slice(0, 80), kind: "artist" });
         openArtistScreen(group.name, tracks, { artistId: group.artistId, source: group.source });
       },
     });
@@ -2679,6 +2714,7 @@
       seed: group.albumId || group.artist,
       onClick: () => {
         rememberSearch({ k: "al", albumId: group.albumId, source: group.source, title: group.title, artist: group.artist, cover: group.cover });
+        track("search_pick", { q: (lastSearchQuery || "").trim().slice(0, 80), kind: "album" });
         if (group.albumId) openAlbumById(group.source, group.albumId, group.title, group.artist);
         else openAlbumScreen(group.tracks[0]);
       },
@@ -2707,7 +2743,12 @@
     // already known: show him at once, the rest joins when it arrives
     if (!lastSearchResults && !intent) return;
     const tracks = rankByTaste(rankByIntent(lastSearchResults || [], intent), intent);
-    if (lastSearchResults && !tracks.length && !intent) { showSearchState("search-state-empty-results"); return; }
+    if (lastSearchResults && !tracks.length && !intent) {
+      showSearchState("search-state-empty-results");
+      const q = lastSearchQuery;
+      setTimeout(() => { if (q === lastSearchQuery && q.trim().length >= 3 && lastSearchResults && !lastSearchResults.length) track("search_empty", { q: q.trim().slice(0, 80) }); }, 1500);
+      return;
+    }
 
     stateResults.innerHTML = "";
     const trackRows = (list) => list.map((t) => buildTrackRow(t, { queue: tracks, context: "Поиск" }));
@@ -2793,7 +2834,7 @@
       runSearch(searchInput.value);
       searchInput.blur();
       const q = searchInput.value.trim();
-      if (q.length >= 2) rememberSearch({ k: "q", text: q });
+      if (q.length >= 2) { rememberSearch({ k: "q", text: q }); track("search_submit", { q: q.slice(0, 80) }); }
     }
   });
   searchClear.addEventListener("click", () => {
@@ -2814,7 +2855,11 @@
     const row = e.target.closest(".track-row[data-track-id]");
     if (!row || e.target.closest(".row-action")) return;
     const t = (lastSearchResults || []).find((x) => x.id === row.dataset.trackId);
-    if (t) rememberSearch({ k: "t", track: slimTrack(t) });
+    if (t) {
+      rememberSearch({ k: "t", track: slimTrack(t) });
+      const rank = (lastSearchResults || []).indexOf(t);
+      track("search_pick", { q: (lastSearchQuery || "").trim().slice(0, 80), kind: "track", rank, n: (lastSearchResults || []).length });
+    }
   });
 
   // ============================================================
@@ -3319,6 +3364,7 @@
     } else {
       syncNote = "Проверяем…";
     }
+    $("account-analytics-val").textContent = state.settings.analyticsOff ? "Выключено" : "Включено";
     $("account-sessions-count").textContent = syncValue;
     $("account-sync-sub").textContent = syncNote;
     const tgName = tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") : "";
@@ -3332,6 +3378,13 @@
     $("acc-lists").textContent = String(state.playlists.length);
     $("acc-follows").textContent = String(state.followedArtists.length);
   }
+  $("account-analytics-row").addEventListener("click", () => {
+    Store.setSetting("analyticsOff", !state.settings.analyticsOff);
+    if (state.settings.analyticsOff) eventQueue.length = 0;
+    haptic("light");
+    showToast(state.settings.analyticsOff ? "Выключено" : "Включено, спасибо");
+    renderAccountScreen();
+  });
   $("account-sessions-row").addEventListener("click", () => {
     if (!syncOn()) { showToast("Открой Нотку из Telegram, чтобы включить синхронизацию"); return; }
     syncDeadAt = 0;
@@ -4249,6 +4302,27 @@
   });
   $("menu-look").addEventListener("click", () => showScreen("look"));
   $("look-back-btn").addEventListener("click", goBack);
+
+  // once, after the first screen: what the app remembers (it is also the answer to «what do you store?»)
+  (function dataNotice() {
+    const box = $("data-notice");
+    if (!box || Store.getSetting("dataNoticeSeen")) return;
+    let tries = 0;
+    const attempt = () => {
+      if (Store.getSetting("dataNoticeSeen")) return;
+      if (currentScreen === "splash" || currentScreen === "onboarding" || tries++ > 40) {
+        if (tries <= 40) setTimeout(attempt, 1500);
+        return;
+      }
+      box.hidden = false;
+    };
+    setTimeout(attempt, 2500);
+    $("data-notice-ok").addEventListener("click", () => {
+      box.hidden = true;
+      Store.setSetting("dataNoticeSeen", true);
+      haptic("light");
+    });
+  })();
 
   applyLook();
   syncPlusUI();
@@ -5793,6 +5867,7 @@
       await audio.play();
       if (token !== playToken) return;
       rememberRecent(track);
+      track_play(track, opts);
       failStreak = 0;
       isStarting = false;
       setLoading(false);
@@ -5801,6 +5876,7 @@
     } catch (err) {
       if (token !== playToken || (err && err.name === "AbortError")) return;
       console.error(err);
+      track("play_error", { id: track.id, code: (err && err.code) || "net", retried: !!opts.retried });
       // a source answers «no» now and then for one request: the same track once more,
       // before it is given up on and skipped
       if (!opts.retried && !(err && err.code === "TRACK_NOT_FOUND")) {
@@ -5837,6 +5913,10 @@
       updateMymixCardUI();
       showToast(err && err.code === "TRACK_NOT_FOUND" ? "Трек не найден в официальном каталоге" : "Не удалось включить трек");
     }
+  }
+
+  function track_play(t, opts) {
+    track("play", { id: t.id, a: (t.artist || "").slice(0, 60), src: String((opts && opts.source) || currentSource || "").slice(0, 20), ctx: String(currentContextLabel || "").slice(0, 30) });
   }
 
   function trackQuery(track) {
@@ -5895,6 +5975,9 @@
     if (nextIndex < 0 || nextIndex >= currentQueue.length) {
       if (!opts.auto) showToast(delta > 0 ? "Это последний трек" : "Это первый трек");
       return;
+    }
+    if (delta > 0 && !opts.auto && currentTrack && audio.currentTime >= 0) {
+      track("skip", { id: currentTrack.id, heard: Math.round(audio.currentTime || 0), dur: Math.round(audio.duration || currentTrack.duration || 0) });
     }
     playTrack(currentQueue[nextIndex], currentQueue, { keepQueue: true });
   }
@@ -6776,6 +6859,7 @@
   }
 
   function finishCurrentTrack() {
+    if (currentTrack) track("complete", { id: currentTrack.id });
     audio.pause();
     renderProgress(0, 0);
     if (sleepAfterTrack) { stopBySleep(); return; }
