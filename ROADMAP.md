@@ -16,6 +16,7 @@ Fix what real users reported after the app was dropped into the uwc'29 chat (130
 | 4 | Lyric card saving through Telegram `downloadFile` (v149) | done, deployed; not confirmed on Samsung |
 | 5 | Queue («play next», «add to end»), sheet swipe-down, track retry, calm free light colors, name fallback (v151) | done, committed `32051f2`; NOT deployed |
 | 5b | Sync visibility (v152, deployed); search history + taste ranking (v153); data notice + product analytics `/analytics` with opt-out (v154); own «Мой микс» algorithm `miniapp/mix.js` (v155, deployed); track profiles (sound via ReccoBeats, genres via MusicBrainz) + mood ranking `track_profile.py` (v156), see `MOOD_RESEARCH.md` | v156 committed, NOT deployed |
+| 5c | YouTube cookies on demand (bot upload, `/cookies`), second-server proxy script, watchdog playback probe, daily data backup, fail2ban, swap (v157+) | deployed; cookies file NOT yet supplied by owner |
 | 6 | Device-dependent layout bugs: Samsung nav bar overlap, sheet vs full-screen open, mini-mode paddings, shaking header | blocked: needs screen recordings |
 | 7 | iPhone download failure | blocked: needs error details from the reporter (Eva) |
 | 8 | Albums assembled from singles/features | not started; root cause is YouTube Music data, needs design |
@@ -45,6 +46,7 @@ Branch `plus-wheel-and-perf`. Live app is v157 (deployed 2026-10-12 evening): tr
 Import checked on the live server for Spotify, Yandex, Apple, Deezer, SoundCloud. `/card` endpoint checked with tests (auth, size, type, rate limit). Frontend syntax checked with `node --check`. No device testing done.
 
 ## Blockers
+- Owner has to export `cookies.txt` (extension «Get cookies.txt LOCALLY», preferably a spare Google account) so that YouTube sign-in checks can be passed; Chrome/Edge cookie DBs cannot be read from the PC.
 - Screen recordings for stage 6; error details for stage 7.
 - Owner decisions for stage 9.
 
