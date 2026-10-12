@@ -4893,7 +4893,44 @@
         ctx.fillText(cutText(ctx, r.sub, tmax), tx, y + 128);
       });
     }
-    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+    return canvasToBlob(canvas);
+  }
+
+  // PNG of a big canvas can come back empty on a phone short of memory: then a JPEG, which is lighter
+  function canvasToBlob(canvas) {
+    return new Promise((resolve) => {
+      try {
+        canvas.toBlob((b) => {
+          if (b) return resolve(b);
+          try { canvas.toBlob((b2) => resolve(b2), "image/jpeg", 0.92); } catch (e) { resolve(null); }
+        }, "image/png");
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  // Inside Telegram (Android above all) a plain «download» link in the web view saves nothing and
+  // says nothing. Telegram's own «save file» does the job, but takes a link: the picture is put on
+  // the server for a quarter of an hour and the link is handed over.
+  async function saveImageViaTelegram(blob, name) {
+    if (!(tg && typeof tg.downloadFile === "function" && tgAtLeast("8.0") && tg.initData)) return false;
+    try {
+      const res = await fetch(`${API_BASE_URL}/card`, {
+        method: "POST",
+        headers: { "content-type": blob.type || "image/png", "X-Telegram-Init-Data": tg.initData },
+        body: blob,
+      });
+      if (!res.ok) return false;
+      const { url } = await res.json();
+      const base = (API_BASE_URL || window.location.origin).replace(/\/$/, "");
+      const ext = blob.type === "image/jpeg" ? ".jpg" : ".png";
+      const fileName = name.replace(/\.[a-z]+$/i, "") + ext;
+      return await new Promise((resolve) => {
+        try { tg.downloadFile({ url: base + url, file_name: fileName }, (ok) => resolve(!!ok)); }
+        catch (e) { resolve(false); }
+      });
+    } catch (e) {
+      return false;
+    }
   }
 
   // отправка картинки: только сама картинка, без подписи.
@@ -4901,24 +4938,26 @@
   // показываем картинку с кнопками «Скачать» и «Скопировать».
   let lastShareBlob = null, lastShareName = "notka.png";
   async function shareImageBlob(blob, name) {
-    const file = new File([blob], name, { type: "image/png" });
+    const file = new File([blob], name, { type: blob.type || "image/png" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file] }); haptic("success"); return; }
-      catch (e) { if (e && e.name === "AbortError") return; /* else show the picture below */ }
+      catch (e) { if (e && e.name === "AbortError") return; /* else the next way */ }
     }
+    if (await saveImageViaTelegram(blob, name)) { haptic("success"); showToast("Картинка сохранена"); return; }
     lastShareBlob = blob; lastShareName = name;
     $("recap-preview").src = URL.createObjectURL(blob);
     openOverlay("recap-modal");
   }
-  $("recap-modal-download").addEventListener("click", () => {
+  $("recap-modal-download").addEventListener("click", async () => {
     if (!lastShareBlob) return;
+    if (await saveImageViaTelegram(lastShareBlob, lastShareName)) { showToast("Картинка сохранена"); return; }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(lastShareBlob);
     a.download = lastShareName;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    showToast("Картинка сохранена");
+    showToast("Если картинка не сохранилась, нажми на неё и удерживай");
   });
   $("recap-modal-copy").addEventListener("click", async () => {
     if (!lastShareBlob) return;
@@ -5161,13 +5200,19 @@
       ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `500 42px ${F}`;
       ctx.fillText(cutText(ctx, track.artist || "", pw - 72), px + 36, py + 118);
     }
-    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+    return canvasToBlob(canvas);
   }
   async function paintQuotePreview() {
     const token = ++quoteToken;
     $("quote-preview").style.opacity = "0.4";
-    const blob = await renderQuoteImage(quoteTrack, quoteLines, quoteStyle);
-    if (token !== quoteToken || !blob) return;
+    let blob = null;
+    try { blob = await renderQuoteImage(quoteTrack, quoteLines, quoteStyle); } catch (e) { blob = null; }
+    if (token !== quoteToken) return;
+    if (!blob) {
+      $("quote-preview").style.opacity = "";
+      showToast("Не получилось собрать картинку. Нажми стиль ещё раз");
+      return;
+    }
     if (quoteUrl) URL.revokeObjectURL(quoteUrl);
     quoteUrl = URL.createObjectURL(blob);
     $("quote-preview").src = quoteUrl;

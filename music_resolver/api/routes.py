@@ -431,6 +431,60 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             found = []
         return {"results": found}
 
+    # ---- a picture the app has made (a lyric card, a recap), handed back as a plain
+    # https link: Telegram's own «save file» takes a link, not a blob. Kept a quarter
+    # of an hour, then gone. Only for people inside Telegram, and not many at a time. ----
+    cards_dir = _CACHE_DIR.parent / "cards"
+    cards_dir.mkdir(parents=True, exist_ok=True)
+    card_uploads: dict[int, list[float]] = {}
+
+    def _store_card(raw: bytes, kind: str) -> str:
+        now = time.time()
+        for old in cards_dir.iterdir():
+            try:
+                if now - old.stat().st_mtime > 900:
+                    old.unlink(missing_ok=True)
+            except OSError:
+                pass
+        token = secrets.token_urlsafe(16)
+        (cards_dir / f"{token}.{kind}").write_bytes(raw)
+        return f"{token}.{kind}"
+
+    @router.post("/card")
+    async def card_upload(request: Request, x_telegram_init_data: str = Header(default="")):
+        user_id = plus_store.verify_init_data(x_telegram_init_data)
+        if user_id is None:
+            return JSONResponse({"error": {"code": "NOT_IN_TELEGRAM"}}, status_code=401)
+        now = time.time()
+        recent = [t for t in card_uploads.get(user_id, []) if now - t < 600]
+        if len(recent) >= 20:
+            return JSONResponse({"error": {"code": "TOO_MANY"}}, status_code=429)
+        raw = await request.body()
+        if len(raw) < 100 or len(raw) > 8 * 1024 * 1024:
+            return JSONResponse({"error": {"code": "BAD_SIZE"}}, status_code=413)
+        if raw[:8] == b"\x89PNG\r\n\x1a\n":
+            kind = "png"
+        elif raw[:3] == b"\xff\xd8\xff":
+            kind = "jpg"
+        else:
+            return JSONResponse({"error": {"code": "NOT_AN_IMAGE"}}, status_code=415)
+        card_uploads[user_id] = recent + [now]
+        name = await asyncio.to_thread(_store_card, raw, kind)
+        return {"url": f"/card/{name}"}
+
+    @router.get("/card/{name}")
+    async def card_get(name: str):
+        if not re.fullmatch(r"[A-Za-z0-9_-]{16,32}\.(png|jpg)", name):
+            return JSONResponse({"error": {"code": "NOT_FOUND"}}, status_code=404)
+        path = cards_dir / name
+        if not path.is_file():
+            return JSONResponse({"error": {"code": "NOT_FOUND"}}, status_code=404)
+        return FileResponse(
+            path,
+            media_type="image/png" if name.endswith(".png") else "image/jpeg",
+            headers={"cache-control": "no-store"},
+        )
+
     # ---- «Перенести плейлист»: the name and the track list behind a
     # Spotify / Yandex Music / Apple Music / YouTube link ----
     @router.get("/import")
