@@ -502,10 +502,14 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     async def sync_account(request: Request, x_telegram_init_data: str = Header(default="")):
         user_id = plus_store.verify_init_data(x_telegram_init_data)
         if user_id is None:
+            # counted, so the admin site shows how often a device is turned away (empty data = not opened as a Mini App)
+            metrics.count("sync_no_auth" if not x_telegram_init_data else "sync_bad_auth")
             return JSONResponse({"error": {"code": "NOT_IN_TELEGRAM"}}, status_code=401)
         raw = await request.body()
         if len(raw) > sync_store.MAX_BYTES:
+            metrics.count("sync_too_big")
             return JSONResponse({"error": {"code": "TOO_BIG"}}, status_code=413)
+        metrics.count("sync_ok")
         try:
             body = json.loads(raw or b"{}")
         except ValueError:
