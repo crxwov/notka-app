@@ -170,6 +170,60 @@ _COOKIE_DECRYPT_MARKERS = ("failed to decrypt with dpapi",)
 # После первой такой ошибки десять минут идём сразу без cookies.
 _cookie_pause_until = 0.0
 
+# YouTube answers a server's address with «sign in to confirm you're not a bot» (or an age
+# check). Then, and only then, the account cookies are used — never for ordinary requests, so
+# the account is exposed as little as possible.
+_SIGNIN_MARKERS = ("sign in to confirm", "not a bot", "confirm your age", "age-restricted", "sign in to view")
+
+
+def needs_signin(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(marker in text for marker in _SIGNIN_MARKERS)
+
+
+_cookie_stats = {"used": 0, "failed": 0, "last_failed_at": 0.0}
+
+
+def _note_cookie_use(ok: bool, exc: Exception | None = None) -> None:
+    """Counted, so the owner's watchdog can say «the cookies have gone stale» (see run_server)."""
+    _cookie_stats["used" if ok else "failed"] += 1
+    if not ok:
+        _cookie_stats["last_failed_at"] = time.time()
+    try:
+        from music_resolver.services import metrics
+
+        metrics.count("yt_cookie_ok" if ok else "yt_cookie_failed")
+    except Exception:
+        pass
+
+
+def cookie_stats() -> dict:
+    return dict(_cookie_stats, file=bool(cookie_file_path()))
+
+
+def cookie_file_path() -> str | None:
+    """The account cookies for sign-in checks: YTDLP_COOKIE_FILE, or the file the owner sent the
+    bot (data/youtube-cookies.txt). Looked for each time, so a new file works without a restart."""
+    import os as _os
+
+    candidates = []
+    configured = _os.environ.get("YTDLP_COOKIE_FILE")
+    if configured:
+        candidates.append(configured)
+    try:
+        from music_resolver.services.plus_store import DATA_DIR
+
+        candidates.append(str(DATA_DIR / "youtube-cookies.txt"))
+    except Exception:
+        pass
+    for path in candidates:
+        try:
+            if _os.path.isfile(path) and _os.path.getsize(path) > 50:
+                return path
+        except OSError:
+            continue
+    return None
+
 
 def _pause_cookies() -> None:
     global _cookie_pause_until
@@ -196,7 +250,7 @@ class YtDlpResolver:
         info = await asyncio.to_thread(self._extract, target)
         return self._to_resolved(info)
 
-    def _base_opts(self, use_cookies: bool = True) -> dict:
+    def _base_opts(self, use_cookies: bool = True, force_file: bool = False) -> dict:
         if use_cookies and time.time() < _cookie_pause_until:
             use_cookies = False
         opts = {
@@ -206,9 +260,10 @@ class YtDlpResolver:
             "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
             "socket_timeout": self.settings.provider_timeout,
         }
-        if use_cookies and self.settings.ytdlp_cookie_file:
-            opts["cookiefile"] = self.settings.ytdlp_cookie_file
-        elif use_cookies and self.settings.ytdlp_cookies_from_browser:
+        file_cookies = cookie_file_path() if force_file else None
+        if file_cookies:
+            opts["cookiefile"] = file_cookies
+        elif use_cookies and self.settings.ytdlp_cookies_from_browser and not self.settings.ytdlp_cookie_file:
             # Reads cookies straight from an installed browser's profile
             # (no export step needed). Lets yt-dlp pass age-gated /
             # "sign in to confirm your age" videos using whatever Google
@@ -220,8 +275,8 @@ class YtDlpResolver:
             # why age-restricted tracks still fail.
             opts["no_warnings"] = False
         using_browser_cookies = bool(
-            (use_cookies and self.settings.ytdlp_cookie_file)
-            or (use_cookies and self.settings.ytdlp_cookies_from_browser)
+            file_cookies
+            or (use_cookies and self.settings.ytdlp_cookies_from_browser and not self.settings.ytdlp_cookie_file)
         )
         if self.settings.ytdlp_proxy and not using_browser_cookies:
             # Cookies are tied to the IP they were issued to (this
@@ -242,6 +297,18 @@ class YtDlpResolver:
 
     def _uses_browser_cookies(self) -> bool:
         return bool(not self.settings.ytdlp_cookie_file and self.settings.ytdlp_cookies_from_browser)
+
+    def _run_download(self, opts: dict, target: str, dest_dir: Path, tmp_stem: str) -> tuple[dict, str]:
+        try:
+            with YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(target, download=True)
+                if "entries" in (info or {}) and info.get("entries"):
+                    info = next((entry for entry in info["entries"] if entry), info)
+                return info, ydl.prepare_filename(info)
+        except Exception:
+            for leftover in dest_dir.glob(f"{tmp_stem}*"):
+                leftover.unlink(missing_ok=True)
+            raise
 
     def _extract(self, target: str) -> dict:
         opts = self._base_opts()
@@ -298,8 +365,8 @@ class YtDlpResolver:
             raise AppError(ErrorCode.INVALID_SOURCE_URL, "Unsupported or invalid YouTube URL")
         return await asyncio.to_thread(self._download_sync, target, dest_dir, dest_stem)
 
-    def _download_opts(self, use_cookies: bool, outtmpl: str) -> dict:
-        opts = self._base_opts(use_cookies=use_cookies)
+    def _download_opts(self, use_cookies: bool, outtmpl: str, force_file: bool = False) -> dict:
+        opts = self._base_opts(use_cookies=use_cookies, force_file=force_file)
         opts["skip_download"] = False
         opts["outtmpl"] = outtmpl
         opts["retries"] = 3
@@ -318,28 +385,24 @@ class YtDlpResolver:
         outtmpl = str(dest_dir / (tmp_stem + ".%(ext)s"))
         opts = self._download_opts(use_cookies=True, outtmpl=outtmpl)
         try:
-            with YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(target, download=True)
-                if "entries" in (info or {}) and info.get("entries"):
-                    info = next((entry for entry in info["entries"] if entry), info)
-                filepath = ydl.prepare_filename(info)
+            info, filepath = self._run_download(opts, target, dest_dir, tmp_stem)
         except Exception as exc:
-            for leftover in dest_dir.glob(f"{tmp_stem}*"):
-                leftover.unlink(missing_ok=True)
             if self._uses_browser_cookies() and _is_cookie_error(exc):
                 _pause_cookies()
-                # Same locked-cookie-database problem as _extract (see its
-                # comment) — retry once with no cookies before giving up.
-                fallback_opts = self._download_opts(use_cookies=False, outtmpl=outtmpl)
+                # The browser (e.g. Chrome) holds a lock on its cookie database: retry once without cookies
                 try:
-                    with YoutubeDL(fallback_opts) as ydl:
-                        info = ydl.extract_info(target, download=True)
-                        if "entries" in (info or {}) and info.get("entries"):
-                            info = next((entry for entry in info["entries"] if entry), info)
-                        filepath = ydl.prepare_filename(info)
+                    info, filepath = self._run_download(self._download_opts(use_cookies=False, outtmpl=outtmpl), target, dest_dir, tmp_stem)
                 except Exception as exc2:
-                    for leftover in dest_dir.glob(f"{tmp_stem}*"):
-                        leftover.unlink(missing_ok=True)
+                    raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc2
+            elif needs_signin(exc) and cookie_file_path():
+                # YouTube wants a signed-in visitor: the account cookies are used for this one track
+                try:
+                    info, filepath = self._run_download(
+                        self._download_opts(use_cookies=True, outtmpl=outtmpl, force_file=True), target, dest_dir, tmp_stem
+                    )
+                    _note_cookie_use(True)
+                except Exception as exc2:
+                    _note_cookie_use(False, exc2)
                     raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc2
             else:
                 raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc

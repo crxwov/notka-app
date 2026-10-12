@@ -149,7 +149,9 @@ def make_backup(data_dir: Path, backup_dir: Path, keep: int = 7) -> Path:
     out = backup_dir / f"notka-data-{time.strftime('%Y-%m-%d')}.tar.gz"
     tmp = out.with_name(out.name + f".{uuid.uuid4().hex[:6]}.part")
     with tarfile.open(tmp, "w:gz") as tar:
-        tar.add(str(data_dir), arcname="data", filter=lambda ti: None if ti.name.endswith(".tmp") else ti)
+        # the YouTube cookies are a login: they are never put in a copy that goes to a chat
+        skip = (".tmp", "youtube-cookies.txt", ".upload")
+        tar.add(str(data_dir), arcname="data", filter=lambda ti: None if ti.name.endswith(skip) else ti)
     tmp.replace(out)
     for old in sorted(backup_dir.glob("notka-data-*.tar.gz"))[:-keep]:
         old.unlink(missing_ok=True)

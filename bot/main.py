@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     FSInputFile,
@@ -283,6 +283,58 @@ async def main() -> None:
         except Exception:
             logger.exception("Could not build the stats")
             await message.answer("Не получилось собрать статистику, попробуй позже.")
+
+    # ---- YouTube cookies: the owner sends cookies.txt to the bot; it is kept and used on its
+    # own when YouTube asks the server to sign in (nothing to do over ssh) ----
+    cookies_path = plus_store.DATA_DIR / "youtube-cookies.txt"
+
+    @dp.message(F.document)
+    async def handle_document(message: Message) -> None:
+        doc = message.document
+        if message.from_user.id not in admin_ids or not doc or not (doc.file_name or "").lower().endswith(".txt"):
+            await message.answer("Не понял. Жми /start, чтобы открыть Нотку.")
+            return
+        if doc.file_size and doc.file_size > 2 * 1024 * 1024:
+            await message.answer("Файл слишком большой для файла кук.")
+            return
+        tmp = cookies_path.with_suffix(".upload")
+        try:
+            cookies_path.parent.mkdir(parents=True, exist_ok=True)
+            await bot.download(doc, destination=tmp)
+            text = tmp.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            logger.exception("Could not take the cookies file")
+            await message.answer("Не получилось принять файл, попробуй ещё раз.")
+            return
+        rows = [ln for ln in text.splitlines() if ln.strip() and not ln.startswith("#") and ln.count("\t") >= 6]
+        yt = [ln for ln in rows if "youtube.com" in ln or "google.com" in ln]
+        if len(yt) < 3:
+            tmp.unlink(missing_ok=True)
+            await message.answer(
+                "Это не похоже на файл кук YouTube (нужен формат Netscape: cookies.txt из расширения «Get cookies.txt LOCALLY» "
+                "на странице youtube.com, вошедшего в аккаунт)."
+            )
+            return
+        os.replace(tmp, cookies_path)
+        try:
+            os.chmod(cookies_path, 0o600)
+        except OSError:
+            pass
+        await message.answer(
+            f"Куки YouTube сохранены ({len(yt)} записей). Они применяются сами, только когда YouTube просит войти. "
+            "Сообщение с файлом лучше удалить из чата."
+        )
+
+    @dp.message(Command("cookies"))
+    async def handle_cookies_status(message: Message) -> None:
+        if message.from_user.id not in admin_ids:
+            await message.answer("Не понял команду. Жми /start, чтобы открыть Нотку.")
+            return
+        if cookies_path.exists():
+            age_days = (time.time() - cookies_path.stat().st_mtime) / 86400
+            await message.answer(f"Куки YouTube загружены {age_days:.0f} дн. назад. Пришлите новый cookies.txt файлом, чтобы обновить.")
+        else:
+            await message.answer("Куки YouTube не загружены. Пришлите файл cookies.txt сюда, если YouTube станет просить войти.")
 
     @dp.message()
     async def handle_other(message: Message) -> None:
