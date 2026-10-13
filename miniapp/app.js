@@ -7133,6 +7133,8 @@
       $("pi-sub").textContent = extra.listeners ? listeners(extra.listeners) : "";
       const photo = extra.photo || t.artwork;
       setCoverEl($("pi-photo"), photo, t.artist || t.id);
+      // the card wears the artist's photo, blurred, along its right side
+      $("pi-artist").style.setProperty("--pi-bg", photo ? `url("${String(photo).replace(/"/g, "%22")}")` : "none");
       $("pi-artist").onclick = () => { haptic("light"); openArtistScreen(t.artist, [t], { artistId: t.artistId, source: t.source }); };
       const albumBtn = $("pi-album");
       albumBtn.hidden = !t.album;
@@ -7140,7 +7142,8 @@
         $("pi-album-title").textContent = t.album;
         const year = extra.year || (extra.credits && extra.credits.released ? String(extra.credits.released).slice(0, 4) : "");
         const label = extra.credits && extra.credits.label ? String(extra.credits.label).split(",")[0] : "";
-        $("pi-album-sub").textContent = [year, label].filter(Boolean).join(" · ");
+        const count = extra.tracks ? `${extra.tracks} ${plural(extra.tracks, "трек", "трека", "треков")}` : "";
+        $("pi-album-sub").textContent = [year, count, label].filter(Boolean).join(" · ");
         setCoverEl($("pi-album-cover"), t.artwork, t.album);
         albumBtn.onclick = () => { haptic("light"); if (t.albumId) openAlbumById(t.source, t.albumId, t.album, t.artist); else openAlbumScreen(t); };
       }
@@ -7177,6 +7180,7 @@
       ]);
       const extra = {
         year: alb && alb.year ? String(alb.year) : "",
+        tracks: alb && alb.tracks ? alb.tracks.length : 0,
         listeners: art && art.subscribers ? art.subscribers : "",
         photo: art && art.photo ? art.photo : "",
         credits: cr,
