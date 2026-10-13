@@ -452,8 +452,9 @@ class YtDlpResolver:
                     return result
                 except Exception as exc:  # noqa: BLE001 - yt-dlp raises many kinds
                     last = exc
-                    if fast and _is_format_error(exc):
-                        continue  # the same route without the shortcut
+                    text = str(exc).lower()
+                    if fast and (_is_format_error(exc) or "403" in text or "forbidden" in text):
+                        continue  # the same route without the shortcut (a format it hides, a file URL refused once)
                     if no_proxy and _worth_other_route(exc):
                         _mark_direct(False)
                     break
