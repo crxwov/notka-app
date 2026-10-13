@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import os
 import re
 import logging
@@ -20,6 +21,9 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineQuery,
     InlineQueryResultAudio,
+    InlineQueryResultCachedAudio,
+    BufferedInputFile,
+    ChatMemberUpdated,
     InlineQueryResultsButton,
     MenuButtonWebApp,
     Message,
@@ -240,24 +244,102 @@ async def main() -> None:
             artist = (track.get("artist") or "")[:120]
             cover = str(track.get("artwork") or "")
             url = f"{public_base}/inline/{quote(source)}/{quote(source_id)}.mp3?" + urlencode({"t": title, "a": artist, "c": cover})
-            items.append(
-                InlineQueryResultAudio(
-                    id=hashlib.sha1(f"{source}:{source_id}".encode()).hexdigest()[:40],
-                    audio_url=url,
-                    title=title,
-                    performer=artist or None,
-                    audio_duration=duration or None,
+            rid = hashlib.sha1(f"{source}:{source_id}".encode()).hexdigest()[:40]
+            stored = inline_files.get(f"{source}:{source_id}")
+            if stored:
+                # already in the store: Telegram has the file, with its cover; it is sent at once
+                items.append(InlineQueryResultCachedAudio(id=rid, audio_file_id=stored))
+            else:
+                items.append(
+                    InlineQueryResultAudio(id=rid, audio_url=url, title=title, performer=artist or None, audio_duration=duration or None)
                 )
-            )
-            picks.append((source, source_id, title, artist, cover))
+            picks.append((source, source_id, title, artist, cover, duration))
             if len(items) >= 10:
                 break
         await query.answer(items, cache_time=300, is_personal=False, button=open_button)
         # the first four are made ready while the list is on the screen (the converter works two at a time)
-        for source, source_id, title, artist, cover in picks[:4]:
-            task = asyncio.create_task(warm(source, source_id, title, artist, cover))
+        for source, source_id, title, artist, cover, duration in picks[:4]:
+            if storage_chat():
+                task = asyncio.create_task(ensure_uploaded(source, source_id, title, artist, cover, duration))
+            else:
+                task = asyncio.create_task(warm(source, source_id, title, artist, cover))
             warm_tasks.add(task)
             task.add_done_callback(warm_tasks.discard)
+
+    # ---- the music store: a private channel the bot is an admin of. A track is uploaded there once, WITH its cover, and
+    # from then on it is offered as a file that Telegram already has: it shows the cover and is sent at once. ----
+    files_path = plus_store.DATA_DIR / "inline_files.json"
+    storage_path = plus_store.DATA_DIR / "inline_storage.json"
+
+    def _read_json(path) -> dict:
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def _write_json(path, data) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+
+    inline_files: dict[str, str] = _read_json(files_path)
+
+    def storage_chat() -> int | None:
+        env = os.environ.get("INLINE_STORAGE_CHAT_ID", "").strip()
+        if env.lstrip("-").isdigit():
+            return int(env)
+        value = _read_json(storage_path).get("chat_id")
+        return int(value) if value else None
+
+    @dp.my_chat_member()
+    async def handle_my_chat_member(update: ChatMemberUpdated) -> None:
+        # the bot was made an admin of a channel: that channel becomes the music store
+        if update.chat.type != "channel":
+            return
+        status = update.new_chat_member.status
+        if status in ("administrator", "creator"):
+            _write_json(storage_path, {"chat_id": update.chat.id, "title": update.chat.title})
+            for admin in admin_ids:
+                try:
+                    await bot.send_message(admin, f"Склад музыки подключён: «{update.chat.title}». Теперь треки в чатах будут с обложками и отправляться сразу, как только загрузятся на склад (первые разы пару секунд).")
+                except Exception:
+                    pass
+        elif status in ("left", "kicked") and _read_json(storage_path).get("chat_id") == update.chat.id:
+            _write_json(storage_path, {})
+
+    upload_lock = asyncio.Lock()
+    uploading: set[str] = set()
+
+    async def ensure_uploaded(source: str, source_id: str, title: str, artist: str, cover: str, duration: int) -> None:
+        key = f"{source}:{source_id}"
+        chat = storage_chat()
+        if not chat or key in inline_files or key in uploading:
+            return
+        uploading.add(key)
+        try:
+            async with upload_lock:  # one at a time: the server is small
+                async with httpx.AsyncClient(timeout=240) as client:
+                    mp3 = await client.get(f"{backend}/inline/{quote(source)}/{quote(source_id)}.mp3", params={"t": title, "a": artist, "c": cover})
+                    if mp3.status_code != 200 or len(mp3.content) < 20_000:
+                        return
+                    thumb = None
+                    if cover:
+                        t = await client.get(f"{backend}/inline-thumb/{quote(source)}/{quote(source_id)}.jpg", params={"c": cover})
+                        if t.status_code == 200 and len(t.content) < 200_000:
+                            thumb = BufferedInputFile(t.content, filename="cover.jpg")
+                sent = await bot.send_audio(
+                    chat_id=chat,
+                    audio=BufferedInputFile(mp3.content, filename=f"{artist} - {title}.mp3"[:120]),
+                    title=title, performer=artist or None, duration=duration or None, thumbnail=thumb,
+                )
+                if sent.audio:
+                    inline_files[key] = sent.audio.file_id
+                    _write_json(files_path, inline_files)
+        except Exception:
+            logger.exception("Could not put %s into the music store", key)
+        finally:
+            uploading.discard(key)
 
     # ---- «/stats»: the owner's quick summary in the chat (the full one is on the admin site) ----
     @dp.message(Command("stats"))

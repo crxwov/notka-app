@@ -431,6 +431,26 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             return JSONResponse({"error": {"code": "NO"}}, status_code=403)
         return await asyncio.to_thread(admin_stats.summary)
 
+    @router.get("/inline-thumb/{source}/{source_id}.jpg")
+    async def inline_thumb(source: str, source_id: str, c: str = ""):
+        """The cover as a thumbnail Telegram accepts for an audio file: JPEG, at most 320 px, well under 200 KB."""
+        if not _inline_ids_ok(source, source_id):
+            return Response(status_code=404)
+        src = await _cover_file(c, f"{source}_{source_id}")
+        exe = ffmpeg_exe()
+        if src is None or not exe:
+            return Response(status_code=404)
+        out = src.with_name(src.stem + ".t320.jpg")
+        if not out.exists() or out.stat().st_size < 500:
+            proc = await asyncio.create_subprocess_exec(
+                exe, "-y", "-v", "error", "-i", str(src), "-vf", "scale=320:320:force_original_aspect_ratio=decrease", "-q:v", "6", str(out),
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(proc.communicate(), timeout=20)
+        if not out.exists() or out.stat().st_size < 500:
+            return Response(status_code=404)
+        return FileResponse(out, media_type="image/jpeg", headers={"cache-control": "public, max-age=86400"})
+
     @router.get("/inline-warm/{source}/{source_id}")
     async def inline_warm(source: str, source_id: str, t: str = "", a: str = "", c: str = "") -> dict:
         # called by the bot for the first results of a query, so that by the time one is picked it is ready
