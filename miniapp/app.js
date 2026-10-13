@@ -6701,10 +6701,55 @@
   }
   $("player-prev-btn").addEventListener("click", () => playAdjacent(-1));
   $("player-next-btn").addEventListener("click", () => playAdjacent(1));
+  // «В любимое»: the heart springs, a ring goes out from it and a scatter of small hearts in the brand's
+  // colours flies off (the way the heart reaction does in Telegram); taking it back only deflates the heart
+  const HEART_COLORS = ["#FF2D78", "#FF6F7F", "#FFB08E", "#FFE9DF", "#FF5C95"];
+  function heartBurst(anchor) {
+    if (!anchor) return;
+    const r = anchor.getBoundingClientRect();
+    if (!r.width && !r.height) return;
+    const host = document.createElement("span");
+    host.className = "heart-burst";
+    host.setAttribute("aria-hidden", "true");
+    host.style.left = `${r.left + r.width / 2}px`;
+    host.style.top = `${r.top + r.height / 2}px`;
+    const ring = document.createElement("i");
+    ring.className = "heart-ring";
+    host.appendChild(ring);
+    const n = 11;
+    for (let k = 0; k < n; k++) {
+      const angle = (k / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.5 - Math.PI / 2;
+      const dist = 40 + Math.random() * 34;
+      const sp = document.createElement("i");
+      sp.className = "heart-spark" + (k % 3 === 2 ? " dot" : "");
+      sp.style.setProperty("--dx", `${(Math.cos(angle) * dist).toFixed(1)}px`);
+      sp.style.setProperty("--dy", `${(Math.sin(angle) * dist - 10).toFixed(1)}px`); // a little upwards: it floats
+      sp.style.setProperty("--sc", (0.75 + Math.random() * 0.75).toFixed(2));
+      sp.style.setProperty("--rot", `${Math.round((Math.random() - 0.5) * 70)}deg`);
+      sp.style.setProperty("--d", `${Math.round(Math.random() * 70)}ms`);
+      sp.style.setProperty("--c", HEART_COLORS[k % HEART_COLORS.length]);
+      if (!sp.classList.contains("dot")) sp.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-heart-fill"/></svg>';
+      host.appendChild(sp);
+    }
+    document.body.appendChild(host);
+    setTimeout(() => host.remove(), 1100);
+  }
+  function heartPop(buttons, liked) {
+    buttons.forEach((b) => {
+      if (!b) return;
+      b.classList.remove("heart-pop", "heart-unlike");
+      void b.offsetWidth;
+      b.classList.add(liked ? "heart-pop" : "heart-unlike");
+      setTimeout(() => b.classList.remove("heart-pop", "heart-unlike"), 850);
+    });
+  }
   $("player-fav-btn").addEventListener("click", () => {
     if (!currentTrack) return;
     const isFav = Store.toggleFavorite(currentTrack);
     haptic(isFav ? "success" : "light");
+    const hearts = [$("player-fav-btn"), $("mp-fav-btn")];
+    heartPop(hearts, isFav);
+    if (isFav) heartBurst(hearts.find((el) => el && el.getClientRects().length));
     syncPlayerFav();
     refreshCurrentScreen();
   });
@@ -6803,6 +6848,7 @@
     if (!trackMenuTrack) return;
     const on = Store.toggleFavorite(trackMenuTrack);
     haptic(on ? "success" : "light");
+    if (on) heartBurst($("menu-track-fav").querySelector("svg"));
     closeOverlay("track-menu-sheet");
     showToast(on ? "Добавлено в любимое" : "Убрано из любимого");
     syncPlayerFav();
