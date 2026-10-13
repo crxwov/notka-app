@@ -921,3 +921,18 @@ body.is-desktop .hero-actions .pill-icon-only { min-width: 48px; }
 /* три кнопки в шапке списка: подписи не обрезаются */
 .hero-actions .pill-btn { padding: 0 12px; }
 .hero-actions .pill-btn.play-src { flex-grow: 0.75; }
+
+/* кнопка микса «подороже»: почти белая жемчужная капля; от фона в ней только лёгкие перетекающие тона по краю и внизу */
+.mix-blob.b1 {
+  background:
+    radial-gradient(circle at 28% 22%, #fff 0 8%, rgba(255, 255, 255, 0) 36%),
+    radial-gradient(circle at 80% 86%, color-mix(in srgb, var(--c-warm) 42%, transparent) 0, transparent 52%),
+    radial-gradient(circle at 12% 78%, color-mix(in srgb, var(--c-core) 26%, transparent) 0, transparent 46%),
+    radial-gradient(circle at 88% 14%, color-mix(in srgb, var(--c-mid) 18%, transparent) 0, transparent 40%),
+    linear-gradient(155deg, #fffefd, #fff4ef 60%, color-mix(in srgb, var(--c-warm) 22%, #fff4ef));
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.95),
+    inset 0 -10px 18px color-mix(in srgb, var(--c-warm) 30%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    0 18px 34px -12px color-mix(in srgb, var(--c-deep) 80%, #000);
+}
