@@ -6424,25 +6424,28 @@
   $("player-lyrics-btn").addEventListener("click", () => { haptic("light"); setLyricsOpen(!lyricsOpen); });
   ["touchstart", "wheel"].forEach((type) => lyricsBox.addEventListener(type, () => { lyricsTouchedAt = Date.now(); }, { passive: true }));
 
-  // A swipe down puts the player away: it follows the finger, shrinks a little and fades while the page it
-  // came from comes up under it (a cross-fade, so that only position and opacity move: that is what
-  // stays smooth on a weak phone). Let go far enough and it slides down and away, otherwise it settles
-  // back. On the cover from anywhere but the controls; over the text only when it is at its very top (the
-  // text follows the song, so it rarely is); the top bar and the title block fold the player always.
+  // A swipe down puts the player away like a card: it stays whole and follows the finger, the page it came
+  // from shows from under it, the tab bar and the small player are there from the first moment. Let go far
+  // enough and it slides down and fades at the very end, otherwise it settles back. Only position and
+  // opacity move (that is what stays smooth on a weak phone). On the cover from anywhere but the controls;
+  // over the text only when it is at its very top (the text follows the song, so it rarely is); the top bar
+  // and the title block fold the player always.
   let playerPull = null;
   let pullBehind = null;
   let pullBehindName = null;
   const pullScreen = $("screen-player"); // (the swipe code further down names it too, but declares it later)
-  const pullStyle = (dy, animate) => {
-    const t = animate ? "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.32s ease-out" : "none";
+  const pullDock = () => [bottomNav, miniPlayer];
+  const pullStyle = (dy, animate, fade) => {
     const k = Math.min(1, dy / 700);
-    pullScreen.style.transition = t;
+    pullScreen.style.transition = animate ? "transform 0.34s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.34s ease-in" : "none";
     pullScreen.style.transform = `translate3d(0, ${dy}px, 0) scale(${(1 - k * 0.08).toFixed(3)})`;
-    pullScreen.style.opacity = String(Math.max(0, 1 - dy / 340).toFixed(3));
+    pullScreen.style.opacity = fade ? "0" : "1";
+    const appear = String(Math.min(1, dy / 90).toFixed(3));
     if (pullBehind) {
-      pullBehind.style.transition = animate ? "opacity 0.32s ease-out" : "none";
-      pullBehind.style.opacity = String(Math.min(1, dy / 240).toFixed(3));
+      pullBehind.style.transition = animate ? "opacity 0.34s ease-out" : "none";
+      pullBehind.style.opacity = fade ? "1" : String(Math.min(1, 0.35 + dy / 200).toFixed(3));
     }
+    pullDock().forEach((el) => { el.style.transition = animate ? "opacity 0.3s ease-out" : "none"; el.style.opacity = fade ? "1" : appear; });
   };
   const pullReset = () => {
     pullScreen.style.transition = "";
@@ -6450,6 +6453,7 @@
     pullScreen.style.opacity = "";
     pullScreen.style.willChange = "";
     if (pullBehind) { pullBehind.style.transition = ""; pullBehind.style.opacity = ""; pullBehind.style.willChange = ""; }
+    pullDock().forEach((el) => { el.style.transition = ""; el.style.opacity = ""; el.style.animation = ""; });
     document.body.classList.remove("player-pulling");
   };
   function pullBegin() {
@@ -6457,10 +6461,18 @@
     pullBehindName = below && below.name !== "player" && screens[below.name] ? below.name : "home";
     pullBehind = screens[pullBehindName] || null;
     if (pullBehind) {
-      pullBehind.style.opacity = "0";
+      pullBehind.style.opacity = "0.35";
       pullBehind.style.willChange = "opacity";
       pullBehind.hidden = false; // the page under the player
     }
+    // the tab bar and the small player are shown now, as they will be on that page: so they do not
+    // pop in with their own entrance when the player is already gone
+    const tabs = TAB_SCREENS.has(pullBehindName) && !isDesktop();
+    const mini = !!currentTrack && !NO_MINI_SCREENS.has(pullBehindName);
+    pullDock().forEach((el) => { el.style.animation = "none"; el.style.opacity = "0"; });
+    bottomNav.hidden = !tabs;
+    miniPlayer.hidden = !mini;
+    document.body.classList.toggle("no-tabbar", !tabs);
     // the light takes the pose of the page it is going back to while the player is still being moved,
     // not with a jump after it is gone
     document.body.dataset.screen = pullBehindName;
@@ -6470,6 +6482,7 @@
     playerPull = null;
     if (e.touches.length !== 1 || !currentTrack || currentScreen !== "player") return;
     if (document.body.classList.contains("quote-picking") || openOverlays.length) return;
+    if (isDesktop()) return;
     if (e.target.closest("#player-progress-track, .scrub, .scrub-times, button, input, a, .theme-try")) return;
     if (e.target.closest("#player-lyrics") && lyricsBox.scrollTop > 0) return;
     if (artGrab) return; // a record or a cassette is being turned by the finger
@@ -6491,7 +6504,7 @@
     playerPull.dy = Math.max(0, dy);
     if (!playerPull.raf) {
       const p = playerPull;
-      p.raf = requestAnimationFrame(() => { p.raf = 0; if (playerPull === p) pullStyle(p.dy * 0.95, false); });
+      p.raf = requestAnimationFrame(() => { p.raf = 0; if (playerPull === p) pullStyle(p.dy * 0.95, false, false); });
     }
   }, { passive: true });
   const endPlayerPull = (e) => {
@@ -6503,24 +6516,26 @@
     const speed = p.dy / Math.max(1, performance.now() - p.t);
     const go = e && e.type === "touchend" && (p.dy > 120 || (p.dy > 50 && speed > 0.55));
     if (!go) {
-      // back into place; the page under it is put away again, the light goes back to the player's pose
-      pullStyle(0, true);
+      // back into place; the page under it is put away again, the light and the dock go back to the player's pose
+      pullStyle(0, true, false);
+      if (pullBehind) pullBehind.style.opacity = "0";
+      pullDock().forEach((el) => { el.style.opacity = "0"; });
       document.body.dataset.screen = "player";
       setTimeout(() => {
         if (currentScreen === "player" && pullBehind) pullBehind.hidden = true;
         pullReset();
         pullBehind = null;
-      }, 340);
+        updateDock(); // the tab bar and the small player as the player page has them (none)
+      }, 360);
       return;
     }
     haptic("light");
-    pullStyle(window.innerHeight * 0.55, true);
-    if (pullBehind) pullBehind.style.opacity = "1";
+    pullStyle(window.innerHeight * 0.6, true, true);
     setTimeout(() => {
       // the app really goes back; the page is already there and stays as it was
       goBack({ keep: true });
       requestAnimationFrame(() => { pullReset(); pullBehind = null; });
-    }, 330);
+    }, 340);
   };
   pullScreen.addEventListener("touchend", endPlayerPull);
   pullScreen.addEventListener("touchcancel", endPlayerPull);

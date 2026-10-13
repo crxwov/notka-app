@@ -641,6 +641,21 @@ body:not(.is-desktop).lyrics-open .lyrics { bottom: -14px; padding-top: 20px; }
 body:not(.is-desktop).lyrics-open .player-controls { display: none; }
 body:not(.is-desktop).lyrics-open .player-foot { margin-top: 6px; }
 
-/* свайп вниз по плееру: плеер уходит вниз и растворяется, страница под ним проявляется (только transform и opacity) */
-body.player-pulling #screen-player { animation: none !important; z-index: 5; }
+/* свайп вниз по плееру: плеер как карточка (цельный, с цветным фоном трека), под ним страница,
+   панель вкладок и мини-плеер на месте с первого момента; двигаются только transform и opacity */
+body.player-pulling #screen-player {
+  animation: none !important;
+  z-index: 5;
+  overflow: hidden;
+  border-radius: 26px;
+  background:
+    radial-gradient(130% 55% at 50% 0%, color-mix(in srgb, var(--c-warm) 40%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--c-mid) 28%, #170A14) 0%, color-mix(in srgb, var(--c-deep) 60%, #0A0709) 100%);
+  box-shadow: 0 -12px 44px rgba(0, 0, 0, 0.4);
+}
 body.player-pulling .player-prism { display: none; }
+body.player-pulling #bottom-nav, body.player-pulling #mini-player { z-index: 6; animation: none !important; }
+
+/* телефон: аватарка справа сверху крупнее (была 36 px) */
+body:not(.is-desktop) #screen-home .avatar-btn { width: 60px; height: 60px; margin: -4px -4px -4px 0; }
+body:not(.is-desktop) #screen-home .avatar-btn .avatar { width: 54px; height: 54px; font-size: 23px; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.26), 0 8px 20px -8px rgba(0, 0, 0, 0.5); }
