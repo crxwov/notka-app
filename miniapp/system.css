@@ -900,7 +900,24 @@ body.is-desktop .hero-actions .pill-icon-only { min-width: 48px; }
 .album-group-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .album-group-count { flex: none; font-weight: 600; }
 
-/* язык миксов: три переключателя под кнопками микса */
+/* ОДИН СТИЛЬ КНОПОК: стекло. Раньше «тихие» кнопки были плоскими серыми плашками, а белые — залитыми, и рядом со стеклом
+   они выбивались (замечание uniq). Теперь все кнопки: матовое стекло с тонкой обводкой и бликом сверху; главная — светлое стекло. */
+.pill-quiet, .lang-row button, .mix-refresh, .mood-btn {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.32), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+}
+.pill-primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -2px 6px rgba(255, 150, 130, 0.18), 0 10px 26px -12px color-mix(in srgb, var(--c-core, #ff2d78) 70%, transparent);
+}
+.pill-quiet[aria-pressed="true"], .lang-row button[aria-pressed="true"] {
+  color: var(--text);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c-core, #ff2d78) 55%, rgba(255, 255, 255, 0.2)), color-mix(in srgb, var(--c-core, #ff2d78) 28%, rgba(255, 255, 255, 0.06)));
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
 .lang-row { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
-.lang-row button { height: 32px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-2); background: var(--surface-1); transition: background-color 0.2s, color 0.2s; }
-.lang-row button[aria-pressed="true"] { background: var(--btn-light, #fff); color: var(--bg, #1a0b16); }
+.lang-row button { height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-2); transition: transform 0.2s var(--ease-out), background-color 0.2s; }
+.lang-row button:active { transform: scale(0.95); }
+/* три кнопки в шапке списка: подписи не обрезаются */
+.hero-actions .pill-btn { padding: 0 12px; }
+.hero-actions .pill-btn.play-src { flex-grow: 0.75; }
