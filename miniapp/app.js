@@ -2831,6 +2831,24 @@
     return section;
   }
 
+  // While the listener looks at the results, the server makes the first ones ready: a tap then starts
+  // them at once. Once the typing has paused, the first two, each only once.
+  const warmed = new Set();
+  let warmTimer = 0;
+  function warmSoon(list) {
+    clearTimeout(warmTimer);
+    if (!Array.isArray(list) || !list.length || !(lastSearchQuery || "").trim() || lastSearchQuery.trim().length < 3) return;
+    if (navigator.connection && navigator.connection.saveData) return;
+    warmTimer = setTimeout(() => {
+      if (currentScreen !== "search") return;
+      list.slice(0, 2).forEach((t) => {
+        if (!t || !t.id || !t.source || !t.sourceId || warmed.has(t.id)) return;
+        warmed.add(t.id);
+        fetch(`${API_BASE_URL}/warm?source=${encodeURIComponent(t.source)}&id=${encodeURIComponent(t.sourceId)}`).catch(() => {});
+      });
+    }, 900);
+  }
+
   function renderFilteredResults() {
     const intent = intentArtist();
     // the tracks are still on their way, but the artist the query names is
@@ -2844,6 +2862,7 @@
       return;
     }
 
+    warmSoon(tracks);
     stateResults.innerHTML = "";
     const trackRows = (list) => list.map((t) => buildTrackRow(t, { queue: tracks, context: "Поиск" }));
     if (searchTab === "tracks") {
