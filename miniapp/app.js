@@ -7132,9 +7132,11 @@
       $("pi-name").textContent = t.artist || "Неизвестный исполнитель";
       $("pi-sub").textContent = extra.listeners ? listeners(extra.listeners) : "";
       const photo = extra.photo || t.artwork;
-      setCoverEl($("pi-photo"), photo, t.artist || t.id);
-      // the card wears the artist's photo, blurred, along its right side
-      $("pi-artist").style.setProperty("--pi-bg", photo ? `url("${String(photo).replace(/"/g, "%22")}")` : "none");
+      // the card is the artist's photo, whole, with the name over its lower edge (as «About the artist» in Spotify)
+      const big = photo ? hiResArtwork(photo) || photo : "";
+      const ph = $("pi-photo");
+      ph.style.backgroundImage = big ? `url("${String(big).replace(/"/g, "%22")}")` : "";
+      ph.classList.toggle("is-empty", !big);
       $("pi-artist").onclick = () => { haptic("light"); openArtistScreen(t.artist, [t], { artistId: t.artistId, source: t.source }); };
       const albumBtn = $("pi-album");
       albumBtn.hidden = !t.album;

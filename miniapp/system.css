@@ -739,16 +739,24 @@ body.is-desktop .player-info { width: min(100%, 600px); margin-left: auto; margi
 .pi-source { margin: 4px 4px 0; font-size: 12px; color: var(--text-3); }
 .pi-source:empty { display: none; }
 
-/* «О треке», второй проход: карточка исполнителя выше и шире, на ней размытое фото; альбом с крупной обложкой */
-.pi-artist { position: relative; overflow: hidden; min-height: 124px; padding: 16px 18px 16px 16px; gap: 18px; border-radius: 26px; isolation: isolate; }
-.pi-artist::before {
-  content: ""; position: absolute; inset: -20px -20px -20px 30%; z-index: -1;
-  background: var(--pi-bg, none) center / cover no-repeat; filter: blur(22px) saturate(1.3); opacity: 0.55;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 70%); mask-image: linear-gradient(90deg, transparent, #000 70%);
+/* «О треке», третий проход: карточка исполнителя как «Об исполнителе» в Spotify: фото во всю карточку, имя на нём */
+.pi-artist {
+  position: relative; display: block; overflow: hidden; isolation: isolate; width: 100%;
+  aspect-ratio: 1 / 0.9; max-height: 420px; padding: 0; border-radius: 26px; text-align: left;
+  background: color-mix(in srgb, var(--c-deep) 50%, #14090f);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 18px 36px -18px rgba(0, 0, 0, 0.6);
 }
-.pi-photo { flex-basis: 84px; width: 84px; height: 84px; box-shadow: 0 10px 26px -8px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(255, 255, 255, 0.14); }
-.pi-name { font-size: 23px; line-height: 1.15; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.pi-artist .pi-sub { font-size: 15px; }
+.pi-photo { position: absolute; inset: 0; z-index: -2; border-radius: 0; box-shadow: none; width: auto; height: auto; flex: none;
+  background: center 20% / cover no-repeat; transition: transform 0.6s var(--ease-out); }
+.pi-photo.is-empty { background: linear-gradient(150deg, var(--c-warm), var(--c-mid) 60%, var(--c-deep)); }
+.pi-artist::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(8, 5, 12, 0.28) 0%, rgba(8, 5, 12, 0) 32%, rgba(8, 5, 12, 0.78) 100%); }
+.pi-artist:active .pi-photo { transform: scale(1.03); }
+.pi-artist .pi-kicker { position: absolute; left: 16px; top: 16px; padding: 6px 12px; border-radius: 999px; font-size: 12px; letter-spacing: 0.04em; color: #fff; text-transform: none; font-weight: 600;
+  background: rgba(12, 8, 18, 0.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.pi-artist .pi-artist-text { position: absolute; left: 18px; right: 18px; bottom: 16px; display: flex; flex-direction: column; gap: 2px; }
+.pi-artist .pi-name { font-size: 30px; line-height: 1.1; letter-spacing: -0.03em; color: #fff; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5); }
+.pi-artist .pi-sub { font-size: 15px; color: rgba(255, 255, 255, 0.82); }
 .pi-album { padding: 12px 16px 12px 12px; gap: 16px; border-radius: 22px; min-height: 92px; }
 .pi-album-cover { flex-basis: 68px; width: 68px; height: 68px; border-radius: 14px; box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.55); }
 .pi-album-title { font-size: 17px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+body.is-desktop .pi-artist { aspect-ratio: 16 / 7; max-height: 300px; }
