@@ -190,6 +190,68 @@ class _RetryingClient:
         return call
 
 
+class _RouteClient:
+    """The server's own address first, the proxy only when that fails.
+
+    YouTube Music treats the shared proxy address as a region where the big labels' releases are
+    closed: a search through it returns the fan remakes and remixes of «Espresso» or «Not Like Us»
+    and not the songs themselves (measured: 4 of 8 official tracks in the top three, against 8 of 8
+    straight from the server). From the server's own address the whole catalog is there. The proxy
+    stays as the way out when the direct request fails, or a search comes back empty.
+    """
+
+    PAUSE = 120.0  # seconds the proxy goes first after the direct route failed
+
+    def __init__(self, direct, make_proxy):
+        self._direct = direct
+        self._make_proxy = make_proxy
+        self._proxy = None
+        self._proxy_key = None
+        self._direct_bad_until = 0.0
+
+    def _proxy_client(self):
+        address = self._make_proxy.__self__.settings.ytmusic_proxy
+        if not address:
+            return None
+        if self._proxy is None or self._proxy_key != address:
+            self._proxy = self._make_proxy(address)
+            self._proxy_key = address
+        return self._proxy
+
+    def __getattr__(self, name):
+        attr = getattr(self._direct, name)
+        if name.startswith("_") or not callable(attr):
+            return attr
+
+        def call(*args, **kwargs):
+            error: Exception | None = None
+            empty = None
+            if time.time() >= self._direct_bad_until:
+                try:
+                    result = attr(*args, **kwargs)
+                    if not (name == "search" and not result):
+                        return result
+                    empty = result  # nothing found: the other route is asked as well
+                except Exception as exc:  # noqa: BLE001
+                    error = exc
+                    self._direct_bad_until = time.time() + self.PAUSE
+            proxy = self._proxy_client()
+            if proxy is None:
+                if error is not None:
+                    raise error
+                return empty
+            try:
+                return getattr(proxy, name)(*args, **kwargs)
+            except Exception:  # noqa: BLE001
+                if error is not None:
+                    raise error
+                if empty is not None:
+                    return empty
+                raise
+
+        return call
+
+
 ARTIST_SONGS_LIMIT = 60
 YTM_REQUEST_TIMEOUT = 4.0  # seconds for one request to YouTube Music
 ARTIST_FETCH_DEADLINE = 7.0  # seconds for all side requests of an artist page together
@@ -690,33 +752,38 @@ class YoutubeMusicProvider:
     def can_handle_url(self, url: str) -> bool:
         return is_youtube_url(url)
 
+    def _make_proxy_client(self, address: str):
+        return self._build_ytmusic(address)
+
     def _client(self):
         if self._ytmusic is None:
             with self._lock:
                 if self._ytmusic is None:
                     from ytmusicapi import YTMusic
 
-                    kwargs: dict = {}
-                    if self.settings.ytmusic_proxy:
-                        # requests-style proxy map, not a bare URL string —
-                        # ytmusicapi hands this straight to requests.Session.
-                        kwargs["proxies"] = {
-                            "http": self.settings.ytmusic_proxy,
-                            "https": self.settings.ytmusic_proxy,
-                        }
-                    if self.settings.ytmusic_location:
-                        kwargs["location"] = self.settings.ytmusic_location
                     import functools
 
                     import requests
 
-                    # a short timeout: a good answer takes under a second, a
-                    # throttled one hangs for ten — better to ask again
-                    session = requests.Session()
-                    session.request = functools.partial(session.request, timeout=YTM_REQUEST_TIMEOUT)  # type: ignore[method-assign]
-                    kwargs["requests_session"] = session
+                    def build(proxy_address: str | None):
+                        kwargs: dict = {}
+                        if proxy_address:
+                            # requests-style proxy map, not a bare URL string —
+                            # ytmusicapi hands this straight to requests.Session.
+                            kwargs["proxies"] = {"http": proxy_address, "https": proxy_address}
+                        if self.settings.ytmusic_location:
+                            kwargs["location"] = self.settings.ytmusic_location
+                        # a short timeout: a good answer takes under a second, a
+                        # throttled one hangs for ten — better to ask again
+                        session = requests.Session()
+                        session.request = functools.partial(session.request, timeout=YTM_REQUEST_TIMEOUT)  # type: ignore[method-assign]
+                        kwargs["requests_session"] = session
+                        return _RetryingClient(YTMusic(**kwargs))
+
+                    self._build_ytmusic = build
                     self._built_proxy = self.settings.ytmusic_proxy
-                    self._ytmusic = _RetryingClient(YTMusic(**kwargs))
+                    # direct first, the proxy (if there is one and it is alive) only as the way out
+                    self._ytmusic = _RouteClient(build(None), self._make_proxy_client)
         return self._ytmusic
 
     def _search_sync(self, query: str, limit: int) -> list[TrackCandidate]:
