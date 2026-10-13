@@ -7117,46 +7117,48 @@
     pa.addEventListener("click", openFromPlayer);
     pa.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFromPlayer(); } });
   }
-  // «О треке»: under the player, scrolled up to (as in Spotify): the facts of the track and who made it
+  // «О треке»: under the player, scrolled up to (as in Spotify): a small card of the artist, the album
+  // and who made the track (credits)
   {
-    const facts = $("pi-facts"), credits = $("pi-credits"), source = $("pi-source"), section = $("player-info");
-    const fact = (k, v, onClick) => {
-      if (!v) return;
-      const row = document.createElement("div");
-      row.className = "pi-row" + (onClick ? " is-link" : "");
-      const dt = document.createElement("dt"); dt.textContent = k;
-      const dd = document.createElement("dd"); dd.textContent = v;
-      row.appendChild(dt); row.appendChild(dd);
-      if (onClick) { row.setAttribute("role", "link"); row.tabIndex = 0; row.addEventListener("click", onClick); }
-      facts.appendChild(row);
-    };
-    const GROUPS = [["performers", "Исполнители"], ["writers", "Авторы"], ["producers", "Продюсеры"], ["engineers", "Запись и сведение"], ["other", "Участвовали"]];
+    const credits = $("pi-credits"), source = $("pi-source"), section = $("player-info");
+    const GROUPS = [["writers", "Авторы"], ["producers", "Продюсеры"], ["engineers", "Запись и сведение"], ["performers", "Участвовали"]];
     const infoCache = new Map();
     let infoFor = null, infoTimer = 0;
+    const listeners = (v) => {
+      const n = String(v || "").replace(/subscribers?/i, "").trim();
+      return n ? `${n} слушателей` : "";
+    };
     function paintInfo(t, extra) {
-      facts.innerHTML = "";
+      $("pi-name").textContent = t.artist || "Неизвестный исполнитель";
+      $("pi-sub").textContent = extra.listeners ? listeners(extra.listeners) : "";
+      const photo = extra.photo || t.artwork;
+      setCoverEl($("pi-photo"), photo, t.artist || t.id);
+      $("pi-artist").onclick = () => { haptic("light"); openArtistScreen(t.artist, [t], { artistId: t.artistId, source: t.source }); };
+      const albumBtn = $("pi-album");
+      albumBtn.hidden = !t.album;
+      if (t.album) {
+        $("pi-album-title").textContent = t.album;
+        const year = extra.year || (extra.credits && extra.credits.released ? String(extra.credits.released).slice(0, 4) : "");
+        const label = extra.credits && extra.credits.label ? String(extra.credits.label).split(",")[0] : "";
+        $("pi-album-sub").textContent = [year, label].filter(Boolean).join(" · ");
+        setCoverEl($("pi-album-cover"), t.artwork, t.album);
+        albumBtn.onclick = () => { haptic("light"); if (t.albumId) openAlbumById(t.source, t.albumId, t.album, t.artist); else openAlbumScreen(t); };
+      }
       credits.innerHTML = "";
-      const goAlbum = () => { if (t.albumId) openAlbumById(t.source, t.albumId, t.album, t.artist); else openAlbumScreen(t); };
-      const goArtist = () => openArtistScreen(t.artist, [t], { artistId: t.artistId, source: t.source });
-      fact("Исполнитель", t.artist, t.artist ? goArtist : null);
-      fact("Альбом", t.album, t.album ? goAlbum : null);
-      fact("Год выпуска", extra.year || (extra.credits && extra.credits.released ? String(extra.credits.released).slice(0, 4) : ""));
-      fact("Лейбл", extra.credits && extra.credits.label);
-      fact("Длительность", t.duration ? formatDuration(t.duration) : "");
-      fact("Слушателей у исполнителя", extra.listeners);
       const c = extra.credits;
       let any = false;
       if (c && c.found) {
         GROUPS.forEach(([key, label]) => {
-          const names = (c[key] || []).filter(Boolean);
+          let names = (c[key] || []).filter(Boolean);
+          if (key === "performers") names = names.filter((n) => n !== t.artist);
           if (!names.length) return;
-          if (key === "performers" && names.length < 2) return; // the artist alone is already in the facts
           any = true;
           const g = document.createElement("div");
           g.className = "pi-group";
           const h = document.createElement("h3"); h.textContent = label;
-          const p = document.createElement("p"); p.textContent = names.join(", ");
-          g.appendChild(h); g.appendChild(p);
+          const row = document.createElement("div"); row.className = "pi-chips";
+          names.slice(0, 10).forEach((n) => { const chip = document.createElement("span"); chip.textContent = n; row.appendChild(chip); });
+          g.appendChild(h); g.appendChild(row);
           credits.appendChild(g);
         });
       }
@@ -7175,21 +7177,22 @@
       ]);
       const extra = {
         year: alb && alb.year ? String(alb.year) : "",
-        listeners: art && art.subscribers ? String(art.subscribers).replace(/subscribers?/i, "").trim() : "",
+        listeners: art && art.subscribers ? art.subscribers : "",
+        photo: art && art.photo ? art.photo : "",
         credits: cr,
       };
       infoCache.set(t.id, extra);
       if (currentTrack && currentTrack.id === t.id) paintInfo(t, extra);
     }
-    // the section is made when the track changes (a moment later, so flipping through tracks asks for nothing)
+    // made when the track changes (a moment later, so flipping through tracks asks for nothing)
     window.refreshPlayerInfo = function refreshPlayerInfo() {
       clearTimeout(infoTimer);
       const t = currentTrack;
       section.hidden = !t;
       if (!t || infoFor === t.id) return;
       infoFor = t.id;
-      facts.innerHTML = ""; credits.innerHTML = ""; source.textContent = "";
-      infoTimer = setTimeout(() => loadInfo(t), 700);
+      paintInfo(t, infoCache.get(t.id) || {});
+      infoTimer = setTimeout(() => loadInfo(t), 600);
     };
   }
   // a double tap on the cover opens the track's album
