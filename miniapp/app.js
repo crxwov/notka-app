@@ -1296,7 +1296,11 @@
     opts = opts || {};
     const prev = currentScreen;
     currentScreen = name;
-    Object.entries(screens).forEach(([key, el]) => { if (el) el.hidden = key !== name; });
+    Object.entries(screens).forEach(([key, el]) => {
+      if (!el) return;
+      el.hidden = key !== name;
+      if (key !== name) el.classList.remove("no-enter"); // its next ordinary showing has its entrance again
+    });
     document.body.dataset.screen = name;
     // «keep»: coming back to a page that is already on the screen under a player being put away:
     // it stays exactly as it was (no redraw, no jump to its top, no flash)
@@ -6522,6 +6526,9 @@
     if (pullBehind) {
       pullBehind.style.opacity = "0.35";
       pullBehind.style.willChange = "opacity";
+      // the page comes up already in place: its cards and rows must not play their entrance (they slide in
+      // from the side for three quarters of a second, right when the player is leaving)
+      pullBehind.classList.add("no-enter");
       pullBehind.hidden = false; // the page under the player
     }
     // the tab bar and the small player are shown now, as they will be on that page: so they do not
