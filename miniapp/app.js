@@ -2309,7 +2309,7 @@
     const seen = new Set();
     for (const t of source) {
       if (t && t.artwork && !seen.has(t.artwork)) { seen.add(t.artwork); covers.push(hiResArtwork(t.artwork)); }
-      if (covers.length >= 4) break;
+      if (covers.length >= 5) break;
     }
     const key = covers.join("|");
     if (key === mixArtKey) return;
@@ -7462,8 +7462,14 @@
   // ---- the turntable's sound: while a record or a disc is turned by the finger, a scratch is heard (synthesised:
   // filtered noise whose pitch, loudness and grain follow the speed of the hand). Can be switched off in the settings. ----
   const scratch = (() => {
-    let ctx = null, gain = null, filter = null, src = null, lfo = null, lfoGain = null, last = 0;
+    let ctx = null, master = null, gain = null, filter = null, src = null, osc = null, oscGain = null, lfo = null, lfoGain = null, shaper = null;
+    let ducked = false, lastDir = 0;
     const enabled = () => Store.getSetting("scratchSound") !== false;
+    function curve() {
+      const n = 1024, c = new Float32Array(n);
+      for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(x * 3.2); }
+      return c;
+    }
     function start() {
       if (!enabled()) return;
       try {
@@ -7474,38 +7480,62 @@
           const len = ctx.sampleRate * 2;
           const buf = ctx.createBuffer(1, len, ctx.sampleRate);
           const d = buf.getChannelData(0);
-          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (0.55 + 0.45 * Math.sin(i / 37));
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (0.6 + 0.4 * Math.sin(i / 23));
           src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-          filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 900; filter.Q.value = 1.6;
+          filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 1200; filter.Q.value = 3.2;
           gain = ctx.createGain(); gain.gain.value = 0;
-          lfo = ctx.createOscillator(); lfo.type = "sawtooth"; lfo.frequency.value = 18;
+          // a tone riding with the noise: the «wicka» of a record turned by hand
+          osc = ctx.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = 220;
+          oscGain = ctx.createGain(); oscGain.gain.value = 0;
+          lfo = ctx.createOscillator(); lfo.type = "square"; lfo.frequency.value = 12;
           lfoGain = ctx.createGain(); lfoGain.gain.value = 0;
           lfo.connect(lfoGain); lfoGain.connect(gain.gain);
-          src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
-          src.start(); lfo.start();
+          shaper = ctx.createWaveShaper(); shaper.curve = curve(); shaper.oversample = "2x";
+          master = ctx.createGain(); master.gain.value = 1.6;
+          src.connect(filter); filter.connect(gain);
+          osc.connect(oscGain); oscGain.connect(gain);
+          gain.connect(shaper); shaper.connect(master); master.connect(ctx.destination);
+          src.start(); osc.start(); lfo.start();
         }
         if (ctx.state === "suspended") ctx.resume();
+        duck(true);
       } catch (e) { ctx = null; }
+    }
+    // the music steps back under the scratch (where the device lets the volume be changed)
+    function duck(on) {
+      if (typeof volumeWorks === "undefined" || !volumeWorks) return;
+      if (on && !ducked) { ducked = true; try { audio.volume = Math.max(0, userVolume * 0.28); } catch (e) { /* ignore */ } }
+      else if (!on && ducked) { ducked = false; try { audio.volume = userVolume; } catch (e) { /* ignore */ } }
     }
     // speed in degrees per second (or pixels), sign = direction
     function move(speed) {
       if (!ctx || !gain || !enabled()) return;
-      const v = Math.min(1, Math.abs(speed) / 900);
+      const v = Math.min(1, Math.abs(speed) / 420);
       const now = ctx.currentTime;
-      const level = v < 0.02 ? 0 : 0.05 + v * 0.2;
+      const dir = speed === 0 ? lastDir : Math.sign(speed);
+      const turned = lastDir !== 0 && dir !== lastDir && v > 0.08; // the hand changed direction: a sharp tick
+      lastDir = dir;
+      const level = v < 0.01 ? 0 : 0.55 + v * 0.45;
       gain.gain.cancelScheduledValues(now);
-      gain.gain.setTargetAtTime(level, now, 0.03);
-      filter.frequency.setTargetAtTime(500 + v * 3600 + (speed < 0 ? 400 : 0), now, 0.03);
-      src.playbackRate.setTargetAtTime(0.6 + v * 1.6, now, 0.03);
-      lfo.frequency.setTargetAtTime(8 + v * 40, now, 0.05);
-      lfoGain.gain.setTargetAtTime(level * 0.6, now, 0.05);
+      gain.gain.setTargetAtTime(turned ? 1.2 : level, now, 0.012);
+      filter.frequency.setTargetAtTime(700 + v * 3800 + (dir < 0 ? 600 : 0), now, 0.02);
+      filter.Q.setTargetAtTime(2.4 + v * 3, now, 0.03);
+      src.playbackRate.setTargetAtTime(0.7 + v * 1.7, now, 0.02);
+      osc.frequency.setTargetAtTime(110 + v * 760 + (dir < 0 ? 90 : 0), now, 0.02);
+      oscGain.gain.setTargetAtTime(v < 0.01 ? 0 : 0.22 + v * 0.35, now, 0.02);
+      lfo.frequency.setTargetAtTime(10 + v * 34, now, 0.04);
+      lfoGain.gain.setTargetAtTime(level * 0.35, now, 0.04);
     }
     function stop() {
-      if (!ctx || !gain) return;
-      const now = ctx.currentTime;
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setTargetAtTime(0, now, 0.05);
-      lfoGain.gain.setTargetAtTime(0, now, 0.05);
+      if (ctx && gain) {
+        const now = ctx.currentTime;
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setTargetAtTime(0, now, 0.06);
+        oscGain.gain.setTargetAtTime(0, now, 0.05);
+        lfoGain.gain.setTargetAtTime(0, now, 0.05);
+      }
+      lastDir = 0;
+      duck(false);
     }
     return { start, move, stop };
   })();
