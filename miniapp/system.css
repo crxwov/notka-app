@@ -861,7 +861,7 @@ body.is-desktop .mix-stage { width: 340px; height: 210px; }
 .mix-hero.is-live .mix-blob.b2 { scale: calc(1 + var(--lvl, 0) * 0.2); transition: scale 0.12s linear; }
 .mix-hero.is-live .mix-blob.b3 { opacity: calc(0.5 + var(--lvl, 0) * 0.5); transition: opacity 0.12s linear; }
 .mix-hero.playing .mix-play-xl, .mix-hero.is-live .mix-play-xl { animation: none; transform: none; }
-.mix-play-xl { position: relative; z-index: 3; transition: transform 0.5s cubic-bezier(0.3, 1.8, 0.4, 1); }
+.mix-play-xl { position: relative; z-index: 3; transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
 .mix-play-xl:active { transform: scale(0.9, 0.84); transition: transform 0.12s var(--ease-out); }
 .mix-play-xl .ic-play, .mix-play-xl .ic-pause { position: relative; z-index: 2; color: color-mix(in srgb, var(--c-deep) 85%, #1b0e18); filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.5)); }
 .mix-hero.playing .mix-fan i:nth-child(1), .mix-hero.playing .mix-fan i:nth-child(2) { animation: none; }
