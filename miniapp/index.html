@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=143" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=98" />
+<link rel="stylesheet" href="system.css?v=99" />
 <link rel="stylesheet" href="plus.css?v=9" />
 <script src="telegram-web-app.js?v=1"></script>
 </head>
@@ -134,16 +134,21 @@
     <p class="home-greet" id="home-greeting">Привет!</p>
 
     <section class="mix-hero" id="mymix-card">
-      <button class="mix-play-xl" id="mymix-play-btn" type="button" aria-label="Включить «Мой микс»">
-        <span class="mix-ring" aria-hidden="true"></span>
-        <span class="mix-ring mix-ring-2" aria-hidden="true"></span>
-        <svg class="ic-play" width="38" height="38" aria-hidden="true"><use href="#i-play"/></svg>
-        <svg class="ic-pause" width="36" height="36" aria-hidden="true"><use href="#i-pause"/></svg>
-      </button>
+      <div class="mix-art" id="mix-art" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <button class="mix-title-btn" id="mymix-open-btn" type="button">
+        <span class="mix-kicker">Для тебя</span>
         <h1 class="mix-title">Мой микс</h1>
         <span class="mix-sub" id="mymix-sub">Из твоих любимых треков</span>
       </button>
+      <div class="mix-controls">
+        <button class="mix-play-xl" id="mymix-play-btn" type="button" aria-label="Включить «Мой микс»">
+          <span class="mix-ring" aria-hidden="true"></span>
+          <span class="mix-ring mix-ring-2" aria-hidden="true"></span>
+          <svg class="ic-play" width="28" height="28" aria-hidden="true"><use href="#i-play"/></svg>
+          <svg class="ic-pause" width="26" height="26" aria-hidden="true"><use href="#i-pause"/></svg>
+        </button>
+        <button class="mix-refresh" id="mymix-refresh-btn" type="button" aria-label="Обновить микс"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.4L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.4L20 15.5"/><path d="M20 20v-4.5h-4.5"/></svg></button>
+      </div>
       <button class="mood-btn" id="mood-open-btn" type="button"><span class="mood-dot" aria-hidden="true"></span>Под настроение</button>
     </section>
 
@@ -1378,6 +1383,6 @@
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
 <script src="mix.js?v=1"></script>
-<script src="app.js?v=183"></script>
+<script src="app.js?v=184"></script>
 </body>
 </html>

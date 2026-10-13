@@ -2299,6 +2299,55 @@
       }
     } finally { mixExtending = false; }
   }
+  // the card's picture: four covers of what the mix is made of (the playing mix, else the listener's own music)
+  let mixArtKey = "";
+  function paintMixArt() {
+    const box = $("mix-art");
+    if (!box) return;
+    const source = mymixActive && currentQueue.length ? currentQueue : [...knownTracks().values()];
+    const covers = [];
+    const seen = new Set();
+    for (const t of source) {
+      if (t && t.artwork && !seen.has(t.artwork)) { seen.add(t.artwork); covers.push(hiResArtwork(t.artwork)); }
+      if (covers.length >= 4) break;
+    }
+    const key = covers.join("|");
+    if (key === mixArtKey) return;
+    mixArtKey = key;
+    box.querySelectorAll("i").forEach((el, k) => {
+      const url = covers[k];
+      el.style.backgroundImage = url ? `url("${String(url).replace(/"/g, "%22")}")` : "";
+      el.classList.toggle("is-empty", !url);
+    });
+    box.classList.toggle("is-empty", covers.length === 0);
+  }
+  // «Обновить»: a new mix instead of the kept one
+  let mixRefreshing = false;
+  async function refreshMymix() {
+    if (mixRefreshing) return;
+    const known = knownTracks();
+    if (!known.size) { showToast("Отметь пару треков сердцем — и микс подберёт похожее"); return; }
+    mixRefreshing = true;
+    const btn = $("mymix-refresh-btn"), card = $("mymix-card");
+    btn.classList.add("is-spinning");
+    card.classList.add("is-building");
+    try {
+      delete mixResume.mymix;
+      try { localStorage.setItem(MIX_RESUME_KEY, JSON.stringify(mixResume)); } catch (e) { /* not kept */ }
+      const mix = await buildMix();
+      if (!mix.length) { showToast("Не получилось собрать микс, попробуй ещё раз"); return; }
+      haptic("success");
+      shuffleOn = false;
+      playTrack(mix[0], mix, { mymix: true, source: "mix", mixKey: "mymix" });
+      mixArtKey = "";
+      paintMixArt();
+      showToast("Новый микс собран");
+    } finally {
+      card.classList.remove("is-building");
+      btn.classList.remove("is-spinning");
+      mixRefreshing = false;
+    }
+  }
   async function startMymix(openPlayer) {
     const known = knownTracks();
     if (!known.size) { showToast("Отметь пару треков сердцем или собери плейлист — и микс подберёт похожее"); return; }
@@ -2539,6 +2588,7 @@
     if (mymixActive && currentTrack) togglePlayPause();
     else startMymix(false);
   });
+  $("mymix-refresh-btn").addEventListener("click", () => { haptic("light"); refreshMymix(); });
 
   // ============================================================
   // SEARCH
@@ -6033,6 +6083,7 @@
         ? "Похожее на твои любимые треки и плейлисты"
         : "Отметь треки сердцем — и микс подберёт похожее";
     $("mymix-play-btn").setAttribute("aria-label", mymixActive && currentTrack && !audio.paused ? "Пауза" : "Включить «Мой микс»");
+    paintMixArt();
   }
 
   function setMiniPlayerFor(track) {
