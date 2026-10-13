@@ -20,7 +20,7 @@ from music_resolver.errors import AppError, ErrorCode
 from music_resolver.models import AlbumResponse, ArtistResponse, ResolveResponse, SearchResponse
 from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
-from music_resolver.services import admin_stats, events_store, metrics, mood_mix, plus_store, sync_store, track_profile
+from music_resolver.services import admin_stats, auth_store, events_store, metrics, mood_mix, plus_store, sync_store, track_profile
 from music_resolver.services.playlist_import import read_playlist
 from music_resolver.utils.remux import defragment, defragment_all, ffmpeg_exe
 
@@ -630,12 +630,53 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
 
     # ---- «один аккаунт — все устройства»: the listener's favourites, playlists,
     # settings and listening stats under their Telegram account (see sync_store) ----
+    # ---- sign in to the mobile app (the Android app of the other branch): a code from the bot, then a session token ----
+    @router.post("/auth/request-code")
+    async def auth_request_code(request: Request):
+        try:
+            body = await request.json()
+            username = str(body.get("username") or "")
+        except Exception:
+            return JSONResponse({"ok": False, "error": "bad_request", "message": "Некорректный запрос"}, status_code=400)
+        res = await auth_store.request_code(username)
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @router.post("/auth/verify-code")
+    async def auth_verify_code(request: Request):
+        try:
+            body = await request.json()
+            username = str(body.get("username") or "")
+            code = str(body.get("code") or "")
+        except Exception:
+            return JSONResponse({"ok": False, "error": "bad_request", "message": "Некорректный запрос"}, status_code=400)
+        res = auth_store.verify_code(username, code)
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @router.get("/auth/me")
+    async def auth_me(authorization: str = Header(default=""), x_auth_token: str = Header(default="")):
+        user_id = auth_store.resolve_user_id(authorization=authorization, x_auth_token=x_auth_token)
+        if not user_id:
+            return JSONResponse({"ok": False, "error": "unauthorized"}, status_code=401)
+        user_info = metrics.users().get(str(user_id), {})
+        return {
+            "ok": True,
+            "user": {"id": user_id, "username": user_info.get("username") or "", "name": user_info.get("name") or ""},
+            "sync": sync_store.load(user_id),
+            "plus": plus_store.status(user_id),
+        }
+
     @router.post("/sync")
-    async def sync_account(request: Request, x_telegram_init_data: str = Header(default="")):
-        user_id = plus_store.verify_init_data(x_telegram_init_data)
+    async def sync_account(
+        request: Request,
+        x_telegram_init_data: str = Header(default=""),
+        authorization: str = Header(default=""),
+        x_auth_token: str = Header(default=""),
+    ):
+        # a Mini App is known by its signed initData, the mobile app by its session token
+        user_id = auth_store.resolve_user_id(x_telegram_init_data, authorization, x_auth_token)
         if user_id is None:
             # counted, so the admin site shows how often a device is turned away (empty data = not opened as a Mini App)
-            metrics.count("sync_no_auth" if not x_telegram_init_data else "sync_bad_auth")
+            metrics.count("sync_no_auth" if not (x_telegram_init_data or x_auth_token) else "sync_bad_auth")
             return JSONResponse({"error": {"code": "NOT_IN_TELEGRAM"}}, status_code=401)
         raw = await request.body()
         if len(raw) > sync_store.MAX_BYTES:
@@ -649,7 +690,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         if not isinstance(body, dict):
             body = {}
         device = body.get("device") if isinstance(body.get("device"), dict) else {}
-        metrics.touch_user(user_id, metrics.profile_from_init_data(x_telegram_init_data), device.get("id"))
+        metrics.touch_user(user_id, metrics.profile_from_init_data(x_telegram_init_data) if x_telegram_init_data else None, device.get("id"))
         try:
             return await asyncio.to_thread(sync_store.exchange, user_id, body)
         except sync_store.TooBig:
