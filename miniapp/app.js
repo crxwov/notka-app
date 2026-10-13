@@ -3018,8 +3018,9 @@
           data = await res.json();
         } catch (e) { break; }
         const found = (data && data.replacements) || {};
+        const retry = new Set((data && data.retry) || []);
         batch.forEach((t) => {
-          checked.add(t.id);
+          if (!retry.has(t.id)) checked.add(t.id); // a request that failed is asked again later
           if (found[t.id] && found[t.id].id && found[t.id].id !== t.id) originalsProposals[t.id] = { old: t, neu: found[t.id] };
         });
         lsSet(ORIG_CHECKED_KEY, [...checked].slice(-3000));

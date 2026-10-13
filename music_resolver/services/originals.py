@@ -37,6 +37,10 @@ _BRACKETS = re.compile(r"\s*[\(\[].*?[\)\]]")
 _FEAT = re.compile(r"\s*[-–—]?\s*\b(feat|ft)\b\.?.*$", re.I)
 _SUBS = re.compile(r"([\d]+(?:[.,]\d+)?)\s*(k|m|b|тыс|млн|млрд)?", re.I)
 
+class Transient(Exception):
+    """A request failed for now (not «there is no such artist»): the track is looked at again later."""
+
+
 _subs_cache: dict[str, tuple[float, int | None]] = {}
 _SUBS_TTL = 24 * 3600
 
@@ -74,12 +78,11 @@ def _subscribers(client, artist_id: str | None) -> int | None:
     hit = _subs_cache.get(artist_id)
     if hit and now - hit[0] < _SUBS_TTL:
         return hit[1]
-    value = None
     try:
         page = client.get_artist(artist_id) or {}
-        value = parse_subscribers(page.get("subscribers"))
-    except Exception:  # noqa: BLE001 - an artist page that does not open is simply unknown
-        value = None
+    except Exception as exc:  # noqa: BLE001
+        raise Transient(str(exc)) from exc
+    value = parse_subscribers(page.get("subscribers"))
     _subs_cache[artist_id] = (now, value)
     return value
 
@@ -107,8 +110,10 @@ def _saved_artist_subscribers(client, track: dict) -> int | None:
                 continue
             subs = parse_subscribers(found.get("subscribers")) or _subscribers(client, found.get("browseId"))
             best = max(best, subs or 0)
-    except Exception:  # noqa: BLE001
-        return None
+    except Transient:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise Transient(str(exc)) from exc
     _name_cache[name] = (now, best)
     return best
 
@@ -140,8 +145,8 @@ def _one(client, track: dict) -> dict | None:
         return None  # an unknown artist, or one too big to be a remake's author: left alone
     try:
         found = client.search(base, filter="songs", limit=10) or []
-    except Exception:  # noqa: BLE001
-        return None
+    except Exception as exc:  # noqa: BLE001
+        raise Transient(str(exc)) from exc
     duration = track.get("duration") or 0
     qualified: list[tuple[int, dict, str]] = []
     for item in found:
@@ -184,19 +189,27 @@ def _one(client, track: dict) -> dict | None:
     return candidate_to_track(candidate).model_dump(by_alias=True)
 
 
-def find_originals(client, tracks: list[dict]) -> dict[str, dict]:
-    """{saved track id: the original track} for the tracks that have one."""
+def find_originals(client, tracks: list[dict]) -> tuple[dict[str, dict], list[str]]:
+    """({saved track id: the original track}, [ids that could not be looked at now])."""
     wanted = [t for t in tracks[:MAX_TRACKS] if isinstance(t, dict) and t.get("id") and t.get("sourceId")]
     out: dict[str, dict] = {}
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    retry: list[str] = []
+    with ThreadPoolExecutor(max_workers=3) as pool:
         for track, result in zip(wanted, pool.map(lambda t: _safe(client, t), wanted)):
-            if result:
+            if result is _RETRY:
+                retry.append(str(track["id"]))
+            elif result:
                 out[str(track["id"])] = result
-    return out
+    return out, retry
 
 
-def _safe(client, track: dict) -> dict | None:
+_RETRY = object()
+
+
+def _safe(client, track: dict):
     try:
         return _one(client, track)
+    except Transient:
+        return _RETRY
     except Exception:  # noqa: BLE001 - one track never spoils the rest
         return None

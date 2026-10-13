@@ -909,9 +909,10 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         if not tracks or provider is None or not hasattr(provider, "_client"):
             return {"replacements": {}}
         client = provider._client()
-        found = await asyncio.wait_for(asyncio.to_thread(originals_service.find_originals, client, tracks), timeout=45)
-        metrics.count("originals_found", len(found)) if found else None
-        return {"replacements": found}
+        found, retry = await asyncio.wait_for(asyncio.to_thread(originals_service.find_originals, client, tracks), timeout=45)
+        if found:
+            metrics.count("originals_found", len(found))
+        return {"replacements": found, "retry": retry}
 
     # ---- what Нотка knows about a track: sound, mood fit, the artist's genres ----
     @router.get("/profile")
