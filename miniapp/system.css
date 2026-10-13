@@ -817,31 +817,54 @@ body.is-desktop .pi-artist { aspect-ratio: 16 / 7; max-height: 300px; }
 .mix-hero.is-building .mix-play-xl::after { width: 40px; height: 40px; border-width: 4px; }
 body.is-desktop .mix-stage { width: 340px; height: 210px; }
 
-/* кнопка микса живая: в такт трека (темп из профиля трека), на десктопе по реальному уровню звука; на нажатие сжимается,
-   от пальца идёт волна. Только transform и opacity, всё останавливается на паузе. */
-.mix-glow {
-  position: absolute; left: 50%; top: 50%; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; z-index: 2; pointer-events: none;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--c-core) 70%, transparent), color-mix(in srgb, var(--c-warm) 40%, transparent) 55%, transparent 72%);
-  opacity: 0; transform: scale(1);
+/* кнопка микса — капля жидкости: три слоя с плавно перетекающими краями, внутри свет, который медленно ходит.
+   Текучесть быстрее, пока играет; на десктопе её ведёт реальный уровень звука. На нажатие капля проседает и пружинит. */
+.mix-play-xl { background: none; box-shadow: none; border-radius: 0; overflow: visible; width: 124px; height: 124px; }
+.mix-ring, .mix-glow, .mix-wave, .mix-progress { display: none; }
+.mix-blob { position: absolute; z-index: 0; pointer-events: none; will-change: transform, border-radius; }
+.mix-blob.b1 {
+  inset: 0; border-radius: 58% 42% 55% 45% / 48% 58% 42% 52%;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.95) 0 9%, transparent 34%),
+    radial-gradient(circle at 72% 80%, color-mix(in srgb, var(--c-warm) 55%, transparent) 0, transparent 55%),
+    linear-gradient(150deg, #fff7f3, color-mix(in srgb, var(--c-core) 70%, #ffffff) 55%, color-mix(in srgb, var(--c-warm) 60%, #fff));
+  box-shadow: inset 0 -8px 16px color-mix(in srgb, var(--c-mid) 38%, transparent), 0 18px 34px -12px color-mix(in srgb, var(--c-deep) 85%, #000);
+  animation: blob-a 11s ease-in-out infinite alternate;
 }
-.mix-hero.playing .mix-glow { animation: mix-glow-beat var(--beat, 0.62s) cubic-bezier(0.1, 0.8, 0.3, 1) infinite; }
-@keyframes mix-glow-beat { 0% { transform: scale(1); opacity: 0.75; } 100% { transform: scale(2.1); opacity: 0; } }
-.mix-hero.playing .mix-play-xl { animation: mix-btn-beat var(--beat, 0.62s) cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
-@keyframes mix-btn-beat { 0% { transform: scale(1.07); } 45% { transform: scale(1); } 100% { transform: scale(1); } }
-.mix-hero.playing .mix-fan i:nth-child(1) { animation: mix-fan-l var(--beat, 0.62s) cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
-.mix-hero.playing .mix-fan i:nth-child(2) { animation: mix-fan-r var(--beat, 0.62s) cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
-@keyframes mix-fan-l { 0% { translate: -5px 0; } 50%, 100% { translate: 0 0; } }
-@keyframes mix-fan-r { 0% { translate: 5px 0; } 50%, 100% { translate: 0 0; } }
-/* with a real level (desktop) the music itself moves the button, smoothly */
-.mix-hero.is-live .mix-glow { animation: none; opacity: calc(var(--lvl, 0) * 0.9); transform: scale(calc(1 + var(--lvl, 0) * 1.1)); transition: opacity 0.08s linear, transform 0.08s linear; }
-.mix-hero.is-live .mix-play-xl { animation: none; transform: scale(calc(1 + var(--lvl, 0) * 0.1)); transition: transform 0.08s linear; }
-.mix-hero.is-live .mix-fan i:nth-child(1), .mix-hero.is-live .mix-fan i:nth-child(2) { animation: none; }
-.mix-play-xl:active { transform: scale(0.88); transition: transform 0.12s var(--ease-out); }
-.mix-wave { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; pointer-events: none; }
-.mix-wave::after {
-  content: ""; position: absolute; left: var(--x, 50%); top: var(--y, 50%); width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--c-mid) 55%, transparent), transparent); opacity: 0; transform: scale(0);
+.mix-blob.b2 {
+  inset: -9px; border-radius: 46% 54% 40% 60% / 56% 44% 56% 44%; z-index: -1;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c-warm) 62%, transparent), color-mix(in srgb, var(--c-mid) 40%, transparent) 70%, transparent 100%);
+  filter: blur(2px); opacity: 0.75; animation: blob-b 14s ease-in-out infinite alternate;
 }
-.mix-wave.go::after { animation: mix-wave 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
-@keyframes mix-wave { 0% { transform: scale(0); opacity: 0.9; } 100% { transform: scale(11); opacity: 0; } }
-.perf-lite .mix-hero.playing .mix-glow, .perf-lite .mix-hero.playing .mix-fan i { animation: none; }
+.mix-blob.b3 {
+  inset: -20px; border-radius: 52% 48% 60% 40% / 44% 56% 44% 56%; z-index: -2;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c-core) 30%, transparent), transparent 70%);
+  filter: blur(10px); opacity: 0.6; animation: blob-c 17s ease-in-out infinite alternate;
+}
+@keyframes blob-a {
+  0% { border-radius: 58% 42% 55% 45% / 48% 58% 42% 52%; transform: rotate(0deg) scale(1); }
+  33% { border-radius: 45% 55% 42% 58% / 58% 46% 54% 42%; transform: rotate(40deg) scale(1.02); }
+  66% { border-radius: 52% 48% 60% 40% / 42% 56% 44% 58%; transform: rotate(-20deg) scale(0.99); }
+  100% { border-radius: 40% 60% 48% 52% / 54% 40% 60% 46%; transform: rotate(30deg) scale(1.03); }
+}
+@keyframes blob-b {
+  0% { border-radius: 46% 54% 40% 60% / 56% 44% 56% 44%; transform: rotate(0deg) scale(1); }
+  50% { border-radius: 60% 40% 54% 46% / 42% 58% 42% 58%; transform: rotate(-50deg) scale(1.05); }
+  100% { border-radius: 42% 58% 46% 54% / 60% 40% 56% 44%; transform: rotate(35deg) scale(0.98); }
+}
+@keyframes blob-c { from { transform: rotate(0deg) scale(0.96); } to { transform: rotate(-90deg) scale(1.08); } }
+.mix-hero.playing .mix-blob.b1 { animation-duration: calc(var(--beat, 0.62s) * 9); }
+.mix-hero.playing .mix-blob.b2 { animation-duration: calc(var(--beat, 0.62s) * 11); }
+.mix-hero.playing .mix-blob.b3 { animation-duration: calc(var(--beat, 0.62s) * 14); }
+/* the liquid answers the loudness: swells with it (desktop) */
+.mix-hero.is-live .mix-blob.b1 { scale: calc(1 + var(--lvl, 0) * 0.1); transition: scale 0.12s linear; }
+.mix-hero.is-live .mix-blob.b2 { scale: calc(1 + var(--lvl, 0) * 0.2); transition: scale 0.12s linear; }
+.mix-hero.is-live .mix-blob.b3 { opacity: calc(0.5 + var(--lvl, 0) * 0.5); transition: opacity 0.12s linear; }
+.mix-hero.playing .mix-play-xl, .mix-hero.is-live .mix-play-xl { animation: none; transform: none; }
+.mix-play-xl { position: relative; z-index: 3; transition: transform 0.5s cubic-bezier(0.3, 1.8, 0.4, 1); }
+.mix-play-xl:active { transform: scale(0.9, 0.84); transition: transform 0.12s var(--ease-out); }
+.mix-play-xl .ic-play, .mix-play-xl .ic-pause { position: relative; z-index: 2; color: color-mix(in srgb, var(--c-deep) 85%, #1b0e18); filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.5)); }
+.mix-hero.playing .mix-fan i:nth-child(1), .mix-hero.playing .mix-fan i:nth-child(2) { animation: none; }
+.mix-hero.is-building .mix-play-xl::after { width: 40px; height: 40px; border-width: 4px; z-index: 3; }
+.perf-lite .mix-blob { animation: none !important; }
+body.is-desktop .mix-play-xl { width: 140px; height: 140px; }

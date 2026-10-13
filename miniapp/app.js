@@ -2404,15 +2404,6 @@
   document.addEventListener("pointerdown", (e) => {
     const btn = e.target.closest && e.target.closest("#mymix-play-btn");
     if (!btn) return;
-    const wave = btn.querySelector(".mix-wave");
-    const r = btn.getBoundingClientRect();
-    if (wave) {
-      wave.style.setProperty("--x", `${e.clientX - r.left}px`);
-      wave.style.setProperty("--y", `${e.clientY - r.top}px`);
-      wave.classList.remove("go");
-      void wave.offsetWidth;
-      wave.classList.add("go");
-    }
     haptic("medium");
   }, { passive: true });
 
