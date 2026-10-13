@@ -715,12 +715,12 @@ class YoutubeMusicProvider:
         random.shuffle(candidates)
         return candidates
 
-    async def radio(self, video_id: str, limit: int) -> list[TrackCandidate]:
+    async def radio(self, video_id: str, limit: int, known_artists: list[str] | None = None) -> list[TrackCandidate]:
         """Tracks YouTube Music's own radio would play after this one —
         the basis for «Мой микс» (see /radio)."""
-        return await asyncio.to_thread(self._radio_sync, video_id, limit)
+        return await asyncio.to_thread(self._radio_sync, video_id, limit, known_artists)
 
-    def _radio_sync(self, video_id: str, limit: int) -> list[TrackCandidate]:
+    def _radio_sync(self, video_id: str, limit: int, known_artists: list[str] | None = None) -> list[TrackCandidate]:
         raw = self._client().get_watch_playlist(videoId=video_id, radio=True, limit=limit)
         results: list[TrackCandidate] = []
         for item in (raw or {}).get("tracks") or []:
@@ -747,6 +747,13 @@ class YoutubeMusicProvider:
                     artist_id=artist_id,
                 )
             )
+        # the mix's own gate: no covers, nursery rhymes or unknown channels (see services/mix_quality.py)
+        from music_resolver.services import mix_quality
+
+        try:
+            results = mix_quality.filter_tracks(self._client(), results, set(known_artists or []))
+        except Exception:  # noqa: BLE001 - a failing gate must not empty the mix
+            pass
         return results[:limit]
 
     def can_handle_url(self, url: str) -> bool:

@@ -2164,7 +2164,9 @@
   async function fetchRadio(track, limit) {
     if (track.source !== "youtube_music") return [];
     try {
-      const res = await fetch(`${API_BASE_URL}/radio?source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}&limit=${limit || 25}`);
+      // the listener's own artists: a small band they love is not dropped by the mix's «real artists only» gate
+      const mine = [...new Set([...knownTracks().values()].map((t) => artistKeyOf(t.artist)).filter(Boolean))].slice(0, 60).join("|");
+      const res = await fetch(`${API_BASE_URL}/radio?source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}&limit=${limit || 25}&known=${encodeURIComponent(mine)}`);
       if (!res.ok) return [];
       return (await res.json()).results || [];
     } catch (e) { return []; }
@@ -2203,6 +2205,29 @@
       allowSpam: [...knownTracks().values()].some((t) => window.NotkaMix && window.NotkaMix.SPAM.test(t.title || "")),
     };
   }
+  // the language of a title: what script it is written in. A mix does not bring Persian or Turkish songs to
+  // someone whose music has none (that is what «a mix of strangers» was)
+  function scriptOf(text) {
+    const s = String(text || "");
+    if (/[؀-ۿ]/.test(s)) return "arabic";
+    if (/[ऀ-ॿ]/.test(s)) return "devanagari";
+    if (/[぀-ヿ一-鿿가-힯]/.test(s)) return "cjk";
+    if (/[֐-׿]/.test(s)) return "hebrew";
+    if (/[฀-๿]/.test(s)) return "thai";
+    if (/[əıİğĞşŞ]/.test(s)) return "turkic";
+    if (/[а-яёА-ЯЁ]/.test(s)) return "cyrillic";
+    if (/[A-Za-zÀ-ɏ]/.test(s)) return "latin";
+    return "other";
+  }
+  function scriptProfile(tracks) {
+    const count = {};
+    let total = 0;
+    tracks.forEach((t) => { const k = scriptOf(`${t.title || ""} ${t.artist || ""}`); count[k] = (count[k] || 0) + 1; total++; });
+    const have = new Set(["latin", "other"]);
+    Object.entries(count).forEach(([k, n]) => { if (n / Math.max(1, total) >= 0.06 || n >= 3) have.add(k); });
+    if (have.has("cyrillic")) have.add("latin"); // those who listen in Russian listen to the West as well
+    return have;
+  }
   async function buildMix() {
     const known = knownTracks();
     const own = new Map(known);
@@ -2215,7 +2240,13 @@
     const lists = await Promise.all(seeds.map((s) => fetchRadio(s, 30)));
     const seen = new Set();
     const adjacent = [];
-    lists.forEach((list) => list.forEach((t) => { if (t && !seen.has(t.id) && !own.has(t.id)) { seen.add(t.id); adjacent.push(t); } }));
+    const scripts = scriptProfile(ownList);
+    lists.forEach((list) => list.forEach((t) => {
+      if (!t || seen.has(t.id) || own.has(t.id)) return;
+      if (!scripts.has(scriptOf(`${t.title || ""} ${t.artist || ""}`))) return; // a language this listener does not listen to
+      seen.add(t.id);
+      adjacent.push(t);
+    }));
     const mix = window.NotkaMix.assemble(Object.assign({ familiar: ownList, adjacent, size: 40, familiarShare: 0.4 }, prof));
     const famIds = new Set(ownList.map((t) => t.id));
     track("mix_built", { v: 2, n: mix.length, fam: mix.filter((t) => famIds.has(t.id)).length, adj: adjacent.length, seeds: seeds.length });
@@ -2227,6 +2258,7 @@
   // mix («мой микс», each mood), for a few days, in this device's storage.
   const MIX_RESUME_KEY = "notka_mix_resume";
   const MIX_RESUME_DAYS = 3;
+  const MIX_RULES_VERSION = 3; // a mix kept from before the quality gate is not carried on (it had junk in it)
   let mixResume = {};
   try { mixResume = JSON.parse(localStorage.getItem(MIX_RESUME_KEY) || "{}") || {}; } catch (e) { mixResume = {}; }
   let lastMixSave = 0;
@@ -2234,6 +2266,7 @@
     if (!currentMixKey || !currentTrack || !currentQueue.length) return;
     lastMixSave = Date.now();
     mixResume[currentMixKey] = {
+      v: MIX_RULES_VERSION,
       at: lastMixSave,
       queue: currentQueue.slice(0, 120),
       trackId: currentTrack.id,
@@ -2246,7 +2279,7 @@
   }
   function mixResumeFor(key) {
     const r = mixResume[key];
-    if (!r || !r.queue || !r.queue.length || Date.now() - r.at > MIX_RESUME_DAYS * 86400000) return null;
+    if (!r || r.v !== MIX_RULES_VERSION || !r.queue || !r.queue.length || Date.now() - r.at > MIX_RESUME_DAYS * 86400000) return null;
     const track = r.queue.find((t) => t.id === r.trackId);
     return track ? { track, queue: r.queue, position: r.position || 0, context: r.context } : null;
   }
@@ -2301,6 +2334,7 @@
   }
   // the card's picture: four covers of what the mix is made of (the playing mix, else the listener's own music)
   let mixArtKey = "";
+  const mixProgressEl = $("mix-progress");
   function paintMixArt() {
     const box = $("mix-art");
     if (!box) return;
@@ -2309,7 +2343,7 @@
     const seen = new Set();
     for (const t of source) {
       if (t && t.artwork && !seen.has(t.artwork)) { seen.add(t.artwork); covers.push(hiResArtwork(t.artwork)); }
-      if (covers.length >= 5) break;
+      if (covers.length >= 3) break;
     }
     const key = covers.join("|");
     if (key === mixArtKey) return;
@@ -7889,6 +7923,11 @@
   renderAtStartSwitches();
 
   audio.addEventListener("timeupdate", () => {
+    if (mymixActive && mixProgressEl) {
+      const dur = effectiveDuration();
+      const k = dur ? Math.min(1, audio.currentTime / dur) : 0;
+      mixProgressEl.style.strokeDashoffset = String(389.6 * (1 - k));
+    }
     saveResume(false);
     recordListening();
     syncLyrics();

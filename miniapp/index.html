@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=143" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=101" />
+<link rel="stylesheet" href="system.css?v=102" />
 <link rel="stylesheet" href="plus.css?v=9" />
 <script src="telegram-web-app.js?v=1"></script>
 </head>
@@ -135,16 +135,12 @@
 
     <section class="mix-hero" id="mymix-card">
       <div class="mix-stage">
-        <div class="mix-orbit" id="mix-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-        <span class="mix-halo" aria-hidden="true"></span>
+        <div class="mix-fan" id="mix-art" aria-hidden="true"><i></i><i></i><i></i></div>
+        <svg class="mix-progress" viewBox="0 0 132 132" aria-hidden="true"><circle class="mp-track" cx="66" cy="66" r="62"/><circle class="mp-fill" id="mix-progress" cx="66" cy="66" r="62"/></svg>
         <button class="mix-play-xl" id="mymix-play-btn" type="button" aria-label="Включить «Мой микс»">
-          <span class="mix-ring" aria-hidden="true"></span>
-          <span class="mix-ring mix-ring-2" aria-hidden="true"></span>
-          <span class="mix-ring mix-ring-3" aria-hidden="true"></span>
           <svg class="ic-play" width="44" height="44" aria-hidden="true"><use href="#i-play"/></svg>
           <svg class="ic-pause" width="40" height="40" aria-hidden="true"><use href="#i-pause"/></svg>
         </button>
-        <span class="mix-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       </div>
       <button class="mix-title-btn" id="mymix-open-btn" type="button">
         <h1 class="mix-title">Мой микс</h1>
@@ -1397,6 +1393,6 @@
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
 <script src="mix.js?v=1"></script>
-<script src="app.js?v=187"></script>
+<script src="app.js?v=188"></script>
 </body>
 </html>

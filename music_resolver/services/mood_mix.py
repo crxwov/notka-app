@@ -166,6 +166,17 @@ def build(
         mood_pool = []
     from_mood = [t for t in mood_pool if any(part in neighbours for part in _artist_parts(t.artist)) and fresh(t)][:10]
 
+    # the mix's own gate (covers, nursery rhymes, unknown channels), the listener's own artists let through
+    from music_resolver.services import mix_quality
+
+    known = {name.strip().lower() for name in artists if name and name.strip()}
+    for seed in picked:
+        known.update(_artist_parts(seed.get("artist", "")))
+    try:
+        near = mix_quality.filter_tracks(provider._client(), near, known)
+        from_mood = mix_quality.filter_tracks(provider._client(), from_mood, known)
+    except Exception:  # noqa: BLE001 - a failing gate must not empty the mix
+        pass
     near = _by_mood(key, near)
     from_mood = _by_mood(key, from_mood)
     mix = near[:limit]

@@ -744,12 +744,14 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         source: str = Query(...),
         id: str = Query(..., min_length=1),
         limit: int = Query(default=25, ge=1, le=50),
+        known: str = Query(default="", max_length=2500),
     ) -> SearchResponse:
         provider = service.manager.get(source)
         if provider is None or not hasattr(provider, "radio"):
             raise AppError(ErrorCode.INVALID_SOURCE_URL, "This source has no radio")
+        known_artists = [a.strip().lower() for a in known.split("|") if a.strip()][:80]
         try:
-            tracks = await asyncio.wait_for(provider.radio(id, limit), timeout=settings.provider_timeout)
+            tracks = await asyncio.wait_for(provider.radio(id, limit, known_artists), timeout=max(settings.provider_timeout, 14))
         except asyncio.TimeoutError as exc:
             raise AppError(ErrorCode.PROVIDER_UNAVAILABLE, "Radio timed out") from exc
         except AppError:
