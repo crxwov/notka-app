@@ -606,3 +606,24 @@ body.is-desktop #screen-plus .plus-hero::before {
     radial-gradient(42% 50% at 50% 52%, color-mix(in srgb, var(--c-core) 22%, transparent), transparent 74%);
 }
 .plus-bar::before { left: -20px; right: -20px; top: -56px; height: 56px; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.8) 85%); }
+
+/* «Текст» на телефоне: слова занимают почти весь экран. Пока он открыт, нижний блок сжимается
+   (название в одну строку, кнопки меньше), а список уходит чуть под него и тает у кнопок. */
+.player-meta, .player-controls, .ctrl, .ctrl-play, .player-foot .foot-btn, .player-title, .player-artist {
+  transition-property: margin, width, height, font-size, opacity, transform;
+  transition-duration: 0.4s;
+  transition-timing-function: var(--ease-out);
+}
+body:not(.is-desktop).lyrics-open .player-bar { margin-bottom: 0; }
+body:not(.is-desktop).lyrics-open .player-art-wrap { padding-top: 6px; padding-bottom: 0; }
+body:not(.is-desktop).lyrics-open .player-meta { margin-bottom: 2px; }
+body:not(.is-desktop).lyrics-open .player-title { font-size: 17px; line-height: 1.25; }
+body:not(.is-desktop).lyrics-open .player-artist { font-size: 13.5px; margin-top: 0; }
+body:not(.is-desktop).lyrics-open .player-meta .fav-btn { transform: scale(0.85); }
+body:not(.is-desktop).lyrics-open .scrub-times { margin-top: 0; }
+body:not(.is-desktop).lyrics-open .player-controls { margin: 4px 0 4px; gap: 20px; }
+body:not(.is-desktop).lyrics-open .ctrl { width: 46px; height: 46px; }
+body:not(.is-desktop).lyrics-open .ctrl-play { width: 58px; height: 58px; }
+body:not(.is-desktop).lyrics-open .player-foot .foot-btn { width: 40px; height: 40px; }
+body:not(.is-desktop).lyrics-open .screen-player { padding-bottom: calc(var(--sab) + 10px); }
+body:not(.is-desktop).lyrics-open .lyrics { bottom: -14px; padding-top: 20px; }
