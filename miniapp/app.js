@@ -604,11 +604,13 @@
       state.playlists.splice(Math.min(index, state.playlists.length), 0, playlist);
       persist();
     },
-    addTrackToPlaylist(playlistId, track) {
+    addTrackToPlaylist(playlistId, track, toStart) {
       eventNote("playlist", 1);
       const playlist = state.playlists.find((p) => p.id === playlistId);
       if (!playlist) return;
-      if (!playlist.trackIds.includes(track.id)) playlist.trackIds.push(track.id);
+      if (!playlist.trackIds.includes(track.id)) {
+        if (toStart) playlist.trackIds.unshift(track.id); else playlist.trackIds.push(track.id);
+      }
       playlist.tracksCache = playlist.tracksCache || {};
       playlist.tracksCache[track.id] = track;
       persist();
@@ -1524,6 +1526,39 @@
   // Track rows — one strict grid everywhere:
   // cover · title/artist · time · one action
   // ============================================================
+  // the heart in a list row: «в любимое» without opening the menu (what the lists were missing)
+  function rowHeart(track) {
+    const h = document.createElement("button");
+    h.type = "button";
+    h.className = "icon-btn row-heart";
+    h.dataset.trackId = track.id;
+    h.innerHTML = '<svg class="ic-off" width="22" height="22" aria-hidden="true"><use href="#i-heart"/></svg><svg class="ic-on" width="22" height="22" aria-hidden="true"><use href="#i-heart-fill"/></svg>';
+    const paint = () => {
+      const on = Store.isFavorite(track.id);
+      h.setAttribute("aria-pressed", on ? "true" : "false");
+      h.setAttribute("aria-label", on ? `Убрать «${track.title || "трек"}» из любимого` : `«${track.title || "трек"}» в любимое`);
+    };
+    paint();
+    h.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const on = Store.toggleFavorite(track);
+      haptic(on ? "success" : "light");
+      heartPop([h], on);
+      if (on) heartBurst(h);
+      syncRowHearts(track.id);
+      if (currentTrack && currentTrack.id === track.id) syncPlayerFav();
+      if (currentScreen === "library") renderLibrary();
+    });
+    return h;
+  }
+  function syncRowHearts(trackId) {
+    const on = Store.isFavorite(trackId);
+    document.querySelectorAll(".row-heart").forEach((h) => {
+      if (h.dataset.trackId !== trackId) return;
+      h.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
   function buildTrackRow(track, opts) {
     opts = opts || {};
     const li = document.createElement("li");
@@ -1594,6 +1629,7 @@
         btn.innerHTML = icon("i-close", 22);
         btn.addEventListener("click", (e) => { e.stopPropagation(); if (opts.onAction) opts.onAction(btn); });
       }
+      if (opts.heart && action === "more") li.appendChild(rowHeart(track));
       li.appendChild(btn);
     }
 
@@ -1856,9 +1892,9 @@
       row.addEventListener("click", () => {
         if (!addToPlaylistTrack) return;
         if (p.trackIds.includes(addToPlaylistTrack.id)) { showToast(`Уже в «${p.name}»`); return; }
-        Store.addTrackToPlaylist(p.id, addToPlaylistTrack);
+        Store.addTrackToPlaylist(p.id, addToPlaylistTrack, !!Store.getSetting("playlistAddToStart"));
         haptic("success");
-        showToast(`Добавлено в «${p.name}»`);
+        showToast(Store.getSetting("playlistAddToStart") ? `Добавлено в начало «${p.name}»` : `Добавлено в «${p.name}»`);
         renderAddToPlaylistSheet();
         renderLibrary();
         if (currentPlaylistId === p.id && currentScreen === "playlist") openPlaylist(p.id, true);
@@ -2881,7 +2917,7 @@
 
     warmSoon(tracks);
     stateResults.innerHTML = "";
-    const trackRows = (list) => list.map((t) => buildTrackRow(t, { queue: tracks, context: "Поиск" }));
+    const trackRows = (list) => list.map((t) => buildTrackRow(t, { queue: tracks, context: "Поиск", heart: true }));
     if (searchTab === "tracks") {
       stateResults.appendChild(resultsSection(null, trackRows(tracks)));
     } else if (searchTab === "artists") {
@@ -3227,7 +3263,7 @@
     $("playlist-play-btn").disabled = !tracks.length;
     $("playlist-shuffle-btn").disabled = !tracks.length;
     tracks.forEach((track, i) => {
-      list.appendChild(buildTrackRow(track, { index: i + 1, queue: tracks, context: playlist.name }));
+      list.appendChild(buildTrackRow(track, { index: i + 1, queue: tracks, context: playlist.name, heart: true }));
     });
     updateSourceButtons();
     if (!keepStack) showScreen("playlist");
@@ -3442,7 +3478,7 @@
             if (!currentPlaylistId) return;
             const pl = state.playlists.find((p) => p.id === currentPlaylistId);
             if (pl && pl.trackIds.includes(t.id)) { showToast("Уже в плейлисте"); return; }
-            Store.addTrackToPlaylist(currentPlaylistId, t);
+            Store.addTrackToPlaylist(currentPlaylistId, t, !!Store.getSetting("playlistAddToStart"));
             renderLibrary();
             haptic("success");
             if (btn) {
@@ -6022,6 +6058,9 @@
     $("player-fav-btn").setAttribute("aria-label", on ? "Убрать из любимого" : "В любимое");
     $("mp-fav-btn").setAttribute("aria-pressed", on ? "true" : "false");
     $("mp-fav-btn").setAttribute("aria-label", on ? "Убрать из любимого" : "В любимое");
+    $("mp-fav-ph").setAttribute("aria-pressed", on ? "true" : "false");
+    $("mp-fav-ph").setAttribute("aria-label", on ? "Убрать из любимого" : "В любимое");
+    if (currentTrack) syncRowHearts(currentTrack.id);
   }
 
   function setMediaSession(track) {
@@ -6747,7 +6786,7 @@
     if (!currentTrack) return;
     const isFav = Store.toggleFavorite(currentTrack);
     haptic(isFav ? "success" : "light");
-    const hearts = [$("player-fav-btn"), $("mp-fav-btn")];
+    const hearts = [$("player-fav-btn"), $("mp-fav-btn"), $("mp-fav-ph")];
     heartPop(hearts, isFav);
     if (isFav) heartBurst(hearts.find((el) => el && el.getClientRects().length));
     syncPlayerFav();
@@ -7100,7 +7139,7 @@
     currentAlbumTracks = tracks;
     const list = $("album-tracks");
     list.innerHTML = "";
-    tracks.forEach((t, i) => list.appendChild(buildTrackRow(t, { index: i + 1, queue: tracks, context: contextTitle })));
+    tracks.forEach((t, i) => list.appendChild(buildTrackRow(t, { index: i + 1, queue: tracks, context: contextTitle, heart: true })));
   }
 
   // Single-track pseudo-album view, used when a track carries no real
@@ -7507,6 +7546,21 @@
   $("mp-next-btn").addEventListener("click", () => playAdjacent(1));
   $("mp-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
   $("mp-fav-btn").addEventListener("click", () => $("player-fav-btn").click());
+  $("mp-fav-ph").addEventListener("click", (e) => { e.stopPropagation(); $("player-fav-btn").click(); });
+
+  // «Новые треки в начало»: one setting, two switches (the settings page and the add-to-playlist sheet)
+  function renderAtStartSwitches() {
+    const on = !!Store.getSetting("playlistAddToStart");
+    ["toggle-atstart", "toggle-atstart-sheet"].forEach((id) => { const el = $(id); if (el) el.setAttribute("aria-checked", on ? "true" : "false"); });
+  }
+  ["toggle-atstart", "toggle-atstart-sheet"].forEach((id) => {
+    $(id).addEventListener("click", () => {
+      Store.setSetting("playlistAddToStart", !Store.getSetting("playlistAddToStart"));
+      haptic("select");
+      renderAtStartSwitches();
+    });
+  });
+  renderAtStartSwitches();
 
   audio.addEventListener("timeupdate", () => {
     saveResume(false);

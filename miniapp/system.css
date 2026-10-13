@@ -349,6 +349,8 @@ body.is-desktop #screen-profile, body.is-desktop #screen-account, body.is-deskto
    ========================================================== */
 .mini-center, .mini-transport, .mini-seek { display: contents; } /* the phone's single row */
 .mini-desk { display: none; }
+.mini-ph { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+body.is-desktop .mini-ph { display: none; }
 .mini-scrub { --tl: 21px; }
 body.is-desktop .mini-desk { display: flex; align-items: center; flex: 0 0 auto; }
 /* three zones: the track on the left, the transport exactly in the middle, the rest on the right */
@@ -697,3 +699,9 @@ body.player-pulling .light-group { transition-duration: 0.3s, 0.3s; }
   100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(var(--sc, 1)) rotate(var(--rot, 0deg)); }
 }
 .perf-lite .heart-spark, .perf-lite .heart-ring { display: none; }
+
+/* сердце в строке трека (плейлисты, поиск, альбомы) и переключатель «в начало» в шторке плейлиста */
+.row-heart { color: var(--text-2); flex: 0 0 auto; }
+.row-heart[aria-pressed="true"] { color: var(--liked); }
+.sheet-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 6px 14px; font-size: 15px; color: var(--text-2); }
+.sheet-switch > span { flex: 1; min-width: 0; }

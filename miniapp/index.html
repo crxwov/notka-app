@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=141" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=91" />
+<link rel="stylesheet" href="system.css?v=92" />
 <link rel="stylesheet" href="plus.css?v=9" />
 <script src="telegram-web-app.js?v=1"></script>
 </head>
@@ -636,6 +636,16 @@
     </section>
 
     <section class="look-sec snd-sec" data-reveal>
+      <h2 class="look-h">Плейлисты</h2>
+      <div class="group">
+        <div class="group-row">
+          <span class="group-label">Новые треки в начало<span class="group-sub">При добавлении в плейлист трек встаёт первым, а не в конец (удобно для больших плейлистов)</span></span>
+          <button class="switch" id="toggle-atstart" type="button" role="switch" aria-checked="false" aria-label="Новые треки в начало плейлиста"><span></span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="look-sec snd-sec" data-reveal>
       <div class="group">
         <div class="group-row">
           <span class="group-label">Выравнивание громкости<span class="group-sub" id="normalize-sub">Все треки звучат одинаково громко</span></span>
@@ -989,13 +999,14 @@
     </button>
     <div class="mini-center">
       <div class="mini-transport">
+        <button class="round-btn mini-ctrl mini-ph" id="mp-fav-ph" type="button" aria-label="В любимое" aria-pressed="false"><svg class="ic-off" width="20" height="20" aria-hidden="true"><use href="#i-heart"/></svg><svg class="ic-on" width="20" height="20" aria-hidden="true"><use href="#i-heart-fill"/></svg></button>
         <button class="round-btn mini-desk mini-ctrl" id="mp-prev-btn" type="button" aria-label="Предыдущий трек"><svg width="20" height="20" aria-hidden="true"><use href="#i-prev"/></svg></button>
         <button class="round-btn round-light mini-play" id="mp-play-btn" type="button" aria-label="Включить">
           <svg class="ic-play" width="20" height="20" aria-hidden="true"><use href="#i-play"/></svg>
           <svg class="ic-pause" width="20" height="20" aria-hidden="true"><use href="#i-pause"/></svg>
           <span class="spinner" aria-hidden="true"></span>
         </button>
-        <button class="round-btn mini-desk mini-ctrl" id="mp-next-btn" type="button" aria-label="Следующий трек"><svg width="20" height="20" aria-hidden="true"><use href="#i-next"/></svg></button>
+        <button class="round-btn mini-ctrl" id="mp-next-btn" type="button" aria-label="Следующий трек"><svg width="20" height="20" aria-hidden="true"><use href="#i-next"/></svg></button>
       </div>
       <div class="mini-seek">
         <span class="mini-scrub" id="mp-scrub" role="slider" aria-label="Позиция в треке" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="mini-progress"><span id="mp-progress"></span></span><span class="mini-thumb" aria-hidden="true"></span></span>
@@ -1177,6 +1188,10 @@
       <p class="sheet-title" id="add-to-playlist-title">Добавить в плейлист</p>
       <button class="sheet-row sheet-accent" id="add-to-playlist-new" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-plus"/></svg><span>Новый плейлист</span></button>
       <div id="add-to-playlist-list" class="sheet-scroll"></div>
+      <div class="sheet-switch">
+        <span>Новые треки — в начало плейлиста</span>
+        <button class="switch" id="toggle-atstart-sheet" type="button" role="switch" aria-checked="false" aria-label="Новые треки в начало плейлиста"><span></span></button>
+      </div>
       <button class="sheet-row sheet-cancel" id="add-to-playlist-close" type="button">Готово</button>
     </div>
   </div>
@@ -1339,6 +1354,6 @@
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
 <script src="mix.js?v=1"></script>
-<script src="app.js?v=176"></script>
+<script src="app.js?v=177"></script>
 </body>
 </html>
