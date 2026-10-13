@@ -6,11 +6,12 @@ track keeps its old id, so it stays a remake for good. This looks for the real o
 
 A replacement is proposed only when everything agrees:
   * the saved title is a plain title, not a deliberate variant (remix, sped up, cover, live…);
-  * a result of the same title (parentheses and «feat.» ignored) is by another artist and about the
-    same length;
+  * a result of the same title (parentheses and «feat.» ignored) is by another artist (the length
+    may differ: a remake is often a quarter shorter or longer);
   * that artist is a real one: many times more subscribers than the one it replaces, and at least
     a hundred thousand.
-Anything else is left alone: a remix or a small band's song is never swapped for a famous one.
+If two comparably big artists have a song of that name, nothing is proposed. Anything else is left
+alone: a remix is never swapped. The listener still sees the list and confirms it in the app.
 """
 
 import re
@@ -141,7 +142,7 @@ def _one(client, track: dict) -> dict | None:
     except Exception:  # noqa: BLE001
         return None
     duration = track.get("duration") or 0
-    best = None
+    qualified: list[tuple[int, dict]] = []
     for item in found:
         video_id = item.get("videoId")
         if not video_id or video_id == track.get("sourceId"):
@@ -152,17 +153,23 @@ def _one(client, track: dict) -> dict | None:
         if _same_artist(str(track.get("artist") or ""), names):
             continue
         other = item.get("duration_seconds") or 0
-        if duration and other and abs(other - duration) > max(6, 0.06 * duration):
+        # a remake is often shorter or longer than the original by a quarter and more, so the length only
+        # rules out a different piece altogether (a twice as long or half as long one)
+        if duration and other and not (0.5 <= other / duration <= 2.0):
             continue
         artists = item.get("artists") or []
         artist_id = artists[0].get("id") if artists and isinstance(artists[0], dict) else None
         subs = _subscribers(client, artist_id)
         if subs is None or subs < MIN_SUBSCRIBERS or subs < RATIO * max(saved_subs, 1):
             continue
-        if best is None or subs > best[0]:
-            best = (subs, item)
-    if best is None:
+        qualified.append((subs, item))
+    if not qualified:
         return None
+    qualified.sort(key=lambda pair: -pair[0])
+    # two comparably big artists with a song of that name: which one was meant is not known, nothing is proposed
+    if len(qualified) > 1 and qualified[0][0] < 10 * qualified[1][0]:
+        return None
+    best = qualified[0]
     from music_resolver.providers.youtube_music import map_search_item
 
     candidate = map_search_item(best[1])
