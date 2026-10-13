@@ -641,14 +641,6 @@ body:not(.is-desktop).lyrics-open .lyrics { bottom: -14px; padding-top: 20px; }
 body:not(.is-desktop).lyrics-open .player-controls { display: none; }
 body:not(.is-desktop).lyrics-open .player-foot { margin-top: 6px; }
 
-/* свайп вниз по плееру: плеер как карточка (подложка, скругление), под ним видна страница */
-body.player-pulling #screen-player {
-  animation: none !important;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--c-deep) 40%, #0A0709);
-  box-shadow: 0 -14px 50px rgba(0, 0, 0, 0.45);
-  will-change: transform;
-  z-index: 5;
-}
+/* свайп вниз по плееру: плеер уходит вниз и растворяется, страница под ним проявляется (только transform и opacity) */
+body.player-pulling #screen-player { animation: none !important; z-index: 5; }
 body.player-pulling .player-prism { display: none; }
-body.no-screen-anim .screen-anim { animation: none !important; }

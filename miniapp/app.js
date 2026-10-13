@@ -1296,6 +1296,9 @@
     currentScreen = name;
     Object.entries(screens).forEach(([key, el]) => { if (el) el.hidden = key !== name; });
     document.body.dataset.screen = name;
+    // «keep»: coming back to a page that is already on the screen under a player being put away:
+    // it stays exactly as it was (no redraw, no jump to its top, no flash)
+    if (!opts.keep) {
     if (name === "home") renderHome();
     if (name === "library") renderLibrary();
     if (name === "search" && typeof renderSearchHistory === "function" && !searchInput.value.trim()) renderSearchHistory();
@@ -1313,6 +1316,8 @@
     if (name === "mood") { $("mood-note").hidden = hasPlus(); document.body.classList.toggle("has-plus", hasPlus()); revealIn("screen-mood", true); requestAnimationFrame(startMoodPhysics); }
     if (name === "profile") $("menu-plus").hidden = !plusPreview();
     if (name === "playlist" && currentPlaylistId && opts.replace) openPlaylist(currentPlaylistId, true);
+    }
+    if (opts.keep && name === "event") applyLook(); // the page of an event wears its own atmosphere again
     if (TAB_SCREENS.has(name)) {
       document.querySelectorAll(".tab").forEach((b) => {
         const on = b.dataset.tab === name;
@@ -1326,19 +1331,25 @@
     if (opts.params) shownParams[name] = opts.params;
     const activeEl = screens[name];
     if (activeEl) {
-      activeEl.classList.remove("screen-anim");
-      void activeEl.offsetWidth;
-      activeEl.classList.add("screen-anim");
-      if (prev !== name) activeEl.scrollTop = 0;
+      if (!opts.keep) {
+        activeEl.classList.remove("screen-anim");
+        void activeEl.offsetWidth;
+        activeEl.classList.add("screen-anim");
+        if (prev !== name) activeEl.scrollTop = 0;
+      }
     }
     updateDock();
     syncBackButton();
     syncPrism();
   }
 
-  function goBack() {
+  function goBack(extra) {
     navStack.pop();
     const prev = navStack[navStack.length - 1] || { name: "home", params: null };
+    if (extra && extra.keep && screens[prev.name]) {
+      showScreen(prev.name, { replace: true, keep: true });
+      return;
+    }
     if (prev.params && REOPENERS[prev.name] && shownParams[prev.name] !== prev.params) {
       shownParams[prev.name] = prev.params;
       REOPENERS[prev.name](prev.params);
@@ -6413,32 +6424,46 @@
   $("player-lyrics-btn").addEventListener("click", () => { haptic("light"); setLyricsOpen(!lyricsOpen); });
   ["touchstart", "wheel"].forEach((type) => lyricsBox.addEventListener(type, () => { lyricsTouchedAt = Date.now(); }, { passive: true }));
 
-  // A swipe down puts the player away like a card: it follows the finger, shrinks a little and rounds off,
-  // the page it came from shows underneath; let go far enough and it slides down and away, otherwise it
-  // settles back. On the cover from anywhere but the controls; over the text only when it is at its very
-  // top, so that the same gesture further down just scrolls the words.
+  // A swipe down puts the player away: it follows the finger, shrinks a little and fades while the page it
+  // came from comes up under it (a cross-fade, so that only position and opacity move: that is what
+  // stays smooth on a weak phone). Let go far enough and it slides down and away, otherwise it settles
+  // back. On the cover from anywhere but the controls; over the text only when it is at its very top (the
+  // text follows the song, so it rarely is); the top bar and the title block fold the player always.
   let playerPull = null;
   let pullBehind = null;
+  let pullBehindName = null;
   const pullScreen = $("screen-player"); // (the swipe code further down names it too, but declares it later)
   const pullStyle = (dy, animate) => {
-    const k = Math.min(1, dy / 600);
-    pullScreen.style.transition = animate ? "transform 0.34s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.34s, opacity 0.34s" : "none";
-    pullScreen.style.transform = `translateY(${dy}px) scale(${(1 - k * 0.1).toFixed(3)})`;
-    pullScreen.style.borderRadius = `${Math.round(Math.min(1, dy / 90) * 30)}px`;
-    pullScreen.style.opacity = ""; // the card stays solid: what is under it must not show through
+    const t = animate ? "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.32s ease-out" : "none";
+    const k = Math.min(1, dy / 700);
+    pullScreen.style.transition = t;
+    pullScreen.style.transform = `translate3d(0, ${dy}px, 0) scale(${(1 - k * 0.08).toFixed(3)})`;
+    pullScreen.style.opacity = String(Math.max(0, 1 - dy / 340).toFixed(3));
+    if (pullBehind) {
+      pullBehind.style.transition = animate ? "opacity 0.32s ease-out" : "none";
+      pullBehind.style.opacity = String(Math.min(1, dy / 240).toFixed(3));
+    }
   };
   const pullReset = () => {
     pullScreen.style.transition = "";
     pullScreen.style.transform = "";
-    pullScreen.style.borderRadius = "";
     pullScreen.style.opacity = "";
+    pullScreen.style.willChange = "";
+    if (pullBehind) { pullBehind.style.transition = ""; pullBehind.style.opacity = ""; pullBehind.style.willChange = ""; }
     document.body.classList.remove("player-pulling");
   };
   function pullBegin() {
     const below = navStack[navStack.length - 2];
-    const el = below && below.name !== "player" ? screens[below.name] : null;
-    pullBehind = el || screens.home || null;
-    if (pullBehind) pullBehind.hidden = false; // the page under the card
+    pullBehindName = below && below.name !== "player" && screens[below.name] ? below.name : "home";
+    pullBehind = screens[pullBehindName] || null;
+    if (pullBehind) {
+      pullBehind.style.opacity = "0";
+      pullBehind.style.willChange = "opacity";
+      pullBehind.hidden = false; // the page under the player
+    }
+    // the light takes the pose of the page it is going back to while the player is still being moved,
+    // not with a jump after it is gone
+    document.body.dataset.screen = pullBehindName;
     document.body.classList.add("player-pulling");
   }
   pullScreen.addEventListener("touchstart", (e) => {
@@ -6446,57 +6471,56 @@
     if (e.touches.length !== 1 || !currentTrack || currentScreen !== "player") return;
     if (document.body.classList.contains("quote-picking") || openOverlays.length) return;
     if (e.target.closest("#player-progress-track, .scrub, .scrub-times, button, input, a, .theme-try")) return;
-    // over the words it has to be their very top (the text follows the song, so it rarely is): the
-    // top bar and the title block below the words always fold the player
     if (e.target.closest("#player-lyrics") && lyricsBox.scrollTop > 0) return;
     if (artGrab) return; // a record or a cassette is being turned by the finger
-    playerPull = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0, locked: false, t: performance.now(), inText: !!e.target.closest("#player-lyrics") };
+    pullScreen.style.willChange = "transform, opacity"; // its own layer before the first move, not in the middle of it
+    playerPull = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0, locked: false, t: performance.now(), inText: !!e.target.closest("#player-lyrics"), raf: 0 };
   }, { passive: true });
   pullScreen.addEventListener("touchmove", (e) => {
     if (!playerPull) return;
     const dx = e.touches[0].clientX - playerPull.x, dy = e.touches[0].clientY - playerPull.y;
     if (!playerPull.locked) {
-      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { playerPull = null; return; } // sideways: the other swipe
-      if (dy < -10) { playerPull = null; return; } // upwards: the text scrolls
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { pullScreen.style.willChange = ""; playerPull = null; return; } // sideways: the other swipe
+      if (dy < -10) { pullScreen.style.willChange = ""; playerPull = null; return; } // upwards: the text scrolls
       if (dy < 12) return;
-      if (lyricsOpen && playerPull.inText && lyricsBox.scrollTop > 0) { playerPull = null; return; }
+      if (lyricsOpen && playerPull.inText && lyricsBox.scrollTop > 0) { pullScreen.style.willChange = ""; playerPull = null; return; }
       playerPull.locked = true;
       lyricsTouchedAt = Date.now();
       pullBegin();
     }
     playerPull.dy = Math.max(0, dy);
-    pullStyle(playerPull.dy * 0.9, false);
+    if (!playerPull.raf) {
+      const p = playerPull;
+      p.raf = requestAnimationFrame(() => { p.raf = 0; if (playerPull === p) pullStyle(p.dy * 0.95, false); });
+    }
   }, { passive: true });
   const endPlayerPull = (e) => {
     if (!playerPull) return;
     const p = playerPull;
     playerPull = null;
-    if (!p.locked) return;
+    cancelAnimationFrame(p.raf);
+    if (!p.locked) { pullScreen.style.willChange = ""; return; }
     const speed = p.dy / Math.max(1, performance.now() - p.t);
     const go = e && e.type === "touchend" && (p.dy > 120 || (p.dy > 50 && speed > 0.55));
     if (!go) {
-      // back into place; the page under it is put away again
+      // back into place; the page under it is put away again, the light goes back to the player's pose
       pullStyle(0, true);
+      document.body.dataset.screen = "player";
       setTimeout(() => {
+        if (currentScreen === "player" && pullBehind) pullBehind.hidden = true;
         pullReset();
-        if (pullBehind && currentScreen === "player") pullBehind.hidden = true;
         pullBehind = null;
-      }, 360);
+      }, 340);
       return;
     }
     haptic("light");
-    // slides down and away, then the app really goes back (its own entrance animation is skipped: the page is
-    // already there, a second one would flicker)
-    pullStyle(window.innerHeight * 1.02, true);
+    pullStyle(window.innerHeight * 0.55, true);
+    if (pullBehind) pullBehind.style.opacity = "1";
     setTimeout(() => {
-      document.body.classList.add("no-screen-anim");
-      goBack();
-      pullBehind = null;
-      requestAnimationFrame(() => {
-        pullReset();
-        requestAnimationFrame(() => document.body.classList.remove("no-screen-anim"));
-      });
-    }, 300);
+      // the app really goes back; the page is already there and stays as it was
+      goBack({ keep: true });
+      requestAnimationFrame(() => { pullReset(); pullBehind = null; });
+    }, 330);
   };
   pullScreen.addEventListener("touchend", endPlayerPull);
   pullScreen.addEventListener("touchcancel", endPlayerPull);
