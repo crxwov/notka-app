@@ -3637,6 +3637,7 @@
   $("toggle-minimal").addEventListener("click", () => {
     const on = $("toggle-minimal").getAttribute("aria-checked") !== "true";
     Store.setSetting("minimal", on);
+    $("toggle-minimal").setAttribute("aria-checked", on ? "true" : "false");
     haptic("select");
     applyLook();
   });
@@ -4108,6 +4109,8 @@
   const isMinimal = () => !!Store.getSetting("minimal");
   function applyLook() {
     document.documentElement.classList.toggle("minimal", isMinimal());
+    const minSw = $("toggle-minimal");
+    if (minSw) minSw.setAttribute("aria-checked", isMinimal() ? "true" : "false");
     const theme = lookValue("playerTheme");
     document.body.dataset.playerTheme = theme;
     document.body.dataset.bg = lookValue("bgPattern");
@@ -6177,8 +6180,11 @@
   const KARAOKE = { i: -1, spans: [], times: [], raf: 0 };
   function karaokeTimes(words, start, end) {
     const chars = words.reduce((n, w) => n + w.length, 0);
-    // sung over most of the line's time, but not slower than a voice is
-    const sing = clamp(chars * 0.085 + 0.4, 0.8, Math.max(0.8, end - start - 0.15));
+    // a line is sung over nearly all of its own time (that is what the timings say); only when the
+    // next line is far away (a break, a solo) is it sung at the pace of a voice, not stretched over the gap
+    const room = Math.max(0.8, end - start - 0.12);
+    const voice = chars * 0.16 + 1.2;
+    const sing = room <= voice * 1.5 ? room : clamp(voice, 0.8, room);
     const weights = words.map((w) => Math.max(2, w.length) + 1);
     const total = weights.reduce((a, b) => a + b, 0);
     let at = start;
@@ -6209,19 +6215,29 @@
     KARAOKE.spans = [];
     KARAOKE.times = [];
   }
-  function karaokeTick() {
+  let karaokeLastFrame = 0;
+  function karaokeTick(frameNow, force) {
     KARAOKE.raf = 0;
     if (KARAOKE.i < 0 || !lyricsOpen || currentScreen !== "player") return;
-    const now = karaokeClockStep(KCLOCK, audio.currentTime, performance.now(), audio.paused, audio.playbackRate) + 0.1;
+    const clock = performance.now();
+    // the word light is repainted text: on a phone 30 frames a second look the same and cost half
+    if (!force && clock - karaokeLastFrame < 30) {
+      if (!audio.paused) KARAOKE.raf = requestAnimationFrame(karaokeTick);
+      return;
+    }
+    karaokeLastFrame = clock;
+    const now = karaokeClockStep(KCLOCK, audio.currentTime, clock, audio.paused, audio.playbackRate) + 0.1;
     const spans = KARAOKE.spans, times = KARAOKE.times;
     for (let k = 0; k < spans.length; k++) {
       const [from, to] = times[k];
-      const p = now >= to ? 1 : now <= from ? 0 : smoothstep((now - from) / (to - from));
+      let p = now >= to ? 1 : now <= from ? 0 : smoothstep((now - from) / (to - from));
+      p = Math.round(p * 100) / 100; // a word is repainted only when its light moved a visible step
       const el = spans[k];
       if (el._p !== p) {
         el._p = p;
-        el.style.setProperty("--p", p.toFixed(3));
-        el.classList.toggle("is-now", p > 0 && p < 1);
+        el.style.setProperty("--p", p);
+        const sung = p > 0 && p < 1;
+        if (el._now !== sung) { el._now = sung; el.classList.toggle("is-now", sung); }
       }
     }
     if (!audio.paused) KARAOKE.raf = requestAnimationFrame(karaokeTick);
@@ -6254,10 +6270,10 @@
     KARAOKE.i = i;
     KARAOKE.spans = spans;
     KARAOKE.times = times;
-    karaokeTick();
+    karaokeTick(0, true);
   }
   audio.addEventListener("play", () => { if (KARAOKE.i >= 0 && !KARAOKE.raf) KARAOKE.raf = requestAnimationFrame(karaokeTick); });
-  audio.addEventListener("seeked", () => { if (KARAOKE.i >= 0) karaokeTick(); });
+  audio.addEventListener("seeked", () => { if (KARAOKE.i >= 0) karaokeTick(0, true); });
 
   function syncLyrics(jump, instant) {
     if (!lyricsOpen || !lyricsData || !lyricsData.synced || currentScreen !== "player") return;
@@ -6277,6 +6293,7 @@
       const lo = k === i ? 1 : d < 0 ? Math.max(0.2, 0.42 + d * 0.06) : Math.max(0.26, 0.58 - d * 0.08);
       items[k].style.setProperty("--lo", lo.toFixed(2));
       items[k].style.setProperty("--bl", `${Math.min(2.2, Math.abs(d) * 0.55).toFixed(1)}px`);
+      items[k].classList.toggle("is-near", k !== i && Math.abs(d) <= 3); // only the lines beside the sung one are blurred
     }
     // don't pull the text away from someone who is scrolling it by hand or picking lines
     if (quotePicking || (!jump && Date.now() - lyricsTouchedAt < 3000)) return;

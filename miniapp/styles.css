@@ -1696,12 +1696,12 @@ body[data-screen="splash"] .light-spill { opacity: 0; }
   font-size: 30px;
   line-height: 1.1;
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.01em;
   color: transparent;
   background: linear-gradient(170deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.55) 45%, rgba(255, 255, 255, 0.32) 62%, rgba(255, 255, 255, 0.7) 100%);
   -webkit-background-clip: text;
   background-clip: text;
-  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.6);
+  /* без обводки: у Unbounded внутри букв контуры перекрываются, и обводка рисовала их линиями */
   filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.18));
   opacity: 0;
   animation: splash-word 0.9s var(--ease-out) 0.6s forwards;
@@ -2115,9 +2115,12 @@ body.lyrics-open .player-art { opacity: 0; transform: scale(0.8); filter: blur(1
 .lyrics-line.is-past { opacity: 0.34; }
 .lyrics-line.is-active { opacity: 1; text-shadow: 0 2px 22px rgba(4, 2, 10, 0.45); }
 /* depth: the lines away from the sung one are a touch softer and smaller */
-.lyrics-lines.is-synced .lyrics-line { transform-origin: 0 60%; transition: opacity 0.35s var(--ease-out), transform 0.6s var(--ease-out), filter 0.5s var(--ease-out); filter: blur(var(--bl, 0px)); transform: scale(0.965); }
+.lyrics-lines.is-synced .lyrics-line { transform-origin: 0 60%; transition: opacity 0.35s var(--ease-out), transform 0.6s var(--ease-out), filter 0.5s var(--ease-out); transform: scale(0.965); }
+.lyrics-lines.is-synced .lyrics-line.is-near { filter: blur(var(--bl, 0px)); }
 .lyrics-lines.is-synced .lyrics-line.is-active { transform: scale(1); filter: none; }
-.perf-lite .lyrics-lines.is-synced .lyrics-line { filter: none; transition: opacity 0.35s var(--ease-out); }
+.perf-lite .lyrics-lines.is-synced .lyrics-line, .perf-lite .lyrics-lines.is-synced .lyrics-line.is-near { filter: none; transition: opacity 0.35s var(--ease-out); }
+/* телефон: без размытия строк (оно перерисовывается на каждом шаге прокрутки), глубину даёт яркость */
+@media (pointer: coarse) { .lyrics-lines.is-synced .lyrics-line.is-near { filter: none; } }
 /* the word light: a word fills from the left as it is sung; the one being sung lifts a little */
 /* the edge of the fill is soft (40% of a word wide), so the light flows through a word instead of cutting it */
 .lyrics-line .kw { display: inline-block; --p: 0; color: transparent; -webkit-text-fill-color: transparent;

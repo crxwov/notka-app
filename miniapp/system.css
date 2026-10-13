@@ -542,8 +542,9 @@ body.is-desktop .pd-atmo.demo-seasons .atmo-view { height: 190px; }
   transform-origin: 0 55%;
   transform: scale(0.93);
   transition: opacity 0.75s var(--ease-out), transform 0.8s var(--ease-out), text-shadow 0.8s var(--ease-out), background-color 0.2s var(--ease-out);
-  will-change: opacity, transform;
 }
+.lyrics-lines.is-synced .lyrics-line.is-active { will-change: transform; }
+.perf-lite .lyrics-lines.is-synced .lyrics-line { transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out); }
 .lyrics-lines.is-synced .lyrics-line.is-active { transform: scale(1); }
 .lyrics-lines.is-synced:not(.is-picking) .lyrics-line { opacity: var(--lo, 0.5); }
 .lyrics-lines.is-synced:not(.is-picking) .lyrics-line:active { opacity: 0.7; }
@@ -568,6 +569,12 @@ html.minimal .sheet, html.minimal .modal {
     linear-gradient(135deg, rgba(32, 32, 32, 0.92), rgba(22, 22, 22, 0.95));
 }
 html.minimal .tab.active { background: rgba(255, 255, 255, 0.12); }
+/* минимализм: экран загрузки без цветных пятен, только знак и слово на ровном фоне */
+html.minimal .screen-splash::before { display: none; }
+html.minimal .splash-word { background: #EDEDED; -webkit-background-clip: text; background-clip: text; filter: none; }
+html.minimal .glass-note::before { display: none; }
+html.minimal .gn-body { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(255, 255, 255, 0.2); }
+html.minimal .gn-shine { display: none; }
 
 /* ПК: знак и слово на экране открытия крупнее (в окне 900+ px 96 px терялись) */
 body.is-desktop .splash-mark { width: clamp(190px, 24vmin, 320px); height: clamp(190px, 24vmin, 320px); }
