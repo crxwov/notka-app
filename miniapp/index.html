@@ -129,23 +129,26 @@
       <h1 class="auth-title">Вход в Нотку</h1>
       <p class="auth-sub">Войди по Telegram, чтобы подтянуть свои любимые треки, плейлисты и настройки</p>
 
-      <!-- Step 1: Username -->
+      <!-- Step 1: Username / ID -->
       <div class="auth-step" id="auth-step-user">
         <label class="auth-field-wrap">
           <span class="auth-at">@</span>
-          <input id="auth-username-input" class="auth-input" type="text" placeholder="username" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="next">
+          <input id="auth-username-input" class="auth-input" type="text" placeholder="username или ID" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="next">
         </label>
         <div id="auth-user-error" class="auth-error" hidden></div>
         <button id="auth-request-code-btn" class="auth-primary-btn" type="button">Получить код в Telegram</button>
+        <button id="auth-open-bot-btn" class="auth-text-btn" type="button">💬 Открыть бота @notka_app_bot</button>
+        <button id="auth-have-code-btn" class="auth-secondary-btn" type="button">У меня уже есть код из бота</button>
       </div>
 
       <!-- Step 2: Confirmation code -->
       <div class="auth-step" id="auth-step-code" hidden>
-        <p class="auth-code-hint">Бот отправил 6-значный код в Telegram пользователю <b id="auth-code-target-user"></b></p>
+        <p class="auth-code-hint">Введи 6-значный код из сообщения Telegram-бота <b id="auth-code-target-user"></b></p>
         <input id="auth-code-input" class="auth-code-input" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
         <div id="auth-code-error" class="auth-error" hidden></div>
         <button id="auth-verify-code-btn" class="auth-primary-btn" type="button">Подтвердить и войти</button>
-        <button id="auth-change-user-btn" class="auth-secondary-btn" type="button">Изменить юзернейм</button>
+        <button id="auth-change-user-btn" class="auth-secondary-btn" type="button">Назад к вводу юзернейма</button>
+        <button id="auth-code-open-bot-btn" class="auth-text-btn" type="button">💬 Написать боту @notka_app_bot</button>
       </div>
     </div>
   </main>

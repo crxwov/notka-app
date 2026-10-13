@@ -186,3 +186,25 @@
   padding: 10px 14px;
   line-height: 1.4;
 }
+
+.auth-text-btn {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 18px;
+  color: #C38FFF;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.auth-text-btn:active {
+  background: rgba(139, 92, 246, 0.2);
+  transform: scale(0.98);
+}

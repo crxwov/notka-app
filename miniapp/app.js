@@ -7548,6 +7548,50 @@
       });
     }
 
+    const haveCodeBtn = $("auth-have-code-btn");
+    const openBotBtn = $("auth-open-bot-btn");
+    const codeOpenBotBtn = $("auth-code-open-bot-btn");
+
+    function openTelegramBot(startParam) {
+      const param = startParam || "login";
+      const tgUrl = `https://t.me/notka_app_bot?start=${param}`;
+      if (window.Android && window.Android.openExternal) {
+        window.Android.openExternal(tgUrl);
+      } else {
+        window.open(tgUrl, "_blank");
+      }
+    }
+
+    if (openBotBtn) {
+      openBotBtn.addEventListener("click", () => {
+        haptic("impact", "light");
+        openTelegramBot("login");
+      });
+    }
+
+    if (codeOpenBotBtn) {
+      codeOpenBotBtn.addEventListener("click", () => {
+        haptic("impact", "light");
+        openTelegramBot("code");
+      });
+    }
+
+    if (haveCodeBtn) {
+      haveCodeBtn.addEventListener("click", () => {
+        haptic("impact", "light");
+        hideUserError();
+        hideCodeError();
+        currentReqUser = (userInput ? userInput.value : "").trim().replace(/^@/, "");
+        if (targetUserLabel) targetUserLabel.textContent = currentReqUser ? `@${currentReqUser}` : "из бота @notka_app_bot";
+        if (userStep) userStep.hidden = true;
+        if (codeStep) codeStep.hidden = false;
+        if (codeInput) {
+          codeInput.value = "";
+          setTimeout(() => codeInput.focus(), 100);
+        }
+      });
+    }
+
     if (changeBtn) {
       changeBtn.addEventListener("click", () => {
         hideCodeError();

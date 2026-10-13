@@ -423,6 +423,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         except Exception:
             return JSONResponse({"ok": False, "error": "bad_request", "message": "Некорректный запрос"}, status_code=400)
         res = await auth_store.request_code(username)
+        logger.info("[AUTH] request-code user=%r result ok=%s", username, res.get("ok"))
         status_code = 200 if res.get("ok") else 400
         return JSONResponse(res, status_code=status_code)
 
@@ -435,6 +436,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         except Exception:
             return JSONResponse({"ok": False, "error": "bad_request", "message": "Некорректный запрос"}, status_code=400)
         res = auth_store.verify_code(username, code)
+        logger.info("[AUTH] verify-code user=%r code=%r result ok=%s", username, code, res.get("ok"))
         status_code = 200 if res.get("ok") else 400
         return JSONResponse(res, status_code=status_code)
 

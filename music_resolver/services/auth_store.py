@@ -66,30 +66,96 @@ def normalize_query(query: str) -> str:
 
 
 def find_user(query: str) -> tuple[int, dict] | None:
-    """Find a registered user by Telegram @username or numeric ID."""
+    """Find a registered user by Telegram @username, numeric ID, or display name."""
     clean = normalize_query(query)
     if not clean:
         return None
 
-    all_users = metrics.users()
+    def _search(users_map: dict) -> tuple[int, dict] | None:
+        # 1. Exact match on username (case-insensitive)
+        for uid_str, data in users_map.items():
+            uname = (data.get("username") or "").strip().lstrip("@").lower()
+            if uname and uname == clean:
+                try:
+                    return int(uid_str), data
+                except ValueError:
+                    continue
 
-    # 1. Match by username (case-insensitive)
-    for uid_str, data in all_users.items():
-        uname = (data.get("username") or "").lower()
-        if uname == clean:
+        # 2. Match by numeric user_id
+        if clean.isdigit() and clean in users_map:
             try:
-                return int(uid_str), data
+                return int(clean), users_map[clean]
             except ValueError:
-                continue
+                pass
 
-    # 2. Match by numeric user_id
-    if clean.isdigit() and clean in all_users:
-        try:
-            return int(clean), all_users[clean]
-        except ValueError:
-            pass
+        # 3. Match by name or first_name (case-insensitive)
+        for uid_str, data in users_map.items():
+            name = (data.get("name") or "").strip().lower()
+            if name and name == clean:
+                try:
+                    return int(uid_str), data
+                except ValueError:
+                    continue
+
+        # 4. Prefix match if clean is at least 3 chars (e.g. 'hackov' matches 'hackov_crew')
+        candidates = []
+        if len(clean) >= 3:
+            for uid_str, data in users_map.items():
+                uname = (data.get("username") or "").strip().lstrip("@").lower()
+                name = (data.get("name") or "").strip().lower()
+                if uname and (uname.startswith(clean) or clean.startswith(uname)):
+                    candidates.append((uid_str, data))
+                elif name and (name.startswith(clean) or clean.startswith(name)):
+                    candidates.append((uid_str, data))
+        if len(candidates) == 1:
+            try:
+                return int(candidates[0][0]), candidates[0][1]
+            except ValueError:
+                pass
+
+        return None
+
+    # First check in-memory users cache
+    all_users = metrics.users()
+    res = _search(all_users)
+    if res:
+        return res
+
+    # Fallback: re-read users.json directly from disk
+    try:
+        disk_users = metrics._read(metrics._USERS)
+        if disk_users:
+            res = _search(disk_users)
+            if res:
+                with metrics._LOCK:
+                    metrics._users.update(disk_users)
+                return res
+    except Exception as exc:
+        logger.warning("Error reading disk users: %s", exc)
 
     return None
+
+
+def generate_code_for_user(user_id: int, username: str = "", name: str = "") -> str:
+    """Generate a 6-digit confirmation code directly for a known Telegram user (e.g. from the bot)."""
+    now = time.time()
+    code = f"{secrets.randbelow(900000) + 100000}"
+    entry = {
+        "code": code,
+        "user_id": user_id,
+        "username": username or str(user_id),
+        "name": name or "Пользователь",
+        "expires_at": now + 300,
+        "attempts": 0,
+        "last_sent": now,
+    }
+    with _LOCK:
+        _PENDING_CODES[str(user_id)] = entry
+        if username:
+            _PENDING_CODES[normalize_query(username)] = entry
+        _PENDING_CODES[f"code:{code}"] = entry
+    logger.info("[AUTH] Generated code for user_id=%s username=%s", user_id, username)
+    return code
 
 
 async def send_telegram_code(user_id: int, code: str) -> tuple[bool, str]:
@@ -123,7 +189,7 @@ async def send_telegram_code(user_id: int, code: str) -> tuple[bool, str]:
             err_desc = data.get("description", "Unknown error")
             logger.warning("Telegram sendMessage failed for %s: %s", user_id, err_desc)
             if "bot was blocked" in err_desc.lower() or "chat not found" in err_desc.lower():
-                return False, "Бот заблокирован или чат с ботом не начат. Открой нашего бота в Telegram и нажми /start."
+                return False, "Бот заблокирован или чат с ботом не начат. Открой нашего бота @notka_app_bot в Telegram и нажми /start."
             return False, f"Ошибка Telegram: {err_desc}"
     except Exception as exc:
         logger.exception("Failed to contact Telegram API")
@@ -131,17 +197,48 @@ async def send_telegram_code(user_id: int, code: str) -> tuple[bool, str]:
 
 
 async def request_code(query: str) -> dict:
-    """Request a 6-digit confirmation code for a given Telegram username."""
+    """Request a 6-digit confirmation code for a given Telegram username or numeric ID."""
     clean = normalize_query(query)
     if not clean:
-        return {"ok": False, "error": "empty_username", "message": "Введите ваш юзернейм в Telegram"}
+        return {"ok": False, "error": "empty_username", "message": "Введите ваш юзернейм или ID в Telegram"}
 
+    logger.info("[AUTH] request_code query=%r clean=%r", query, clean)
     user_info = find_user(clean)
+
+    # If not found in users.json, but user passed numeric Telegram ID: attempt direct message
+    if not user_info and clean.isdigit():
+        target_uid = int(clean)
+        now = time.time()
+        code = f"{secrets.randbelow(900000) + 100000}"
+        success, err_msg = await send_telegram_code(target_uid, code)
+        if success:
+            metrics.touch_user(target_uid, profile={"name": f"ID {target_uid}"})
+            entry = {
+                "code": code,
+                "user_id": target_uid,
+                "username": str(target_uid),
+                "name": f"ID {target_uid}",
+                "expires_at": now + 300,
+                "attempts": 0,
+                "last_sent": now,
+            }
+            with _LOCK:
+                _PENDING_CODES[clean] = entry
+                _PENDING_CODES[f"code:{code}"] = entry
+            return {
+                "ok": True,
+                "message": "Код подтверждения отправлен в Telegram бота!",
+                "user_id": target_uid,
+                "name": f"ID {target_uid}",
+                "username": str(target_uid),
+            }
+
     if not user_info:
+        logger.warning("[AUTH] User not found for query=%r", query)
         return {
             "ok": False,
             "error": "user_not_found",
-            "message": "Пользователь с таким ником не найден в базе Нотки. Сначала открой нашего бота в Telegram и нажми /start!",
+            "message": f"Пользователь «{query}» не найден в базе Нотки. Открой бота @notka_app_bot в Telegram и отправь команду /code — бот сразу выдаст код!",
         }
 
     user_id, data = user_info
@@ -150,7 +247,7 @@ async def request_code(query: str) -> dict:
 
     now = time.time()
     with _LOCK:
-        existing = _PENDING_CODES.get(clean)
+        existing = _PENDING_CODES.get(clean) or _PENDING_CODES.get(str(user_id))
         if existing and now - existing.get("last_sent", 0) < 30:
             rem = int(30 - (now - existing.get("last_sent", 0)))
             return {
@@ -161,7 +258,7 @@ async def request_code(query: str) -> dict:
 
         # Generate 6-digit code
         code = f"{secrets.randbelow(900000) + 100000}"
-        _PENDING_CODES[clean] = {
+        entry = {
             "code": code,
             "user_id": user_id,
             "username": username,
@@ -170,11 +267,16 @@ async def request_code(query: str) -> dict:
             "attempts": 0,
             "last_sent": now,
         }
+        _PENDING_CODES[clean] = entry
+        _PENDING_CODES[str(user_id)] = entry
+        _PENDING_CODES[f"code:{code}"] = entry
 
     success, err_msg = await send_telegram_code(user_id, code)
     if not success:
         with _LOCK:
             _PENDING_CODES.pop(clean, None)
+            _PENDING_CODES.pop(str(user_id), None)
+            _PENDING_CODES.pop(f"code:{code}", None)
         return {
             "ok": False,
             "error": "send_failed",
@@ -195,41 +297,52 @@ def verify_code(query: str, code: str) -> dict:
     clean = normalize_query(query)
     clean_code = (code or "").strip().replace(" ", "")
 
+    if not clean_code:
+        return {"ok": False, "error": "empty_code", "message": "Введите 6-значный код"}
+
     now = time.time()
+    pending = None
+
     with _LOCK:
-        pending = _PENDING_CODES.get(clean)
+        # 1. Match by clean query / user_id
+        if clean and clean in _PENDING_CODES:
+            cand = _PENDING_CODES[clean]
+            if cand.get("code") == clean_code:
+                pending = cand
+
+        # 2. Match by direct code index
+        if not pending and f"code:{clean_code}" in _PENDING_CODES:
+            pending = _PENDING_CODES[f"code:{clean_code}"]
+
+        # 3. Linear scan active unexpired pending codes
+        if not pending:
+            for k, cand in list(_PENDING_CODES.items()):
+                if cand.get("code") == clean_code and cand.get("expires_at", 0) > now:
+                    pending = cand
+                    break
+
         if not pending:
             return {
                 "ok": False,
                 "error": "not_requested",
-                "message": "Код не запрашивался или устарел. Запросите код заново.",
+                "message": "Код не запрашивался или устарел. Отправь /code в боте @notka_app_bot.",
             }
 
         if now > pending.get("expires_at", 0):
-            _PENDING_CODES.pop(clean, None)
             return {
                 "ok": False,
                 "error": "expired",
-                "message": "Срок действия кода истёк. Запросите код заново.",
+                "message": "Срок действия кода истёк. Запросите новый код.",
             }
 
         if pending.get("attempts", 0) >= 5:
-            _PENDING_CODES.pop(clean, None)
             return {
                 "ok": False,
                 "error": "too_many_attempts",
                 "message": "Слишком много неверных попыток. Запросите новый код.",
             }
 
-        if pending.get("code") != clean_code:
-            pending["attempts"] = pending.get("attempts", 0) + 1
-            return {
-                "ok": False,
-                "error": "invalid_code",
-                "message": "Неверный код подтверждения. Проверьте сообщение в Telegram.",
-            }
-
-        # Code is correct! Generate session token
+        # Code matches! Generate session token
         token = secrets.token_hex(32)
         user_id = pending["user_id"]
         username = pending["username"]

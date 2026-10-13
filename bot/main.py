@@ -20,7 +20,7 @@ from aiogram.types import (
 )
 
 from bot.config import load_config
-from music_resolver.services import plus_store
+from music_resolver.services import auth_store, metrics, plus_store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("notka.bot")
@@ -50,13 +50,49 @@ async def main() -> None:
     except Exception:
         logger.exception("Could not set the menu button")
 
+    def _touch_message_user(user) -> None:
+        if not user:
+            return
+        metrics.touch_user(
+            user.id,
+            profile={
+                "name": (user.full_name or "")[:80],
+                "username": (user.username or "")[:40],
+                "lang": (user.language_code or "")[:8],
+                "premium": bool(user.is_premium),
+            }
+        )
+
+    async def _send_auth_code_reply(message: Message) -> None:
+        user = message.from_user
+        if not user:
+            return
+        _touch_message_user(user)
+        code = auth_store.generate_code_for_user(user.id, user.username or "", user.full_name or "")
+        login_label = f"@{user.username}" if user.username else f"ID: {user.id}"
+        await message.answer(
+            f"🔐 <b>Вход в мобильное приложение Нотка</b>\n\n"
+            f"Твой код подтверждения: <code>{code}</code>\n"
+            f"Твой логин: <code>{login_label}</code>\n\n"
+            f"Введи этот 6-значный код в приложении на телефоне.\n"
+            f"⏳ Код действует 5 минут.\n"
+            f"⚠️ Никому не сообщай этот код!",
+            parse_mode="HTML",
+        )
+
     @dp.message(CommandStart())
     async def handle_start(message: Message) -> None:
+        _touch_message_user(message.from_user)
         # Links shared from the Mini App: t.me/<bot>?start=t_<src>_<id> (a track)
         # or ?start=p_<id> (a playlist). Answer with a button that opens Нотка
         # straight on it.
         parts = (message.text or "").split(maxsplit=1)
         payload = parts[1].strip() if len(parts) > 1 else ""
+
+        if payload in ("login", "code", "auth"):
+            await _send_auth_code_reply(message)
+            return
+
         # t.me/<bot>?start=promo_CODE — a link from an ad: Нотка opens
         # with the code already entered
         promo = re.fullmatch(r"promo_([A-Za-zА-Яа-яЁё0-9_-]{3,24})", payload)
@@ -88,7 +124,8 @@ async def main() -> None:
             return
         await message.answer(
             "Привет! Это Нотка — музыка прямо в Телеграме.\n\n"
-            "Жми на кнопку ниже, чтобы найти и включить трек.",
+            "Жми на кнопку ниже, чтобы найти и включить трек.\n\n"
+            "📱 Для входа в мобильное приложение на Android отправь /code",
             reply_markup=build_open_app_inline_keyboard(config.miniapp_url),
         )
         # also clears the old keyboard button, which may hold a dead address
@@ -97,15 +134,22 @@ async def main() -> None:
             reply_markup=ReplyKeyboardRemove(),
         )
 
+    # ---- Mobile App Authentication Code ----
+    @dp.message(Command("code", "login", "auth"))
+    async def handle_code(message: Message) -> None:
+        await _send_auth_code_reply(message)
+
     # ---- for the owner (ADMIN_IDS in .env): promo codes for «Нотка Плюс» ----
     admin_ids = {int(x) for x in re.findall(r"\d+", os.environ.get("ADMIN_IDS", ""))}
 
     @dp.message(Command("id"))
     async def handle_id(message: Message) -> None:
+        _touch_message_user(message.from_user)
         await message.answer(f"Твой номер в Telegram: {message.from_user.id}")
 
     @dp.message(Command("promo"))
     async def handle_promo(message: Message, command: CommandObject) -> None:
+        _touch_message_user(message.from_user)
         if message.from_user.id not in admin_ids:
             await message.answer("Не понял команду. Жми /start, чтобы открыть Нотку.")
             return
@@ -150,8 +194,16 @@ async def main() -> None:
 
     @dp.message()
     async def handle_other(message: Message) -> None:
+        _touch_message_user(message.from_user)
+        txt = (message.text or "").strip().lower()
+        if any(w in txt for w in ("код", "code", "войти", "логин", "вход", "auth", "login")):
+            await _send_auth_code_reply(message)
+            return
         await message.answer(
-            "Не понял команду. Жми /start, чтобы открыть Нотку.",
+            "Привет! Это Нотка — музыка прямо в Телеграме. 🎧\n\n"
+            "📱 Чтобы получить код для входа в приложение, отправь /code\n"
+            "Или жми /start, чтобы открыть плеер в Telegram.",
+            reply_markup=build_open_app_inline_keyboard(config.miniapp_url),
         )
 
     logger.info("Starting Notka bot polling...")
