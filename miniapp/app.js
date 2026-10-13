@@ -555,6 +555,9 @@
       if (eventQueue.length >= 25) flushEvents();
     } catch (e) { /* never in the way */ }
   }
+  // the same call under a name no local variable takes: playTrack(track, …) hides «track», and its
+  // error branch (retry, other version, next track) used to die on «track is not a function»
+  const sendEvent = (name, props) => track(name, props);
   async function flushEvents() {
     if (eventsFlushing || !eventQueue.length || !tgInitRaw || state.settings.analyticsOff) return;
     eventsFlushing = true;
@@ -1071,6 +1074,8 @@
   }
   window.addEventListener("resize", () => requestAnimationFrame(placePrism));
 
+  // the warm brand hues a cover without usable colours is given (the constant was lost in a move, and the function threw)
+  const BRAND_HUES = [14, 24, 34, 336, 348, 6, 318];
   function brandPaletteFor(seed) {
     const h = BRAND_HUES[hashString(seed) % BRAND_HUES.length];
     return { core: hsl(h, 0.9, 0.9), warm: hsl(h, 0.76, 0.62), mid: hsl((h + 340) % 360, 0.5, 0.52), deep: "#44112F" };
@@ -5968,7 +5973,7 @@
     } catch (err) {
       if (token !== playToken || (err && err.name === "AbortError")) return;
       console.error(err);
-      track("play_error", { id: track.id, code: (err && err.code) || "net", retried: !!opts.retried });
+      sendEvent("play_error", { id: track.id, code: (err && err.code) || "net", retried: !!opts.retried });
       // a source answers «no» now and then for one request: the same track once more,
       // before it is given up on and skipped
       if (!opts.retried && !(err && err.code === "TRACK_NOT_FOUND")) {
