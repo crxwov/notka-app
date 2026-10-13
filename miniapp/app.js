@@ -7426,7 +7426,7 @@
       g.moved = true;
       isScrubbing = true;
       document.body.classList.add("art-held");
-      scratch.start();
+      scratch.start(artTheme());
     }
     const dur = effectiveDuration();
     let shift;
@@ -7455,86 +7455,126 @@
     const nowMs = performance.now();
     const turnedNow = artTheme() === "cassette" ? (e.clientX - g.x) * 2 : g.turned;
     const dt = Math.max(8, nowMs - g.at);
-    scratch.move(((turnedNow - g.prev) / dt) * 1000);
+    scratch.move(((turnedNow - g.prev) / dt) * 1000, turnedNow);
     g.prev = turnedNow;
     g.at = nowMs;
   });
-  // ---- the turntable's sound: while a record or a disc is turned by the finger, a scratch is heard (synthesised:
-  // filtered noise whose pitch, loudness and grain follow the speed of the hand). Can be switched off in the settings. ----
+  // ---- the sound of turning a player by hand. Soft and short, each player its own:
+  //   vinyl: a gentle scratch, a filtered breath with a «wiu» that slides with the hand;
+  //   cd: little musical blips, one for every notch the disc is turned (a pentatonic scale, so it always sounds good);
+  //   cassette: the tape winding: a low whirr with a light flutter, higher forward, lower back.
+  // Quiet by design (the music steps back a little under it). Can be switched off in the settings. ----
   const scratch = (() => {
-    let ctx = null, master = null, gain = null, filter = null, src = null, osc = null, oscGain = null, lfo = null, lfoGain = null, shaper = null;
-    let ducked = false, lastDir = 0;
+    let ctx = null, master = null;
+    let kind = "vinyl";
+    let noise = null, noiseFilter = null, noiseGain = null;
+    let tone = null, toneGain = null, vib = null, vibGain = null;
+    let ducked = false, lastNotch = null, lastBlip = 0;
     const enabled = () => Store.getSetting("scratchSound") !== false;
-    function curve() {
-      const n = 1024, c = new Float32Array(n);
-      for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(x * 3.2); }
-      return c;
+    const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21]; // pentatonic, in semitones above A3
+    function build() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      ctx = new AC();
+      master = ctx.createGain(); master.gain.value = 0.7;
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -22; comp.ratio.value = 4;
+      master.connect(comp); comp.connect(ctx.destination);
+      // a breath of noise (soft, not hiss): looped, band-passed
+      const len = Math.floor(ctx.sampleRate * 1.5);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.06 * w) / 1.06; d[i] = last * 3.2; } // brown-ish noise
+      noise = ctx.createBufferSource(); noise.buffer = buf; noise.loop = true;
+      noiseFilter = ctx.createBiquadFilter(); noiseFilter.type = "bandpass"; noiseFilter.frequency.value = 900; noiseFilter.Q.value = 5;
+      noiseGain = ctx.createGain(); noiseGain.gain.value = 0;
+      noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(master);
+      // the tone that follows the hand
+      tone = ctx.createOscillator(); tone.type = "triangle"; tone.frequency.value = 200;
+      toneGain = ctx.createGain(); toneGain.gain.value = 0;
+      vib = ctx.createOscillator(); vib.frequency.value = 5.5;
+      vibGain = ctx.createGain(); vibGain.gain.value = 0;
+      vib.connect(vibGain); vibGain.connect(tone.frequency);
+      tone.connect(toneGain); toneGain.connect(master);
+      noise.start(); tone.start(); vib.start();
+      return true;
     }
-    function start() {
+    function start(player) {
       if (!enabled()) return;
+      kind = player === "cd" || player === "cassette" ? player : "vinyl";
       try {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return;
-        if (!ctx) {
-          ctx = new AC();
-          const len = ctx.sampleRate * 2;
-          const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-          const d = buf.getChannelData(0);
-          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (0.6 + 0.4 * Math.sin(i / 23));
-          src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-          filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 1200; filter.Q.value = 3.2;
-          gain = ctx.createGain(); gain.gain.value = 0;
-          // a tone riding with the noise: the «wicka» of a record turned by hand
-          osc = ctx.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = 220;
-          oscGain = ctx.createGain(); oscGain.gain.value = 0;
-          lfo = ctx.createOscillator(); lfo.type = "square"; lfo.frequency.value = 12;
-          lfoGain = ctx.createGain(); lfoGain.gain.value = 0;
-          lfo.connect(lfoGain); lfoGain.connect(gain.gain);
-          shaper = ctx.createWaveShaper(); shaper.curve = curve(); shaper.oversample = "2x";
-          master = ctx.createGain(); master.gain.value = 1.6;
-          src.connect(filter); filter.connect(gain);
-          osc.connect(oscGain); oscGain.connect(gain);
-          gain.connect(shaper); shaper.connect(master); master.connect(ctx.destination);
-          src.start(); osc.start(); lfo.start();
-        }
+        if (!ctx && !build()) return;
         if (ctx.state === "suspended") ctx.resume();
+        tone.type = kind === "cassette" ? "sine" : "triangle";
+        noiseFilter.Q.value = kind === "cassette" ? 1.2 : 5;
+        lastNotch = null;
         duck(true);
       } catch (e) { ctx = null; }
     }
-    // the music steps back under the scratch (where the device lets the volume be changed)
     function duck(on) {
       if (typeof volumeWorks === "undefined" || !volumeWorks) return;
-      if (on && !ducked) { ducked = true; try { audio.volume = Math.max(0, userVolume * 0.28); } catch (e) { /* ignore */ } }
+      if (on && !ducked) { ducked = true; try { audio.volume = Math.max(0, userVolume * 0.4); } catch (e) { /* ignore */ } }
       else if (!on && ducked) { ducked = false; try { audio.volume = userVolume; } catch (e) { /* ignore */ } }
     }
-    // speed in degrees per second (or pixels), sign = direction
-    function move(speed) {
-      if (!ctx || !gain || !enabled()) return;
-      const v = Math.min(1, Math.abs(speed) / 420);
+    function blip(step, v) {
       const now = ctx.currentTime;
-      const dir = speed === 0 ? lastDir : Math.sign(speed);
-      const turned = lastDir !== 0 && dir !== lastDir && v > 0.08; // the hand changed direction: a sharp tick
-      lastDir = dir;
-      const level = v < 0.01 ? 0 : 0.55 + v * 0.45;
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setTargetAtTime(turned ? 1.2 : level, now, 0.012);
-      filter.frequency.setTargetAtTime(700 + v * 3800 + (dir < 0 ? 600 : 0), now, 0.02);
-      filter.Q.setTargetAtTime(2.4 + v * 3, now, 0.03);
-      src.playbackRate.setTargetAtTime(0.7 + v * 1.7, now, 0.02);
-      osc.frequency.setTargetAtTime(110 + v * 760 + (dir < 0 ? 90 : 0), now, 0.02);
-      oscGain.gain.setTargetAtTime(v < 0.01 ? 0 : 0.22 + v * 0.35, now, 0.02);
-      lfo.frequency.setTargetAtTime(10 + v * 34, now, 0.04);
-      lfoGain.gain.setTargetAtTime(level * 0.35, now, 0.04);
+      if (now - lastBlip < 0.035) return; // never a buzz
+      lastBlip = now;
+      const note = SCALE[((step % SCALE.length) + SCALE.length) % SCALE.length];
+      const f = 220 * Math.pow(2, note / 12);
+      const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+      const o2 = ctx.createOscillator(); o2.type = "triangle"; o2.frequency.value = f * 2;
+      const g = ctx.createGain();
+      const peak = 0.16 + v * 0.1;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(peak, now + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+      const g2 = ctx.createGain(); g2.gain.value = 0.35;
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(master);
+      o.start(now); o2.start(now); o.stop(now + 0.2); o2.stop(now + 0.2);
+    }
+    // speed: how fast the hand turns (units per second, sign = direction); position: how far it has turned in all
+    function move(speed, position) {
+      if (!ctx || !enabled()) return;
+      const v = Math.min(1, Math.abs(speed) / 520);
+      const dir = speed < 0 ? -1 : 1;
+      const now = ctx.currentTime;
+      const quiet = v < 0.015;
+      if (kind === "cd") {
+        // a blip for each notch; between notches, a faint high shimmer follows the speed
+        const step = Math.floor((position || 0) / 16);
+        if (lastNotch === null) lastNotch = step;
+        if (step !== lastNotch) { lastNotch = step; if (!quiet) blip(step, v); }
+        noiseGain.gain.setTargetAtTime(quiet ? 0 : 0.015 + v * 0.05, now, 0.05);
+        noiseFilter.frequency.setTargetAtTime(2400 + v * 3000, now, 0.05);
+        toneGain.gain.setTargetAtTime(0, now, 0.03);
+        return;
+      }
+      if (kind === "cassette") {
+        // the tape: a whirr that rises with the speed, with the slight waver of a real mechanism
+        toneGain.gain.setTargetAtTime(quiet ? 0 : 0.07 + v * 0.1, now, 0.06);
+        tone.frequency.setTargetAtTime((dir > 0 ? 130 : 90) + v * (dir > 0 ? 360 : 220), now, 0.06);
+        vib.frequency.setTargetAtTime(4 + v * 6, now, 0.1);
+        vibGain.gain.setTargetAtTime(6 + v * 14, now, 0.1);
+        noiseGain.gain.setTargetAtTime(quiet ? 0 : 0.035 + v * 0.06, now, 0.06);
+        noiseFilter.frequency.setTargetAtTime(1800 + v * 2500, now, 0.06);
+        return;
+      }
+      // vinyl: the breath of the groove and a «wiu» that goes up with the hand and down when it turns back
+      noiseGain.gain.setTargetAtTime(quiet ? 0 : 0.1 + v * 0.22, now, 0.03);
+      noiseFilter.frequency.setTargetAtTime(500 + v * 2600 + (dir < 0 ? -120 : 140), now, 0.03);
+      toneGain.gain.setTargetAtTime(quiet ? 0 : 0.05 + v * 0.1, now, 0.04);
+      tone.frequency.setTargetAtTime((dir > 0 ? 160 : 120) + v * (dir > 0 ? 520 : 300), now, 0.04);
+      vib.frequency.setTargetAtTime(5.5, now, 0.1);
+      vibGain.gain.setTargetAtTime(v * 10, now, 0.1);
     }
     function stop() {
-      if (ctx && gain) {
+      if (ctx) {
         const now = ctx.currentTime;
-        gain.gain.cancelScheduledValues(now);
-        gain.gain.setTargetAtTime(0, now, 0.06);
-        oscGain.gain.setTargetAtTime(0, now, 0.05);
-        lfoGain.gain.setTargetAtTime(0, now, 0.05);
+        noiseGain.gain.setTargetAtTime(0, now, 0.07);
+        toneGain.gain.setTargetAtTime(0, now, 0.07);
+        vibGain.gain.setTargetAtTime(0, now, 0.07);
       }
-      lastDir = 0;
       duck(false);
     }
     return { start, move, stop };
