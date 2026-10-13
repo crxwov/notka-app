@@ -130,9 +130,16 @@ def mood_fit(f: dict, mood: str) -> float | None:
     elif mood == "sleep":
         gate, rest = _trap(e, -0.1, 0.0, 0.22, 0.42), [(2, _trap(a, 0.3, 0.55, 1.0, 1.1)), (1.5, _trap(t, 30, 50, 100, 125)), (1.5, _trap(s, -0.1, 0.0, 0.08, 0.2))]
     elif mood == "focus":
-        # words pull attention: little singing or talking is the thing that matters
-        gate = 0.6 * _trap(i, 0.15, 0.5, 1.0, 1.1) + 0.4 * _trap(s, -0.1, 0.0, 0.06, 0.16)
-        rest = [(2, _trap(e, -0.1, 0.0, 0.62, 0.82)), (1, _trap(d, 0.0, 0.15, 0.7, 0.95)), (0.5, _trap(t, 50, 70, 125, 160))]
+        # even music, words allowed (even rap): what matters is that nothing jolts: not too quiet to drift off,
+        # not loud and sharp, a steady tempo. Wordless music is a plus, not a requirement.
+        gate = _trap(e, 0.08, 0.22, 0.66, 0.85)
+        rest = [
+            (1.5, _trap(s, -0.1, 0.0, 0.3, 0.6)),   # speech is fine up to a rap's amount
+            (1, 0.55 + 0.45 * _trap(i, -0.1, 0.0, 1.0, 1.1)),  # no words at all: a little better
+            (1.5, _trap(t, 55, 75, 128, 165)),
+            (1, _trap(d, 0.1, 0.35, 0.8, 0.98)),
+            (0.5, _trap(v, 0.1, 0.25, 0.8, 0.95)),
+        ]
     elif mood == "sad":
         gate, rest = _trap(v, -0.1, 0.0, 0.28, 0.45), [(2, _trap(e, -0.1, 0.0, 0.4, 0.62)), (1.5, _trap(d, -0.1, 0.0, 0.65, 0.85)), (1, _trap(t, 30, 55, 115, 140))]
     elif mood == "romance":
