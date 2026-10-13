@@ -37,6 +37,16 @@ Audio streaming throughput and track latency overhauled:
   - In `perf-lite`, `.glass` and `.field` were assigned a hardcoded muddy purple `rgba(58, 42, 92, 0.78)` and `-webkit-backdrop-filter: none`, breaking search bar, mini-player, and bottom nav on iOS/Android.
   - Fix: removed automatic false-positive downgrade in `perfGuard`, cleared stale auto-lite flags on start, replaced hardcoded purple with elegant dark frosted surfaces in fallbacks, and made `lightForTrack` and `brandPaletteFor` derive dynamic hues synchronously with token cancellation.
   - Deployed v197 (`app.js`), v145 (`styles.css`).
+- Fixed player half-dismissed pull freeze & cropped cover ("фон в ахуе" / обложки багаются):
+  - Root cause:
+    1. Gesture race condition: when swiping diagonally to skip a track, vertical `playerPull` detected `dy >= 12` and called `pullBegin()`, scaling the player down (`scale(0.92)`), unhiding the background screen (`pullBehind`), adding `player-pulling` class, and switching `document.body.dataset.screen = "home"`. Simultaneously, horizontal `swipe` locked and initiated track change via pointer capture. `endPlayerPull` was swallowed or its 360ms timer was preempted by the next touch, permanently stranding the player in half-pulled card mode with the Home screen bleeding through.
+    2. Scroll retention in `#screen-player`: the container has `overflow-y: auto` to allow scrolling down to `#player-info` ("О треке" / "Из альбома"). When scrolled down, neither `playTrack` nor `setFullPlayerFor` reset `scrollTop = 0`, causing the next track to open scrolled up, cutting off the cover and exposing `#pi-album` at the bottom.
+  - Solution:
+    - Implemented strict mutual exclusion: `cancelPlayerPull()` cleans up all transforms, classes, behind-screens, and timeouts immediately when horizontal `swipe` locks; `cancelSwipe()` clears swipe targets when pull begins.
+    - Added guaranteed `cancelPlayerPull()` and `screens.player.scrollTop = 0` inside `playTrack`, `playAdjacent`, and `showScreen("player")`.
+    - Protected `#player-info` and scrolled positions from initiating accidental track-skip swipes (`pullScreen.scrollTop > 5`).
+    - Enforced `.player-main` `height: 100%; min-height: 100%; box-sizing: border-box;` in `system.css`.
+    - Deployed v198 (`app.js`), v146 (`styles.css`), v112 (`system.css`).
 
 ## Findings and Decisions
 - Audio cache hit response time reduced from ~19s to 12–15 ms.
