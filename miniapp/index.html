@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=143" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=106" />
+<link rel="stylesheet" href="system.css?v=108" />
 <link rel="stylesheet" href="plus.css?v=9" />
 <script src="telegram-web-app.js?v=1"></script>
 </head>
@@ -151,6 +151,11 @@
       <div class="mix-row">
         <button class="mood-btn" id="mood-open-btn" type="button"><span class="mood-dot" aria-hidden="true"></span>Под настроение</button>
         <button class="mix-refresh" id="mymix-refresh-btn" type="button" aria-label="Обновить микс"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.4L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.4L20 15.5"/><path d="M20 20v-4.5h-4.5"/></svg><span>Обновить</span></button>
+      </div>
+      <div class="lang-row" id="mix-lang" role="group" aria-label="Язык миксов">
+        <button type="button" data-lang="any" aria-pressed="true">Любой</button>
+        <button type="button" data-lang="ru" aria-pressed="false">Русские</button>
+        <button type="button" data-lang="world" aria-pressed="false">Зарубежные</button>
       </div>
     </section>
 
@@ -335,6 +340,7 @@
       <div class="hero-actions">
         <button class="pill-btn pill-primary play-src" id="favorites-play-btn" type="button"><svg class="ic-play" width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic-pause" width="18" height="18" aria-hidden="true"><use href="#i-pause"/></svg><span class="pill-label">Слушать</span></button>
         <button class="pill-btn pill-quiet" id="favorites-shuffle-btn" type="button" aria-pressed="false"><svg width="18" height="18" aria-hidden="true"><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
+        <button class="pill-btn pill-quiet pill-icon-only" id="favorites-group-btn" type="button" aria-pressed="false" aria-label="Собрать по альбомам"><svg width="18" height="18" aria-hidden="true"><use href="#i-disc"/></svg></button>
       </div>
     </div>
     <ul class="track-list" id="favorites-list"></ul>
@@ -363,6 +369,7 @@
       <div class="hero-actions">
         <button class="pill-btn pill-primary play-src" id="playlist-play-btn" type="button"><svg class="ic-play" width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic-pause" width="18" height="18" aria-hidden="true"><use href="#i-pause"/></svg><span class="pill-label">Слушать</span></button>
         <button class="pill-btn pill-quiet" id="playlist-shuffle-btn" type="button" aria-pressed="false"><svg width="18" height="18" aria-hidden="true"><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
+        <button class="pill-btn pill-quiet pill-icon-only" id="playlist-group-btn" type="button" aria-pressed="false" aria-label="Собрать по альбомам"><svg width="18" height="18" aria-hidden="true"><use href="#i-disc"/></svg></button>
       </div>
     </div>
     <ul class="track-list" id="playlist-tracks-list"></ul>
@@ -384,6 +391,7 @@
       <p class="hero-sub" id="album-meta">Альбом</p>
       <div class="hero-actions">
         <button class="pill-btn pill-primary play-src" id="album-play-btn" type="button"><svg class="ic-play" width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic-pause" width="18" height="18" aria-hidden="true"><use href="#i-pause"/></svg><span class="pill-label">Слушать</span></button>
+        <button class="pill-btn pill-quiet" id="album-shuffle-btn" type="button" aria-pressed="false"><svg width="18" height="18" aria-hidden="true"><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
       </div>
     </div>
     <ul class="track-list" id="album-tracks"></ul>
@@ -400,6 +408,7 @@
       <p class="hero-sub" id="artist-listeners">в Нотке</p>
       <div class="hero-actions">
         <button class="pill-btn pill-primary play-src" id="artist-play-btn" type="button"><svg class="ic-play" width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic-pause" width="18" height="18" aria-hidden="true"><use href="#i-pause"/></svg><span class="pill-label">Слушать</span></button>
+        <button class="pill-btn pill-quiet pill-icon-only" id="artist-shuffle-btn" type="button" aria-pressed="false" aria-label="Вперемешку"><svg width="18" height="18" aria-hidden="true"><use href="#i-shuffle"/></svg></button>
         <button class="pill-btn pill-quiet" id="artist-follow-btn" type="button" aria-pressed="false"><span id="artist-follow-label">Подписаться</span></button>
       </div>
     </div>
@@ -1184,6 +1193,7 @@
         <span class="row-meta"><span class="row-title" id="menu-playlist-title">Плейлист</span></span>
       </div>
       <button class="sheet-row" id="menu-addtracks" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-plus"/></svg><span>Добавить треки</span></button>
+      <button class="sheet-row" id="menu-shuffle-order" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-shuffle"/></svg><span>Перемешать порядок</span></button>
       <button class="sheet-row" id="menu-editlist" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-edit"/></svg><span>Редактировать</span></button>
       <button class="sheet-row" id="menu-details" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg><span>Название и описание</span></button>
       <button class="sheet-row" id="menu-share" type="button"><svg width="22" height="22" aria-hidden="true"><use href="#i-share"/></svg><span>Поделиться</span></button>
@@ -1389,6 +1399,6 @@
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
 <script src="mix.js?v=1"></script>
-<script src="app.js?v=191"></script>
+<script src="app.js?v=193"></script>
 </body>
 </html>

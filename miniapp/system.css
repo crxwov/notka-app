@@ -869,3 +869,38 @@ body.is-desktop .mix-stage { width: 340px; height: 210px; }
 .mix-hero.is-building .mix-play-xl::after { width: 40px; height: 40px; border-width: 4px; z-index: 3; }
 .perf-lite .mix-blob { animation: none !important; }
 body.is-desktop .mix-play-xl { width: 140px; height: 140px; }
+
+/* кнопка «Вперемешку» — режим списка: включённая подсвечена; в шапке исполнителя только значок, чтобы три кнопки влезли */
+.hero-actions .pill-icon-only { flex: 0 0 48px; padding: 0; }
+body.is-desktop .hero-actions .pill-icon-only { min-width: 48px; }
+
+/* низкое окно (мини-режим Telegram на ПК, телефон в альбомной): панель и мини-плеер занимали полэкрана — делаем их компактнее */
+@media (max-height: 640px) {
+  body:not(.is-desktop) .tabbar { height: 54px; padding: 4px; bottom: calc(var(--sab) + 8px); }
+  body:not(.is-desktop) .tab { flex-direction: row; gap: 8px; font-size: 13px; }
+  body:not(.is-desktop) .tab svg { width: 20px; height: 20px; }
+  body:not(.is-desktop) .mini-player { bottom: calc(var(--sab) + 70px); height: 58px; padding: 8px 8px 12px 8px; }
+  body:not(.is-desktop).no-tabbar .mini-player { bottom: calc(var(--sab) + 10px); }
+  body:not(.is-desktop) .mini-player .cover { width: 38px; height: 38px; }
+  body:not(.is-desktop) .mini-play { width: 40px; height: 40px; }
+}
+@media (max-height: 480px) {
+  body:not(.is-desktop) .tab span { display: none; }
+}
+
+/* свайп по строке трека: вправо «Следующим», влево «В плейлист» */
+.track-row.swipeable { position: relative; touch-action: pan-y; }
+.swipe-hint { position: absolute; top: 4px; bottom: 4px; width: 78px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10px; font-weight: 700; line-height: 1.1; text-align: center; opacity: 0; pointer-events: none; color: var(--text-2); }
+.swipe-hint-r { left: 0; }
+.swipe-hint-l { right: 0; }
+.swipe-hint.is-ready { color: var(--c-core, #ff6f9c); }
+
+/* заголовок альбома в режиме «По альбомам» */
+.album-group { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 18px 4px 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-2); }
+.album-group-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.album-group-count { flex: none; font-weight: 600; }
+
+/* язык миксов: три переключателя под кнопками микса */
+.lang-row { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+.lang-row button { height: 32px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-2); background: var(--surface-1); transition: background-color 0.2s, color 0.2s; }
+.lang-row button[aria-pressed="true"] { background: var(--btn-light, #fff); color: var(--bg, #1a0b16); }

@@ -212,8 +212,15 @@
     const root = document.documentElement.style;
     if (top) root.setProperty("--sat", `${top}px`);
     if (bottom) root.setProperty("--sab", `${bottom}px`);
+    // Some Android phones (Samsung One UI) let the web view run under the system navigation bar and report no inset:
+    // the view is then as tall as the whole screen, so keep the dock clear of the bar by hand.
+    if (!bottom && tg.platform === "android") {
+      const full = window.screen && window.screen.height && window.innerHeight >= window.screen.height - 1;
+      if (full) root.setProperty("--sab", "24px");
+    }
   }
   applySafeAreas();
+  window.addEventListener("resize", applySafeAreas);
   if (tg && tg.onEvent) {
     tg.onEvent("safeAreaChanged", applySafeAreas);
     tg.onEvent("contentSafeAreaChanged", applySafeAreas);
@@ -1288,9 +1295,12 @@
     document.body.classList.toggle("no-tabbar", !showTabs);
     let dock = 0;
     if (desk) dock = showMini ? 108 : 0;
-    else if (showTabs && showMini) dock = 160;
-    else if (showTabs) dock = 84;
-    else if (showMini) dock = 86;
+    else {
+      const low = window.innerHeight <= 640; // the compact dock of a low window (see system.css)
+      if (showTabs && showMini) dock = low ? 132 : 160;
+      else if (showTabs) dock = low ? 72 : 84;
+      else if (showMini) dock = low ? 76 : 86;
+    }
     document.documentElement.style.setProperty("--dock", `${dock}px`);
   }
 
@@ -1657,10 +1667,68 @@
       playTrack(track, opts.queue || [track], { context: opts.context });
     });
 
+    if (action === "more") attachRowSwipe(li, main, track);
     applyRowState(li);
     return li;
   }
   function btnOf(li) { return li.querySelector(".row-action"); }
+
+  // A swipe on a track row (a finger, not a mouse): right = «Играть следующим», left = «В плейлист».
+  // Vertical scrolling stays the browser's (touch-action: pan-y); the row follows the finger and springs back.
+  function attachRowSwipe(li, main, track) {
+    const SWIPE_AT = 72;
+    const hintR = document.createElement("span");
+    hintR.className = "swipe-hint swipe-hint-r";
+    hintR.setAttribute("aria-hidden", "true");
+    hintR.innerHTML = `${icon("i-queue", 20)}<span>Следующим</span>`;
+    const hintL = document.createElement("span");
+    hintL.className = "swipe-hint swipe-hint-l";
+    hintL.setAttribute("aria-hidden", "true");
+    hintL.innerHTML = `${icon("i-playlist-add", 20)}<span>В плейлист</span>`;
+    li.append(hintR, hintL);
+    li.classList.add("swipeable");
+    let x0 = 0, y0 = 0, dx = 0, mode = null, id = null;
+    const kids = () => [...li.children].filter((c) => !c.classList.contains("swipe-hint"));
+    const setDx = (v, animate) => {
+      kids().forEach((c) => { c.style.transition = animate ? "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)" : "none"; c.style.transform = v ? `translateX(${v}px)` : ""; });
+      const k = Math.min(1, Math.abs(v) / SWIPE_AT);
+      hintR.style.opacity = v > 0 ? String(k) : "0";
+      hintL.style.opacity = v < 0 ? String(k) : "0";
+      hintR.classList.toggle("is-ready", v >= SWIPE_AT);
+      hintL.classList.toggle("is-ready", v <= -SWIPE_AT);
+    };
+    li.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" || id !== null || e.target.closest(".row-action, .row-heart")) return;
+      id = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = null;
+    });
+    li.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== id) return;
+      const mx = e.clientX - x0, my = e.clientY - y0;
+      if (mode === null) {
+        if (Math.abs(mx) < 10 && Math.abs(my) < 10) return;
+        mode = Math.abs(mx) > Math.abs(my) * 1.5 ? "x" : "y";
+        if (mode === "x") { try { li.setPointerCapture(id); } catch (err) { /* ignore */ } }
+      }
+      if (mode !== "x") return;
+      dx = Math.max(-110, Math.min(110, mx * 0.7));
+      setDx(dx, false);
+    });
+    const end = () => {
+      if (id === null) return;
+      const was = mode === "x", d = dx;
+      id = null; mode = null; dx = 0;
+      if (!was) return;
+      li.dataset.swiped = String(Date.now()); // the click that follows a drag is not a tap
+      setDx(0, true);
+      if (d >= SWIPE_AT) { haptic("medium"); queueTrack(track, false); }
+      else if (d <= -SWIPE_AT) { haptic("medium"); openAddToPlaylistSheet(track); }
+    };
+    li.addEventListener("pointerup", end);
+    li.addEventListener("pointercancel", end);
+    li.addEventListener("click", (e) => {
+      if (Date.now() - Number(li.dataset.swiped || 0) < 400) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
+  }
 
   function applyRowState(li) {
     const isCurrent = !!currentTrackId && li.dataset.trackId === currentTrackId;
@@ -2230,11 +2298,40 @@
     if (have.has("cyrillic")) have.add("latin"); // those who listen in Russian listen to the West as well
     return have;
   }
+  // «Язык» of the mixes: any / only Russian / only foreign (by the script of the title and artist). Kept on this device.
+  const MIX_LANG_KEY = "notka_mix_lang";
+  let mixLang = "any";
+  try { const v = localStorage.getItem(MIX_LANG_KEY); if (v === "ru" || v === "world") mixLang = v; } catch (e) { /* any */ }
+  const MIX_LANG_NAMES = { any: "любой язык", ru: "русские песни", world: "зарубежные песни" };
+  function langOk(t) {
+    if (mixLang === "any") return true;
+    const cyr = scriptOf(`${t.title || ""} ${t.artist || ""}`) === "cyrillic";
+    return mixLang === "ru" ? cyr : !cyr;
+  }
+  function paintLang() {
+    document.querySelectorAll("#mix-lang [data-lang]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === mixLang ? "true" : "false"));
+  }
+  function setMixLang(lang) {
+    if (lang === mixLang) return;
+    mixLang = lang;
+    try { localStorage.setItem(MIX_LANG_KEY, lang); } catch (e) { /* ignore */ }
+    mixResume = {}; // the kept mixes were made for another language
+    try { localStorage.setItem(MIX_RESUME_KEY, "{}"); } catch (e) { /* ignore */ }
+    paintLang();
+    haptic("select");
+    if (mymixActive) refreshMymix(); else showToast(`Миксы: ${MIX_LANG_NAMES[lang]}`);
+  }
+  document.querySelectorAll("#mix-lang [data-lang]").forEach((b) => b.addEventListener("click", () => setMixLang(b.dataset.lang)));
+  paintLang();
   async function buildMix() {
     const known = knownTracks();
     const own = new Map(known);
     (state.recent || []).forEach((t) => { if (!own.has(t.id)) own.set(t.id, t); });
-    const ownList = [...own.values()];
+    let ownList = [...own.values()];
+    if (mixLang !== "any") {
+      const only = ownList.filter(langOk);
+      if (only.length >= 3) ownList = only; // too little of that language of one's own: the new ones carry the mix
+    }
     const seedPool = ownList.filter((t) => t.source === "youtube_music");
     if (!seedPool.length || !window.NotkaMix) return shuffled([...known.values()]);
     const prof = mixProfile();
@@ -2246,13 +2343,14 @@
     lists.forEach((list) => list.forEach((t) => {
       if (!t || seen.has(t.id) || own.has(t.id)) return;
       if (!scripts.has(scriptOf(`${t.title || ""} ${t.artist || ""}`))) return; // a language this listener does not listen to
+      if (!langOk(t)) return;
       seen.add(t.id);
       adjacent.push(t);
     }));
     const mix = window.NotkaMix.assemble(Object.assign({ familiar: ownList, adjacent, size: 40, familiarShare: 0.4 }, prof));
     const famIds = new Set(ownList.map((t) => t.id));
     track("mix_built", { v: 2, n: mix.length, fam: mix.filter((t) => famIds.has(t.id)).length, adj: adjacent.length, seeds: seeds.length });
-    if (mix.length < 8) return shuffled([...known.values()]);
+    if (mix.length < 8) return shuffled([...known.values()].filter(langOk).length >= 3 ? [...known.values()].filter(langOk) : [...known.values()]);
     return mix;
   }
   // Leaving a mix for something else keeps its place: coming back goes on
@@ -2496,7 +2594,7 @@
     return {
       seeds,
       artists: Array.from(weight.entries()).sort((a, b) => b[1] - a[1]).slice(0, 40).map((e) => e[0]),
-      ru_share: total >= 5 ? russian / total : null,
+      ru_share: mixLang === "ru" ? 0.97 : mixLang === "world" ? 0.03 : (total >= 5 ? russian / total : null),
     };
   }
 
@@ -3371,12 +3469,58 @@
     $("favorites-empty").hidden = state.favorites.length > 0;
     $("favorites-play-btn").disabled = !state.favorites.length;
     $("favorites-shuffle-btn").disabled = !state.favorites.length;
-    state.favorites.forEach((track) => list.appendChild(buildTrackRow(track, { queue: state.favorites, context: "Любимые треки" })));
+    const favs = isGroupedByAlbum("fav") ? albumOrder(state.favorites) : state.favorites;
+    fillTrackList(list, favs, "fav", (track) => buildTrackRow(track, { queue: favs, context: "Любимые треки" }));
+    $("favorites-group-btn").setAttribute("aria-pressed", isGroupedByAlbum("fav") ? "true" : "false");
     updateSourceButtons();
   }
+  // «По альбомам»: a view of a list with the tracks of one album gathered under the album's name (the list itself keeps its order)
+  const GROUP_KEY = "notka_group_albums";
+  const groupModes = (() => { try { return new Set(JSON.parse(localStorage.getItem(GROUP_KEY) || "[]")); } catch (e) { return new Set(); } })();
+  const isGroupedByAlbum = (key) => groupModes.has(key);
+  function toggleGroupByAlbum(key) {
+    if (groupModes.has(key)) groupModes.delete(key); else groupModes.add(key);
+    try { localStorage.setItem(GROUP_KEY, JSON.stringify([...groupModes].slice(-60))); } catch (e) { /* ignore */ }
+    haptic("select");
+    showToast(groupModes.has(key) ? "Треки собраны по альбомам" : "Обычный порядок");
+  }
+  const albumKeyOf = (t) => (t.album || "").trim().toLowerCase();
+  function albumOrder(tracks) {
+    const groups = new Map();
+    tracks.forEach((t) => {
+      const k = albumKeyOf(t) || " ";
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(t);
+    });
+    // albums by where they first appear; the tracks without an album stay at the end
+    const keys = [...groups.keys()].sort((a, b) => (a === " ") - (b === " "));
+    return keys.flatMap((k) => groups.get(k));
+  }
+  function fillTrackList(list, tracks, key, build) {
+    let last = null;
+    const grouped = isGroupedByAlbum(key);
+    tracks.forEach((track) => {
+      if (grouped) {
+        const k = albumKeyOf(track) || " ";
+        if (k !== last) {
+          last = k;
+          const count = tracks.filter((t) => (albumKeyOf(t) || " ") === k).length;
+          const h = document.createElement("li");
+          h.className = "album-group";
+          h.innerHTML = `<span class="album-group-name"></span><span class="album-group-count"></span>`;
+          h.firstChild.textContent = track.album || "Без альбома";
+          h.lastChild.textContent = pluralTracks(count);
+          list.appendChild(h);
+        }
+      }
+      list.appendChild(build(track));
+    });
+  }
+  $("favorites-group-btn").addEventListener("click", () => { toggleGroupByAlbum("fav"); renderFavoritesScreen(); });
+  $("playlist-group-btn").addEventListener("click", () => { toggleGroupByAlbum(`pl:${currentPlaylistId}`); openPlaylist(currentPlaylistId, true); });
   $("favorites-back-btn").addEventListener("click", goBack);
   $("favorites-play-btn").addEventListener("click", () => playOrToggle("fav", state.favorites, "Любимые треки"));
-  $("favorites-shuffle-btn").addEventListener("click", () => shuffleOrToggle("fav", state.favorites, "Любимые треки"));
+  $("favorites-shuffle-btn").addEventListener("click", () => shuffleOrToggle("fav"));
 
   // ============================================================
   // PLAYLIST DETAIL
@@ -3400,9 +3544,11 @@
     $("playlist-empty").hidden = tracks.length > 0;
     $("playlist-play-btn").disabled = !tracks.length;
     $("playlist-shuffle-btn").disabled = !tracks.length;
-    tracks.forEach((track, i) => {
-      list.appendChild(buildTrackRow(track, { index: i + 1, queue: tracks, context: playlist.name, heart: true }));
-    });
+    const grouped = isGroupedByAlbum(`pl:${playlistId}`);
+    const shown = grouped ? albumOrder(tracks) : tracks;
+    let n = 0;
+    fillTrackList(list, shown, `pl:${playlistId}`, (track) => buildTrackRow(track, { index: ++n, queue: shown, context: playlist.name, heart: true }));
+    $("playlist-group-btn").setAttribute("aria-pressed", grouped ? "true" : "false");
     updateSourceButtons();
     if (!keepStack) showScreen("playlist");
   }
@@ -3422,9 +3568,7 @@
     playOrToggle(`pl:${currentPlaylistId}`, tracks, $("playlist-title").textContent);
   });
   $("playlist-shuffle-btn").addEventListener("click", () => {
-    const tracks = Store.getPlaylistTracks(currentPlaylistId);
-    if (!tracks.length) { showToast("Плейлист пуст"); return; }
-    shuffleOrToggle(`pl:${currentPlaylistId}`, tracks, $("playlist-title").textContent);
+    shuffleOrToggle(`pl:${currentPlaylistId}`);
   });
   $("playlist-heart-btn").addEventListener("click", () => {
     if (!currentPlaylistId) return;
@@ -3458,6 +3602,16 @@
   $("menu-addtracks").addEventListener("click", () => {
     closeOverlay("playlist-menu-sheet");
     openAddTracksScreen();
+  });
+  // really reorder the playlist (for good), unlike the «Вперемешку» mode
+  $("menu-shuffle-order").addEventListener("click", () => {
+    closeOverlay("playlist-menu-sheet");
+    const tracks = Store.getPlaylistTracks(currentPlaylistId);
+    if (tracks.length < 2) { showToast("Мало треков"); return; }
+    Store.reorderPlaylist(currentPlaylistId, shuffled(tracks).map((t) => t.id));
+    openPlaylist(currentPlaylistId, true);
+    haptic("medium");
+    showToast("Порядок в плейлисте перемешан");
   });
   $("menu-editlist").addEventListener("click", () => {
     closeOverlay("playlist-menu-sheet");
@@ -6088,25 +6242,33 @@
   const queuedIds = new Set(); // tracks put in the queue by hand (see queueTrack)
   let currentSource = null; // "fav" | "pl:<id>" | "album:<title>" | "artist:<name>" | "mix"
 
-  // A list's «Слушать» plays it in order; pressed again it pauses/resumes.
-  function playOrToggle(source, tracks, context) {
-    if (currentSource === source && currentTrack) {
-      if (shuffleOn) { shuffleOn = false; startFrom(source, tracks, context, false); return; }
-      togglePlayPause();
-      return;
-    }
-    startFrom(source, tracks, context, false);
+  // «Вперемешку» is a mode of a list, not a way to start it: pressing it only switches the mode (remembered per list),
+  // «Слушать» then plays in order or shuffled by that mode. If the list is playing now the mode applies at once.
+  const SHUFFLE_KEY = "notka_shuffle_modes";
+  const shuffleModes = (() => {
+    try { return new Set(JSON.parse(localStorage.getItem(SHUFFLE_KEY) || "[]")); } catch (e) { return new Set(); }
+  })();
+  function saveShuffleModes() {
+    try { localStorage.setItem(SHUFFLE_KEY, JSON.stringify([...shuffleModes].slice(-60))); } catch (e) { /* ignore */ }
   }
-  // «Вперемешку»: shuffled from a random track; pressed again it goes back
-  // to the list's own order.
-  function shuffleOrToggle(source, tracks, context) {
-    if (currentSource === source && currentTrack && shuffleOn) {
-      shuffleOn = false;
-      startFrom(source, tracks, context, false);
-      showToast("По порядку");
-      return;
+  function playOrToggle(source, tracks, context) {
+    if (currentSource === source && currentTrack) { togglePlayPause(); return; }
+    startFrom(source, tracks, context, shuffleModes.has(source));
+  }
+  function shuffleOrToggle(source) {
+    const on = !shuffleModes.has(source);
+    if (on) shuffleModes.add(source); else shuffleModes.delete(source);
+    saveShuffleModes();
+    haptic("select");
+    if (currentSource === source && currentTrack) {
+      shuffleOn = on;
+      currentQueue = on ? withShuffledTail(originalQueue, currentTrack) : originalQueue.slice();
+      currentQueueIndex = currentQueue.findIndex((t) => t.id === currentTrack.id);
+      showToast(on ? "Перемешали" : "По порядку");
+    } else {
+      showToast(on ? "Вперемешку: включится, когда нажмёте «Слушать»" : "По порядку");
     }
-    startFrom(source, tracks, context, true);
+    syncModeButtons();
   }
   function startFrom(source, tracks, context, shuffle) {
     if (!tracks.length) return;
@@ -6119,17 +6281,18 @@
     [
       ["favorites-play-btn", "favorites-shuffle-btn", () => "fav"],
       ["playlist-play-btn", "playlist-shuffle-btn", () => `pl:${currentPlaylistId}`],
-      ["album-play-btn", null, () => `album:${$("album-title").textContent}`],
-      ["artist-play-btn", null, () => `artist:${$("artist-name").textContent}`],
+      ["album-play-btn", "album-shuffle-btn", () => `album:${$("album-title").textContent}`],
+      ["artist-play-btn", "artist-shuffle-btn", () => `artist:${$("artist-name").textContent}`],
     ].forEach(([playId, shuffleId, key]) => {
       const btn = $(playId);
       if (!btn) return;
       const current = !!currentTrack && currentSource === key();
       btn.classList.toggle("is-current", current);
-      const label = current && !shuffleOn ? (audio.paused ? "Продолжить" : "Пауза") : "Слушать";
+      const label = current ? (audio.paused ? "Продолжить" : "Пауза") : "Слушать";
       btn.querySelector(".pill-label").textContent = label;
-      btn.setAttribute("aria-label", label === "Слушать" ? "Слушать по порядку" : label);
-      if (shuffleId) $(shuffleId).setAttribute("aria-pressed", current && shuffleOn ? "true" : "false");
+      btn.setAttribute("aria-label", label === "Слушать" ? (shuffleModes.has(key()) ? "Слушать вперемешку" : "Слушать по порядку") : label);
+      const sb = shuffleId && $(shuffleId);
+      if (sb) sb.setAttribute("aria-pressed", shuffleModes.has(key()) ? "true" : "false");
     });
     const mix = $("mymix-card");
     if (mix) updateMymixCardUI();
@@ -7394,6 +7557,8 @@
     if (!currentArtistTracks.length) { showToast("Нет треков"); return; }
     playOrToggle(`artist:${$("artist-name").textContent}`, currentArtistTracks, $("artist-name").textContent);
   });
+  $("artist-shuffle-btn").addEventListener("click", () => shuffleOrToggle(`artist:${$("artist-name").textContent}`));
+  $("album-shuffle-btn").addEventListener("click", () => shuffleOrToggle(`album:${$("album-title").textContent}`));
   $("artist-follow-btn").addEventListener("click", () => {
     const name = $("artist-name").textContent;
     const on = Store.toggleArtistFollow(name, {
