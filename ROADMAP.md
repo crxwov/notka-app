@@ -23,7 +23,7 @@ Fix what real users reported after the app was dropped into the uwc'29 chat (130
 | 9 | Product wishes (language wave, similar songs, profile customization, release-date filter, year recap, APK) | waiting for owner decisions |
 
 ## Current State
-Branch `plus-wheel-and-perf`. Live app is v158 (deployed 2026-10-13: smooth word fill in lyrics, neutral buttons in Минимализм; before: v157): track profiles + mood ranking, word-by-word lyrics, download limit.
+Branch `plus-wheel-and-perf`. Live app is v159 (deployed 2026-10-13: Минимализм toggle fixed (aria-checked was never updated, could not be turned off), splash without text-stroke and without colors in Минимализм, lyrics words spread over the line time, lighter lyrics rendering on phones: 30 fps fill, blur only near lines and off on touch; before: v158 smooth word fill): track profiles + mood ranking, word-by-word lyrics, download limit.
 
 ## Findings and Decisions
 - Yandex API refuses non-Russian IPs. Fix: `YANDEX_PROXY` in `/opt/notka/app/.env` (proxys.io shared IPv4, 30 days, expires ~2026-11-11). Fallback relay kept in `deploy/yandex_relay*`.
