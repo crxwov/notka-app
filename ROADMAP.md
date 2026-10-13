@@ -31,10 +31,10 @@ Build and deploy a full-featured Android mobile application for Notka (`Нотк
 6. Completed — Frontend Living Light auth screen (`miniapp/auth.css`, `miniapp/index.html`, `miniapp/app.js`), bundled into Android APK assets and deployed to VPS.
 7. Completed — Live device deployment & end-to-end verification on connected TECNO CH6i phone (Telegram auth flow, negative case validation, code confirmation, full database sync, background streaming over HTTPS, MediaSession notification).
 8. Completed — Artwork & CDN bypass proxy (`GET /artwork`) with disk caching, CORS headers for canvas Living Light shader, and mobile token propagation for Plus/Events/Analytics.
-9. In Progress — Git repository commit, tag, and first GitHub beta release `v0.0.1` (`0.0.1`) with standalone Android APK asset attached.
+9. Completed — Git repository commit, tag, and first GitHub beta release `v0.0.1` (`0.0.1`) with standalone Android APK asset attached.
 
 ## Current State
-Production VPS updated, Android APK built and verified on device, ready for GitHub release publish.
+Released v0.0.1 Beta on GitHub with APK asset (https://github.com/asyaandreeva209-collab/notka/releases/tag/v0.0.1). Production VPS and connected test device fully synchronized.
 
 ## Findings / Decisions
 - **Connected Device**: TECNO CH6i (`08357252AA002939`, Android 13, API 33, 1080x2460 display).
