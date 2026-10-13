@@ -193,7 +193,7 @@ async def main() -> None:
     warmed: dict[str, float] = {}
     warm_tasks: set[asyncio.Task] = set()
 
-    async def warm(source: str, source_id: str, title: str, artist: str) -> None:
+    async def warm(source: str, source_id: str, title: str, artist: str, cover: str = "") -> None:
         key = f"{source}:{source_id}"
         if time.time() - warmed.get(key, 0) < 600:
             return
@@ -205,7 +205,7 @@ async def main() -> None:
             async with httpx.AsyncClient(timeout=240) as client:
                 await client.get(
                     f"{backend}/inline-warm/{quote(source)}/{quote(source_id)}",
-                    params={"t": title, "a": artist},
+                    params={"t": title, "a": artist, "c": cover},
                 )
         except Exception:
             warmed.pop(key, None)
@@ -238,7 +238,8 @@ async def main() -> None:
                 continue
             title = (track.get("title") or "Без названия")[:120]
             artist = (track.get("artist") or "")[:120]
-            url = f"{public_base}/inline/{quote(source)}/{quote(source_id)}.mp3?" + urlencode({"t": title, "a": artist})
+            cover = str(track.get("artwork") or "")
+            url = f"{public_base}/inline/{quote(source)}/{quote(source_id)}.mp3?" + urlencode({"t": title, "a": artist, "c": cover})
             items.append(
                 InlineQueryResultAudio(
                     id=hashlib.sha1(f"{source}:{source_id}".encode()).hexdigest()[:40],
@@ -248,12 +249,13 @@ async def main() -> None:
                     audio_duration=duration or None,
                 )
             )
-            picks.append((source, source_id, title, artist))
+            picks.append((source, source_id, title, artist, cover))
             if len(items) >= 10:
                 break
         await query.answer(items, cache_time=300, is_personal=False, button=open_button)
-        for source, source_id, title, artist in picks[:2]:
-            task = asyncio.create_task(warm(source, source_id, title, artist))
+        # the first four are made ready while the list is on the screen (the converter works two at a time)
+        for source, source_id, title, artist, cover in picks[:4]:
+            task = asyncio.create_task(warm(source, source_id, title, artist, cover))
             warm_tasks.add(task)
             task.add_done_callback(warm_tasks.discard)
 

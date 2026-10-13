@@ -254,11 +254,33 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     mp3_locks: dict[str, asyncio.Lock] = {}
     mp3_slots = asyncio.Semaphore(2)  # converting is heavy for a small server
 
-    async def mp3_for(source: str, source_id: str, title: str = "", artist: str = "") -> Path:
+    _COVER_HOSTS = re.compile(r"^https://([a-z0-9-]+\.)*(googleusercontent\.com|ggpht\.com|ytimg\.com|mzstatic\.com|dzcdn\.net|sndcdn\.com)/")
+
+    async def _cover_file(url: str, stem: str) -> Path | None:
+        """The cover of a track as a small JPEG next to its audio (for the tag inside the mp3); None when it cannot be had."""
+        if not url or not _COVER_HOSTS.match(url):
+            return None
+        url = re.sub(r"=w\d+-h\d+[^\s]*$", "=w600-h600-l90-rj", url)
+        dest = _CACHE_DIR / f"{stem}.cover.jpg"
+        try:
+            if dest.stat().st_size > 1000:
+                return dest
+        except OSError:
+            pass
+        try:
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                res = await client.get(url, headers={"User-Agent": _UPSTREAM_USER_AGENT})
+            if res.status_code == 200 and 1000 < len(res.content) < 3_000_000:
+                dest.write_bytes(res.content)
+                return dest
+        except Exception:  # noqa: BLE001 - the track goes without a cover, not without a file
+            pass
+        return None
+
+    async def mp3_for(source: str, source_id: str, title: str = "", artist: str = "", cover: str = "") -> Path:
         path, mime = await audio_file(source, source_id)
-        if mime.split(";", 1)[0].strip().lower() in ("audio/mpeg", "audio/mp3"):
-            return path
-        out = path.with_suffix(".mp3")
+        # «.cv»: converted with the cover inside (the older files without it are left to be pruned)
+        out = path.with_name(path.stem + ".cv.mp3")
         try:
             if out.stat().st_size > 0:
                 os.utime(out)
@@ -276,8 +298,14 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             except OSError:
                 pass
             tmp = out.with_name(f"{out.stem}.part-{uuid.uuid4().hex}.mp3")
-            cmd = [exe, "-y", "-v", "error", "-i", str(path), "-vn", "-map_metadata", "-1",
-                   "-c:a", "libmp3lame", "-b:a", "192k", "-id3v2_version", "3"]
+            cover_path = await _cover_file(cover, path.stem)
+            cmd = [exe, "-y", "-v", "error", "-i", str(path)]
+            if cover_path is not None:
+                cmd += ["-i", str(cover_path), "-map", "0:a", "-map", "1:v", "-c:v", "mjpeg", "-vf", "scale=500:500:force_original_aspect_ratio=decrease",
+                        "-metadata:s:v", "title=Album cover", "-metadata:s:v", "comment=Cover (front)", "-disposition:v", "attached_pic"]
+            else:
+                cmd += ["-vn"]
+            cmd += ["-map_metadata", "-1", "-c:a", "libmp3lame", "-b:a", "160k", "-compression_level", "9", "-id3v2_version", "3"]
             if title:
                 cmd += ["-metadata", f"title={title[:120]}"]
             if artist:
@@ -301,10 +329,10 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         return bool(re.fullmatch(r"[a-z_]{3,20}", source) and re.fullmatch(r"[A-Za-z0-9_.\-]{3,64}", source_id))
 
     @router.api_route("/inline/{source}/{source_id}.mp3", methods=["GET", "HEAD"])
-    async def inline_audio(request: Request, source: str, source_id: str, t: str = "", a: str = ""):
+    async def inline_audio(request: Request, source: str, source_id: str, t: str = "", a: str = "", c: str = ""):
         if not _inline_ids_ok(source, source_id):
             return Response(status_code=404)
-        path = await mp3_for(source, source_id, t, a)
+        path = await mp3_for(source, source_id, t, a, c)
         if request.method == "GET":
             metrics.count("inline_send")
         return FileResponse(path, media_type="audio/mpeg", headers={"cache-control": "public, max-age=86400"})
@@ -404,11 +432,11 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         return await asyncio.to_thread(admin_stats.summary)
 
     @router.get("/inline-warm/{source}/{source_id}")
-    async def inline_warm(source: str, source_id: str, t: str = "", a: str = "") -> dict:
+    async def inline_warm(source: str, source_id: str, t: str = "", a: str = "", c: str = "") -> dict:
         # called by the bot for the first results of a query, so that by the time one is picked it is ready
         if not _inline_ids_ok(source, source_id):
             return {"ok": False}
-        await mp3_for(source, source_id, t, a)
+        await mp3_for(source, source_id, t, a, c)
         return {"ok": True}
 
     @router.get("/health")
