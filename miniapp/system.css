@@ -623,3 +623,16 @@ body:not(.is-desktop).lyrics-open .ctrl-play { width: 58px; height: 58px; }
 body:not(.is-desktop).lyrics-open .player-foot .foot-btn { width: 40px; height: 40px; }
 body:not(.is-desktop).lyrics-open .screen-player { padding-bottom: calc(var(--sab) + 10px); }
 body:not(.is-desktop).lyrics-open .lyrics { bottom: -14px; padding-top: 20px; }
+
+/* найденные оригиналы вместо сохранённых ремейков: список «было → станет» с галочками */
+.sheet-note { margin: 2px 4px 10px; font-size: 14px; color: var(--text-2); }
+.originals-list { list-style: none; margin: 0 0 12px; padding: 0; overflow-y: auto; max-height: 52vh; }
+.originals-item { padding: 12px 6px; border-bottom: 1px solid var(--line); }
+.originals-item:last-child { border-bottom: 0; }
+.originals-item label { display: flex; gap: 12px; width: 100%; align-items: flex-start; cursor: pointer; }
+.originals-item input { flex: none; width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--c-warm); }
+.originals-text { flex: 1; min-width: 0; display: block; }
+.originals-text b { display: block; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.originals-text i { display: block; font-style: normal; font-size: 14px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.originals-text i.was { text-decoration: line-through; opacity: 0.7; }
+.originals-go { width: 100%; margin-bottom: 8px; }

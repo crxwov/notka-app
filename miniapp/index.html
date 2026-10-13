@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=141" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=83" />
+<link rel="stylesheet" href="system.css?v=84" />
 <link rel="stylesheet" href="plus.css?v=9" />
 <script src="telegram-web-app.js?v=1"></script>
 </head>
@@ -275,6 +275,15 @@
       <span class="row-meta">
         <span class="row-title">Любимые треки</span>
         <span class="row-sub" id="library-fav-count">0 треков</span>
+      </span>
+      <svg class="row-chevron" width="20" height="20" aria-hidden="true"><use href="#i-chevron"/></svg>
+    </button>
+
+    <button class="import-card" id="originals-card" type="button" hidden>
+      <span class="import-card-ic" aria-hidden="true"><svg width="24" height="24"><use href="#i-heart-fill"/></svg></span>
+      <span class="row-meta">
+        <span class="row-title" id="originals-card-title">Нашли оригиналы</span>
+        <span class="row-sub">Вместо них сохранились ремейки. Проверьте и замените</span>
       </span>
       <svg class="row-chevron" width="20" height="20" aria-hidden="true"><use href="#i-chevron"/></svg>
     </button>
@@ -1110,6 +1119,17 @@
     </div>
   </div>
 
+  <div id="originals-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="originals-title">
+    <div class="sheet sheet-tall">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <p class="sheet-title" id="originals-title">Заменить на оригиналы</p>
+      <p class="sheet-note">Снимите галочку у тех, что менять не нужно.</p>
+      <ul class="originals-list" id="originals-list"></ul>
+      <button class="pill-btn pill-primary originals-go" id="originals-apply" type="button">Заменить выбранные</button>
+      <button class="sheet-row sheet-cancel" id="originals-skip" type="button">Не менять</button>
+    </div>
+  </div>
+
   <div id="playlist-menu-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="menu-playlist-title">
     <div class="sheet">
       <span class="sheet-handle" aria-hidden="true"></span>
@@ -1319,6 +1339,6 @@
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
 <script src="mix.js?v=1"></script>
-<script src="app.js?v=165"></script>
+<script src="app.js?v=167"></script>
 </body>
 </html>

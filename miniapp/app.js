@@ -2978,8 +2978,143 @@
   // ============================================================
   // LIBRARY («Моё»)
   // ============================================================
+  // ============================================================
+  // ORIGINALS. While the search hid the labels' releases, fan remakes got saved in their place; they
+  // keep their old id. The server finds the real song under strict rules, the listener confirms.
+  // ============================================================
+  const ORIG_CHECKED_KEY = "notka_orig_checked";
+  const ORIG_PROPOSALS_KEY = "notka_orig_props";
+  const ORIG_SCAN_KEY = "notka_orig_scan";
+  const lsGet = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? fallback : v; } catch (e) { return fallback; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* a nicety */ } };
+  let originalsProposals = lsGet(ORIG_PROPOSALS_KEY, {}); // old id -> { old, neu }
+  let originalsScanning = false;
+
+  function savedTracksForScan() {
+    const seen = new Map();
+    const add = (t) => { if (t && t.id && t.source === "youtube_music" && t.sourceId && !seen.has(t.id)) seen.set(t.id, t); };
+    (state.favorites || []).forEach(add);
+    (state.playlists || []).forEach((p) => Object.values(p.tracksCache || {}).forEach(add));
+    return [...seen.values()];
+  }
+  async function scanOriginals() {
+    if (originalsScanning) return;
+    const last = lsGet(ORIG_SCAN_KEY, 0);
+    if (Date.now() - last < 6 * 3600 * 1000) return;
+    originalsScanning = true;
+    try {
+      const checked = new Set(lsGet(ORIG_CHECKED_KEY, []));
+      const todo = savedTracksForScan().filter((t) => !checked.has(t.id)).slice(0, 120);
+      for (let i = 0; i < todo.length; i += 12) {
+        const batch = todo.slice(i, i + 12);
+        let data = null;
+        try {
+          const res = await fetch(`${API_BASE_URL}/originals`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ tracks: batch.map((t) => ({ id: t.id, source: t.source, sourceId: t.sourceId, title: t.title, artist: t.artist, artistId: t.artistId || null, duration: t.duration || null })) }),
+          });
+          if (!res.ok) break;
+          data = await res.json();
+        } catch (e) { break; }
+        const found = (data && data.replacements) || {};
+        batch.forEach((t) => {
+          checked.add(t.id);
+          if (found[t.id] && found[t.id].id && found[t.id].id !== t.id) originalsProposals[t.id] = { old: t, neu: found[t.id] };
+        });
+        lsSet(ORIG_CHECKED_KEY, [...checked].slice(-3000));
+        lsSet(ORIG_PROPOSALS_KEY, originalsProposals);
+        renderOriginalsCard();
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      lsSet(ORIG_SCAN_KEY, Date.now());
+    } finally { originalsScanning = false; }
+  }
+  function renderOriginalsCard() {
+    const card = $("originals-card");
+    if (!card) return;
+    const n = Object.keys(originalsProposals).length;
+    card.hidden = n === 0;
+    if (n) $("originals-card-title").textContent = `Нашли оригиналы для ${n} ${plural(n, "трека", "треков", "треков")}`;
+  }
+  function openOriginalsSheet() {
+    const list = $("originals-list");
+    list.innerHTML = "";
+    Object.entries(originalsProposals).forEach(([oldId, p]) => {
+      const li = document.createElement("li");
+      li.className = "originals-item";
+      const label = document.createElement("label");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = true;
+      box.dataset.oldId = oldId;
+      const text = document.createElement("span");
+      text.className = "originals-text";
+      const now = document.createElement("b");
+      now.textContent = `${p.neu.artist || ""} — ${p.neu.title || ""}`;
+      const was = document.createElement("i");
+      was.className = "was";
+      was.textContent = `Сейчас: ${p.old.artist || ""} — ${p.old.title || ""}`;
+      text.appendChild(now);
+      text.appendChild(was);
+      label.appendChild(box);
+      label.appendChild(text);
+      li.appendChild(label);
+      list.appendChild(li);
+    });
+    openOverlay("originals-sheet");
+  }
+  function applyOriginals(ids) {
+    let done = 0;
+    ids.forEach((oldId) => {
+      const p = originalsProposals[oldId];
+      if (!p) return;
+      const neu = p.neu;
+      const swapList = (arr) => {
+        const i = arr.findIndex((t) => t && t.id === oldId);
+        if (i < 0) return false;
+        if (arr.some((t) => t && t.id === neu.id)) arr.splice(i, 1); else arr[i] = neu;
+        return true;
+      };
+      let touched = swapList(state.favorites || []);
+      if (state.recent) touched = swapList(state.recent) || touched;
+      (state.playlists || []).forEach((pl) => {
+        const idx = (pl.trackIds || []).indexOf(oldId);
+        if (idx < 0) return;
+        if (pl.trackIds.includes(neu.id)) pl.trackIds.splice(idx, 1); else pl.trackIds[idx] = neu.id;
+        pl.tracksCache = pl.tracksCache || {};
+        delete pl.tracksCache[oldId];
+        pl.tracksCache[neu.id] = neu;
+        touched = true;
+      });
+      if (touched) done++;
+    });
+    return done;
+  }
+  $("originals-card").addEventListener("click", openOriginalsSheet);
+  $("originals-skip").addEventListener("click", () => {
+    originalsProposals = {};
+    lsSet(ORIG_PROPOSALS_KEY, {});
+    renderOriginalsCard();
+    closeOverlay("originals-sheet");
+  });
+  $("originals-apply").addEventListener("click", () => {
+    const ids = [...document.querySelectorAll("#originals-list input:checked")].map((b) => b.dataset.oldId);
+    const done = applyOriginals(ids);
+    originalsProposals = {};
+    lsSet(ORIG_PROPOSALS_KEY, {});
+    if (done) persist();
+    closeOverlay("originals-sheet");
+    renderOriginalsCard();
+    renderLibrary();
+    haptic("select");
+    showToast(done ? `Заменили: ${done}` : "Ничего не поменяли");
+  });
+
   function renderLibrary() {
     if (isDesktop()) renderSidebar();
+    renderOriginalsCard();
+    setTimeout(scanOriginals, 1500);
     $("library-fav-count").textContent = pluralTracks(state.favorites.length);
     const grid = $("playlists-grid");
     grid.innerHTML = "";
