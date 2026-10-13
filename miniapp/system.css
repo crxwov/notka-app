@@ -659,3 +659,5 @@ body.player-pulling #bottom-nav, body.player-pulling #mini-player { z-index: 6; 
 /* телефон: аватарка справа сверху крупнее (была 36 px) */
 body:not(.is-desktop) #screen-home .avatar-btn { width: 60px; height: 60px; margin: -4px -4px -4px 0; }
 body:not(.is-desktop) #screen-home .avatar-btn .avatar { width: 54px; height: 54px; font-size: 23px; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.26), 0 8px 20px -8px rgba(0, 0, 0, 0.5); }
+/* пока плеер уходит, свет успевает занять позу страницы под ним (иначе его 1,1-секундное движение видно уже после ухода плеера) */
+body.player-pulling .light-group { transition-duration: 0.3s, 0.3s; }

@@ -6097,6 +6097,7 @@
     setPlaying(false);
     setLoading(true);
     isStarting = true;
+    if (!opts.startAt) resumeAt = 0;
     setMiniPlayerFor(track);
     setFullPlayerFor(track);
     setMediaSession(track);
@@ -6105,6 +6106,7 @@
     lightForTrack(track);
     loadLyrics();
     resetProgress(track);
+    saveResume(true, opts.startAt || 0);
     extendMixIfNeeded();
     haptic("light");
 
@@ -6209,9 +6211,61 @@
     return [current, ...shuffled(rest)];
   }
 
+  // ---- the small player survives leaving the app: the track, its place in the queue and the second it
+  // stopped at are kept on the device; on the next start the small player holds the same track, paused,
+  // and ▶ goes on from that second ----
+  const RESUME_KEY = "notka_resume_v1";
+  let resumeAt = 0; // the second a restored (not yet started) track goes on from
+  let lastResumeSave = 0;
+  function saveResume(force, posOverride) {
+    if (!currentTrack || !currentTrack.id) return;
+    if (isStarting && posOverride == null) return; // between two tracks the audio still holds the old one
+    const now = Date.now();
+    if (!force && now - lastResumeSave < 4000) return;
+    lastResumeSave = now;
+    const started = !!audio.getAttribute("src");
+    const pos = posOverride != null ? posOverride : (started ? audio.currentTime || 0 : resumeAt);
+    const idx = Math.max(0, currentQueueIndex);
+    const from = Math.max(0, idx - 3), to = Math.min(currentQueue.length, idx + 40);
+    const slice = currentQueue.slice(from, to);
+    try {
+      localStorage.setItem(RESUME_KEY, JSON.stringify({ track: currentTrack, pos: Math.floor(pos), queue: slice.length ? slice : [currentTrack], index: slice.length ? idx - from : 0, ctx: currentContextLabel, at: now }));
+    } catch (e) { /* a nicety: the storage may be full */ }
+  }
+  function restoreResume() {
+    if (currentTrack) return;
+    let r = null;
+    try { r = JSON.parse(localStorage.getItem(RESUME_KEY)); } catch (e) { r = null; }
+    if (!r || !r.track || !r.track.id || !r.track.source || Date.now() - (r.at || 0) > 30 * 86400 * 1000) return;
+    currentTrack = r.track;
+    currentTrackId = r.track.id;
+    currentQueue = Array.isArray(r.queue) && r.queue.length ? r.queue.filter((t) => t && t.id) : [r.track];
+    if (!currentQueue.length) currentQueue = [r.track];
+    originalQueue = currentQueue.slice();
+    currentQueueIndex = currentQueue.findIndex((t) => t.id === r.track.id);
+    if (currentQueueIndex < 0) { currentQueue.unshift(r.track); originalQueue = currentQueue.slice(); currentQueueIndex = 0; }
+    if (r.ctx) { currentContextLabel = r.ctx; $("player-context").textContent = r.ctx === "Поиск" ? "Из поиска" : r.ctx; }
+    resumeAt = Math.max(0, +r.pos || 0);
+    setMiniPlayerFor(currentTrack);
+    setFullPlayerFor(currentTrack);
+    lightForTrack(currentTrack);
+    const dur = +currentTrack.duration || 0;
+    if (dur) {
+      renderProgress(Math.min(100, (resumeAt / dur) * 100), resumeAt);
+      $("player-time-total").textContent = formatDuration(dur);
+    }
+    updateDock();
+  }
+  window.addEventListener("pagehide", () => saveResume(true));
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveResume(true); });
+
   function togglePlayPause() {
     if (!audio.getAttribute("src")) {
-      if (currentTrack && !isLoading) playTrack(currentTrack, currentQueue, { keepQueue: true });
+      if (currentTrack && !isLoading) {
+        const startAt = resumeAt;
+        resumeAt = 0;
+        playTrack(currentTrack, currentQueue, { keepQueue: true, startAt });
+      }
       return;
     }
     haptic("light");
@@ -6255,7 +6309,7 @@
   }
 
   audio.addEventListener("play", () => setPlaying(true));
-  audio.addEventListener("pause", () => setPlaying(false));
+  audio.addEventListener("pause", () => { setPlaying(false); saveResume(true); });
   audio.addEventListener("waiting", () => { if (!audio.paused) setLoading(true); });
   audio.addEventListener("playing", () => setLoading(false));
 
@@ -7402,6 +7456,7 @@
   $("mp-fav-btn").addEventListener("click", () => $("player-fav-btn").click());
 
   audio.addEventListener("timeupdate", () => {
+    saveResume(false);
     recordListening();
     syncLyrics();
     const dur = effectiveDuration();
@@ -7602,6 +7657,7 @@
       setTimeout(() => {
         splash.classList.remove("is-leaving");
         Store.markOnboardingSeen();
+        restoreResume();
         showScreen("home", { replace: true });
         openDeepLink();
       }, 450);
