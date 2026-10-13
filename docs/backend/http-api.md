@@ -1,10 +1,10 @@
-# Справочник HTTP API (`music_resolver/api/routes.py`)
+# Справочник HTTP API (`music_resolver/api/routes/`)
 
 [← Модели данных и ошибки](models-and-errors.md) · [К оглавлению](../README.md) · [Далее: Аудио-стриминг и кэш →](audio-streaming.md)
 
 ---
 
-Все 20 HTTP-маршрутов приложения объявлены в `music_resolver/api/routes.py`.
+Все 20 HTTP-маршрутов приложения организованы в модульном пакете `music_resolver/api/routes/` (< 220 строк на модуль).
 
 ## 1. Поиск и каталог
 

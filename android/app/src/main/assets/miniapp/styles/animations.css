@@ -1,0 +1,149 @@
+/* ==========================================================
+   REDUCED MOTION
+   ========================================================== */
+/* Windows with "animation effects" off reports reduce: screens and sheets
+   stop sliding, but the light keeps flowing — it is the product's
+   identity, and loaders must always show that something is happening. */
+@media (prefers-reduced-motion: reduce) {
+  .screen-anim, .screen-player.screen-anim, .mini-player { animation-duration: 0.01ms !important; }
+  .sheet, .modal, .toast, .pill-btn, .round-btn, .icon-btn { transition-duration: 0.12s !important; }
+}
+
+/* lighter glass where blur is unsupported */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass, .round-glass, .field { background: rgba(38, 32, 50, 0.92); }
+}
+
+.sheet::-webkit-scrollbar { display: none; }
+@media (max-height: 720px) {
+  .sheet-row { min-height: 48px; }
+  .sheet-head { padding-bottom: 10px; }
+}
+
+/* ==========================================================
+   МАШИНА ВРЕМЕНИ + ДРУГ НОТКИ
+   ========================================================== */
+.shelf-card.is-locked .cover img { filter: blur(7px) saturate(0.8); transform: scale(1.12); }
+.shelf-card.is-locked .cover::after { content: "Плюс"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); height: 24px; padding: 0 12px; display: flex; align-items: center; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: #14110f; font-size: 12.5px; font-weight: 700; z-index: 3; }
+.time-list { margin: 8px 0 4px; max-height: 38vh; overflow-y: auto; scrollbar-width: none; }
+.time-list::-webkit-scrollbar { display: none; }
+#time-sheet .pill-btn { margin: 4px 0 6px; }
+
+.friend-badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 13px 0 10px; margin-top: 10px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: 0.01em; position: relative; overflow: hidden; }
+.friend-badge svg { color: currentColor; }
+.friend-badge[data-tier="new"] { color: #ffd9a0; background: rgba(255, 217, 160, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 217, 160, 0.4); }
+.friend-badge[data-tier="gold"] { color: #2a1a06; background: linear-gradient(120deg, #ffe7a8, #f2b950); box-shadow: 0 6px 18px -8px rgba(242, 185, 80, 0.7); }
+.friend-badge[data-tier="veteran"] { color: #2a1a06; background: linear-gradient(120deg, #fff1c4, #f5c451 55%, #ffb36b); box-shadow: 0 8px 24px -8px rgba(245, 196, 81, 0.85); }
+.friend-badge[data-tier="veteran"]::after { content: ""; position: absolute; top: 0; bottom: 0; width: 34%; left: -40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7), transparent); animation: friend-shine 3.8s ease-in-out infinite; }
+@keyframes friend-shine { 0%, 55% { left: -40%; } 100% { left: 130%; } }
+
+/* невидимые витрины Плюса не крутят анимации впустую */
+.pd-swap .v:not(.is-on) .md-orb, .pd-swap .v:not(.is-on) .sp { animation-play-state: paused; }
+
+/* слабые телефоны: режим включается сам (см. perfGuard в app.js). Тот же вид, но без дорогого размытия фона и без анимации цвета света */
+.perf-lite .glass, .perf-lite .round-glass, .perf-lite .field, .perf-lite .search-head, .perf-lite .sheet, .perf-lite .modal, .perf-lite .gn-body, .perf-lite .playlist-card .cover .fav-badge { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.perf-lite .glass, .perf-lite .round-glass, .perf-lite .field { background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05)), rgba(58, 42, 92, 0.78); }
+.perf-lite .search-head { background: rgba(14, 11, 22, 0.94); }
+.perf-lite .sheet, .perf-lite .modal { background-color: rgba(23, 19, 31, 0.98); }
+.perf-lite .plus-bar { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(22, 18, 30, 0.98); }
+.perf-lite .light-group { animation-name: none; will-change: auto; }
+.perf-lite .md-orb { animation: none; }
+
+/* профиль: чуть богаче, все цвета из палитры темы */
+.hero-profile .avatar-lg { background: linear-gradient(150deg, var(--c-warm), var(--c-mid) 58%, var(--c-deep)); box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16), 0 0 0 10px rgba(255, 255, 255, 0.06), 0 28px 56px -14px color-mix(in srgb, var(--c-mid) 80%, transparent); }
+.pf-stats { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; margin: 4px 0 14px; padding: 18px 6px; border-radius: 24px; text-align: center; background: linear-gradient(135deg, color-mix(in srgb, var(--c-warm) 18%, transparent), color-mix(in srgb, var(--c-deep) 22%, transparent)), var(--surface-1); box-shadow: inset 0 0 0 1px var(--line), inset 0 1px 0 rgba(255, 255, 255, 0.14); transition: transform 0.25s var(--ease-out); }
+.pf-stats:active { transform: scale(0.98); }
+.pf-stat { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0 4px; }
+.pf-stat + .pf-stat { box-shadow: inset 1px 0 0 var(--line); }
+.pf-stat b { font-size: 28px; line-height: 1; font-weight: 800; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+.pf-stat i { font-style: normal; font-size: 12.5px; color: var(--text-2); }
+.pf-empty { display: none; grid-column: 1 / -1; padding: 4px 18px; font-size: 15px; line-height: 1.4; color: var(--text-2); }
+.pf-stats.is-empty { grid-template-columns: 1fr; }
+.pf-stats.is-empty .pf-stat { display: none; }
+.pf-stats.is-empty .pf-empty { display: block; }
+.pf-group .group-row { min-height: 64px; }
+.pf-group .group-row:nth-child(2) .pf-group .group-row:nth-child(3) .pf-group .group-row:nth-child(4) .pf-group .group-row:nth-child(5) .pf-group .group-sub { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.pf-actions .pill-btn { height: 48px; padding: 0 12px; font-size: 14.5px; gap: 8px; }
+.pf-actions .pill-btn svg { flex: none; }
+.modal-text { padding: 0 10px 14px; font-size: 15px; line-height: 1.45; color: var(--text-2); }
+
+/* аккаунт */
+.hero-profile .hero-sub:empty { display: none; }
+.modal-area { height: auto; min-height: 112px; padding: 12px 16px; line-height: 1.35; font-size: 14px; resize: none; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; word-break: break-all; }
+#screen-account .group-row .group-sub { white-space: normal; line-height: 1.35; }
+#screen-account .group-value { max-width: 55%; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.perf-lite .pv *, .perf-lite .pv { animation: none !important; }
+.pattern-thumb[data-bg="prism"] .pv .orb-rim, .pattern-thumb[data-bg="prism"] .pv .orb-rim-b, .pattern-thumb[data-bg="aurora"] .pv .orb-rim, .pattern-thumb[data-bg="aurora"] .pv .orb-rim-b, .pattern-thumb[data-bg="horizon"] .pv .orb-rim, .pattern-thumb[data-bg="horizon"] .pv .orb-rim-b { opacity: 0 !important; }
+
+/* ЗВУК И ЗАГРУЗКИ: one clear thing, the crossfade, drawn as what it does */
+#screen-sound .bar-title { opacity: 0; }
+.snd-sec { margin-top: 30px; }
+.xf { padding: 22px 20px 16px; border-radius: 30px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); }
+.xf-value { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.xf-value b { font-size: 60px; line-height: 1; font-weight: 800; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; }
+.xf-value span { font-size: 22px; font-weight: 700; color: var(--text-2); }
+.xf-fig { width: 100%; height: 84px; margin: 6px 0 14px; overflow: visible; }
+.xf-fig path { mix-blend-mode: screen; }
+.xf-range { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 30px; background: transparent; margin: 0; --p: 0%; }
+.xf-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--text) var(--p), rgba(255, 255, 255, 0.16) var(--p)); }
+.xf-range::-moz-range-track { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); }
+.xf-range::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--text); }
+.xf-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; margin-top: -11px; border-radius: 50%; background: var(--btn-light); box-shadow: 0 6px 16px -4px rgba(4, 2, 10, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.5); }
+.xf-range::-moz-range-thumb { width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--text); box-shadow: 0 6px 16px -4px rgba(4, 2, 10, 0.7); }
+.xf-ends { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--text-3); margin-top: 2px; }
+.snd-note { font-size: 15px; line-height: 1.4; color: var(--text-2); margin: 12px 4px 0; text-wrap: pretty; }
+.snd-how .group-sub { margin-top: 4px; }
+.about-hero .hero-title { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; }
+
+/* мостик к рекламе: цвета баннера (сиренево-розовый, персик, ярко-розовый) мягким светом поверх прежнего фона.
+   Только фоновые градиенты, без blur и backdrop: ничего лишнего слабым телефонам. */
+.screen-splash::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0;
+  background:
+    radial-gradient(62% 36% at 20% 28%, rgba(234, 115, 250, 0.30), transparent 70%),
+    radial-gradient(56% 34% at 84% 72%, rgba(254, 26, 124, 0.26), transparent 70%),
+    radial-gradient(50% 30% at 52% 50%, rgba(250, 156, 143, 0.22), transparent 72%);
+  animation: bridge-in 1.4s var(--ease-out) 0.5s forwards;
+}
+.screen-splash.is-leaving::before { animation: bridge-out 0.5s var(--ease-out) forwards; }
+.splash-center { position: relative; z-index: 1; }
+@keyframes bridge-in { to { opacity: 1; } }
+@keyframes bridge-out { from { opacity: 1; } to { opacity: 0; } }
+
+.plus-hero { position: relative; isolation: isolate; }
+.plus-hero::before {
+  content: ""; position: absolute; left: -20px; right: -20px; top: -70px; height: 300px; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(58% 60% at 18% 40%, rgba(234, 115, 250, 0.26), transparent 70%),
+    radial-gradient(52% 56% at 86% 55%, rgba(254, 26, 124, 0.22), transparent 70%),
+    radial-gradient(46% 50% at 52% 70%, rgba(250, 156, 143, 0.18), transparent 72%);
+  -webkit-mask-image: linear-gradient(#000 45%, transparent);
+  mask-image: linear-gradient(#000 45%, transparent);
+}
+.modal-actions-stack .modal-actions-row .pill-btn { flex: 1; width: auto; }
+
+/* cards of the light-pattern picker that are not on the screen stand still (see watchPatternCards) */
+.pattern-opt.is-off .pattern-thumb, .pattern-opt.is-off .pattern-thumb * { animation-play-state: paused !important; }
+
+/* «Недавнее» в поиске: что искали и что открывали (как в Spotify) */
+.search-history { width: 100%; margin-top: 4px; text-align: left; }
+.search-history-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 6px; }
+.search-history-clear { font-size: 14px; font-weight: 600; color: var(--text-2); padding: 6px 4px; }
+#search-state-empty.has-history { padding-top: 8px; }
+#search-state-empty.has-history > .state-orb, #search-state-empty.has-history > .state-title, #search-state-empty.has-history > .state-sub { display: none; }
+.cover-query { display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.08); color: var(--text-2); }
+
+/* одно окно при первом запуске: что запоминает Нотка */
+.data-notice { position: fixed; z-index: 60; left: 12px; right: 12px; bottom: calc(var(--dock, 0px) + var(--sab, 0px) + 12px); max-width: 460px; margin: 0 auto; padding: 14px 16px 14px; border-radius: 22px; background: rgba(22, 18, 30, 0.97); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 18px 40px -14px rgba(4, 2, 10, 0.9); animation: bar-in 0.5s var(--ease-out) both; }
+.data-notice[hidden] { display: none; }
+.data-notice p { font-size: 14px; line-height: 1.4; color: var(--text-2); margin: 0 0 10px; }
+.data-notice .pill-btn { width: 100%; }
+
+/* «Минимализм»: все кнопки и плашки в одном нейтральном цвете; свет трека на них не влияет */
+html.minimal {
+  --c-core: #EDEDED !important;
+  --c-warm: #A6A6A6 !important;
+  --c-mid: #787878 !important;
+  --c-deep: #2C2C2C !important;
+}

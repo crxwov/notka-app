@@ -1,0 +1,344 @@
+/* ЕДИНАЯ СИСТЕМА. Загружается последней и приводит все экраны к одним правилам:
+   одна шкала заголовков, одни скругления, одни отступы между разделами.
+   Новые экраны берут значения отсюда, а не придумывают свои. */
+:root {
+  --t-title: 40px;   /* большой заголовок экрана */
+  --t-hero: 28px;    /* имя в центре (профиль, плейлист, альбом, о Нотке) */
+  --t-h2: 22px;      /* заголовок раздела внутри экрана */
+  --gap-sec: 32px;   /* между разделами */
+  --gap-head: 14px;  /* от заголовка раздела до его содержимого */
+  /* скругления: --radius-s 10 (мелкие обложки), --radius-m 16 (полки, сетка), --radius-l 24 (карточки, большие обложки) */
+}
+
+/* большие заголовки экранов */
+.display, .look-title, .mood-title, .plus-title, .event-title {
+  font-size: var(--t-title); line-height: 1; font-weight: 800; letter-spacing: -0.04em;
+}
+.display.page-title { margin: 12px 0 18px; }
+
+/* имя в центре */
+.hero-title, .about-hero .hero-title { font-size: var(--t-hero); line-height: 1.12; font-weight: 800; letter-spacing: -0.03em; }
+.pw-name { font-size: var(--t-hero); font-weight: 800; letter-spacing: -0.03em; }
+
+/* заголовки разделов */
+.h2, .look-h, .mood-h, .event-h, .group-caption, .results-section .h2, .block-title {
+  font-size: var(--t-h2); line-height: 1.15; font-weight: 800; letter-spacing: -0.03em; color: var(--text);
+}
+.block-head { margin-bottom: var(--gap-head); }
+.block-title, .look-h, .event-h, .mood-h { margin-bottom: var(--gap-head); }
+.mood-h { margin-top: var(--gap-sec); }
+.event-h { margin-top: var(--gap-sec); }
+.group-caption { margin: var(--gap-sec) 2px var(--gap-head); display: flex; align-items: center; gap: 8px; }
+.results-section .h2 { margin: 22px 0 8px; }
+
+/* разделы друг под другом */
+.block { margin-bottom: var(--gap-sec); }
+.look-sec, .snd-sec { margin-top: var(--gap-sec); }
+
+/* карточки и группы: одно скругление */
+.group, .plus-card, .import-card, .xf, .event-banner { border-radius: var(--radius-l); }
+.cover-sm, .cover-md { border-radius: var(--radius-s); }
+.playlist-card .cover { border-radius: var(--radius-m); }
+.cover-lg { border-radius: var(--radius-l); }
+
+/* подпись под большим заголовком */
+.look-note, .mood-lede { font-size: 16px; line-height: 1.4; color: var(--text-2); margin: 10px 2px 0; max-width: 30em; text-wrap: pretty; }
+
+/* заголовок экрана сразу под кнопкой «назад»; заголовок «Статистика», «Добавить треки», «Редактировать» — такие же, как у «Оформления» */
+.screen > .look-title + .chips, .screen > .look-title + .field, .screen > .look-title + p { margin-top: 18px; }
+.atmo-opt-row .chip { height: 38px; font-size: 15px; padding: 0 16px; }
+
+/* круглое остаётся круглым (исполнители, аватары), даже если размер задаёт скругление */
+.cover-round, .cover-lg.cover-round, .cover-sm.cover-round, .cover-md.cover-round { border-radius: 50%; }
+
+/* Аккаунт: фото и имя в одну строку слева, под большим заголовком (а не по центру поверх него) */
+#screen-account .hero-profile { display: grid; grid-template-columns: auto 1fr; column-gap: 18px; align-items: center; justify-items: start; text-align: left; padding: 6px 0 0; margin: 18px 0 var(--gap-sec); }
+#screen-account .hero-profile .cover-edit-wrap { grid-row: 1 / span 2; }
+#screen-account .hero-profile .avatar-lg { width: 84px; height: 84px; font-size: 34px; margin: 0; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16), 0 18px 36px -12px color-mix(in srgb, var(--c-mid) 80%, transparent); }
+#screen-account .hero-profile .cover-edit { width: 34px; height: 34px; bottom: -2px; right: -6px; }
+#screen-account .hero-profile .hero-name-btn { grid-column: 2; align-self: end; display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-hero); font-weight: 800; letter-spacing: -0.03em; min-height: 0; padding: 0; }
+#screen-account .hero-profile .hero-sub { grid-column: 2; align-self: start; margin-top: 2px; }
+#screen-account .hero-profile:has(.hero-sub:empty) .hero-name-btn { grid-row: 1 / span 2; align-self: center; }
+
+/* Плюс: над плашкой с ценой контент плавно гаснет, а не упирается в её край */
+.plus-bar::before { content: ""; position: absolute; left: -4px; right: -4px; top: -40px; height: 40px; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.85)); }
+
+/* Страница Плюса: подборка обложек сверху, метка, «Твой план» (по мотивам страницы подписки в музыкальных сервисах) */
+.plus-brand { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.plus-brand-orb { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--c-core), var(--c-warm) 45%, var(--c-mid) 80%); box-shadow: 0 0 14px color-mix(in srgb, var(--c-warm) 60%, transparent); }
+.plus-plan-sec { margin: var(--gap-sec) 0 22px; }
+.plus-plan-h { margin-bottom: var(--gap-head); }
+.plan-buy[hidden] { display: none; }
+.plus-bar.is-covered { display: none; }
+
+/* шапка Плюса: полотно из горизонтальных мини-плееров с настоящими обложками, ровная сетка в перспективе, будто лежат на столе */
+#screen-plus { isolation: isolate; }
+.plus-hero { padding-top: 188px; }
+.plus-showcase {
+  position: absolute; left: 0; right: 0; top: 0; height: 330px; overflow: hidden; pointer-events: none; z-index: -1;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 22%, #000 46%, transparent 80%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 22%, #000 46%, transparent 80%);
+}
+.ps-deck {
+  position: absolute; left: 50%; top: 4px; width: 780px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+  transform: translateX(-50%) perspective(640px) rotateX(58deg) rotateZ(-9deg);
+  transform-origin: 50% 0;
+  opacity: 0.7;
+}
+.ps-tile {
+  position: relative; display: flex; align-items: center; gap: 12px; height: 72px; padding: 9px 12px 14px 9px; border-radius: 18px;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.26) 0, rgba(255, 255, 255, 0.06) 38%, rgba(255, 255, 255, 0.02) 62%, rgba(255, 255, 255, 0.12) 100%),
+    linear-gradient(160deg, color-mix(in srgb, var(--c-mid) 30%, rgba(60, 40, 80, 0.72)), color-mix(in srgb, var(--c-deep) 40%, rgba(24, 16, 34, 0.78)));
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 -10px 18px -10px rgba(255, 255, 255, 0.12), 0 18px 28px -14px rgba(0, 0, 0, 0.75);
+}
+.ps-tile:nth-child(n+19) { display: none; }
+.ps-cover { display: block; width: 52px; height: 52px; flex-shrink: 0; border-radius: 12px; background: var(--surface-2) center / cover; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.ps-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.ps-meta b { font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-meta em { font-style: normal; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-play { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
+.ps-play svg { width: 16px; height: 16px; }
+.ps-bar { position: absolute; left: 73px; right: 12px; bottom: 8px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.ps-bar u { display: block; height: 100%; border-radius: 3px; background: var(--c-warm); }
+
+/* план: выбор срока и сама карточка */
+.plan-card { position: relative; padding: 22px 16px 18px; border-radius: var(--radius-l); background: radial-gradient(120% 70% at 12% 0%, color-mix(in srgb, var(--c-mid) 34%, transparent), transparent 70%), linear-gradient(180deg, #221a2f, #151019); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 30px 60px -28px color-mix(in srgb, var(--c-mid) 80%, #000); }
+.plan-name { display: flex; align-items: center; gap: 10px; padding: 0 4px 16px; font-size: 24px; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; color: var(--c-warm); }
+.plan-opts { display: flex; flex-direction: column; gap: 10px; }
+.plan-opt { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 14px 14px 16px; border-radius: var(--radius-m); text-align: left; background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); transition: box-shadow 0.3s var(--ease-out), background-color 0.3s var(--ease-out), transform 0.25s var(--ease-out); }
+.plan-opt:active { transform: scale(0.985); }
+.plan-opt.is-on { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 0 2px var(--c-warm); }
+.po-radio { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3); transition: box-shadow 0.3s var(--ease-out), background-color 0.3s; }
+.plan-opt.is-on .po-radio { background: radial-gradient(circle, #fff 0 30%, var(--c-warm) 34%); box-shadow: 0 0 14px color-mix(in srgb, var(--c-warm) 55%, transparent); }
+.po-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.po-main b { font-size: 18px; font-weight: 700; letter-spacing: -0.015em; }
+.po-main i { font-style: normal; font-size: 14px; color: var(--text-2); }
+.po-price { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.po-price b { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.po-price s { font-size: 13px; color: var(--text-3); }
+.po-badge { position: absolute; top: -9px; right: 14px; padding: 2px 9px; border-radius: 999px; font-style: normal; font-size: 12.5px; font-weight: 800; color: #1a1020; background: var(--c-warm); }
+.plan-list { margin: 18px 0 0; padding: 18px 4px 0 24px; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 15.5px; line-height: 1.4; color: var(--text-2); }
+.plan-list li { margin-bottom: 8px; padding-left: 2px; }
+.plan-state { margin-top: 6px; padding: 0 4px; font-size: 16px; font-weight: 600; }
+.plan-buy { margin-top: 16px; height: 54px; font-size: 17px; }
+.plus-bar.is-skipped { display: none; }
+
+/* метка Плюса: тот же круг с плюсом, что на карточке «Нотка Плюс» в профиле */
+.plus-brand-mark { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--btn-light); color: var(--bg); }
+.plan-name .plus-brand-mark { width: 30px; height: 30px; }
+
+/* Оформление, выбор плеера: ровно по левому краю, как ряд атмосфер */
+#screen-look .look-stage { gap: 12px; padding: 6px 20px 10px; scroll-padding-inline: 20px; scroll-snap-type: x mandatory; }
+#screen-look .look-slide { width: 196px; align-items: flex-start; text-align: left; scroll-snap-align: start; gap: 9px; padding: 0; }
+#screen-look .look-obj { width: 196px; height: 196px; justify-content: flex-start; }
+#screen-look .look-std { width: 196px; height: 196px; border-radius: var(--radius-l); }
+#screen-look .look-slide .show-disc { width: 196px; }
+#screen-look .look-slide .cassette { max-width: 196px; }
+#screen-look .look-slide-name { padding: 0 2px; font-size: 15px; }
+
+/* О Нотке: коротко, кто мы и что делаем */
+.about-text { margin: 18px 2px 0; font-size: 16px; line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
+.about-lead + .about-text { margin-top: 18px; }
+.about-lead { margin-bottom: 0; }
+.about-text + .about-note, .about-text ~ .about-note { margin-top: 28px; }
+
+/* Итоги: плоские карточки, крупный шрифт, цвета темы */
+.stats-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.stats-head .look-title { margin-bottom: 0; }
+.stats-head + .chips { margin-top: 18px; }
+.stats-recap-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 38px; padding: 0 12px 0 16px; margin-bottom: 4px; border-radius: 999px; font-size: 15px; font-weight: 700; color: var(--text); background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); transition: transform 0.25s var(--ease-out); }
+.stats-recap-btn:active { transform: scale(0.95); }
+.stats-recap-btn svg { opacity: 0.8; }
+.rcp-deck { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 18px -20px 0; padding: 4px 20px 6px; scroll-snap-type: x mandatory; scroll-padding-inline: 20px; }
+.rcp-deck::-webkit-scrollbar { display: none; }
+.rcp-card { --soft: rgba(255, 255, 255, 0.74); position: relative; flex: 0 0 min(78vw, 320px); aspect-ratio: 4 / 5; scroll-snap-align: start; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 22px 20px 20px; border-radius: var(--radius-l); overflow: hidden; color: #fff; isolation: isolate;
+  background: radial-gradient(110% 62% at 4% 0%, color-mix(in srgb, var(--c-warm) 78%, transparent), transparent 64%), radial-gradient(90% 60% at 100% 58%, color-mix(in srgb, var(--c-mid) 66%, transparent), transparent 64%), color-mix(in srgb, var(--c-deep) 40%, #0c0a12); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.rcp-card[data-v="1"] { background: radial-gradient(100% 60% at 100% 0%, color-mix(in srgb, var(--c-warm) 78%, transparent), transparent 62%), radial-gradient(90% 60% at 0% 66%, color-mix(in srgb, var(--c-mid) 66%, transparent), transparent 64%), color-mix(in srgb, var(--c-deep) 40%, #0c0a12); }
+.rcp-card[data-v="2"] { background: radial-gradient(120% 64% at 50% 100%, color-mix(in srgb, var(--c-warm) 72%, transparent), transparent 64%), radial-gradient(80% 56% at 0% 8%, color-mix(in srgb, var(--c-mid) 66%, transparent), transparent 62%), color-mix(in srgb, var(--c-deep) 40%, #0c0a12); }
+.rcp-card[data-v="3"] { background: radial-gradient(100% 60% at 0% 100%, color-mix(in srgb, var(--c-warm) 74%, transparent), transparent 62%), radial-gradient(90% 60% at 100% 10%, color-mix(in srgb, var(--c-mid) 66%, transparent), transparent 62%), color-mix(in srgb, var(--c-deep) 40%, #0c0a12); }
+.rcp-card > * { position: relative; z-index: 1; }
+.rcp-top { position: absolute; top: 18px; left: 20px; right: 18px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rcp-brand { display: flex; align-items: center; gap: 8px; font-family: "Unbounded", "Onest", system-ui, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.04em; }
+.rcp-brand svg { width: 20px; height: 20px; }
+.rcp-pill { max-width: 62%; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24); }
+.rcp-num { font-size: clamp(76px, 25vw, 108px); line-height: 0.9; font-weight: 800; letter-spacing: -0.055em; font-variant-numeric: tabular-nums; text-shadow: 0 4px 28px rgba(0, 0, 0, 0.3); }
+.rcp-num.is-long { font-size: clamp(60px, 19vw, 84px); }
+.rcp-word { font-size: 24px; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; }
+.rcp-note { margin-top: 6px; font-size: 14.5px; line-height: 1.35; color: var(--soft); text-wrap: pretty; }
+.rcp-plate { display: flex; align-items: center; margin-top: 14px; padding: 12px 6px; border-radius: 22px; background: rgba(255, 255, 255, 0.13); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
+.rcp-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.rcp-stat + .rcp-stat { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.2); }
+.rcp-stat b { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
+.rcp-stat span { font-size: 12.5px; color: var(--soft); }
+.rcp-name { font-size: clamp(38px, 12.5vw, 52px); line-height: 0.98; font-weight: 800; letter-spacing: -0.045em; text-wrap: balance; overflow-wrap: anywhere; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.3); }
+.rcp-artist-head { position: absolute; top: 62px; left: 20px; right: 20px; z-index: 2; display: flex; flex-direction: column; gap: 8px; }
+.rcp-disc { position: absolute; z-index: 1; width: 118%; aspect-ratio: 1; left: 22%; bottom: -54%; border-radius: 50%; overflow: hidden; background: color-mix(in srgb, var(--c-mid) 70%, #000); box-shadow: 0 -6px 0 3px #0c0a12, 0 24px 50px rgba(0, 0, 0, 0.5); }
+.rcp-disc img, .rcp-disc > span { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: rotate(-12deg) scale(1.1); }
+.rcp-disc::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: repeating-radial-gradient(circle at 50% 50%, transparent 0 6px, rgba(0, 0, 0, 0.16) 6px 7px), linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 55%); }
+.rcp-card.is-artist { justify-content: flex-start; }
+.rcp-list { display: flex; flex-direction: column; gap: 7px; margin-top: 46px; width: 100%; }
+.rcp-row { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 10px 7px 8px; border-radius: 18px; background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16); }
+.rcp-row:first-child { background: rgba(255, 255, 255, 0.22); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3); }
+.rcp-row i { width: 16px; flex-shrink: 0; text-align: center; font-style: normal; font-size: 15px; font-weight: 800; color: var(--soft); font-variant-numeric: tabular-nums; }
+.rcp-row .cover { width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; overflow: hidden; }
+.rcp-row.is-round .cover { border-radius: 50%; }
+.rcp-row .cover img { width: 100%; height: 100%; object-fit: cover; }
+.rcp-row span.t { display: flex; flex-direction: column; min-width: 0; }
+.rcp-row b { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcp-row em { font-style: normal; font-size: 12.5px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcp-dots { display: flex; justify-content: center; gap: 7px; margin: 14px 0 18px; }
+.rcp-dots i { width: 7px; height: 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.24); transition: width 0.4s var(--ease-out), background-color 0.3s; }
+.rcp-dots i.is-on { width: 24px; background: #F4EFFF; }
+.rcp-preview { display: block; width: 100%; max-height: 52vh; object-fit: contain; border-radius: var(--radius-m); margin: 8px 0 14px; }
+
+/* цитата из песни: выбор строк в тексте и окно с карточкой */
+#player-quote-btn { display: none; }
+body.lyrics-open.has-lyrics #player-quote-btn { display: grid; }
+#player-quote-btn[aria-pressed="true"] { background: var(--btn-light); color: var(--bg); }
+/* контейнер текста шире на 14px с каждой стороны, а сами строки сдвинуты обратно: текст стоит там же, где стоял, а плашка выбора не обрезается */
+.lyrics { left: -14px; right: -14px; padding-left: 16px; padding-right: 16px; }
+.lyrics-line { margin: 0 -14px; padding-left: 14px; padding-right: 14px; border-radius: 16px; transition: opacity 0.35s var(--ease-out), background-color 0.2s var(--ease-out); }
+.lyrics-lines.is-picking .lyrics-line { cursor: pointer; opacity: 0.5; }
+.lyrics-lines.is-picking .lyrics-line.is-picked { opacity: 1; background: rgba(255, 255, 255, 0.16); }
+body.quote-picking .player-foot { opacity: 0; pointer-events: none; }
+.quote-bar { position: fixed; z-index: 60; left: 16px; right: 16px; bottom: calc(var(--sab) + 14px); display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 18px; border-radius: 999px; }
+.quote-bar[hidden] { display: none; }
+.quote-bar-text { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
+.quote-bar-make { height: 44px; padding: 0 20px; flex-shrink: 0; }
+.quote-bar-x { width: 44px; height: 44px; flex-shrink: 0; }
+.quote-styles { flex: none; margin: 2px 10px 14px; padding: 0; overflow: visible; }
+#quote-sheet .sheet { height: 88%; display: flex; flex-direction: column; }
+.quote-stage { flex: 1 1 0; min-height: 0; display: flex; justify-content: center; align-items: center; margin: 0 10px 16px; }
+.quote-stage img { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; border-radius: var(--radius-m); transition: opacity 0.25s var(--ease-out); }
+#quote-share-btn { flex: none; width: auto; margin: 0 10px; }
+body.quote-sheet-open .quote-bar { display: none; }
+
+/* свайп по плееру: обложка и название едут за пальцем и возвращаются, новый трек въезжает сбоку */
+.screen-player { touch-action: pan-y; }
+.player-art-wrap, .player-meta { transition: transform 0.35s var(--ease-out), opacity 0.35s var(--ease-out); }
+@keyframes swipe-in-right { from { transform: translateX(46px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes swipe-in-left { from { transform: translateX(-46px); opacity: 0; } to { transform: none; opacity: 1; } }
+.swipe-in-right { animation: swipe-in-right 0.4s var(--ease-out) both; }
+.swipe-in-left { animation: swipe-in-left 0.4s var(--ease-out) both; }
+.screen-player { -webkit-user-select: none; user-select: none; }
+.screen-player img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
+
+/* ==========================================================
+   COMPUTER LAYOUT — a window from 900px wide (Telegram Desktop, a browser).
+   The tabs become a side panel, the mini player a bar at the bottom,
+   the content a wide column. A phone is not touched by any of this.
+   ========================================================== */
+body.is-desktop { --side: 268px; }
+body.is-desktop:is([data-screen="splash"], [data-screen="onboarding"]) { --side: 0px; }
+body.is-desktop .app { max-width: none; margin: 0; }
+body.is-desktop .screen {
+  left: var(--side);
+  --pad-x: max(40px, calc((100vw - var(--side) - 1120px) / 2));
+  padding: calc(var(--sat) + 28px) var(--pad-x) calc(var(--dock) + var(--sab) + 32px);
+}
+body.is-desktop .tabbar {
+  left: 16px;
+  right: auto;
+  width: calc(var(--side) - 32px);
+  top: calc(var(--sat) + 16px);
+  bottom: calc(var(--sab) + 16px);
+  height: auto;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 14px 10px;
+  border-radius: 28px;
+}
+body.is-desktop .tab { flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 14px; height: 48px; padding: 0 16px; font-size: 15px; border-radius: 16px; cursor: pointer; }
+body.is-desktop .tab:hover:not(.active) { background: rgba(255, 255, 255, 0.07); color: var(--text); }
+
+/* the full player on a computer: one centred column, a larger cover */
+body.is-desktop .screen-player > :not(.player-prism):not(.player-art-wrap) { width: min(100%, 600px); margin-left: auto; margin-right: auto; }
+body.is-desktop .player-art { max-height: min(54vh, 480px); }
+
+/* the side panel: brand, sections, then what is yours, then the profile */
+.side-brand, .side-extra, .side-foot { display: none; }
+body.is-desktop .side-brand { display: flex; align-items: center; gap: 10px; padding: 6px 12px 16px; flex: 0 0 auto; }
+body.is-desktop .side-extra { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; gap: 2px; margin-top: 10px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); overflow-y: auto; scrollbar-width: none; }
+body.is-desktop .side-extra::-webkit-scrollbar { display: none; }
+body.is-desktop .side-foot { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.side-scroll { display: flex; flex-direction: column; gap: 2px; }
+.side-label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); padding: 14px 12px 6px; }
+.side-item { display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 10px 0 8px; border-radius: 14px; color: var(--text-2); font-size: 14.5px; font-weight: 600; text-align: left; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+.side-item:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.side-item:active { transform: scale(0.98); }
+.side-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-count { font-style: normal; font-size: 12.5px; font-weight: 600; color: var(--text-3); }
+.side-ic { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: rgba(255, 255, 255, 0.08); }
+.side-ic-heart { color: #fff; background: linear-gradient(135deg, var(--c-warm), var(--c-mid)); }
+.side-cover { width: 32px; height: 32px; border-radius: 10px; }
+.side-cover.cover-round { border-radius: 50%; }
+.side-profile .avatar { width: 32px; height: 32px; font-size: 14px; flex: 0 0 auto; }
+.side-profile .side-name { color: var(--text); }
+
+body.is-desktop .home-top .brand { display: none; } /* the side panel carries the brand */
+body.is-desktop .home-top { justify-content: flex-end; }
+
+/* the search header's blurred dark backing is cut for a phone's width; on a
+   wide window it stuck out as a hazy rectangle with hard edges, so there it
+   is just part of the page */
+body.is-desktop .search-head { position: static; margin: 0; padding: 0 0 12px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; -webkit-mask: none; mask: none; }
+
+/* ----- arrows over a shelf under the mouse ----- */
+.shelf-arrow { position: fixed; z-index: 6; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; color: var(--text); background: rgba(20, 12, 24, 0.72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 8px 20px -6px rgba(0, 0, 0, 0.6); opacity: 0; pointer-events: none; transform: scale(0.85); transition: opacity 0.18s, transform 0.18s var(--ease-out); cursor: pointer; }
+.shelf-arrow.is-on { opacity: 1; pointer-events: auto; transform: none; }
+.shelf-arrow:hover { background: rgba(60, 30, 56, 0.9); }
+body:not(.is-desktop) .shelf-arrow { display: none; }
+
+/* ----- a mouse: a visible scrollbar, hover, and a wider artist / album page ----- */
+body.is-desktop .screen { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; }
+body.is-desktop .screen::-webkit-scrollbar { display: block; width: 10px; }
+body.is-desktop .screen::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+body.is-desktop .screen::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.34); background-clip: padding-box; }
+body.is-desktop .screen::-webkit-scrollbar-track { background: transparent; }
+@media (hover: hover) {
+  body.is-desktop .track-row { border-radius: 14px; transition: background-color 0.15s; }
+  body.is-desktop .track-row:hover { background: rgba(255, 255, 255, 0.07); }
+  body.is-desktop .shelf-card, body.is-desktop .playlist-card { cursor: pointer; }
+  body.is-desktop .shelf-card:hover .cover, body.is-desktop .playlist-card:hover .cover { transform: translateY(-3px); }
+  body.is-desktop .shelf-card .cover, body.is-desktop .playlist-card .cover { transition: transform 0.25s var(--ease-out), box-shadow 0.25s; }
+}
+body.is-desktop :is(#screen-artist, #screen-album, #screen-favorites, #screen-playlist) .hero {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  column-gap: 32px;
+  align-content: end;
+  justify-items: start;
+  align-items: end;
+  text-align: left;
+  padding: 8px 0 28px;
+}
+body.is-desktop :is(#screen-artist, #screen-album, #screen-favorites) .hero > .cover-lg,
+body.is-desktop #screen-playlist .hero > .cover-edit-wrap { grid-column: 1; grid-row: 1 / span 6; width: 232px; height: 232px; margin: 0; align-self: end; }
+body.is-desktop #screen-playlist .hero .cover-lg { width: 232px; height: 232px; margin: 0; }
+body.is-desktop :is(#screen-artist, #screen-album, #screen-favorites, #screen-playlist) .hero > :not(.cover-lg):not(.cover-edit-wrap) { grid-column: 2; }
+body.is-desktop .hero-title { font-size: 44px; line-height: 1.05; letter-spacing: -0.035em; text-align: left; text-wrap: balance; }
+body.is-desktop .hero-actions { justify-content: flex-start; width: auto; max-width: none; margin-top: 18px; }
+body.is-desktop .hero-actions .pill-btn { flex: 0 0 auto; min-width: 168px; }
+
+body.is-desktop .hero-link { padding-left: 0; margin-top: 6px; }
+
+/* ----- the player, its text, the statistics, on a wide window ----- */
+/* the player takes the whole window (so its dimming layer has no edge at the panel); its column stays right of the panel */
+body.is-desktop .screen-player { left: 0; padding-left: calc(var(--side) + var(--pad-x)); }
+body.is-desktop .player-art-wrap { width: min(100%, 760px); margin-left: auto; margin-right: auto; }
+/* the text: the empty tail below the last line was a percentage of the width, which on a wide window ran over the title and the buttons */
+body.is-desktop .lyrics { padding-bottom: 30vh; }
+body.is-desktop .lyrics-lines.is-synced .lyrics-line { font-size: 34px; }
+/* statistics: the figures on the left, the poster of the artist at the side instead of a picture the width of the window */
+body.is-desktop #stats-body { display: grid; grid-template-columns: minmax(0, 1fr) 380px; column-gap: 48px; row-gap: 0; align-items: start; grid-template-rows: auto auto 1fr; }
+body.is-desktop #stats-body > .stats-big { grid-column: 1; grid-row: 1; }
+body.is-desktop #stats-body > .stats-facts { grid-column: 1; grid-row: 2; }
+body.is-desktop #stats-body > .stats-poster-wrap { grid-column: 2; grid-row: 1 / span 3; margin: 22px 0 34px; }
+body.is-desktop #stats-body > .block { grid-column: 1 / -1; }
+
+/* settings-like pages read better in a narrower column */
+body.is-desktop #screen-profile, body.is-desktop #screen-account, body.is-desktop #screen-sound, body.is-desktop #screen-about { --pad-x: max(40px, calc((100vw - var(--side) - 760px) / 2)); }
+

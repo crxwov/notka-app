@@ -1,0 +1,445 @@
+@font-face { font-family: "Unbounded"; font-style: normal; font-weight: 200 900; font-display: swap; src: url("fonts/unbounded-700.woff2") format("woff2"); }
+/* Onest (SIL Open Font License 1.1), self-hosted variable font, weights 400–800 */
+@font-face {
+  font-family: "Onest";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("fonts/onest-cyrillic-ext.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: "Onest";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("fonts/onest-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Onest";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("fonts/onest-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Onest";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("fonts/onest-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ==========================================================
+   Нотка — «Живой свет»
+   One living light source in the dark; everything else stays
+   quiet. Color is emitted by the orb only; the UI is neutral.
+   ========================================================== */
+
+@property --c-core    { syntax: "<color>"; inherits: true; initial-value: #FFE9DF; }
+@property --c-warm    { syntax: "<color>"; inherits: true; initial-value: #FFA6B8; }
+@property --c-mid     { syntax: "<color>"; inherits: true; initial-value: #FF4FA0; }
+@property --c-deep    { syntax: "<color>"; inherits: true; initial-value: #44112F; }
+
+:root {
+  /* ground + surfaces */
+  --bg: #1A0B16;
+  --surface-1: rgba(255, 233, 223, 0.055);
+  --surface-2: rgba(255, 233, 223, 0.09);
+  --surface-sheet: #251320;
+  --line: rgba(255, 233, 223, 0.09);
+
+  /* text */
+  --text: #FFF1EA;
+  --text-2: rgba(255, 241, 234, 0.66);
+  --text-3: rgba(255, 241, 234, 0.52);
+
+  /* the light (animated per track) */
+  --c-core: #FFE9DF;
+  --c-warm: #FFA6B8;
+  --c-mid: #FF4FA0;
+  --c-deep: #44112F;
+
+  /* reserved: now-playing only — the playing track's own light */
+  --now: var(--c-core);
+  /* light buttons carry a whisper of the track's color */
+  --btn-light: linear-gradient(150deg, #FFFFFF 0%, color-mix(in srgb, var(--c-core) 60%, #FFFFFF) 55%, color-mix(in srgb, var(--c-warm) 32%, #FFFFFF) 100%);
+  /* liked */
+  --liked: #FF2D78;
+
+  --orb-mini: radial-gradient(circle at 36% 30%, var(--c-core) 0 9%, var(--c-warm) 34%, var(--c-mid) 62%, var(--c-deep) 100%);
+
+  --radius-s: 10px;
+  --radius-m: 16px;
+  --radius-l: 24px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* safe areas (Telegram fullscreen + notches), set from app.js */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --dock: 24px; /* bottom space taken by mini-player/tab bar, set from app.js */
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  /* the lowest layer wears the light's own colour, darkened: blue light, deep blue ground (not a fixed plum) */
+  background: color-mix(in srgb, var(--c-deep) 30%, #0A0709);
+}
+
+body {
+  font-family: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--text);
+  height: 100vh;
+  height: 100dvh;
+  height: calc(var(--tg-vh, 1dvh) * 100);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+::selection { background: rgba(238, 144, 90, 0.38); color: #fff; }
+input { caret-color: var(--text); }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled { cursor: default; }
+svg { display: block; flex-shrink: 0; }
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--c-core);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+h1, h2, p { margin: 0; }
+ul { list-style: none; margin: 0; padding: 0; }
+
+/* ==========================================================
+   THE LIGHT
+   ========================================================== */
+.light {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--c-deep) 30%, #0A0709);
+  transition: --c-core 1.4s var(--ease-in-out), --c-warm 1.4s var(--ease-in-out),
+    --c-mid 1.4s var(--ease-in-out), --c-deep 1.4s var(--ease-in-out);
+}
+.glass, .round-glass {
+  transition: --c-warm 1.4s var(--ease-in-out), --c-deep 1.4s var(--ease-in-out), transform 0.25s var(--ease-out);
+}
+
+/* the playing cover itself, blurred into a field of its colors */
+.light-art {
+  position: absolute;
+  inset: -14%;
+  background-size: cover;
+  background-position: center;
+  /* the picture is 12 pixels wide (see tinyArt in app.js): the stretch makes the haze, the blur smooths its steps */
+  filter: blur(36px) saturate(1.12) brightness(0.8);
+  opacity: 0;
+  transform: scale(1.1);
+  -webkit-mask-image: linear-gradient(180deg, #000 25%, transparent 78%);
+  mask-image: linear-gradient(180deg, #000 25%, transparent 78%);
+  transition: opacity 1.3s var(--ease-out);
+  animation: art-drift 24s var(--ease-in-out) infinite alternate;
+  will-change: transform;
+}
+/* a cover that could not be shrunk is shown whole: a lighter blur than before (48 instead of 72), and no drift on weak phones */
+.light-art.is-raw { filter: blur(48px) saturate(1.12) brightness(0.8); }
+.perf-lite .light-art { animation: none; will-change: auto; }
+@keyframes art-drift { from { transform: scale(1.1) rotate(0deg); } to { transform: scale(1.22) rotate(6deg) translate(2%, -2%); } }
+.light-art.is-shown { opacity: 0.42; }
+body[data-screen="home"] .light-art.is-shown { opacity: 0.5; }
+body[data-screen="player"] .light-art.is-shown { opacity: 0.85; -webkit-mask-image: none; mask-image: none; }
+
+/* PATTERNS OF THE LIGHT (Оформление). A pattern does not lay a second shape
+   over the orb: it reshapes the one light — rays out of it, a wide ribbon,
+   a sunrise from below, lobes that wander apart. The same rules dress the
+   little screens in the picker, so they look as the real thing does. */
+.light-shape { position: absolute; inset: 0; opacity: 0; transition: opacity 1.1s var(--ease-out); }
+.light-shape i { display: none; position: absolute; will-change: transform; }
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape { opacity: 1; }
+
+/* ПРИЗМА: a few soft beams out of the orb. Each one keeps changing its shape — it widens, narrows, bends to one side —
+   sways, and flares and fades, so the light seems to be shifting in a draught, not spinning */
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i { display: block; left: 50%; top: 50%; width: 26%; height: 80%; margin-left: -13%; transform-origin: 50% 0; rotate: var(--a); mix-blend-mode: screen; background: linear-gradient(90deg, transparent 0%, var(--bc) 50%, transparent 100%); -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.55) 30%, rgba(0, 0, 0, 0.2) 62%, transparent 100%); mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.55) 30%, rgba(0, 0, 0, 0.2) 62%, transparent 100%); animation: beam-shape var(--d) var(--ease-in-out) var(--w) infinite alternate, beam-sway calc(var(--d) * 1.3) var(--ease-in-out) var(--w) infinite alternate, beam-glint calc(var(--d) * 0.55) ease-in-out var(--w) infinite; }
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i:nth-child(1) { --a: 8deg; --d: 11s; --w: -2s; --bc: color-mix(in srgb, var(--c-core) 62%, transparent); }
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i:nth-child(2) { --a: 62deg; --d: 14s; --w: -7s; --bc: color-mix(in srgb, var(--c-warm) 56%, transparent); }
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i:nth-child(3) { --a: 109deg; --d: 12s; --w: -4s; --bc: color-mix(in srgb, var(--c-core) 52%, transparent); }
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i:nth-child(4) { --a: 158deg; --d: 16s; --w: -10s; --bc: color-mix(in srgb, var(--c-mid) 62%, transparent); }
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i:nth-child(5) { --a: 203deg; --d: 13s; --w: -5s; --bc: color-mix(in srgb, var(--c-core) 60%, transparent); }
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i:nth-child(6) { --a: 251deg; --d: 15s; --w: -9s; --bc: color-mix(in srgb, var(--c-warm) 52%, transparent); }
+:is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i:nth-child(7) { --a: 304deg; --d: 10s; --w: -1s; --bc: color-mix(in srgb, var(--c-core) 56%, transparent); }
+@keyframes beam-shape {
+  0% { clip-path: polygon(46% 0, 54% 0, 68% 100%, 32% 100%); }
+  30% { clip-path: polygon(45% 0, 55% 0, 94% 100%, 50% 100%); }
+  62% { clip-path: polygon(47% 0, 53% 0, 44% 100%, 6% 100%); }
+  100% { clip-path: polygon(45% 0, 55% 0, 78% 100%, 22% 100%); }
+}
+@keyframes beam-sway { 0% { transform: rotate(-6deg) scaleX(0.75) skewX(-5deg); } 100% { transform: rotate(7deg) scaleX(1.3) skewX(6deg); } }
+@keyframes beam-glint { 0%, 100% { opacity: 0.3; } 38% { opacity: 1; } 64% { opacity: 0.55; } 82% { opacity: 0.9; } }
+.perf-lite :is(.light, .pattern-thumb)[data-bg="prism"] .light-shape i { animation: none; }
+@keyframes shape-turn { to { transform: rotate(360deg); } }
+
+/* СИЯНИЕ: the orb is pulled into a wide ribbon that sways across the screen */
+:is(.light, .pattern-thumb)[data-bg="aurora"] .light-group { width: calc(var(--size) * 1.8); height: calc(var(--size) * 0.6); }
+/* curtains of light hang from above and sway, each at its own pace */
+:is(.light, .pattern-thumb)[data-bg="aurora"] .light-shape { opacity: 1; }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .orb { opacity: 0.6; }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .light-shape i:nth-child(-n+3) { display: block; top: -95%; bottom: -35%; width: 20%; mix-blend-mode: screen; -webkit-mask-image: linear-gradient(90deg, transparent, #000 35%, #000 65%, transparent); mask-image: linear-gradient(90deg, transparent, #000 35%, #000 65%, transparent); transform-origin: 50% 0; }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .light-shape i:nth-child(1) { left: 10%; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--c-core) 52%, transparent) 46%, color-mix(in srgb, var(--c-mid) 40%, transparent) 70%, transparent 100%); animation: curtain-a 11s var(--ease-in-out) infinite alternate; }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .light-shape i:nth-child(2) { left: 40%; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--c-mid) 60%, transparent) 44%, color-mix(in srgb, var(--c-deep) 40%, transparent) 68%, transparent 100%); animation: curtain-b 15s var(--ease-in-out) infinite alternate; }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .light-shape i:nth-child(3) { left: 70%; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--c-core) 44%, transparent) 46%, color-mix(in srgb, var(--c-warm) 30%, transparent) 72%, transparent 100%); animation: curtain-c 13s var(--ease-in-out) infinite alternate; }
+@keyframes curtain-a { 0% { transform: translateX(-14%) skewX(-9deg) scaleX(1); opacity: 0.55; } 50% { opacity: 1; } 100% { transform: translateX(22%) skewX(8deg) scaleX(1.5); opacity: 0.7; } }
+@keyframes curtain-b { 0% { transform: translateX(18%) skewX(7deg) scaleX(1.35); opacity: 0.8; } 50% { opacity: 0.5; } 100% { transform: translateX(-20%) skewX(-8deg) scaleX(0.9); opacity: 1; } }
+@keyframes curtain-c { 0% { transform: translateX(-18%) skewX(8deg) scaleX(0.9); opacity: 0.6; } 50% { opacity: 1; } 100% { transform: translateX(16%) skewX(-7deg) scaleX(1.4); opacity: 0.55; } }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .orb-violet { animation-name: aurora-a; }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .orb-magenta { animation-name: aurora-b; }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .orb-orange { animation-name: aurora-c; }
+@keyframes aurora-a { 0% { transform: translate(-9%, 4%) scaleX(1.05); } 100% { transform: translate(9%, -5%) scaleX(0.92); } }
+@keyframes aurora-b { 0% { transform: translate(10%, -4%) scaleX(0.94); } 100% { transform: translate(-12%, 6%) scaleX(1.1); } }
+@keyframes aurora-c { 0% { transform: translate(-6%, -6%) scaleX(1.08); } 100% { transform: translate(12%, 5%) scaleX(0.9); } }
+
+/* ГОРИЗОНТ: a dusk sky fills the screen and drifts slowly, the sun rises and sinks at the bottom */
+.light::before { content: ""; position: absolute; inset: 0; opacity: 0; transition: opacity 1.1s var(--ease-out); }
+body[data-bg="horizon"] .light::before, .pattern-thumb[data-bg="horizon"] .pv::before {
+  content: ""; position: absolute; inset: 0; opacity: 1;
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--c-deep) 26%, transparent) 28%, color-mix(in srgb, var(--c-mid) 24%, transparent) 54%, color-mix(in srgb, var(--c-warm) 34%, transparent) 76%, color-mix(in srgb, var(--c-core) 16%, transparent) 90%, color-mix(in srgb, var(--c-mid) 34%, transparent) 100%);
+  background: linear-gradient(in oklab 180deg, transparent 0%, color-mix(in srgb, var(--c-deep) 26%, transparent) 28%, color-mix(in srgb, var(--c-mid) 24%, transparent) 54%, color-mix(in srgb, var(--c-warm) 34%, transparent) 76%, color-mix(in srgb, var(--c-core) 16%, transparent) 90%, color-mix(in srgb, var(--c-mid) 34%, transparent) 100%);
+  background-size: 100% 190%;
+  animation: sky-flow 18s var(--ease-in-out) infinite alternate;
+}
+@keyframes sky-flow { from { background-position: 0 0; } to { background-position: 0 100%; } }
+body[data-bg="horizon"][data-screen] .light-group { --y: 92vh; --s: 1; }
+:is(.light, .pattern-thumb)[data-bg="horizon"] .orb-violet { animation-name: horizon-a; }
+:is(.light, .pattern-thumb)[data-bg="horizon"] .orb-magenta { animation-name: horizon-b; }
+:is(.light, .pattern-thumb)[data-bg="horizon"] .orb-orange { animation-name: horizon-c; }
+@keyframes horizon-a { 0% { transform: translate(-8%, 10%) scaleX(1.1); } 100% { transform: translate(8%, -12%) scaleX(0.95); } }
+@keyframes horizon-b { 0% { transform: translate(8%, 6%) scaleX(0.95); } 100% { transform: translate(-8%, -14%) scaleX(1.1); } }
+@keyframes horizon-c { 0% { transform: translate(0, 14%) scale(0.94); } 100% { transform: translate(0, -10%) scale(1.08); } }
+
+/* ЛАВА: a field of five big soft blobs fills the whole screen, one colour each, and they wander (the manner of Apple Music) */
+body[data-bg="lava"][data-screen] .light-group { --y: 50vh; --s: 1; }
+:is(.light, .pattern-thumb)[data-bg="lava"] .light-group { width: var(--lw, 150vw); height: var(--lh, 120vh); }
+body[data-bg="lava"] .light { background: color-mix(in srgb, var(--c-deep) 30%, #0A0709); }
+/* a season's own ground stays its own */
+html:not(.minimal) body[data-atmo]:not([data-atmo="none"]) .light { background: var(--bg); }
+:is(.light, .pattern-thumb)[data-bg="lava"] .orb { opacity: 1; }
+:is(.light, .pattern-thumb)[data-bg="lava"] .orb-violet { inset: 38% 28% -22% -22%; animation-name: lava-a; }
+:is(.light, .pattern-thumb)[data-bg="lava"] .orb-magenta { inset: 18% -26% 18% 40%; animation-name: lava-b; }
+:is(.light, .pattern-thumb)[data-bg="lava"] .orb-orange { inset: -18% 34% 50% -12%; animation-name: lava-c; }
+:is(.light, .pattern-thumb)[data-bg="lava"] .orb-rim { inset: 52% -18% -24% 26%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c-mid) 85%, transparent), color-mix(in srgb, var(--c-mid) 25%, transparent) 60%, transparent); opacity: 0.8 !important; animation-name: lava-b; animation-duration: 23s; }
+:is(.light, .pattern-thumb)[data-bg="lava"] .orb-rim-b { inset: -16% -14% 56% 36%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c-warm) 80%, transparent), color-mix(in srgb, var(--c-warm) 22%, transparent) 62%, transparent); opacity: 0.7 !important; animation-name: lava-c; animation-duration: 19s; }
+:is(.light, .pattern-thumb)[data-bg="aurora"] .orb-rim, :is(.light, .pattern-thumb)[data-bg="aurora"] .orb-rim-b, :is(.light, .pattern-thumb)[data-bg="horizon"] .orb-rim, :is(.light, .pattern-thumb)[data-bg="horizon"] .orb-rim-b, :is(.light, .pattern-thumb)[data-bg="prism"] .orb-rim, :is(.light, .pattern-thumb)[data-bg="prism"] .orb-rim-b { opacity: 0 !important; }
+:is(.light, .pattern-thumb)[data-bg="prism"] .orb-core { inset: 32%; opacity: 1 !important; }
+:is(.light, .pattern-thumb)[data-bg="lava"] .orb-core { inset: 16% 40% 52% 22%; opacity: 0.45 !important; }
+/* a little shade over the field, so white text keeps its contrast on any colour */
+body[data-bg="lava"] .light::after, .pattern-thumb[data-bg="lava"] .pv::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 6, 14, 0.1), rgba(8, 6, 14, 0.34)); pointer-events: none; }
+@keyframes lava-a { 0% { transform: translate(-6%, 4%) scale(1.04); } 50% { transform: translate(14%, -10%) scale(0.94); } 100% { transform: translate(4%, 12%) scale(1.1); } }
+@keyframes lava-b { 0% { transform: translate(6%, -6%) scale(0.96); } 50% { transform: translate(-14%, 10%) scale(1.1); } 100% { transform: translate(-2%, -12%) scale(0.94); } }
+@keyframes lava-c { 0% { transform: translate(-8%, 8%) scale(0.94); } 50% { transform: translate(12%, 16%) scale(1.08); } 100% { transform: translate(8%, -8%) scale(0.96); } }
+
+@keyframes sparks-a { to { transform: translateY(-150px); } }
+@keyframes sparks-b { to { transform: translateY(-110px); } }
+@keyframes sparks-c { to { transform: translateY(-190px); } }
+@keyframes twinkle { from { opacity: 0.35; } to { opacity: 1; } }
+
+
+.light-group {
+  --size: min(118vw, 600px);
+  --y: 16vh;
+  --s: 1;
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: var(--size);
+  height: var(--size);
+  transform: translate(-50%, calc(-50% + var(--y))) scale(var(--s));
+  opacity: 1;
+  transition: transform 1.1s var(--ease-out), opacity 1.1s var(--ease-out);
+}
+
+/* Each layer is an ellipse whose gradient fades to nothing at its own
+   edge (closest-side), so the light never shows a rim. Offsetting the
+   layers spreads the hue across the orb: warm at the upper left,
+   magenta to the right, violet pooling underneath. */
+.orb {
+  position: absolute;
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+.orb-violet {
+  inset: 8% -22% -26% -18%;
+  background: radial-gradient(closest-side, var(--c-deep) 0%, color-mix(in srgb, var(--c-deep) 62%, transparent) 42%, color-mix(in srgb, var(--c-deep) 18%, transparent) 72%, transparent 100%);
+}
+.orb-magenta {
+  inset: 2% -10% 14% 30%;
+  background: radial-gradient(closest-side, var(--c-mid) 0%, color-mix(in srgb, var(--c-mid) 58%, transparent) 40%, color-mix(in srgb, var(--c-mid) 14%, transparent) 74%, transparent 100%);
+}
+.orb-orange {
+  inset: 4% 26% 24% -8%;
+  background: radial-gradient(closest-side, var(--c-warm) 0%, color-mix(in srgb, var(--c-warm) 60%, transparent) 38%, color-mix(in srgb, var(--c-warm) 16%, transparent) 72%, transparent 100%);
+}
+/* the bright crescent where two lobes of light meet */
+.orb-rim {
+  inset: 6% 20% 20% 4%;
+  background: radial-gradient(closest-side, transparent 80%, color-mix(in srgb, var(--c-core) 60%, transparent) 90%, color-mix(in srgb, var(--c-warm) 24%, transparent) 96%, transparent 100%);
+  opacity: 0.75;
+}
+.orb-rim-b {
+  inset: 12% -4% 22% 34%;
+  background: radial-gradient(closest-side, transparent 80%, color-mix(in srgb, var(--c-core) 48%, transparent) 90%, color-mix(in srgb, var(--c-mid) 26%, transparent) 96%, transparent 100%);
+  opacity: 0.6;
+}
+.orb-core {
+  inset: 20% 42% 42% 14%;
+  background: radial-gradient(closest-side, var(--c-core) 0%, color-mix(in srgb, var(--c-core) 55%, transparent) 36%, transparent 100%);
+  opacity: 0.95;
+}
+
+/* glow pooling at the bottom so the glass dock has light to hold */
+.light-spill {
+  position: absolute;
+  left: 50%;
+  bottom: -38vh;
+  width: 150vw;
+  height: 70vh;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c-deep) 78%, transparent), color-mix(in srgb, var(--c-deep) 30%, transparent) 55%, transparent);
+  opacity: 0.6;
+  transition: opacity 1.1s var(--ease-out);
+}
+
+.light-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.32;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* placement of the light per screen */
+body[data-screen="home"] .light-group       { --y: 22vh; --s: 1; }
+body[data-screen="onboarding"] .light-group { --y: 36vh; --s: 1.12; }
+body[data-screen="player"] .light-group     { --y: 30vh; --s: 1.55; }
+body[data-screen="player"] .light-spill     { opacity: 0.8; }
+body[data-screen="search"] .light-group     { --y: 6vh; --s: 0.95; opacity: 0.9; }
+body[data-screen="library"] .light-group    { --y: -4vh; --s: 0.9; opacity: 0.8; }
+body:not([data-screen="home"]):not([data-screen="onboarding"]):not([data-screen="player"]):not([data-screen="search"]):not([data-screen="library"]):not([data-screen="splash"]) .light-group {
+  --y: -8vh; --s: 0.85; opacity: 0.6;
+}
+
+/* the rims only belong where the light is the subject */
+.orb-rim, .orb-rim-b { transition: opacity 0.9s var(--ease-out); }
+body:not([data-screen="home"]):not([data-screen="onboarding"]):not([data-screen="player"]) .orb-rim,
+body:not([data-screen="home"]):not([data-screen="onboarding"]):not([data-screen="player"]) .orb-rim-b { opacity: 0; }
+
+/* The light is always alive: the lobes drift past each other, the hues
+   flow, the rims wander. Music makes all of it breathe deeper and faster. */
+.orb { transition: opacity 0.9s var(--ease-out); }
+body:not(.is-playing) .orb-core { opacity: 0.72; }
+
+@keyframes drift-a { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-7%, 5%) scale(1.08); } 100% { transform: translate(5%, -3%) scale(0.96); } }
+@keyframes drift-b { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(9%, -6%) scale(1.12); } 100% { transform: translate(-6%, 4%) scale(0.95); } }
+@keyframes drift-c { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-6%, -7%) scale(0.92); } 100% { transform: translate(8%, 5%) scale(1.07); } }
+@keyframes rim-a { 0% { transform: translate(0, 0) rotate(0deg) scale(1); } 50% { transform: translate(5%, 4%) rotate(8deg) scale(1.05); } 100% { transform: translate(-4%, -2%) rotate(-6deg) scale(0.97); } }
+@keyframes rim-b { 0% { transform: translate(0, 0) rotate(0deg) scale(1); } 50% { transform: translate(-6%, 3%) rotate(-10deg) scale(0.95); } 100% { transform: translate(3%, -5%) rotate(7deg) scale(1.06); } }
+@keyframes hue-flow { 0% { filter: saturate(1.08); } 100% { filter: saturate(1.08); } } /* the hue no longer rotates: the brand colour stays put */
+@keyframes core-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+@keyframes hue-flow-soft { 0% { filter: saturate(1.08); } 100% { filter: saturate(1.08); } }
+
+.light-group  { animation: hue-flow 11s var(--ease-in-out) infinite alternate; will-change: transform, filter; }
+.orb-violet   { animation: drift-a 21s var(--ease-in-out) infinite alternate; }
+.orb-magenta  { animation: drift-b 16s var(--ease-in-out) infinite alternate; }
+.orb-orange   { animation: drift-c 18s var(--ease-in-out) infinite alternate; }
+.orb-rim      { animation: rim-a 15s var(--ease-in-out) infinite alternate; }
+.orb-rim-b    { animation: rim-b 19s var(--ease-in-out) infinite alternate; }
+.orb-core     { animation: core-pulse 6s var(--ease-in-out) infinite; }
+
+body.is-playing .light-group { animation-duration: 6s; }
+body.has-art .light-group { animation-name: hue-flow-soft; }
+body.is-shredding .light-group, body.is-shredding .orb, body.is-shredding .light-art { animation-play-state: paused; }
+body.is-playing .orb-violet  { animation-duration: 9s; }
+body.is-playing .orb-magenta { animation-duration: 7s; }
+body.is-playing .orb-orange  { animation-duration: 8s; }
+body.is-playing .orb-rim     { animation-duration: 7s; }
+body.is-playing .orb-rim-b   { animation-duration: 9s; }
+body.is-playing .orb-core    { animation-duration: 3.2s; }
+body.is-loading .orb-core,
+body.search-loading .orb-core { animation-duration: 0.9s; }
+
+/* ==========================================================
+   APP SHELL
+   ========================================================== */
+.app {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: calc(var(--sat) + 12px) 20px calc(var(--dock) + var(--sab) + 24px);
+  scrollbar-width: none;
+}
+.screen::-webkit-scrollbar { display: none; }
+
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes player-in {
+  from { opacity: 0; transform: translateY(6%); }
+  to   { opacity: 1; transform: none; }
+}
+.screen-anim { animation: screen-in 0.36s var(--ease-out) both; }
+.screen-player.screen-anim { animation: player-in 0.44s var(--ease-out) both; }
+
+/* ==========================================================
+   TYPE
+   ========================================================== */
+.display {
+  font-size: 34px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.lede { font-size: 17px; color: var(--text-2); margin-top: 6px; }
+.h2 { font-size: 20px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+.page-title { margin: 12px 0 22px; }
+

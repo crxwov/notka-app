@@ -16,7 +16,16 @@ For full modular technical and product documentation in Russian, see **[docs/REA
 - `config.py` — `Settings` loader from env + startup proxy health check (`_usable_proxy`).
 - `models.py` — Pydantic models (`TrackCandidate`, `TrackInfo`, `PlaybackInfo`, `ResolvedTrack`, `SearchResponse`, `ResolveResponse`, `AlbumSummary`, `AlbumInfo`, `ArtistInfo`).
 - `errors.py` — `ErrorCode` enum, HTTP status mapping, and `AppError`.
-- `api/routes.py` — All 20 HTTP endpoints (`/health`, `/search`, `/artists`, `/resolve`, `/album`, `/artist`, `/prepare`, `/stream`, `/download`, `/radio`, `/mood`, `/lyrics`, `/import`, `/plus/status`, `/plus/redeem`, `/events`, `/events/sync`, `/events/advance`, `/events/reset`, `/bot-info`, `/shared`, `/shared/{share_id}`) + disk audio cache in `cache/audio_v2/`.
+- `api/routes/` — Modularized HTTP route handlers (all <= 220 lines each):
+  - `audio.py` & `audio_cache.py` — `/stream`, `/inline`, `/prepare`, `/download` + disk audio caching in `cache/audio_v2/`.
+  - `search.py` — `/search`, `/artists`, `/resolve`, `/album`, `/artist`, `/radio`, `/mood`.
+  - `auth.py` — Telegram code verification & session endpoints (`/auth/send-code`, `/auth/verify-code`, `/auth/me`, `/sync`).
+  - `plus.py` — `/plus/status` and `/plus/redeem`.
+  - `events.py` — `/events`, `/events/sync`, `/events/advance`, `/events/reset`.
+  - `content.py` — `/lyrics` and `/import`.
+  - `playlists.py` — `/playlists`, `/playlist/create`, `/playlist/edit`.
+  - `media.py` — `/media/artwork`, `/media/cover`.
+  - `admin.py` — `/metrics`, `/bot-info`, admin stats.
 - `services/`
   - `factory.py` — Wires `MusicService`, `ProviderManager`, `TTLCache`, and all providers.
   - `music_service.py` — High-level search/resolve/album/artist facade with search & resolve caching.
@@ -31,8 +40,8 @@ For full modular technical and product documentation in Russian, see **[docs/REA
 - `providers/`
   - `base.py` — Abstract `BaseProvider`.
   - `youtube_common.py` — Shared `yt-dlp` extraction, search, cookie fallback, and direct audio download helpers.
-  - `youtube_music.py` — `ytmusicapi` search (songs + videos), artist/album lookup, radio generation, and `yt-dlp` stream extraction.
-  - `itunes_catalog.py` — Apple iTunes Search/Lookup catalog provider with 3-pass audio matching against YouTube Music / YouTube Web.
+  - `youtube/` (`provider.py`, `mappers.py`, `moods.py`) — Modularized YouTube Music provider (ytmusicapi + yt-dlp).
+  - `itunes/` (`provider.py`, `matcher.py`, `parser.py`, `cache.py`) — Modularized Apple iTunes Search/Lookup provider with 3-pass matcher.
   - `soundcloud.py` — SoundCloud search (`scsearch`) and stream resolution via `yt-dlp`.
   - `youtube_web.py` — Standard YouTube search (`ytsearch`) and stream resolution via `yt-dlp`.
 - `utils/`
@@ -41,26 +50,39 @@ For full modular technical and product documentation in Russian, see **[docs/REA
   - `remux.py` — `ffmpeg -movflags +faststart` MP4 defragmenter for reliable Telegram WebView playback.
 
 ## Frontend (`miniapp/`)
-- `index.html` — Single-page Telegram WebApp shell containing 21 screens (`splash`, `onboarding`, `home`, `event`, `search`, `library`, `favorites`, `playlist`, `album`, `artist`, `add-tracks`, `edit-playlist`, `profile`, `account`, `stats`, `sound`, `about`, `mood`, `look`, `plus`, `player`), floating dock, mini-player, and 14 bottom sheets / modals.
+- `index.html` — Single-page Telegram WebApp shell containing 21 screens, floating dock, mini-player, and 14 bottom sheets / modals.
 - `config.js` — `window.NOTKA_CONFIG` (`API_BASE`).
-- `app.js` — Main client controller (~4800 lines: state management in `localStorage` under `notka_state_v2`, audio engine, cover color extraction, screen routing, playlists, lyrics sync, Plus & seasonal events).
+- `src/` — Modular client architecture (< 465 lines per file):
+  - `core/` (`env.js`, `state.js`, `sync.js`, `analytics.js`, `dom.js`) — Environment, reactive state, cross-device sync, analytics.
+  - `player/` (`engine.js`, `controls.js`, `lighting.js`, `lyrics.js`, `queue.js`, `resolver.js`, `loudness.js`) — Audio engine, living light, synced lyrics.
+  - `ui/` (`navigation.js`, `modals.js`, `track_row.js`, `context_menu.js`) — Navigation, dialogs, bottom sheets, reusable track cards.
+  - `screens/` (`home.js`, `search.js`, `library.js`, `playlist_detail.js`, `playlist_create.js`, `profile.js`, `settings.js`, `appearance.js`, `events.js`, `wave.js`, `stats.js`, `recap.js`, `artist.js`) — Self-contained screen controllers.
+  - `app.js` — Client bootstrapper and dependency coordinator.
+- `styles/` — Modular CSS architecture:
+  - `base.css`, `controls.css`, `components.css`, `player.css`, `animations.css`
+  - `screens/main.css`, `screens/special.css`
+  - `system/desktop.css`, `system/layout.css`
+- `atmosphere/` (`core.js`, `shapes.js`, `themes_nature.js`, `themes_seasonal.js`) — Weather, seasonal themes, and particle canvas effects.
+- `shredder/` (`engine.js`, `drag.js`, `physics.js`, `strips.js`) — Physics-based paper shredder track deletion.
 - `prism.js` — WebGL2 raymarched prismatic light shader (`window.Prism`) with automatic FPS guard.
-- `shredder.js` — Interactive drag-and-drop reorder & paper-shredder track deletion (`window.Shredder`).
-- `atmosphere.js` — Dual-canvas seasonal/weather effects (`autumn`, `winter`, `spring`, `halloween` with catchable bats, `newyear` with Verlet-physics pullable garland, `rain`, `night`).
 - `pumpkin.js` — Interactive liquid-glass Halloween pumpkin SVG (`window.PumpkinArt`).
-- `styles.css`, `atmosphere.css`, `events.css` — Styling for the "Живой свет" (Living Light) design system.
 
 ## Deploy & Tests
 - `deploy/setup.sh`, `deploy/push.sh`, `deploy/README.md` — Production Ubuntu setup (`systemd` + `Caddy` + `Node 20` + `venv`) and SSH push deployment.
-- `tests/serve_local.py` — Local test server on `127.0.0.1:8099` with `NOTKA_TEST_USER=424242` and `NOTKA_FAKE_NOW=2026-10-22`.
-- `tests/events_store_test.py` — Unit tests for `events_store` and `plus_store` (10 scenarios).
-- `tests/cdp.mjs`, `tests/e2e.mjs` — Headless Chromium CDP driver and 38-assertion E2E test suite.
+- `tests/` — Automated test suite:
+  - `test_api_routes.py` — Tests for public endpoints (`/health`, `/search`, `/artists`, `/resolve`, `/plus/status`, `/events`).
+  - `test_itunes_provider.py` — iTunes parser, caching, and matching tests.
+  - `test_youtube_provider.py` — YouTube mappers, moods, and provider queries.
+  - `test_models.py` — Pydantic models serialization and conversions.
+  - `test_services.py` — Matcher ranking, auth store verification, plus store grants.
+  - `test_utils.py` — Utility tests (IDs, logging configuration).
+  - `events_store_test.py` — Unit tests for seasonal event engine and quests.
+  - `serve_local.py`, `cdp.mjs`, `e2e.mjs` — Local test server and headless Chromium E2E suite.
 
 ## Product & Design Docs
 - `docs/README.md` — Modular technical & product documentation split by subfolder (`getting-started/`, `backend/`, `providers/`, `services/`, `bot/`, `miniapp/`, `operations/`).
 - `PRODUCT.md` — Product vision, audience, feature matrix, and roadmap.
 - `DESIGN.md` — "Живой свет" (Living Light) design system guidelines, palette, typography, and component rules.
-- `ROADMAP.md` — Operational task tracker.
 
 ## Codebase Graph (`codebase-memory`)
 - Indexed project ID: `C-Users-hackov-notka` (`1434` nodes, `4674` edges, `77` files across Python `36`, JavaScript `7`, CSS `4`, HTML `2`).
