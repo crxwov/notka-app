@@ -1281,6 +1281,8 @@
     if (desk) renderSidebar();
     bottomNav.hidden = !showTabs;
     miniPlayer.hidden = !showMini;
+    if (bottomNav.hidden) bottomNav.style.animation = "";
+    if (miniPlayer.hidden) miniPlayer.style.animation = "";
     document.body.classList.toggle("no-tabbar", !showTabs);
     let dock = 0;
     if (desk) dock = showMini ? 108 : 0;
@@ -6453,7 +6455,10 @@
     pullScreen.style.opacity = "";
     pullScreen.style.willChange = "";
     if (pullBehind) { pullBehind.style.transition = ""; pullBehind.style.opacity = ""; pullBehind.style.willChange = ""; }
-    pullDock().forEach((el) => { el.style.transition = ""; el.style.opacity = ""; el.style.animation = ""; });
+    // (the small player's own entrance animation stays switched off here: putting it back now would
+    // start it again, and the player would blink after it was put away; updateDock() puts it back
+    // when the element is hidden, so the next real appearance has its entrance)
+    pullDock().forEach((el) => { el.style.transition = ""; el.style.opacity = ""; });
     document.body.classList.remove("player-pulling");
   };
   function pullBegin() {
