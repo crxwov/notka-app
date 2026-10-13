@@ -5,7 +5,11 @@ and the daily counters (metrics.counters)."""
 
 from __future__ import annotations
 
+import collections
 import json
+import os
+import shutil
+import sys
 import time
 from pathlib import Path
 
@@ -21,6 +25,95 @@ def _json(path: Path) -> dict:
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
+
+
+def _system_stats() -> dict:
+    total_mb, used_mb, pct = 0, 0, 0.0
+    try:
+        mem = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                parts = line.split(":")
+                if len(parts) == 2:
+                    mem[parts[0].strip()] = int(parts[1].strip().split()[0])
+        total_mb = round(mem.get("MemTotal", 0) / 1024)
+        avail_mb = round(mem.get("MemAvailable", 0) / 1024)
+        used_mb = total_mb - avail_mb
+        pct = round((used_mb / max(1, total_mb)) * 100, 1)
+    except Exception:
+        pass
+
+    disk_total_gb, disk_used_gb, disk_pct = 0.0, 0.0, 0.0
+    try:
+        du = shutil.disk_usage("/")
+        disk_total_gb = round(du.total / (1024**3), 1)
+        disk_used_gb = round(du.used / (1024**3), 1)
+        disk_pct = round((du.used / max(1, du.total)) * 100, 1)
+    except Exception:
+        pass
+
+    loads = [0.0, 0.0, 0.0]
+    uptime_sec = 0
+    try:
+        with open("/proc/loadavg") as f:
+            loads = [round(float(x), 2) for x in f.read().split()[:3]]
+        with open("/proc/uptime") as f:
+            uptime_sec = int(float(f.read().split()[0]))
+    except Exception:
+        pass
+
+    tun_active = os.path.exists("/sys/class/net/tun0")
+
+    return {
+        "ram_total_mb": total_mb,
+        "ram_used_mb": used_mb,
+        "ram_pct": pct,
+        "disk_total_gb": disk_total_gb,
+        "disk_used_gb": disk_used_gb,
+        "disk_pct": disk_pct,
+        "load_avg": loads,
+        "uptime_sec": uptime_sec,
+        "tun_active": tun_active,
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+    }
+
+
+def _audio_dna() -> dict:
+    profiles = _json(DATA_DIR / "track_profiles.json")
+    if not profiles:
+        return {}
+    energies = [p["energy"] for p in profiles.values() if isinstance(p, dict) and "energy" in p]
+    valences = [p["valence"] for p in profiles.values() if isinstance(p, dict) and "valence" in p]
+    dance = [p["danceability"] for p in profiles.values() if isinstance(p, dict) and "danceability" in p]
+    tempos = [p["tempo"] for p in profiles.values() if isinstance(p, dict) and "tempo" in p]
+    count = len(energies)
+    if not count:
+        return {}
+    return {
+        "analyzed_tracks": len(profiles),
+        "energy": round(sum(energies) / count, 2),
+        "valence": round(sum(valences) / count, 2),
+        "danceability": round(sum(dance) / count, 2),
+        "tempo": round(sum(tempos) / count, 1),
+    }
+
+
+def _top_genres() -> list[dict]:
+    tags_data = _json(DATA_DIR / "artist_tags.json")
+    if not tags_data:
+        return []
+    genre_counter = collections.Counter()
+    for meta in tags_data.values():
+        if isinstance(meta, dict):
+            for g in meta.get("genres", []):
+                clean = str(g).lower().strip()
+                if clean:
+                    genre_counter[clean] += 1
+    total = sum(genre_counter.values()) or 1
+    return [
+        {"genre": g, "count": cnt, "pct": round((cnt / total) * 100, 1)}
+        for g, cnt in genre_counter.most_common(12)
+    ]
 
 
 def _merge_listens(parts: list[dict]) -> dict:
@@ -152,7 +245,7 @@ def summary() -> dict:
     count_names = sorted({name for day in counters.values() for name in day})
     counter_series = {name: [int((counters.get(d) or {}).get(name, 0)) for d in series_days] for name in count_names}
 
-    def top(items, key, n=15):
+    def top(items, key, n=20):
         return sorted(items, key=key, reverse=True)[:n]
 
     top_tracks = top(
@@ -185,6 +278,30 @@ def summary() -> dict:
             / max(1, active_since(7))
         ),
     }
+
+    # Demographics and cohorts
+    langs = collections.Counter(r.get("lang") or "unknown" for r in rows)
+    demographics = {
+        "languages": dict(langs.most_common(6)),
+        "premium_tg_count": sum(1 for r in rows if r.get("premium_tg")),
+        "premium_tg_pct": round((sum(1 for r in rows if r.get("premium_tg")) / max(1, len(rows))) * 100, 1),
+        "single_device": sum(1 for r in rows if r.get("devices", 1) <= 1),
+        "multi_device": sum(1 for r in rows if r.get("devices", 1) > 1),
+        "cohorts": {
+            "power": sum(1 for r in rows if r.get("minutes", 0) >= 60),
+            "regular": sum(1 for r in rows if 10 <= r.get("minutes", 0) < 60),
+            "casual": sum(1 for r in rows if 1 <= r.get("minutes", 0) < 10),
+            "onlookers": sum(1 for r in rows if r.get("minutes", 0) < 1),
+        },
+    }
+
+    # Hourly distribution in Moscow time (UTC+3)
+    activity_hours = [0] * 24
+    for r in rows:
+        if r.get("last_seen"):
+            h = time.gmtime(r["last_seen"] + 3 * 3600).tm_hour
+            activity_hours[h] += 1
+
     for r in rows:
         r.pop("_days", None)
     rows.sort(key=lambda r: r["last_seen"] or 0, reverse=True)
@@ -192,6 +309,11 @@ def summary() -> dict:
         "generated": int(now),
         "today": today,
         "cards": summary_cards,
+        "system": _system_stats(),
+        "audio_dna": _audio_dna(),
+        "genres": _top_genres(),
+        "demographics": demographics,
+        "activity_hours": activity_hours,
         "series": {"days": series_days, "dau": [dau[d] for d in series_days], "new": [new[d] for d in series_days],
                    "minutes": [minutes[d] for d in series_days], "plays": [plays[d] for d in series_days]},
         "counters": counter_series,
