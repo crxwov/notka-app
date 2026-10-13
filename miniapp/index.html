@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=141" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=93" />
+<link rel="stylesheet" href="system.css?v=94" />
 <link rel="stylesheet" href="plus.css?v=9" />
 <script src="telegram-web-app.js?v=1"></script>
 </head>
@@ -954,7 +954,6 @@
       <div class="player-meta-text">
         <h1 class="player-title" id="player-title">—</h1>
         <p class="player-artist" id="player-artist">—</p>
-        <p class="player-album" id="player-album" role="link" tabindex="0" hidden></p>
       </div>
       <button class="icon-btn fav-btn" id="player-fav-btn" type="button" aria-label="В любимое" aria-pressed="false">
         <svg class="ic-off" width="26" height="26" aria-hidden="true"><use href="#i-heart"/></svg>
@@ -985,6 +984,7 @@
     <div class="player-foot">
       <button class="round-btn round-glass foot-btn" id="player-lyrics-btn" type="button" aria-label="Текст песни" aria-pressed="false"><svg width="22" height="22" aria-hidden="true"><use href="#i-lyrics"/></svg></button>
       <button class="round-btn round-glass foot-btn" id="player-quote-btn" type="button" aria-label="Карточка с цитатой" aria-pressed="false"><svg width="22" height="22" aria-hidden="true"><use href="#i-quote"/></svg></button>
+      <button class="round-btn round-glass foot-btn" id="player-info-btn" type="button" aria-label="О треке"><svg width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg></button>
       <button class="round-btn round-glass foot-btn" id="player-queue-btn" type="button" aria-label="Очередь"><svg width="22" height="22" aria-hidden="true"><use href="#i-queue"/></svg></button>
     </div>
   </main>
@@ -1139,6 +1139,18 @@
       <ul class="originals-list" id="originals-list"></ul>
       <button class="pill-btn pill-primary originals-go" id="originals-apply" type="button">Заменить выбранные</button>
       <button class="sheet-row sheet-cancel" id="originals-skip" type="button">Не менять</button>
+    </div>
+  </div>
+
+  <div id="info-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="info-title">
+    <div class="sheet sheet-tall">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <div class="info-head">
+        <span class="cover cover-md" id="info-cover"></span>
+        <div class="info-head-text"><p class="sheet-title" id="info-title">О треке</p><p class="info-sub" id="info-sub"></p></div>
+      </div>
+      <ul class="info-list" id="info-list"></ul>
+      <button class="sheet-row sheet-cancel" id="info-close" type="button">Закрыть</button>
     </div>
   </div>
 
@@ -1355,6 +1367,6 @@
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
 <script src="mix.js?v=1"></script>
-<script src="app.js?v=178"></script>
+<script src="app.js?v=179"></script>
 </body>
 </html>

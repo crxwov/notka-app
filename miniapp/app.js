@@ -6044,9 +6044,6 @@
   function setFullPlayerFor(track) {
     $("player-title").textContent = track.title || "Без названия";
     $("player-artist").textContent = track.artist || "Неизвестный исполнитель";
-    const albumEl = $("player-album");
-    albumEl.textContent = track.album || "";
-    albumEl.hidden = !track.album;
     setCoverEl($("player-art"), hiResArtwork(track.artwork), track.id);
     // the cassette theme wears the cover as its label
     const art = hiResArtwork(track.artwork);
@@ -7118,18 +7115,71 @@
     pa.addEventListener("click", openFromPlayer);
     pa.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFromPlayer(); } });
   }
+  // a double tap on the cover opens the track's album
   {
-    // the album's name under the artist opens the album (as the artist's name opens the artist)
-    const al = $("player-album");
-    const openAlbumFromPlayer = () => {
+    let lastTap = 0;
+    document.querySelector(".player-art-wrap").addEventListener("click", (e) => {
+      if (document.body.classList.contains("lyrics-open") || e.target.closest("#theme-try, #player-lyrics")) return;
+      const now = Date.now();
+      if (now - lastTap > 340) { lastTap = now; return; }
+      lastTap = 0;
       const t = currentTrack;
-      if (!t || !t.album) return;
-      haptic("light");
+      if (!t) return;
+      haptic("medium");
       if (t.albumId) openAlbumById(t.source, t.albumId, t.album, t.artist);
-      else openAlbumScreen(t);
+      else if (t.album) openAlbumScreen(t);
+      else showToast("У этого трека нет альбома");
+    });
+  }
+
+  // «О треке»: what is known about the track, the album it is from and its artist
+  {
+    const list = $("info-list");
+    const row = (label, value, onClick) => {
+      if (!value) return;
+      const li = document.createElement("li");
+      li.className = "info-row" + (onClick ? " is-link" : "");
+      const k = document.createElement("span"); k.className = "info-k"; k.textContent = label;
+      const v = document.createElement("span"); v.className = "info-v"; v.textContent = value;
+      li.appendChild(k); li.appendChild(v);
+      if (onClick) { li.setAttribute("role", "link"); li.tabIndex = 0; li.addEventListener("click", onClick); }
+      list.appendChild(li);
+      return li;
     };
-    al.addEventListener("click", openAlbumFromPlayer);
-    al.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAlbumFromPlayer(); } });
+    let infoToken = 0;
+    async function openInfo() {
+      const t = currentTrack;
+      if (!t) return;
+      const token = ++infoToken;
+      list.innerHTML = "";
+      $("info-title").textContent = t.title || "О треке";
+      $("info-sub").textContent = t.artist || "";
+      setCoverEl($("info-cover"), t.artwork, t.id);
+      const goAlbum = () => { closeOverlay("info-sheet"); if (t.albumId) openAlbumById(t.source, t.albumId, t.album, t.artist); else openAlbumScreen(t); };
+      const goArtist = () => { closeOverlay("info-sheet"); openArtistScreen(t.artist, [t], { artistId: t.artistId, source: t.source }); };
+      row("Исполнитель", t.artist, t.artist ? goArtist : null);
+      const albumRow = row("Альбом", t.album, t.album ? goAlbum : null);
+      row("Длительность", t.duration ? formatDuration(t.duration) : "");
+      row("Источник", t.source === "youtube_music" ? "YouTube Music" : t.source === "soundcloud" ? "SoundCloud" : "");
+      openOverlay("info-sheet");
+      // the rest comes from the album and the artist page
+      const base = API_BASE_URL;
+      const want = [];
+      if (t.albumId) want.push(fetch(`${base}/album?source=${encodeURIComponent(t.source)}&id=${encodeURIComponent(t.albumId)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+      else want.push(Promise.resolve(null));
+      if (t.artistId) want.push(fetch(`${base}/artist?source=${encodeURIComponent(t.source)}&id=${encodeURIComponent(t.artistId)}&fast=true`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+      else want.push(Promise.resolve(null));
+      const [alb, art] = await Promise.all(want);
+      if (token !== infoToken) return;
+      if (alb) {
+        if (alb.year) row("Год выпуска", String(alb.year));
+        if (alb.tracks && alb.tracks.length) row("Треков в альбоме", String(alb.tracks.length));
+      }
+      if (art && art.subscribers) row("Слушателей у исполнителя", String(art.subscribers).replace(/subscribers?/i, "").trim());
+      if (albumRow && !t.album) albumRow.remove();
+    }
+    $("player-info-btn").addEventListener("click", () => { haptic("light"); openInfo(); });
+    $("info-close").addEventListener("click", () => closeOverlay("info-sheet"));
   }
   $("artist-play-btn").addEventListener("click", () => {
     if (!currentArtistTracks.length) { showToast("Нет треков"); return; }
