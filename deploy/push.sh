@@ -17,6 +17,20 @@ SSH=(ssh -p "$PORT" -i "$KEY" -o StrictHostKeyChecking=accept-new "root@$HOST")
 
 cd "$(dirname "$0")/.."
 
+# Защита от случайной перезаписи: на сервере записано, из какой ветки и кем выложено в прошлый раз.
+# Если сейчас выкладывается ДРУГАЯ ветка, скрипт останавливается (обойти: NOTKA_FORCE=1 bash deploy/push.sh ...).
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+WHO="${NOTKA_DEPLOYER:-$(git config user.name || echo unknown)}@$(hostname)"
+LAST="$("${SSH[@]}" "cat /opt/notka/DEPLOY_INFO 2>/dev/null || true")"
+LAST_BRANCH="$(printf '%s' "$LAST" | sed -n 's/^branch=//p' | head -1)"
+if [ -n "$LAST_BRANCH" ] && [ "$LAST_BRANCH" != "$BRANCH" ] && [ "${NOTKA_FORCE:-0}" != "1" ]; then
+  echo "СТОП: в прошлый раз на сервер выкладывали ветку «$LAST_BRANCH», а сейчас «$BRANCH»."
+  printf '%s
+' "$LAST"
+  echo "Чтобы не затереть чужую работу, договоритесь, кто выкладывает. Если это точно нужно: NOTKA_FORCE=1 bash deploy/push.sh $HOST"
+  exit 2
+fi
+
 echo "Отправляю код..."
 git archive --format=tar HEAD | "${SSH[@]}" "mkdir -p /opt/notka/app && tar -x -C /opt/notka/app && chown -R notka:notka /opt/notka/app"
 
@@ -29,5 +43,10 @@ for attempt in 1 2 3; do
   "${SSH[@]}" "systemctl restart notka && sleep 4 && systemctl is-active notka && curl -s http://127.0.0.1:8080/health" && break
   echo "Перезапуск не подтвердился (попытка $attempt), пробую ещё раз..."; sleep 6
 done
+"${SSH[@]}" "printf 'branch=%s
+commit=%s
+by=%s
+at=%s
+' '$BRANCH' '$(git rev-parse --short HEAD)' '$WHO' '$(date '+%Y-%m-%d %H:%M')' > /opt/notka/DEPLOY_INFO"
 echo
-echo "Готово."
+echo "Готово. На сервере записано: ветка $BRANCH, коммит $(git rev-parse --short HEAD)."
