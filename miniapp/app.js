@@ -6121,10 +6121,17 @@
     syncLyrics(true, true);
   }
 
+  let lyricsFetchTimer = 0;
+  let lyricsAbort = null;
   async function loadLyrics() {
     const track = currentTrack;
     if (!lyricsOpen || !track || lyricsTrackId === track.id) return;
     lyricsTrackId = track.id;
+    // flipping through tracks: what was still being asked for the passed one is dropped, and the old
+    // text's scroll stops, so only the track that stays costs a request and a redraw
+    clearTimeout(lyricsFetchTimer);
+    if (lyricsAbort) { lyricsAbort.abort(); lyricsAbort = null; }
+    cancelAnimationFrame(lyricsGlide);
     if (lyricsCache.has(track.id)) { renderLyrics(lyricsCache.get(track.id)); return; }
     if (!track.title) { renderLyrics({ lines: [], synced: false }); return; }
     lyricsData = null;
@@ -6135,12 +6142,18 @@
     $("lyrics-skeleton").hidden = false;
     lyricsBox.scrollTop = 0;
     let data = null;
+    // wait a moment: a quick flip to the next track makes this one's request pointless
+    await new Promise((resolve) => { lyricsFetchTimer = setTimeout(resolve, 350); });
+    if (lyricsTrackId !== track.id) return;
+    const abort = new AbortController();
+    lyricsAbort = abort;
     try {
       const q = `title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist || "")}`
         + (track.duration ? `&duration=${Math.round(track.duration)}` : "") + `&${trackQuery(track)}`;
-      const res = await fetch(`${API_BASE_URL}/lyrics?${q}`);
+      const res = await fetch(`${API_BASE_URL}/lyrics?${q}`, { signal: abort.signal });
       if (res.ok) data = await res.json();
     } catch (e) { /* shown as "couldn't load" below */ }
+    if (lyricsAbort === abort) lyricsAbort = null;
     if (lyricsTrackId !== track.id) return;
     $("lyrics-skeleton").hidden = true;
     if (!data || !Array.isArray(data.lines)) {
