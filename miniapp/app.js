@@ -6129,19 +6129,17 @@
       if (token !== playToken || (err && err.name === "AbortError")) return;
       console.error(err);
       sendEvent("play_error", { id: track.id, code: (err && err.code) || "net", retried: !!opts.retried });
-      // a source answers «no» now and then for one request: the same track once more,
-      // before it is given up on and skipped
-      if (!opts.retried && !(err && err.code === "TRACK_NOT_FOUND")) {
-        await new Promise((r) => setTimeout(r, 1200));
+      // a source answers «no» now and then for one request: the same track once more. Only when the
+      // request itself did not get through; an answer «could not» from the server already means that
+      // both of its routes were tried, a second go would only double the wait
+      if (!opts.retried && !(err && err.code)) {
+        await new Promise((r) => setTimeout(r, 800));
         if (token !== playToken) return;
         playTrack(track, currentQueue, { keepQueue: true, retried: true, altTried: opts.altTried, startAt: opts.startAt });
         return;
       }
-      isStarting = false;
-      setLoading(false);
-      setPlaying(false);
-      haptic("error");
-      // выбранная запись не играет (источник отказал): пробуем равноценную с тем же названием и исполнителем
+      // the chosen record does not play (the source said no): the equal one with the same title and
+      // artist is looked for while the player still shows «loading», so no error is flashed first
       if (!opts.altTried && !altTried.has(track.id)) {
         altTried.add(track.id);
         const alt = await findEquivalent(track);
@@ -6153,6 +6151,10 @@
           return;
         }
       }
+      isStarting = false;
+      setLoading(false);
+      setPlaying(false);
+      haptic("error");
       const hasNext = currentQueueIndex >= 0 && currentQueueIndex < currentQueue.length - 1;
       if (hasNext && failStreak < 3) {
         failStreak++;
@@ -6411,32 +6413,53 @@
   $("player-lyrics-btn").addEventListener("click", () => { haptic("light"); setLyricsOpen(!lyricsOpen); });
   ["touchstart", "wheel"].forEach((type) => lyricsBox.addEventListener(type, () => { lyricsTouchedAt = Date.now(); }, { passive: true }));
 
-  // A swipe down on the text puts it away — when the text is at its very
-  // top, so that the same gesture further down just scrolls it. The text
-  // follows the finger and either leaves or settles back.
-  let lyricsPull = null;
-  lyricsBox.addEventListener("touchstart", (e) => {
-    lyricsPull = lyricsOpen && lyricsBox.scrollTop <= 0 && e.touches.length === 1 ? { y: e.touches[0].clientY, dy: 0 } : null;
+  // A swipe down folds the player away (to the small one at the bottom), the text with it. On the cover
+  // from anywhere but the controls; over the text only when it is at its very top, so that the same
+  // gesture further down just scrolls it. The player follows the finger and either leaves or settles back.
+  let playerPull = null;
+  const pullScreen = $("screen-player"); // (the swipe code further down names it too, but declares it later)
+  const pullTarget = () => pullScreen;
+  pullScreen.addEventListener("touchstart", (e) => {
+    playerPull = null;
+    if (e.touches.length !== 1 || !currentTrack || currentScreen !== "player") return;
+    if (document.body.classList.contains("quote-picking") || openOverlays.length) return;
+    if (e.target.closest("#player-progress-track, .scrub, .scrub-times, button, input, a, .theme-try")) return;
+    if (e.target.closest("#player-lyrics") && lyricsBox.scrollTop > 0) return;
+    if (artGrab) return; // a record or a cassette is being turned by the finger
+    playerPull = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0, locked: false, t: performance.now() };
   }, { passive: true });
-  lyricsBox.addEventListener("touchmove", (e) => {
-    if (!lyricsPull) return;
-    lyricsPull.dy = e.touches[0].clientY - lyricsPull.y;
-    if (lyricsPull.dy <= 0 || lyricsBox.scrollTop > 0) { lyricsPull.dy = 0; lyricsBox.style.transform = ""; lyricsBox.style.opacity = ""; return; }
-    lyricsBox.style.transition = "none";
-    lyricsBox.style.transform = `translateY(${lyricsPull.dy * 0.6}px)`;
-    lyricsBox.style.opacity = String(Math.max(0.25, 1 - lyricsPull.dy / 320));
+  pullScreen.addEventListener("touchmove", (e) => {
+    if (!playerPull) return;
+    const dx = e.touches[0].clientX - playerPull.x, dy = e.touches[0].clientY - playerPull.y;
+    if (!playerPull.locked) {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { playerPull = null; return; } // sideways: the other swipe
+      if (dy < -10) { playerPull = null; return; } // upwards: the text scrolls
+      if (dy < 12) return;
+      if (lyricsOpen && lyricsBox.scrollTop > 0) { playerPull = null; return; }
+      playerPull.locked = true;
+      lyricsTouchedAt = Date.now();
+    }
+    playerPull.dy = Math.max(0, dy);
+    const el = pullTarget();
+    el.style.transition = "none";
+    el.style.transform = `translateY(${playerPull.dy * 0.8}px)`;
+    el.style.opacity = String(Math.max(0.35, 1 - playerPull.dy / 520));
   }, { passive: true });
-  const endLyricsPull = () => {
-    if (!lyricsPull) return;
-    const far = lyricsPull.dy > 80;
-    lyricsPull = null;
-    lyricsBox.style.transition = "";
-    lyricsBox.style.transform = "";
-    lyricsBox.style.opacity = "";
-    if (far) { haptic("light"); setLyricsOpen(false); }
+  const endPlayerPull = (e) => {
+    if (!playerPull) return;
+    const p = playerPull;
+    playerPull = null;
+    if (!p.locked) return;
+    const el = pullTarget();
+    const speed = p.dy / Math.max(1, performance.now() - p.t);
+    const go = e && e.type === "touchend" && (p.dy > 120 || (p.dy > 50 && speed > 0.55));
+    el.style.transition = "";
+    el.style.transform = "";
+    el.style.opacity = "";
+    if (go) { haptic("light"); goBack(); }
   };
-  lyricsBox.addEventListener("touchend", endLyricsPull);
-  lyricsBox.addEventListener("touchcancel", endLyricsPull);
+  pullScreen.addEventListener("touchend", endPlayerPull);
+  pullScreen.addEventListener("touchcancel", endPlayerPull);
   lyricsList.addEventListener("click", (e) => {
     const li = e.target.closest(".lyrics-line");
     if (li && quotePicking) { toggleQuoteLine(li); return; }

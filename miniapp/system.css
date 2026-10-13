@@ -636,3 +636,7 @@ body:not(.is-desktop).lyrics-open .lyrics { bottom: -14px; padding-top: 20px; }
 .originals-text i { display: block; font-style: normal; font-size: 14px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .originals-text i.was { text-decoration: line-through; opacity: 0.7; }
 .originals-go { width: 100%; margin-bottom: 8px; }
+/* «Текст» на телефоне: лишнее убрано. Перемотка и пауза тут не нужны: остаются название, ползунок
+   и нижний ряд. Плеер сворачивается свайпом вниз. */
+body:not(.is-desktop).lyrics-open .player-controls { display: none; }
+body:not(.is-desktop).lyrics-open .player-foot { margin-top: 6px; }
