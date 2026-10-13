@@ -47,6 +47,7 @@
     fctx = front.getContext("2d");
     window.addEventListener("resize", resize);
     document.addEventListener("visibilitychange", () => { if (document.hidden) stopLoop(); else if (theme) startLoop(); });
+    document.addEventListener("notka:idle", (e) => { if (e.detail && e.detail.idle) stopLoop(); else if (theme && !document.hidden) startLoop(); });
     bindPointer();
   }
   function resize() {

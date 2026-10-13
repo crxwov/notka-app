@@ -261,7 +261,7 @@ void main(){
     frame(now) {
       if (!this.running) return;
       this.raf = requestAnimationFrame(this.onFrame);
-      if (document.hidden) { this.last = now; return; }
+      if (document.hidden || document.documentElement.classList.contains("app-idle")) { this.last = now; return; }
       const raw = now - this.last;
       if (raw < 31) return; // ~30 fps is plenty for a soft halo
       this.last = now;

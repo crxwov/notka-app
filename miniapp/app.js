@@ -1,11 +1,19 @@
 (() => {
-  const API_BASE_URL =
-    window.NOTKA_CONFIG && window.NOTKA_CONFIG.API_BASE_URL !== undefined
-      ? window.NOTKA_CONFIG.API_BASE_URL
-      : "http://localhost:8080";
+  const API_BASE_URL = (() => {
+    if (window.NotkaAndroid && window.NotkaAndroid.getApiBaseUrl) {
+      return window.NotkaAndroid.getApiBaseUrl();
+    }
+    if (window.location.protocol === "file:") {
+      return "https://94-156-179-229.sslip.io";
+    }
+    if (window.NOTKA_CONFIG && window.NOTKA_CONFIG.API_BASE_URL !== undefined && window.NOTKA_CONFIG.API_BASE_URL !== "") {
+      return window.NOTKA_CONFIG.API_BASE_URL;
+    }
+    return "";
+  })();
   const STORAGE_KEY = "notka_state_v2";
   const playerCassette = document.querySelector(".player-art-wrap .cassette");
-  const BG_COLOR = "#0C0A12";
+  const BG_COLOR = "#1A0B16";
 
   // ============================================================
   // Telegram WebApp integration (safe no-op outside Telegram)
@@ -28,7 +36,105 @@
       console.warn("Telegram WebApp init failed", e);
     }
   }
-  const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  // On a computer Telegram opens a Mini App in a small window; ask for the
+  // whole screen (Bot API 8.0). Older clients just keep the window, which
+  // the layout handles too.
+  // On a computer the Mini App opens on the whole screen. That mode has no
+  // window buttons and covers the Windows taskbar, so it is made livable:
+  //  - the side panel has «свернуть в окно» and «закрыть», Esc and F11 too;
+  //  - when the window loses focus (Alt+Tab, the Win key, another program)
+  //    it steps back to a window by itself, so the taskbar and other
+  //    programs are reachable, and widens again when focus is back;
+  //  - leaving it by the button is remembered: then it stays a window.
+  const MOBILE_OR_WEB = ["android", "android_x", "ios", "weba", "webk"];
+  const onComputerClient = !!(tg && tg.platform && !MOBILE_OR_WEB.includes(tg.platform));
+  const canFullscreen = !!(onComputerClient && tgAtLeast("8.0") && tg.requestFullscreen && tg.exitFullscreen);
+  const FULLSCREEN_KEY = "notka_fullscreen_v2";
+  let wantFullscreen = true;
+  try { wantFullscreen = localStorage.getItem(FULLSCREEN_KEY) !== "0"; } catch (e) { /* storage may be blocked */ }
+  let steppedBack = false; // we left fullscreen only because focus went elsewhere
+  let fullscreenFailed = false;
+  let lastFullscreenAt = Date.now(); // the window itself blinks focus while it changes mode
+  let enterTries = 0;
+  function enterFullscreen() {
+    if (!canFullscreen || fullscreenFailed || tg.isFullscreen) return;
+    lastFullscreenAt = Date.now();
+    enterTries++;
+    try { tg.requestFullscreen(); } catch (e) { fullscreenFailed = true; }
+  }
+  function setFullscreen(on) {
+    if (!canFullscreen) return;
+    wantFullscreen = on;
+    steppedBack = false;
+    lastFullscreenAt = Date.now();
+    try { localStorage.setItem(FULLSCREEN_KEY, on ? "1" : "0"); } catch (e) { /* ignore */ }
+    try { on ? tg.requestFullscreen() : tg.exitFullscreen(); } catch (e) { /* ignore */ }
+  }
+  if (canFullscreen) {
+    if (wantFullscreen) {
+      enterFullscreen();
+      // a client may not have been ready the first time, or wants a touch first
+      setTimeout(() => { if (wantFullscreen && !tg.isFullscreen && enterTries < 3) enterFullscreen(); }, 1200);
+      window.addEventListener("pointerdown", function once() {
+        window.removeEventListener("pointerdown", once, true);
+        if (wantFullscreen && !tg.isFullscreen && !steppedBack) enterFullscreen();
+      }, true);
+    }
+    if (tg.onEvent) tg.onEvent("fullscreenFailed", () => { fullscreenFailed = true; });
+    if (tg.onEvent) tg.onEvent("fullscreenChanged", () => { lastFullscreenAt = Date.now(); });
+    let blurTimer = 0;
+    window.addEventListener("blur", () => {
+      clearTimeout(blurTimer);
+      blurTimer = setTimeout(() => {
+        if (document.hasFocus() || !wantFullscreen || !tg.isFullscreen) return;
+        if (Date.now() - lastFullscreenAt < 2500) return; // that was the mode change, not the listener leaving
+        steppedBack = true;
+        lastFullscreenAt = Date.now();
+        try { tg.exitFullscreen(); } catch (e) { /* ignore */ }
+      }, 300);
+    });
+    window.addEventListener("focus", () => {
+      clearTimeout(blurTimer);
+      if (steppedBack && wantFullscreen) { steppedBack = false; enterFullscreen(); }
+    });
+  } else if (onComputerClient && tg.requestFullscreen === undefined) {
+    // an old Telegram on a computer: say so once instead of silently staying small
+    window.addEventListener("load", () => {
+      let told = false;
+      try { told = localStorage.getItem("notka_fs_told") === "1"; localStorage.setItem("notka_fs_told", "1"); } catch (e) { /* ignore */ }
+      if (!told) setTimeout(() => showToast("Полный экран работает в новом Telegram. Обнови Telegram Desktop"), 2500);
+    });
+  }
+  // Окно Нотки на компьютере не в фокусе (игра, браузер, другая программа): через 4 секунды замораживаем
+  // фоновый свет и анимации, чтобы музыка в фоне не отбирала кадры у соседних программ. Вернулся мышью
+  // или фокусом: всё оживает сразу. Звук и ход трека не затрагиваются.
+  if (onComputerClient) {
+    const root = document.documentElement;
+    let idleTimer = 0;
+    const setIdle = (on) => {
+      if (root.classList.contains("app-idle") === on) return;
+      root.classList.toggle("app-idle", on);
+      document.dispatchEvent(new CustomEvent("notka:idle", { detail: { idle: on } }));
+    };
+    const arm = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (!document.hasFocus()) setIdle(true); }, 4000); };
+    window.addEventListener("blur", arm);
+    window.addEventListener("focus", () => { clearTimeout(idleTimer); setIdle(false); });
+    document.addEventListener("pointermove", () => { if (root.classList.contains("app-idle")) { setIdle(false); arm(); } }, { passive: true });
+  }
+  // who is listening: Telegram's own object, or authenticated mobile user, or launch params
+  let tgUser = (() => {
+    try {
+      const stored = localStorage.getItem("notka_auth_user");
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    const direct = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+    if (direct && direct.id && direct.id !== 424242) return direct;
+    try {
+      const fromData = (raw) => { const u = new URLSearchParams(raw || "").get("user"); return u ? JSON.parse(u) : null; };
+      const hash = new URLSearchParams(window.location.hash.slice(1)).get("tgWebAppData");
+      return fromData(tg && tg.initData) || fromData(hash) || null;
+    } catch (e) { return null; }
+  })();
   const hasTgBack = !!(tg && tg.BackButton && tgAtLeast("6.1"));
   if (hasTgBack) document.body.classList.add("tg-back");
 
@@ -40,6 +146,56 @@
       else tg.HapticFeedback.impactOccurred(kind || "light");
     } catch (e) { /* haptics are a nicety */ }
   }
+
+  // слабые телефоны: сами замеряем плавность и при тормозах выключаем дорогое размытие фона.
+  // Режим хранится на устройстве: "auto" (по замеру), "lite" (включён вручную), "full" (выключен вручную).
+  function perfGuard() {
+    const root = document.documentElement;
+    const KEY = "notka_perf";
+    const MODE_KEY = "notka_perf_mode";
+    const read = (k) => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } };
+    const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* storage may be blocked */ } };
+    let mode = read(MODE_KEY) || "auto";
+    if (mode === "lite" || (mode === "auto" && read(KEY) === "lite")) root.classList.add("perf-lite");
+    let probing = false;
+    let tries = 0;
+    function probe() {
+      if (mode !== "auto" || probing || root.classList.contains("perf-lite") || tries >= 3) return;
+      if (document.hidden) { setTimeout(probe, 4000); return; }
+      probing = true;
+      tries += 1;
+      const dts = [];
+      let last = 0;
+      const tick = (t) => {
+        // кадр после паузы вкладки (или свёрнутого окна) не считаем: он не про тормоза
+        if (last && t - last < 250) dts.push(t - last);
+        last = t;
+        if (dts.length < 60) { requestAnimationFrame(tick); return; }
+        probing = false;
+        dts.sort((a, b) => a - b);
+        // медиана дольше 26 мс: меньше ~38 кадров в секунду
+        if (dts[dts.length >> 1] > 26) {
+          root.classList.add("perf-lite");
+          write(KEY, "lite");
+          document.dispatchEvent(new CustomEvent("notka:perf", { detail: { lite: true, auto: true } }));
+        } else if (tries < 3) {
+          setTimeout(probe, 15000); // повторный замер уже под нагрузкой (плеер, список, свет)
+        }
+      };
+      requestAnimationFrame(tick);
+    }
+    setTimeout(probe, 3000);
+    probe.isLite = () => root.classList.contains("perf-lite");
+    probe.mode = () => mode;
+    probe.set = (lite) => {
+      mode = lite ? "lite" : "full";
+      write(MODE_KEY, mode);
+      write(KEY, lite ? "lite" : "");
+      root.classList.toggle("perf-lite", !!lite);
+    };
+    return probe;
+  }
+  const perfProbe = perfGuard();
 
   // --- keyboard-safe viewport height ---
   // 100dvh doesn't reliably shrink when Telegram's in-app WebView opens the
@@ -107,8 +263,13 @@
         listens: parsed.listens || { seconds: 0, plays: 0, tracks: {}, artists: {} },
         sharedImports: parsed.sharedImports || {},
         recent: parsed.recent || [], // the last tracks played, newest first
+        searchHistory: parsed.searchHistory || [], // what was searched and opened from search, newest first
+        skipStats: parsed.skipStats || {}, // per artist: how often a track was turned away early (s) or heard on (p); this device only
         fresh: parsed.fresh || null, // { key, at, items } — «Новое от любимых исполнителей»
         events: parsed.events || null, // { progress, items } — see «События»
+        syncTs: parsed.syncTs || {}, // when each shared key last changed on this device
+        remoteListens: parsed.remoteListens || null, // the other devices' listening stats (see the account sync)
+        listensResetPending: !!parsed.listensResetPending,
       };
     } catch (e) {
       return {
@@ -121,6 +282,8 @@
   }
   const state = loadState();
   state.events = state.events || { progress: {}, items: [] };
+  state.searchHistory = state.searchHistory || [];
+  state.skipStats = state.skipStats || {};
   function ownsItem(item) { return state.events.items.includes(item); }
   // Only what a row needs to be shown and played again.
   function slimTrack(t) {
@@ -151,8 +314,10 @@
     state.listens.tracks = Object.fromEntries(entries.slice(0, keep));
   }
   let storageFullWarned = false;
-  function persist() {
+  function persist(quiet) {
+    stampChanges();
     trimListens(300);
+    if (!quiet) scheduleSync();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
@@ -169,6 +334,267 @@
       }
     }
   }
+
+  // ============================================================
+  // ONE ACCOUNT, ALL DEVICES. Inside Telegram the favourites, playlists,
+  // settings and listening stats also live on the server under the user's
+  // Telegram account, so the phone and the computer show the same.
+  //  - the ordinary keys: each has its own time of last change, the newer wins
+  //    (the first time a device joins, the lists are united, nothing is lost);
+  //  - the stats add up: every device keeps its own counter, the whole is the sum.
+  // ============================================================
+  const SYNC_KEYS = ["favorites", "playlists", "settings", "followedArtists", "followedMeta", "playlistFlags", "accountName", "accountAvatar", "recent", "sharedImports", "onboardingSeenV2", "searchHistory"];
+  const SYNC_JOINED_KEY = "notka_sync_joined_v1";
+  const syncSnap = {};
+  state.syncTs = state.syncTs || {};
+  function snapOf(key) { return JSON.stringify(state[key] === undefined ? null : state[key]); }
+  SYNC_KEYS.forEach((k) => { syncSnap[k] = snapOf(k); });
+  // what changed since the last look gets a time stamp
+  function stampChanges() {
+    const now = Date.now();
+    SYNC_KEYS.forEach((k) => {
+      const j = snapOf(k);
+      if (syncSnap[k] !== j) { syncSnap[k] = j; state.syncTs[k] = now; }
+    });
+  }
+  const syncDeviceId = (() => {
+    try {
+      let id = localStorage.getItem("notka_device_id");
+      if (!id) { id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem("notka_device_id", id); }
+      return id;
+    } catch (e) { return "tmp" + Math.random().toString(36).slice(2, 8); }
+  })();
+
+  // «Недавнее» from two devices: all the tracks, the most recently played first
+  function mergeRecent(a, b) {
+    const best = new Map();
+    [...(a || []), ...(b || [])].forEach((t, i) => {
+      if (!t || !t.id) return;
+      const at = t.at || 0;
+      const cur = best.get(t.id);
+      if (!cur || at > (cur.t.at || 0)) best.set(t.id, { t, i });
+    });
+    return [...best.values()]
+      .sort((x, y) => (y.t.at || 0) - (x.t.at || 0) || x.i - y.i)
+      .slice(0, 20)
+      .map((x) => x.t);
+  }
+
+  let listensRev = 0, listensViewRev = -1, listensViewCache = null;
+  function mergeListens(a, b) {
+    const out = { seconds: (a.seconds || 0) + (b.seconds || 0), plays: (a.plays || 0) + (b.plays || 0), tracks: {}, artists: {}, days: {} };
+    [a, b].forEach((src) => {
+      Object.entries(src.tracks || {}).forEach(([id, x]) => {
+        const t = out.tracks[id] || (out.tracks[id] = { track: x.track, plays: 0, seconds: 0 });
+        t.plays += x.plays || 0; t.seconds += x.seconds || 0;
+        if (!t.track && x.track) t.track = x.track;
+      });
+      Object.entries(src.artists || {}).forEach(([name, x]) => {
+        const t = out.artists[name] || (out.artists[name] = { seconds: 0, plays: 0 });
+        t.seconds += x.seconds || 0; t.plays += x.plays || 0;
+        if (!t.artistId && x.artistId) { t.artistId = x.artistId; t.source = x.source; }
+      });
+      Object.entries(src.days || {}).forEach(([key, d]) => {
+        const day = out.days[key] || (out.days[key] = { s: 0, p: 0, t: {}, a: {} });
+        day.s = Math.round((day.s + (d.s || 0)) * 10) / 10; day.p += d.p || 0;
+        Object.entries(d.t || {}).forEach(([id, v]) => { const x = day.t[id] || (day.t[id] = [0, 0]); x[0] += v[0] || 0; x[1] = Math.round((x[1] + (v[1] || 0)) * 10) / 10; });
+        Object.entries(d.a || {}).forEach(([name, v]) => { const x = day.a[name] || (day.a[name] = [0, 0]); x[0] += v[0] || 0; x[1] = Math.round((x[1] + (v[1] || 0)) * 10) / 10; });
+      });
+    });
+    return out;
+  }
+  // what every screen reads: this device's stats plus the other devices'
+  function listensView() {
+    const other = state.remoteListens;
+    if (!other) return state.listens;
+    if (listensViewRev === listensRev && listensViewCache) return listensViewCache;
+    listensViewCache = mergeListens(state.listens, other);
+    listensViewRev = listensRev;
+    return listensViewCache;
+  }
+
+  // the signed launch data: from the bridge, and when that script did not load, from the
+  // address Telegram opened the page with (#tgWebAppData=...), which carries the same string
+  const tgInitRaw = (() => {
+    try {
+      return (tg && tg.initData) || new URLSearchParams(window.location.hash.slice(1)).get("tgWebAppData") || "";
+    } catch (e) { return ""; }
+  })();
+  const syncOn = () => !!tgInitRaw || !!localStorage.getItem("notka_auth_token");
+  // what the sync is doing, for the account screen: idle | ok | auth | big | net
+  let syncStatus = { code: "idle", at: 0 };
+  function setSyncStatus(code) {
+    syncStatus = { code, at: Date.now() };
+    try { if (typeof currentScreen !== "undefined" && currentScreen === "account") renderAccountScreen(); } catch (e) { /* not drawn yet */ }
+  }
+  let syncBusy = false, syncAgain = false, syncTimer = 0, syncDeadAt = 0, syncLastAt = 0;
+  function scheduleSync(ms) {
+    if (!syncOn() || Date.now() < syncDeadAt) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncNow, ms || 12000);
+  }
+  async function postSync(payload) {
+    const headers = { "content-type": "application/json" };
+    if (tgInitRaw) headers["X-Telegram-Init-Data"] = tgInitRaw;
+    const token = localStorage.getItem("notka_auth_token");
+    if (token) headers["X-Auth-Token"] = token;
+    const res = await fetch(`${API_BASE_URL}/sync`, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(payload),
+    });
+    if (res.status === 401) { syncDeadAt = Date.now() + 20 * 60 * 1000; const e = new Error("sync auth"); e.syncCode = "auth"; throw e; }
+    if (res.status === 413) { syncDeadAt = Date.now() + 2 * 3600 * 1000; const e = new Error("sync big"); e.syncCode = "big"; throw e; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+  // the first time this device joins the account: lists are united, not replaced
+  function unionIntoLocal(remote) {
+    const r = remote.shared || {};
+    const byId = (list) => new Map((list || []).map((x) => [x.id, x]));
+    if (Array.isArray(r.favorites)) {
+      const have = byId(state.favorites);
+      const extra = r.favorites.filter((t) => t && !have.has(t.id));
+      state.favorites = state.favorites.concat(extra);
+    }
+    if (Array.isArray(r.playlists)) {
+      const have = byId(state.playlists);
+      r.playlists.forEach((p) => {
+        if (!p || !p.id) return;
+        const mine = have.get(p.id);
+        if (!mine) { state.playlists.push(p); return; }
+        const ids = new Set(mine.trackIds || []);
+        (p.trackIds || []).forEach((id) => { if (!ids.has(id)) { (mine.trackIds = mine.trackIds || []).push(id); } });
+        mine.tracksCache = Object.assign({}, p.tracksCache || {}, mine.tracksCache || {});
+      });
+    }
+    if (Array.isArray(r.followedArtists)) {
+      const have = new Set(state.followedArtists);
+      r.followedArtists.forEach((n) => { if (!have.has(n)) state.followedArtists.push(n); });
+      state.followedMeta = Object.assign({}, r.followedMeta || {}, state.followedMeta || {});
+    }
+    if (Array.isArray(r.recent)) state.recent = mergeRecent(state.recent, r.recent);
+    if (Array.isArray(r.searchHistory) && !(state.searchHistory || []).length) state.searchHistory = r.searchHistory;
+    if (r.settings && typeof r.settings === "object") state.settings = Object.assign({}, state.settings, r.settings);
+    if (!state.accountName && r.accountName) state.accountName = r.accountName;
+    if (!state.accountAvatar && r.accountAvatar) state.accountAvatar = r.accountAvatar;
+    if (r.playlistFlags) state.playlistFlags = Object.assign({}, r.playlistFlags, state.playlistFlags || {});
+    if (r.sharedImports) state.sharedImports = Object.assign({}, r.sharedImports, state.sharedImports || {});
+    const now = Date.now();
+    SYNC_KEYS.forEach((k) => { state.syncTs[k] = now; syncSnap[k] = snapOf(k); });
+  }
+  function applyRemote(res) {
+    let changed = false;
+    const shared = res.shared || {}, ts = res.ts || {};
+    SYNC_KEYS.forEach((k) => {
+      if (!(k in shared)) return;
+      if (k === "recent" && Array.isArray(shared.recent)) {
+        // the history of both devices: united. If this one had plays the account lacks, it goes back up.
+        const merged = mergeRecent(state.recent, shared.recent);
+        const same = JSON.stringify(merged.map((t) => t.id)) === JSON.stringify(shared.recent.map((t) => t.id));
+        if (JSON.stringify(merged) !== JSON.stringify(state.recent)) { state.recent = merged; syncSnap.recent = snapOf("recent"); changed = true; }
+        state.syncTs.recent = same ? Math.max(ts.recent || 0, state.syncTs.recent || 0) : Date.now();
+        if (!same) setTimeout(() => scheduleSync(1500), 0);
+        return;
+      }
+      if ((ts[k] || 0) > (state.syncTs[k] || 0)) {
+        state[k] = shared[k];
+        state.syncTs[k] = ts[k];
+        syncSnap[k] = snapOf(k);
+        changed = true;
+      }
+    });
+    // the other devices' stats
+    let other = null;
+    Object.entries(res.devices || {}).forEach(([id, d]) => {
+      if (id === syncDeviceId || !d || !d.listens) return;
+      other = other ? mergeListens(other, d.listens) : mergeListens({}, d.listens);
+    });
+    const hadOther = !!state.remoteListens;
+    state.remoteListens = other;
+    listensRev++;
+    persist(true);
+    return changed || (!!other !== hadOther);
+  }
+  async function syncNow() {
+    if (!syncOn() || Date.now() < syncDeadAt) return;
+    if (syncBusy) { syncAgain = true; return; }
+    syncBusy = true;
+    try {
+      let joined = false;
+      try { joined = localStorage.getItem(SYNC_JOINED_KEY) === "1"; } catch (e) { /* treated as joined: no union */ joined = true; }
+      if (!joined) {
+        const remote = await postSync({ shared: {}, ts: {}, device: { id: syncDeviceId, listens: state.listens } });
+        unionIntoLocal(remote);
+        try { localStorage.setItem(SYNC_JOINED_KEY, "1"); } catch (e) { /* once more next time */ }
+      }
+      stampChanges();
+      const shared = {}, ts = {};
+      SYNC_KEYS.forEach((k) => { shared[k] = state[k] === undefined ? null : state[k]; ts[k] = state.syncTs[k] || 0; });
+      const reset = !!state.listensResetPending;
+      const res = await postSync({ shared, ts, device: { id: syncDeviceId, listens: state.listens }, clear_listens: reset });
+      if (reset) state.listensResetPending = false;
+      syncLastAt = Date.now();
+      setSyncStatus("ok");
+      if (applyRemote(res)) {
+        if (typeof refreshCurrentScreen === "function") refreshCurrentScreen();
+        if (typeof renderLibrary === "function") renderLibrary();
+        if (typeof renderSidebar === "function" && document.body.classList.contains("is-desktop")) renderSidebar();
+      }
+    } catch (e) {
+      // offline or the server is busy: the next change or the next visit tries again
+      setSyncStatus((e && e.syncCode) || "net");
+    } finally {
+      syncBusy = false;
+      if (syncAgain) { syncAgain = false; scheduleSync(2000); }
+    }
+  }
+  if (syncOn()) {
+    setTimeout(syncNow, 1200);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") { if (Date.now() - syncLastAt > 20000) syncNow(); }
+      else syncNow();
+    });
+    setInterval(() => { if (document.visibilityState === "visible" && Date.now() - syncLastAt > 90000) syncNow(); }, 30000);
+  }
+
+  // ---- small product events: which searches find nothing, what is skipped, what fails ----
+  // They go to the server in batches, tied to a keyed hash and not to a name, and the switch
+  // in «Аккаунт» turns them off. Only the names of things, never the text of anything private.
+  const eventQueue = [];
+  let eventsFlushing = false;
+  function track(name, props) {
+    try {
+      if (state.settings.analyticsOff) return;
+      if (!tgInitRaw && !localStorage.getItem("notka_auth_token")) return;
+      eventQueue.push({ e: name, t: Date.now(), p: props || {} });
+      if (eventQueue.length >= 25) flushEvents();
+    } catch (e) { /* never in the way */ }
+  }
+  async function flushEvents() {
+    const tok = localStorage.getItem("notka_auth_token");
+    if (eventsFlushing || !eventQueue.length || (!tgInitRaw && !tok) || state.settings.analyticsOff) return;
+    eventsFlushing = true;
+    const batch = eventQueue.splice(0, 50);
+    try {
+      const headers = { "content-type": "application/json" };
+      if (tgInitRaw) headers["X-Telegram-Init-Data"] = tgInitRaw;
+      if (tok) headers["X-Auth-Token"] = tok;
+      const res = await fetch(`${API_BASE_URL}/analytics`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ d: syncDeviceId, events: batch }),
+        keepalive: true,
+      });
+      if (res.status >= 500) eventQueue.unshift(...batch.slice(0, 25));
+    } catch (e) {
+      eventQueue.unshift(...batch.slice(0, 25));
+    } finally {
+      eventsFlushing = false;
+    }
+  }
+  setInterval(flushEvents, 30000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushEvents(); });
 
   const Store = {
     isFavorite(id) { return state.favorites.some((t) => t.id === id); },
@@ -337,10 +763,25 @@
 
   // Covers without artwork get a small piece of the light, tinted by
   // the item's name so neighbouring rows don't all look identical.
-  const BRAND_HUES = [14, 24, 34, 336, 348, 6, 318];
+  // The colours are the light's variables, not fixed values, so such a cover
+  // follows the theme and the playing track's light; the name only moves the
+  // highlight around.
   function fallbackCover(seed) {
-    const h = BRAND_HUES[hashString(seed) % BRAND_HUES.length];
-    return `radial-gradient(circle at 34% 30%, hsl(${(h + 20) % 360} 100% 88%) 0 8%, hsl(${h} 92% 60%) 36%, hsl(${(h + 330) % 360} 72% 50%) 64%, hsl(262 66% 38%) 100%)`;
+    const n = hashString(seed);
+    const x = 22 + (n % 5) * 14;
+    const y = 20 + (Math.floor(n / 5) % 4) * 12;
+    return `radial-gradient(circle at ${x}% ${y}%, var(--c-core) 0 8%, var(--c-warm) 36%, var(--c-mid) 64%, var(--c-deep) 100%)`;
+  }
+
+  function proxyArtwork(url) {
+    if (!url || typeof url !== "string") return url;
+    if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+    if (url.includes("/artwork?url=")) return url;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      const base = (API_BASE_URL || "https://94-156-179-229.sslip.io").replace(/\/$/, "");
+      return `${base}/artwork?url=${encodeURIComponent(url)}`;
+    }
+    return url;
   }
 
   function setCoverEl(el, url, seed) {
@@ -349,7 +790,7 @@
     el.style.background = "";
     if (url) {
       const img = document.createElement("img");
-      img.src = url;
+      img.src = proxyArtwork(url);
       img.alt = "";
       img.loading = "lazy";
       img.onerror = () => { img.remove(); el.style.background = fallbackCover(seed); };
@@ -432,8 +873,8 @@
   // 120px ("=w120-h120-…"); the same URL serves any size.
   function hiResArtwork(url) {
     if (!url) return url;
-    if (/googleusercontent\.com|ggpht\.com/.test(url)) return url.replace(/=w\d+-h\d+/, "=w544-h544");
-    return url;
+    if (/googleusercontent\.com|ggpht\.com/.test(url)) return proxyArtwork(url.replace(/=w\d+-h\d+/, "=w544-h544"));
+    return proxyArtwork(url);
   }
 
   function rgbToHsl(r, g, b) {
@@ -455,15 +896,24 @@
     const BINS = 18;
     const bins = Array.from({ length: BINS }, () => ({ w: 0, x: 0, y: 0, s: 0, l: 0 }));
     const vbins = Array.from({ length: BINS }, () => ({ w: 0, x: 0, y: 0, s: 0, l: 0 }));
-    let total = 0, chroma = 0, vivid = 0, gx = 0, gy = 0;
+    // by area: what actually fills the cover (a small loud accent does not decide the mood)
+    const abins = Array.from({ length: BINS }, () => ({ w: 0, x: 0, y: 0, s: 0, l: 0 }));
+    let total = 0, chroma = 0, vivid = 0, gx = 0, gy = 0, sumL = 0;
     const lights = [];
     for (let i = 0; i < data.length; i += 4) {
       if (data[i + 3] < 128) continue;
       const [h, s, l] = rgbToHsl(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255);
       total++;
+      sumL += l;
       lights.push([h, s, l]);
       if (s < 0.2 || l < 0.1 || l > 0.92) continue;
       chroma++;
+      {
+        const wa = (s + 0.2) * Math.sqrt(1 - Math.abs(2 * l - 1));
+        const ab = abins[Math.floor(h / (360 / BINS)) % BINS];
+        const ra = (h * Math.PI) / 180;
+        ab.w += wa; ab.x += Math.cos(ra) * wa; ab.y += Math.sin(ra) * wa; ab.s += s * wa; ab.l += l * wa;
+      }
       // saturation squared: a small vivid accent beats a large muted area
       const w = s * s * Math.sqrt(1 - Math.abs(2 * l - 1));
       const bi = Math.floor(h / (360 / BINS)) % BINS;
@@ -486,11 +936,12 @@
       const v = vbins.filter((b) => b.w > 0).sort((a, b) => b.w - a.w)[0];
       const h = (Math.atan2(v.y, v.x) * 180 / Math.PI + 360) % 360;
       const s = v.s / v.w, l = v.l / v.w;
+      // softened: a cover's loudest colour is calmed, not copied
       return {
-        core: hsl(h, clamp(s, 0.6, 1), 0.86),
-        warm: hsl(h, clamp(s * 1.1, 0.65, 0.98), clamp(l, 0.46, 0.58)),
-        mid: hsl(h, clamp(s, 0.55, 0.9), 0.4),
-        deep: hsl(h, 0.4, 0.2),
+        core: hsl(h, clamp(s * 0.6, 0.34, 0.55), 0.88),
+        warm: hsl(h, clamp(s * 0.74, 0.4, 0.62), clamp(l, 0.54, 0.64)),
+        mid: hsl(h, clamp(s * 0.68, 0.34, 0.56), 0.42),
+        deep: hsl(h, 0.3, 0.22),
       };
     }
 
@@ -505,17 +956,17 @@
       };
     }
 
-    const colors = bins
+    const colors = abins
       .filter((b) => b.w > 0)
       .map((b) => ({ w: b.w, h: (Math.atan2(b.y, b.x) * 180 / Math.PI + 360) % 360, s: b.s / b.w, l: b.l / b.w }))
       .sort((a, b) => b.w - a.w);
     const picks = [colors[0]];
     for (const c of colors) {
       if (picks.length >= 3) break;
-      if (c.w < colors[0].w * 0.08) break;
-      if (picks.every((p) => hueDist(p.h, c.h) >= 28)) picks.push(c);
+      if (c.w < colors[0].w * 0.12) break;
+      if (picks.every((p) => hueDist(p.h, c.h) >= 30)) picks.push(c);
     }
-    const [a, b = { ...a, h: (a.h + 24) % 360 }, c3] = picks;
+    const [a, b = { ...a, h: (a.h + 24) % 360, s: a.s * 0.9 }, c3] = picks;
     // the darkest chromatic tones of the cover become the deep layer
     const darks = lights.filter((p) => p[1] > 0.15 && p[2] < 0.45).sort((p, q) => p[2] - q[2]).slice(0, Math.max(6, Math.floor(total * 0.15)));
     let deepH = c3 ? c3.h : b.h, deepS = c3 ? c3.s : b.s;
@@ -525,16 +976,23 @@
       deepH = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
       deepS = ds / darks.length;
     }
+    // the vibe: how light the cover is as a whole, and how colourful. A dark, moody cover gives
+    // a deep, quiet light; a light, airy one a light and gentle light; a loud one is calmed.
+    const tone = clamp(sumL / total, 0.16, 0.8);
+    const vivid2 = clamp(a.s, 0.2, 1);
+    const calm = vivid2 > 0.75 ? 0.72 : vivid2 > 0.5 ? 0.8 : 0.9; // the louder the cover, the more it is calmed
+    const warmL = clamp(0.5 + (tone - 0.5) * 0.75, 0.45, 0.68);
     return {
-      core: hsl(a.h, clamp(a.s, 0.55, 1), 0.87),
-      warm: hsl(a.h, clamp(a.s * 1.15, 0.45, 0.96), clamp(a.l, 0.5, 0.64)),
-      mid: hsl(b.h, clamp(b.s * 1.1, 0.4, 0.92), clamp(b.l, 0.45, 0.6)),
-      deep: hsl(deepH, clamp(deepS, 0.35, 0.85), 0.34),
+      core: hsl(a.h, clamp(a.s * 0.55, 0.26, 0.5), clamp(0.77 + tone * 0.17, 0.8, 0.92)),
+      warm: hsl(a.h, clamp(a.s * calm, 0.26, 0.62), warmL),
+      mid: hsl(b.h, clamp(b.s * calm * 0.95, 0.24, 0.58), clamp(warmL - 0.1, 0.36, 0.56)),
+      deep: hsl(deepH, clamp(deepS * 0.78, 0.24, 0.56), clamp(0.13 + tone * 0.28, 0.16, 0.34)),
     };
   }
 
   function paletteFromArtwork(url) {
     if (!url) return Promise.resolve(null);
+    url = proxyArtwork(url);
     if (paletteCache.has(url)) return Promise.resolve(paletteCache.get(url));
     return new Promise((resolve) => {
       const img = new Image();
@@ -570,6 +1028,36 @@
     s.setProperty("--c-deep", p.deep);
     prismPalette = p;
     if (prism) prism.setGradient([p.deep, p.mid, p.warm, p.core]);
+    paintGround(p.deep);
+  }
+  // the lowest layer: the light's deep colour darkened (the same mix as the style sheet's), also for
+  // the strips Telegram draws around the app and the browser's bar
+  let groundPainted = "";
+  let groundProbe = null;
+  function paintGround(deep) {
+    let color;
+    const root = document.documentElement;
+    if (root.classList.contains("minimal")) color = "#121212";
+    else if (document.body.dataset.atmo && document.body.dataset.atmo !== "none") color = getComputedStyle(document.body).getPropertyValue("--bg").trim() || BG_COLOR;
+    else {
+      // any CSS colour (the cover's palette is "hsl(...)"): the browser turns it into rgb()
+      if (!groundProbe) { groundProbe = document.createElement("i"); groundProbe.style.display = "none"; document.body.appendChild(groundProbe); }
+      groundProbe.style.color = "";
+      groundProbe.style.color = String(deep);
+      const m = getComputedStyle(groundProbe).color.match(/[\d.]+/g);
+      if (!m || m.length < 3) return;
+      const base = [10, 7, 9];
+      color = "#" + [0, 1, 2].map((k) => Math.round(+m[k] * 0.3 + base[k] * 0.7).toString(16).padStart(2, "0")).join("");
+    }
+    if (color === groundPainted) return;
+    groundPainted = color;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", color);
+    if (!tg) return;
+    try {
+      if (tgAtLeast("6.1")) { tg.setHeaderColor(color); tg.setBackgroundColor(color); }
+      if (tgAtLeast("7.10") && tg.setBottomBarColor) tg.setBottomBarColor(color);
+    } catch (e) { /* the colours of Telegram's own strips are a nicety */ }
   }
 
   // ---- rays in the player (PrismaticBurst port) ----
@@ -602,7 +1090,7 @@
     // the rays burst from behind the cover — with the lyrics open there is no cover
     // …and only the standard player has the square cover they are drawn around
     const on = currentScreen === "player" && document.body.classList.contains("is-playing") && !document.body.classList.contains("lyrics-open")
-      && (document.body.dataset.playerTheme || "standard") === "standard";
+      && (document.body.dataset.playerTheme || "standard") === "standard" && !isMinimal();
     if (on) {
       if (!ensurePrism()) return;
       requestAnimationFrame(placePrism);
@@ -617,7 +1105,50 @@
 
   function brandPaletteFor(seed) {
     const h = BRAND_HUES[hashString(seed) % BRAND_HUES.length];
-    return { core: hsl(h, 1, 0.88), warm: hsl(h, 0.94, 0.6), mid: hsl((h + 34) % 360, 0.82, 0.56), deep: "#6D34E0" };
+    return { core: hsl(h, 0.9, 0.9), warm: hsl(h, 0.76, 0.62), mid: hsl((h + 340) % 360, 0.5, 0.52), deep: "#44112F" };
+  }
+
+  // The cover under the light is only ever seen as a haze. A big picture blurred by 72px
+  // is what made weak phones freeze for seconds on every track change, so the cover is
+  // shrunk to a dozen pixels first and the browser stretches that — the same haze,
+  // for almost nothing. If the picture can't be read (no CORS), the old way is the fallback.
+  const tinyArtCache = new Map();
+  function tinyArt(url) {
+    if (!url) return Promise.resolve(null);
+    url = proxyArtwork(url);
+    if (tinyArtCache.has(url)) return Promise.resolve(tinyArtCache.get(url));
+    return new Promise((resolve) => {
+      const img = new Image();
+      let done = false;
+      const finish = (val) => {
+        if (done) return;
+        done = true;
+        if (val) {
+          if (tinyArtCache.size > 40) tinyArtCache.delete(tinyArtCache.keys().next().value);
+          tinyArtCache.set(url, val);
+        }
+        resolve(val);
+      };
+      const timer = setTimeout(() => finish(null), 6000);
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        clearTimeout(timer);
+        try {
+          // two steps down (not one) so the small picture is an average, not a few sharp samples
+          const step = document.createElement("canvas");
+          step.width = step.height = 96;
+          step.getContext("2d").drawImage(img, 0, 0, 96, 96);
+          const tiny = document.createElement("canvas");
+          tiny.width = tiny.height = 12;
+          tiny.getContext("2d").drawImage(step, 0, 0, 12, 12);
+          finish(tiny.toDataURL("image/jpeg", 0.72));
+        } catch (e) {
+          finish(null);
+        }
+      };
+      img.onerror = () => { clearTimeout(timer); finish(null); };
+      img.src = url;
+    });
   }
 
   let artUrlShown = null;
@@ -626,16 +1157,20 @@
     artUrlShown = url;
     document.body.classList.toggle("has-art", !!url);
     lightArt.classList.remove("is-shown");
-    setTimeout(() => {
+    setTimeout(async () => {
       if (artUrlShown !== url) return;
-      lightArt.style.backgroundImage = url ? `url("${url.replace(/"/g, "%22")}")` : "";
-      if (url) requestAnimationFrame(() => lightArt.classList.add("is-shown"));
+      if (!url) { lightArt.style.backgroundImage = ""; return; }
+      const tiny = await tinyArt(url);
+      if (artUrlShown !== url) return;
+      lightArt.classList.toggle("is-raw", !tiny);
+      lightArt.style.backgroundImage = `url("${(tiny || url).replace(/"/g, "%22")}")`;
+      requestAnimationFrame(() => lightArt.classList.add("is-shown"));
     }, 450);
   }
 
   // What the playing track gives the light. «Оформление» can put a chosen
   // palette or one pinned cover in its place (see paintLight).
-  const DEFAULT_PALETTE = { core: "#FFE3B8", warm: "#FF6A2E", mid: "#E23C8C", deep: "#6D34E0" };
+  const DEFAULT_PALETTE = { core: "#FFE9DF", warm: "#FFA6B8", mid: "#FF4FA0", deep: "#44112F" };
   let trackLight = { palette: null, art: null };
 
   async function lightForTrack(track) {
@@ -656,6 +1191,7 @@
   // ============================================================
   const screens = {
     splash: $("screen-splash"),
+    auth: $("screen-auth"),
     onboarding: $("screen-onboarding"),
     home: $("screen-home"),
     search: $("screen-search"),
@@ -676,11 +1212,12 @@
     look: $("screen-look"),
     mood: $("screen-mood"),
     stats: $("screen-stats"),
+    recap: $("screen-recap"),
   };
   const bottomNav = $("bottom-nav");
   const miniPlayer = $("mini-player");
   const TAB_SCREENS = new Set(["home", "search", "library"]);
-  const NO_MINI_SCREENS = new Set(["player", "onboarding", "splash"]);
+  const NO_MINI_SCREENS = new Set(["player", "onboarding", "splash", "plus", "auth"]);
 
   // Each step is { name, params }. Artist and album screens are single
   // DOM nodes reused for every artist/album, so going back has to know
@@ -693,16 +1230,93 @@
     album: (p) => (p.track ? openAlbumScreen(p.track, true) : openAlbumById(p.source, p.albumId, p.title, p.artist, true)),
   };
 
+  // The side panel's own content (computer layout): the liked tracks,
+  // playlists, followed artists, the profile, the fullscreen switch.
+  function renderSidebar() {
+    if (!$("side-extra")) return;
+    $("side-fav-count").textContent = state.favorites.length ? String(state.favorites.length) : "";
+    const item = (label, coverUrl, seed, round, onClick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "side-item";
+      const c = document.createElement("span");
+      c.className = "cover side-cover" + (round ? " cover-round" : "");
+      setCoverEl(c, coverUrl, seed);
+      const n = document.createElement("span");
+      n.className = "side-name";
+      n.textContent = label;
+      b.appendChild(c);
+      b.appendChild(n);
+      b.addEventListener("click", onClick);
+      return b;
+    };
+    const pl = $("side-playlists");
+    pl.innerHTML = "";
+    $("side-pl-label").hidden = !state.playlists.length;
+    state.playlists.forEach((p) => pl.appendChild(item(p.name, playlistCoverUrl(p), p.id, false, () => openPlaylist(p.id))));
+    const fl = $("side-follows");
+    fl.innerHTML = "";
+    $("side-follow-label").hidden = !state.followedArtists.length;
+    state.followedArtists.forEach((name) => {
+      const meta = state.followedMeta[name] || {};
+      fl.appendChild(item(name, meta.photo, name, true, () => openArtistScreen(name, [], { artistId: meta.artistId, source: meta.source })));
+    });
+    renderAvatarInto("side-avatar", "side-initial");
+    $("side-name").textContent = displayName();
+    $("side-fs-btn").hidden = !canFullscreen;
+    $("side-fs-label").textContent = tg && tg.isFullscreen ? "Свернуть в окно · Esc" : "На весь экран · F11";
+    $("side-close-btn").hidden = !canFullscreen;
+  }
+  $("side-fav-btn").addEventListener("click", () => { if (currentScreen !== "favorites") showScreen("favorites"); });
+  $("side-profile-btn").addEventListener("click", () => { if (currentScreen !== "profile") showScreen("profile"); });
+  $("side-fs-btn").addEventListener("click", () => setFullscreen(!(tg && tg.isFullscreen)));
+  if (tg && tg.onEvent) tg.onEvent("fullscreenChanged", renderSidebar);
+  document.addEventListener("keydown", (e) => {
+    if (!canFullscreen) return;
+    if (e.key === "Escape" && tg.isFullscreen && !openOverlays.length) setFullscreen(false);
+    else if (e.key === "F11") { e.preventDefault(); setFullscreen(!tg.isFullscreen); }
+  });
+  $("side-close-btn").addEventListener("click", () => { try { tg.close(); } catch (e) { /* not in Telegram */ } });
+  // один раз на компьютере: как развернуть Нотку на весь экран и вернуть обратно
+  if (canFullscreen) {
+    let told = false;
+    try { told = localStorage.getItem("notka_fs_hint") === "1"; } catch (e) { /* ignore */ }
+    if (!told) {
+      setTimeout(() => {
+        if (!isDesktop() || currentScreen === "splash") return;
+        try { localStorage.setItem("notka_fs_hint", "1"); } catch (e) { /* ignore */ }
+        if (tg.isFullscreen) { showToast("Esc или F11 сворачивают Нотку обратно в окно"); return; }
+        showToast("F11 разворачивает Нотку на весь экран", { action: "Развернуть", onAction: () => setFullscreen(true) });
+      }, 7000);
+    }
+  }
+
+  // A wide window (Telegram Desktop, a browser) gets the computer layout:
+  // the tabs become a side panel, the mini player a bar at the bottom.
+  const DESKTOP_MIN_WIDTH = 900;
+  const desktopQuery = window.matchMedia ? window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH}px)`) : null;
+  const isDesktop = () => !!desktopQuery && desktopQuery.matches;
+  function syncDesktop() { document.body.classList.toggle("is-desktop", isDesktop()); }
+  syncDesktop();
+  if (desktopQuery) {
+    const onChange = () => { syncDesktop(); updateDock(); };
+    if (desktopQuery.addEventListener) desktopQuery.addEventListener("change", onChange);
+    else if (desktopQuery.addListener) desktopQuery.addListener(onChange);
+  }
+
   function updateDock() {
-    const showTabs = TAB_SCREENS.has(currentScreen);
+    const desk = isDesktop();
+    const showTabs = desk ? !["splash", "onboarding"].includes(currentScreen) : TAB_SCREENS.has(currentScreen);
     const showMini = !!currentTrack && !NO_MINI_SCREENS.has(currentScreen);
+    if (desk) renderSidebar();
     bottomNav.hidden = !showTabs;
     miniPlayer.hidden = !showMini;
     document.body.classList.toggle("no-tabbar", !showTabs);
     let dock = 0;
-    if (showTabs && showMini) dock = 156;
+    if (desk) dock = showMini ? 108 : 0;
+    else if (showTabs && showMini) dock = 160;
     else if (showTabs) dock = 84;
-    else if (showMini) dock = 82;
+    else if (showMini) dock = 86;
     document.documentElement.style.setProperty("--dock", `${dock}px`);
   }
 
@@ -714,11 +1328,13 @@
     document.body.dataset.screen = name;
     if (name === "home") renderHome();
     if (name === "library") renderLibrary();
+    if (name === "search" && typeof renderSearchHistory === "function" && !searchInput.value.trim()) renderSearchHistory();
     if (name === "favorites") renderFavoritesScreen();
-    if (name === "profile") renderProfile();
-    if (name === "account") renderAccountScreen();
+    if (name === "profile") { renderProfile(); revealIn("screen-profile", true); }
+    if (name === "account") { renderAccountScreen(); revealIn("screen-account", true); }
     if (name === "sound") renderSoundScreen();
     if (name === "stats") renderStatsScreen();
+    if (name === "recap") renderRecap();
     if (name === "about") revealIn("screen-about", true);
     if (name === "plus") openPlusScreen();
     if (name === "look") renderLookScreen();
@@ -763,7 +1379,14 @@
 
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (btn.dataset.tab !== currentScreen) haptic("select");
+      // the tab already open: nothing is drawn again (that restarted the screen's animation on
+      // every click) — the page just goes back to its top, as in any app
+      if (btn.dataset.tab === currentScreen) {
+        const el = screens[currentScreen];
+        if (el && el.scrollTop > 0) el.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      haptic("select");
       showScreen(btn.dataset.tab);
     });
   });
@@ -794,8 +1417,106 @@
   document.querySelectorAll(".sheet-anim, .modal-anim").forEach((el) => {
     el.addEventListener("click", (e) => { if (e.target === el) closeOverlay(el.id); });
   });
+
+  // A sheet is put away by pulling its handle (or its title) down, as in any phone app.
+  document.querySelectorAll(".sheet-anim > .sheet").forEach((sheet) => {
+    const overlay = sheet.parentElement;
+    let drag = null;
+    sheet.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (!e.target.closest(".sheet-handle, .sheet-head, .sheet-title")) return;
+      drag = { id: e.pointerId, y: e.clientY, dy: 0, t: performance.now() };
+      try { sheet.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+    });
+    sheet.addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag.dy = Math.max(0, e.clientY - drag.y);
+      sheet.style.transition = "none";
+      sheet.style.transform = `translateY(${drag.dy}px)`;
+    });
+    const end = (e) => {
+      if (!drag || (e && e.pointerId !== drag.id)) return;
+      const d = drag;
+      drag = null;
+      const speed = d.dy / Math.max(1, performance.now() - d.t); // px per ms
+      if (d.dy > 110 || (d.dy > 36 && speed > 0.5)) {
+        sheet.style.transition = "transform 0.22s ease-out";
+        sheet.style.transform = "translateY(110%)";
+        closeOverlay(overlay.id);
+        setTimeout(() => { sheet.style.transition = ""; sheet.style.transform = ""; }, 420);
+      } else {
+        sheet.style.transition = "transform 0.25s var(--ease-out)";
+        sheet.style.transform = "";
+        setTimeout(() => { sheet.style.transition = ""; }, 280);
+      }
+    };
+    sheet.addEventListener("pointerup", end);
+    sheet.addEventListener("pointercancel", end);
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && openOverlays.length) closeOverlay(openOverlays[openOverlays.length - 1]);
+  });
+
+  // A mouse has no sideways swipe: a shelf under the pointer gets arrows.
+  const shelfArrows = ["left", "right"].map((dir) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `shelf-arrow shelf-arrow-${dir}`;
+    b.setAttribute("aria-label", dir === "left" ? "Назад" : "Вперёд");
+    b.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"}"/></svg>`;
+    document.body.appendChild(b);
+    return b;
+  });
+  let arrowShelf = null;
+  let arrowHideTimer = 0;
+  function placeShelfArrows() {
+    const s = arrowShelf;
+    if (!s || !isDesktop() || !s.isConnected || s.offsetParent === null) { shelfArrows.forEach((b) => b.classList.remove("is-on")); return; }
+    const r = s.getBoundingClientRect();
+    const cardH = Math.min(r.height, 170);
+    const top = r.top + Math.max(0, (cardH - 40) / 2);
+    const canL = s.scrollLeft > 4, canR = s.scrollLeft + s.clientWidth < s.scrollWidth - 4;
+    shelfArrows[0].style.cssText = `left:${Math.round(r.left + 6)}px;top:${Math.round(top)}px`;
+    shelfArrows[1].style.cssText = `left:${Math.round(r.right - 46)}px;top:${Math.round(top)}px`;
+    shelfArrows[0].classList.toggle("is-on", canL);
+    shelfArrows[1].classList.toggle("is-on", canR);
+  }
+  shelfArrows.forEach((b, i) => b.addEventListener("click", () => {
+    if (!arrowShelf) return;
+    arrowShelf.scrollBy({ left: (i ? 1 : -1) * Math.round(arrowShelf.clientWidth * 0.85), behavior: "smooth" });
+    setTimeout(placeShelfArrows, 450);
+  }));
+  document.addEventListener("mouseover", (e) => {
+    if (!isDesktop() || !e.target.closest) return;
+    const s = e.target.closest(".shelf");
+    clearTimeout(arrowHideTimer);
+    if (s) { arrowShelf = s; placeShelfArrows(); return; }
+    if (e.target.closest(".shelf-arrow")) return;
+    arrowHideTimer = setTimeout(() => { arrowShelf = null; placeShelfArrows(); }, 250);
+  });
+  document.addEventListener("scroll", () => { if (arrowShelf) placeShelfArrows(); }, true);
+
+  // Keys on a computer: space plays or pauses, ←/→ seek by 5 seconds
+  // (with Shift: previous / next track). Not while typing or on a control
+  // that uses these keys itself.
+  document.addEventListener("keydown", (e) => {
+    if (!currentTrack || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if (typing || openOverlays.length) return;
+    if (e.code === "Space") {
+      if (t && /^(BUTTON|A)$/.test(t.tagName)) return;
+      e.preventDefault();
+      togglePlayPause();
+    } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      if (t && t.getAttribute && t.getAttribute("role") === "slider") return;
+      e.preventDefault();
+      if (e.shiftKey) { playAdjacent(e.key === "ArrowRight" ? 1 : -1); return; }
+      const dur = effectiveDuration();
+      if (!dur) return;
+      const to = audio.currentTime + (e.key === "ArrowRight" ? 5 : -5);
+      audio.currentTime = Math.max(0, Math.min(dur - 1, to));
+    }
   });
 
   // Telegram's own back button: closes the top sheet, otherwise steps back
@@ -897,14 +1618,14 @@
     main.addEventListener("pointerdown", (e) => {
       lpFired = false;
       startX = e.clientX; startY = e.clientY;
-      if (action !== "more") return;
+      if (action !== "more" || e.pointerType === "mouse") return;
       lpTimer = setTimeout(() => { lpFired = true; haptic("medium"); openTrackMenu(track); }, 480);
     });
     main.addEventListener("pointermove", (e) => {
       if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) cancelLp();
     });
     ["pointerup", "pointercancel", "pointerleave"].forEach((ev) => main.addEventListener(ev, cancelLp));
-    main.addEventListener("contextmenu", (e) => e.preventDefault());
+    main.addEventListener("contextmenu", (e) => { e.preventDefault(); if (action === "more") openTrackMenu(track); });
     main.addEventListener("click", (e) => {
       if (lpFired) { e.preventDefault(); lpFired = false; return; }
       if (opts.onMain) { opts.onMain(btnOf(li)); return; }
@@ -1036,7 +1757,7 @@
         let code = null;
         try { code = (await res.json()).error.code; } catch (e) { /* no readable reason */ }
         problem = code === "INVALID_SOURCE_URL"
-          ? "Это не похоже на ссылку на плейлист. Подойдут Spotify, Яндекс Музыка, Apple Music и YouTube Music."
+          ? "Это не похоже на ссылку на плейлист. Подойдут Spotify, Яндекс Музыка, Apple Music, Deezer, SoundCloud и YouTube Music."
           : "Не получилось прочитать плейлист. Проверь, что он открыт для всех по ссылке.";
       }
     } catch (e) {
@@ -1073,7 +1794,9 @@
         progress(`${item.artist ? item.artist + " — " : ""}${item.title}`);
       }
     };
-    await Promise.all([worker(), worker(), worker()]);
+    // a long playlist needs many searches: more of them at a time (a thousand at three at a time takes minutes)
+    const lanes = wanted.length > 150 ? 6 : 3;
+    await Promise.all(Array.from({ length: lanes }, () => worker()));
     if (run !== importRun) return; // the window was closed: nothing is created
 
     // stopped half-way: what was found so far is still kept
@@ -1089,6 +1812,7 @@
     const seen = new Set();
     tracks.forEach((t) => { if (!seen.has(t.id)) { seen.add(t.id); Store.addTrackToPlaylist(playlist.id, t); } });
     importedPlaylistId = playlist.id;
+    track("import", { svc: String(data.service || "").slice(0, 16), total: wanted.length, found: tracks.length });
     renderLibrary();
     haptic("success");
     $("import-result-title").textContent = `«${playlist.name}» в Нотке`;
@@ -1236,7 +1960,8 @@
   // «Недавнее»: the last tracks that actually started playing.
   function rememberRecent(track) {
     const recent = state.recent || (state.recent = []);
-    state.recent = [slimTrack(track)].concat(recent.filter((t) => t.id !== track.id)).slice(0, 20);
+    // `at` — when it was played: that is how the histories of two devices are put in one order
+    state.recent = [Object.assign(slimTrack(track), { at: Date.now() })].concat(recent.filter((t) => t.id !== track.id)).slice(0, 20);
     persist();
     if (currentScreen === "home") renderRecent();
   }
@@ -1263,14 +1988,14 @@
   // Плюс the cards are shown veiled, and lead to the Плюс page.
   const TIME_STEPS = [[7, "Неделю назад"], [14, "Две недели назад"], [30, "Месяц назад"], [90, "Три месяца назад"]];
   function timeMachineDay(daysAgo) {
-    const days = state.listens.days || {};
+    const days = listensView().days || {};
     for (const off of [0, 1, -1, 2, -2, 3, -3]) {
       const key = dayKey(Date.now() - (daysAgo + off) * 86400000);
       const day = days[key];
       if (!day) continue;
       const tracks = Object.entries(day.t || {})
         .sort((a, b) => b[1][1] - a[1][1])
-        .map(([tid]) => (state.listens.tracks[tid] || {}).track)
+        .map(([tid]) => (listensView().tracks[tid] || {}).track)
         .filter(Boolean);
       if (tracks.length >= 3) return { key, tracks, seconds: day.s || 0, ms: Date.now() - (daysAgo + off) * 86400000 };
     }
@@ -1326,7 +2051,7 @@
       out.push({ name, artistId: ref.artistId, source: ref.source });
     };
     state.followedArtists.forEach((name) => add(name, state.followedMeta[name] || {}));
-    Object.entries(state.listens.artists).sort((a, b) => b[1].seconds - a[1].seconds).slice(0, 6).forEach(([name]) => add(name, artistRef(name)));
+    Object.entries(listensView().artists).sort((a, b) => b[1].seconds - a[1].seconds).slice(0, 6).forEach(([name]) => add(name, artistRef(name)));
     return out.slice(0, 10);
   }
   let freshLoading = false;
@@ -1426,33 +2151,123 @@
     const rest = shuffled(pool.filter((t) => !fresh.some((f) => f.id === t.id)));
     return [...fresh, ...rest].slice(0, n);
   }
+  // ---- «Мой микс» is put together here (the rules are in mix.js); YouTube Music only says what plays nearby ----
+  const artistKeyOf = (name) => String(name || "").toLowerCase().split(/,|&| feat\.? | x /)[0].trim();
+  const sessionGood = []; // tracks of this session that were heard on: the next top-up grows from them
+  function noteListened(track, heard) {
+    if (!track) return;
+    const k = artistKeyOf(track.artist);
+    if (!k) return;
+    const e = state.skipStats[k] || (state.skipStats[k] = { s: 0, p: 0, u: 0 });
+    if (heard < 30) e.s++; else e.p++;
+    e.u = Date.now();
+    const keys = Object.keys(state.skipStats);
+    if (keys.length > 300) keys.sort((a, b) => state.skipStats[a].u - state.skipStats[b].u).slice(0, keys.length - 300).forEach((x) => delete state.skipStats[x]);
+    if (heard >= 30) { sessionGood.push(track); if (sessionGood.length > 10) sessionGood.shift(); }
+    persist(true);
+  }
+  function mixProfile() {
+    const taste = currentTaste();
+    const favIds = new Set(state.favorites.map((t) => t.id));
+    const plays = (t) => { const x = state.listens && state.listens.tracks && state.listens.tracks[t.id]; return x ? x.plays || 0 : 0; };
+    const dayAgo2 = Date.now() - 2 * 86400000;
+    return {
+      affinity: (a) => tasteOf(taste, a),
+      trackWeight: (t) => Math.min(1, (favIds.has(t.id) ? 0.5 : 0) + Math.min(0.5, plays(t) * 0.1)),
+      skips: (a) => (state.skipStats[artistKeyOf(a)] || {}).s || 0,
+      skipRate: (a) => { const e = state.skipStats[artistKeyOf(a)]; return e ? e.s / (e.s + e.p + 2) : 0; },
+      recentIds: new Set((state.recent || []).filter((t) => (t.at || 0) > dayAgo2).map((t) => t.id)),
+      allowSpam: [...knownTracks().values()].some((t) => window.NotkaMix && window.NotkaMix.SPAM.test(t.title || "")),
+    };
+  }
   async function buildMix() {
     const known = knownTracks();
-    const pool = [...known.values()].filter((t) => t.source === "youtube_music");
-    if (!pool.length) return shuffled([...known.values()]);
-    const lists = await Promise.all(pickSeeds(pool, 4).map((s) => fetchRadio(s, 25)));
+    const own = new Map(known);
+    (state.recent || []).forEach((t) => { if (!own.has(t.id)) own.set(t.id, t); });
+    const ownList = [...own.values()];
+    const seedPool = ownList.filter((t) => t.source === "youtube_music");
+    if (!seedPool.length || !window.NotkaMix) return shuffled([...known.values()]);
+    const prof = mixProfile();
+    const seeds = window.NotkaMix.pickSeeds(seedPool, (t) => 0.15 + prof.affinity(t.artist) + prof.trackWeight(t) + (prof.recentIds.has(t.id) ? 0.3 : 0), 5);
+    const lists = await Promise.all(seeds.map((s) => fetchRadio(s, 30)));
     const seen = new Set();
-    const mix = [];
-    for (let i = 0; i < 25; i++) {
-      for (const list of lists) {
-        const t = list[i];
-        if (!t || seen.has(t.id) || known.has(t.id)) continue;
-        seen.add(t.id);
-        mix.push(t);
-      }
-    }
-    if (mix.length < 8) shuffled([...known.values()]).forEach((t) => { if (!seen.has(t.id)) { seen.add(t.id); mix.push(t); } });
-    return mix.slice(0, 50);
+    const adjacent = [];
+    lists.forEach((list) => list.forEach((t) => { if (t && !seen.has(t.id) && !own.has(t.id)) { seen.add(t.id); adjacent.push(t); } }));
+    const mix = window.NotkaMix.assemble(Object.assign({ familiar: ownList, adjacent, size: 40, familiarShare: 0.4 }, prof));
+    const famIds = new Set(ownList.map((t) => t.id));
+    track("mix_built", { v: 2, n: mix.length, fam: mix.filter((t) => famIds.has(t.id)).length, adj: adjacent.length, seeds: seeds.length });
+    if (mix.length < 8) return shuffled([...known.values()]);
+    return mix;
   }
+  // Leaving a mix for something else keeps its place: coming back goes on
+  // with the same queue, from the same track and the same second. Kept per
+  // mix («мой микс», each mood), for a few days, in this device's storage.
+  const MIX_RESUME_KEY = "notka_mix_resume";
+  const MIX_RESUME_DAYS = 3;
+  let mixResume = {};
+  try { mixResume = JSON.parse(localStorage.getItem(MIX_RESUME_KEY) || "{}") || {}; } catch (e) { mixResume = {}; }
+  let lastMixSave = 0;
+  function saveMixResume() {
+    if (!currentMixKey || !currentTrack || !currentQueue.length) return;
+    lastMixSave = Date.now();
+    mixResume[currentMixKey] = {
+      at: lastMixSave,
+      queue: currentQueue.slice(0, 120),
+      trackId: currentTrack.id,
+      position: Math.floor(audio.currentTime || 0),
+      context: currentContextLabel,
+    };
+    const keys = Object.keys(mixResume).sort((a, b) => mixResume[b].at - mixResume[a].at);
+    keys.slice(8).forEach((k) => delete mixResume[k]);
+    try { localStorage.setItem(MIX_RESUME_KEY, JSON.stringify(mixResume)); } catch (e) { /* storage full or blocked: the place is just not kept */ }
+  }
+  function mixResumeFor(key) {
+    const r = mixResume[key];
+    if (!r || !r.queue || !r.queue.length || Date.now() - r.at > MIX_RESUME_DAYS * 86400000) return null;
+    const track = r.queue.find((t) => t.id === r.trackId);
+    return track ? { track, queue: r.queue, position: r.position || 0, context: r.context } : null;
+  }
+  function resumeMix(key, saved) {
+    shuffleOn = false;
+    playTrack(saved.track, saved.queue, { mymix: true, source: "mix", mixKey: key, context: saved.context || undefined, startAt: saved.position });
+  }
+
   let mixExtending = false;
   async function extendMixIfNeeded() {
-    if (currentSource !== "mix" || mixExtending || !currentTrack) return;
+    if (currentSource !== "mix" || mixExtending || !currentTrack || !window.NotkaMix) return;
     if (currentQueueIndex < currentQueue.length - 3) return;
     mixExtending = true;
     try {
+      if (/^mood:/.test(currentMixKey || "")) {
+        // the mood stays: a new set for the same mood, without what is already in the queue
+        const moodKey = currentMixKey.slice(5);
+        const res = await fetch(`${API_BASE_URL}/mood`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(Object.assign({ key: moodKey }, tasteProfile())),
+        });
+        if (res.ok) {
+          const have = new Set(currentQueue.map((t) => t.id));
+          const more = ((await res.json()).results || []).filter((t) => !have.has(t.id));
+          if (more.length && currentMixKey === `mood:${moodKey}`) {
+            currentQueue.push(...more);
+            originalQueue.push(...more);
+            renderQueueSheet();
+            prepareNextTrack();
+          }
+        }
+        return;
+      }
       const known = knownTracks();
       const inQueue = new Set(currentQueue.map((t) => t.id));
-      const more = (await fetchRadio(currentTrack, 25)).filter((t) => !inQueue.has(t.id) && !known.has(t.id));
+      // the next part grows from what was heard on in this session (and the track now playing)
+      const seeds = sessionGood.slice(-3).concat([currentTrack]).filter((t, i, a) => t && a.findIndex((x) => x.id === t.id) === i);
+      const lists = await Promise.all(seeds.map((s) => fetchRadio(s, 20)));
+      const seen = new Set();
+      const adjacent = [];
+      lists.forEach((list) => list.forEach((t) => { if (t && !seen.has(t.id) && !inQueue.has(t.id) && !known.has(t.id)) { seen.add(t.id); adjacent.push(t); } }));
+      const familiar = [...known.values(), ...(state.recent || [])].filter((t) => !inQueue.has(t.id));
+      const more = window.NotkaMix.assemble(Object.assign({ familiar, adjacent, size: 16, familiarShare: 0.3, exclude: inQueue }, mixProfile()));
       if (more.length && currentSource === "mix") {
         currentQueue.push(...more);
         originalQueue.push(...more);
@@ -1464,13 +2279,19 @@
   async function startMymix(openPlayer) {
     const known = knownTracks();
     if (!known.size) { showToast("Отметь пару треков сердцем или собери плейлист — и микс подберёт похожее"); return; }
+    const saved = mixResumeFor("mymix");
+    if (saved) {
+      resumeMix("mymix", saved);
+      if (openPlayer) showScreen("player");
+      return;
+    }
     const card = $("mymix-card");
     card.classList.add("is-building");
     let mix;
     try { mix = await buildMix(); } finally { card.classList.remove("is-building"); }
     if (!mix.length) { showToast("Не получилось собрать микс, попробуй ещё раз"); return; }
     shuffleOn = false;
-    playTrack(mix[0], mix, { mymix: true, source: "mix" });
+    playTrack(mix[0], mix, { mymix: true, source: "mix", mixKey: "mymix" });
     if (openPlayer) showScreen("player");
   }
   // «Под настроение»: the mix grown from the listener's own music. Three
@@ -1500,17 +2321,17 @@
     };
     state.favorites.forEach((t) => add(t, 3));
     state.playlists.forEach((p) => Object.values(p.tracksCache || {}).forEach((t) => add(t, 1)));
-    Object.values(state.listens.tracks).forEach((x) => add(x.track, 1 + Math.min(5, x.plays)));
+    Object.values(listensView().tracks).forEach((x) => add(x.track, 1 + Math.min(5, x.plays)));
     // their own tracks, the dearest first: the favorites, then what is played most, then the playlists
     const seeds = [];
     const taken = new Set();
     const seed = (t) => {
       if (!t || !t.source || !t.sourceId || taken.has(t.id) || seeds.length >= 40) return;
       taken.add(t.id);
-      seeds.push({ source: t.source, id: t.sourceId });
+      seeds.push({ source: t.source, id: t.sourceId, artist: String(t.artist || "").slice(0, 80) });
     };
     state.favorites.forEach(seed);
-    Object.values(state.listens.tracks).sort((a, b) => b.plays - a.plays || b.seconds - a.seconds).forEach((x) => seed(x.track));
+    Object.values(listensView().tracks).sort((a, b) => b.plays - a.plays || b.seconds - a.seconds).forEach((x) => seed(x.track));
     state.playlists.forEach((p) => Object.values(p.tracksCache || {}).forEach(seed));
     return {
       seeds,
@@ -1522,6 +2343,15 @@
   let moodBuilding = false;
   async function startMoodMix(key, picked) {
     if (moodBuilding) return;
+    if (hasPlus() || FREE_MOODS.has(key)) {
+      const saved = mixResumeFor(`mood:${key}`);
+      if (saved) {
+        haptic("success");
+        resumeMix(`mood:${key}`, saved);
+        if (currentScreen === "mood") goBack();
+        return;
+      }
+    }
     moodBuilding = true;
     const screen = $("screen-mood");
     screen.classList.add("is-picking");
@@ -1544,7 +2374,7 @@
     if (!/^ru_/.test(key)) eventNote("mood", key);
     if (hasPlus() || FREE_MOODS.has(key)) {
       // from here on it goes on like «Мой микс»: more of the same is added as it plays
-      playTrack(tracks[0], tracks, { mymix: true, source: "mix", context: `Мой микс · ${MOODS[key]}` });
+      playTrack(tracks[0], tracks, { mymix: true, source: "mix", mixKey: `mood:${key}`, context: `Мой микс · ${MOODS[key]}` });
     } else {
       const taste = tracks.slice(0, 3);
       playTrack(taste[0], taste, { source: "mood-taste", context: `${MOODS[key]} · проба` });
@@ -1697,11 +2527,181 @@
   let debounceTimer = null;
   let lastSearchResults = null; // raw track results from backend, for the active query
   let lastSearchArtists = null; // artists (with photos) found for the same query
+  let lastSearchQuery = "";
   let searchTab = "all"; // all | tracks | artists | albums
   let searchToken = 0;
 
+  // A spelling-proof key for comparing a typed name with an artist's name:
+  // «тревис скотт», «travis scott» and «trevis skot» all become «trvskt».
+  // Vowels, spaces and doubled letters are dropped, Cyrillic is
+  // transliterated, so a half-typed «тревис ск» is a prefix of the key.
+  const TRANSLIT = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "j", з: "z", и: "i", й: "i", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "z", ч: "c", ш: "s", щ: "s", ъ: "", ы: "i", ь: "", э: "e", ю: "u", я: "a" };
+  function looseKey(text) {
+    let s = String(text || "").toLowerCase().replace(/[а-яё]/g, (ch) => TRANSLIT[ch] || "");
+    s = s.replace(/ph/g, "f").replace(/ck/g, "k").replace(/sh|ch|zh|kh/g, (m) => m[0]).replace(/c/g, "k").replace(/x/g, "ks").replace(/w/g, "v");
+    s = s.replace(/[^a-z0-9]/g, "").replace(/[aeiouyh]/g, "");
+    return s.replace(/(.)\1+/g, "$1");
+  }
+  // The artist the query is evidently about («тревис ск» → Travis Scott), or null.
+  function intentArtist() {
+    const q = looseKey(lastSearchQuery);
+    if (q.length < 3 || !lastSearchArtists || !lastSearchArtists.length) return null;
+    const exact = lastSearchArtists.find((a) => looseKey(a.name) === q);
+    if (exact) return exact;
+    return lastSearchArtists.find((a) => looseKey(a.name).startsWith(q)) || null;
+  }
+  // Tracks of the intended artist go first; the rest keep their order.
+  function rankByIntent(tracks, artist) {
+    if (!artist) return tracks;
+    const key = looseKey(artist.name);
+    const mine = [], rest = [];
+    tracks.forEach((t) => (looseKey(t.artist || "") === key ? mine : rest).push(t));
+    return mine.length ? mine.concat(rest) : tracks;
+  }
+
+  // <taste>
+  // What the listener already likes, per artist name (0..1): listening time (every device),
+  // hearts, playlists, what is followed and played lately. Used to put familiar artists first
+  // in the search; it never leaves the device (and the account's own sync).
+  function artistParts(name) {
+    return String(name || "").split(/\s*(?:,|&|\sfeat\.?\s|\sft\.?\s|\sx\s|\sи\s)\s*/i).map((p) => looseKey(p)).filter(Boolean);
+  }
+  function buildTaste(sources) {
+    const raw = new Map();
+    const add = (name, w) => artistParts(name).forEach((k) => raw.set(k, (raw.get(k) || 0) + w));
+    Object.entries(sources.listened || {}).forEach(([name, minutes]) => add(name, Math.min(3, Math.log10(1 + (minutes || 0)) * 1.5)));
+    (sources.favorites || []).forEach((t) => add(t && t.artist, 0.8));
+    (sources.followed || []).forEach((n) => add(n, 3));
+    (sources.playlistTracks || []).forEach((t) => add(t && t.artist, 0.3));
+    (sources.recent || []).forEach((t) => add(t && t.artist, 0.4));
+    const out = new Map();
+    raw.forEach((v, k) => out.set(k, v / (v + 2))); // 0..1, and a lot of listening cannot run away
+    return out;
+  }
+  function tasteOf(taste, artistName) {
+    let best = 0;
+    artistParts(artistName).forEach((k) => { const v = taste.get(k); if (v && v > best) best = v; });
+    return best;
+  }
+  // a familiar artist's tracks climb up to a dozen places; everything else keeps its order
+  function rankByTasteWith(taste, tracks) {
+    if (!taste.size || tracks.length < 2) return tracks;
+    return tracks
+      .map((t, i) => ({ t, s: i - 12 * tasteOf(taste, t.artist) }))
+      .sort((a, b) => a.s - b.s)
+      .map((x) => x.t);
+  }
+  // </taste>
+  let tasteCache = null, tasteSig = "";
+  function currentTaste() {
+    const sig = [listensRev, state.favorites.length, state.followedArtists.length, state.playlists.length, (state.recent || []).length].join("|");
+    if (tasteCache && sig === tasteSig) return tasteCache;
+    const L = listensView() || {};
+    const listened = {};
+    Object.entries(L.artists || {}).forEach(([name, a]) => { listened[name] = (a.seconds || 0) / 60; });
+    const playlistTracks = [];
+    state.playlists.forEach((p) => Object.values(p.tracksCache || {}).forEach((t) => playlistTracks.push(t)));
+    tasteCache = buildTaste({ listened, favorites: state.favorites, followed: state.followedArtists, playlistTracks, recent: (state.recent || []).slice(0, 60) });
+    tasteSig = sig;
+    return tasteCache;
+  }
+  function rankByTaste(tracks, intent) {
+    const taste = currentTaste();
+    if (!intent) return rankByTasteWith(taste, tracks);
+    // the artist the query names stays in front; the taste orders each part
+    const key = looseKey(intent.name);
+    const mine = tracks.filter((t) => looseKey(t.artist || "") === key);
+    const rest = tracks.filter((t) => looseKey(t.artist || "") !== key);
+    return rankByTasteWith(taste, mine).concat(rankByTasteWith(taste, rest));
+  }
+
+  // ---- «Недавнее»: what was searched, and what was opened from the results ----
+  const SEARCH_HISTORY_MAX = 30;
+  function historyKey(e) {
+    if (e.k === "q") return "q:" + String(e.text || "").trim().toLowerCase();
+    if (e.k === "t") return "t:" + (e.track && e.track.id);
+    if (e.k === "a") return "a:" + String(e.name || "").trim().toLowerCase();
+    return "al:" + (e.albumId || `${e.title}|${e.artist}`);
+  }
+  function rememberSearch(entry) {
+    if (!entry) return;
+    entry.at = Date.now();
+    const key = historyKey(entry);
+    state.searchHistory = [entry].concat((state.searchHistory || []).filter((e) => historyKey(e) !== key)).slice(0, SEARCH_HISTORY_MAX);
+    persist();
+  }
+  function historyRow(o) {
+    const li = document.createElement("li");
+    li.className = "track-row";
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "row-main";
+    const art = document.createElement("span");
+    art.className = "cover cover-sm" + (o.round ? " cover-round" : "") + (o.query ? " cover-query" : "");
+    if (o.query) art.innerHTML = icon("i-search", 20);
+    else setCoverEl(art, o.cover, o.seed);
+    const meta = document.createElement("span");
+    meta.className = "row-meta";
+    meta.innerHTML = `<span class="row-title">${escapeHtml(o.title)}</span><span class="row-sub">${escapeHtml(o.sub)}</span>`;
+    main.appendChild(art);
+    main.appendChild(meta);
+    main.addEventListener("click", o.onClick);
+    li.appendChild(main);
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "icon-btn row-action";
+    rm.setAttribute("aria-label", "Убрать из недавнего");
+    rm.innerHTML = icon("i-close", 20);
+    rm.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.searchHistory = (state.searchHistory || []).filter((x) => x !== o.entry);
+      persist();
+      renderSearchHistory();
+    });
+    li.appendChild(rm);
+    return li;
+  }
+  function renderSearchHistory() {
+    const box = $("search-history");
+    const list = $("search-history-list");
+    if (!box || !list) return;
+    const items = state.searchHistory || [];
+    list.innerHTML = "";
+    box.hidden = !items.length;
+    $("search-state-empty").classList.toggle("has-history", items.length > 0);
+    items.forEach((e) => {
+      let row = null;
+      if (e.k === "q") {
+        row = historyRow({ entry: e, query: true, title: e.text, sub: "Запрос", onClick: () => {
+          searchInput.value = e.text;
+          searchClear.hidden = false;
+          clearTimeout(debounceTimer);
+          runSearch(e.text);
+          rememberSearch({ k: "q", text: e.text });
+        } });
+      } else if (e.k === "t" && e.track) {
+        row = historyRow({ entry: e, cover: e.track.artwork, seed: e.track.id, title: e.track.title || "Без названия", sub: `Трек · ${e.track.artist || ""}`, onClick: () => {
+          rememberSearch({ k: "t", track: e.track });
+          playTrack(e.track, [e.track], { context: "Поиск" });
+        } });
+      } else if (e.k === "a") {
+        row = historyRow({ entry: e, round: true, cover: e.photo, seed: e.name, title: e.name, sub: "Исполнитель", onClick: () => {
+          rememberSearch({ k: "a", name: e.name, artistId: e.artistId, source: e.source, photo: e.photo });
+          openArtistScreen(e.name, [], { artistId: e.artistId, source: e.source });
+        } });
+      } else if (e.k === "al") {
+        row = historyRow({ entry: e, cover: e.cover, seed: e.albumId || e.artist, title: e.title, sub: `Альбом · ${e.artist || ""}`, onClick: () => {
+          rememberSearch({ k: "al", albumId: e.albumId, source: e.source, title: e.title, artist: e.artist, cover: e.cover });
+          if (e.albumId) openAlbumById(e.source, e.albumId, e.title, e.artist);
+        } });
+      }
+      if (row) list.appendChild(row);
+    });
+  }
+
   function showSearchState(id) {
     SEARCH_STATES.forEach((sid) => { $(sid).hidden = sid !== id; });
+    if (id === "search-state-empty") renderSearchHistory();
   }
 
   $("search-tabs").addEventListener("click", (e) => {
@@ -1801,8 +2801,16 @@
       return { name: a.name, artistId: a.id, source: a.source, photo: a.photo, tracks: own ? own.tracks : [] };
     });
     const seen = new Set(found.map((a) => norm(a.name)));
-    found.sort((a, b) => (b.tracks.length ? 1 : 0) - (a.tracks.length ? 1 : 0));
-    return found.concat(groups.filter((g) => !seen.has(norm(g.name))));
+    const taste = currentTaste();
+    found.sort((a, b) => ((b.tracks.length ? 1 : 0) + tasteOf(taste, b.name)) - ((a.tracks.length ? 1 : 0) + tasteOf(taste, a.name)));
+    const intent = intentArtist();
+    if (intent) {
+      const i = found.findIndex((a) => a.artistId === intent.id);
+      if (i > 0) found.unshift(found.splice(i, 1)[0]);
+    }
+    const rest = groups.filter((g) => !seen.has(norm(g.name)));
+    rest.sort((a, b) => tasteOf(taste, b.name) - tasteOf(taste, a.name));
+    return found.concat(rest);
   }
   function artistRow(group, tracks) {
     const ownCover = group.tracks.find((t) => t.artwork);
@@ -1814,7 +2822,11 @@
       cover: group.photo || (ownCover ? ownCover.artwork : null),
       seed: group.name,
       round: true,
-      onClick: () => openArtistScreen(group.name, tracks, { artistId: group.artistId, source: group.source }),
+      onClick: () => {
+        rememberSearch({ k: "a", name: group.name, artistId: group.artistId, source: group.source, photo: group.photo || (ownCover ? ownCover.artwork : null) });
+        track("search_pick", { q: (lastSearchQuery || "").trim().slice(0, 80), kind: "artist" });
+        openArtistScreen(group.name, tracks, { artistId: group.artistId, source: group.source });
+      },
     });
   }
   function albumRow(group) {
@@ -1825,6 +2837,8 @@
       cover: group.cover,
       seed: group.albumId || group.artist,
       onClick: () => {
+        rememberSearch({ k: "al", albumId: group.albumId, source: group.source, title: group.title, artist: group.artist, cover: group.cover });
+        track("search_pick", { q: (lastSearchQuery || "").trim().slice(0, 80), kind: "album" });
         if (group.albumId) openAlbumById(group.source, group.albumId, group.title, group.artist);
         else openAlbumScreen(group.tracks[0]);
       },
@@ -1848,9 +2862,17 @@
   }
 
   function renderFilteredResults() {
-    if (!lastSearchResults) return;
-    const tracks = lastSearchResults;
-    if (!tracks.length) { showSearchState("search-state-empty-results"); return; }
+    const intent = intentArtist();
+    // the tracks are still on their way, but the artist the query names is
+    // already known: show him at once, the rest joins when it arrives
+    if (!lastSearchResults && !intent) return;
+    const tracks = rankByTaste(rankByIntent(lastSearchResults || [], intent), intent);
+    if (lastSearchResults && !tracks.length && !intent) {
+      showSearchState("search-state-empty-results");
+      const q = lastSearchQuery;
+      setTimeout(() => { if (q === lastSearchQuery && q.trim().length >= 3 && lastSearchResults && !lastSearchResults.length) track("search_empty", { q: q.trim().slice(0, 80) }); }, 1500);
+      return;
+    }
 
     stateResults.innerHTML = "";
     const trackRows = (list) => list.map((t) => buildTrackRow(t, { queue: tracks, context: "Поиск" }));
@@ -1861,12 +2883,22 @@
     } else if (searchTab === "albums") {
       stateResults.appendChild(resultsSection(null, groupByAlbum(tracks).map(albumRow)));
     } else {
-      stateResults.appendChild(resultsSection("Треки", trackRows(tracks.slice(0, 8))));
-      const artists = searchArtists(tracks).slice(0, 3);
-      if (artists.length) stateResults.appendChild(resultsSection("Исполнители", artists.map((g) => artistRow(g, tracks))));
+      // «Все»: when the query is an artist's name, he comes first, then his
+      // tracks and albums; otherwise tracks lead as before
+      const artistsSection = () => {
+        const artists = searchArtists(tracks).slice(0, intent ? 1 : 3);
+        if (artists.length) stateResults.appendChild(resultsSection(intent ? "Исполнитель" : "Исполнители", artists.map((g) => artistRow(g, tracks))));
+      };
+      if (intent) artistsSection();
+      // with a named artist, «Треки» holds his tracks; the stray matches go to the end
+      const own = intent ? tracks.filter((t) => looseKey(t.artist || "") === looseKey(intent.name)) : [];
+      const head = own.length >= 3 ? own.slice(0, 8) : tracks.slice(0, 8);
+      const tail = tracks.filter((t) => !head.includes(t));
+      if (head.length) stateResults.appendChild(resultsSection("Треки", trackRows(head)));
+      if (!intent) artistsSection();
       const albums = groupByAlbum(tracks).filter((a) => a.albumId).slice(0, 3);
       if (albums.length) stateResults.appendChild(resultsSection("Альбомы", albums.map(albumRow)));
-      if (tracks.length > 8) stateResults.appendChild(resultsSection("Ещё треки", trackRows(tracks.slice(8))));
+      if (tail.length) stateResults.appendChild(resultsSection("Ещё треки", trackRows(tail)));
     }
     showSearchState("search-state-results");
   }
@@ -1876,29 +2908,36 @@
     if (!query.trim()) {
       document.body.classList.remove("search-loading");
       lastSearchResults = null;
+      lastSearchArtists = null;
       showSearchState("search-state-empty");
       return;
     }
     showSearchState("search-state-loading");
     document.body.classList.add("search-loading");
     lastSearchArtists = null;
+    lastSearchResults = null;
+    lastSearchQuery = query;
     // artists are looked up alongside the tracks; they are an addition, so
-    // the results don't wait for them long and never fail because of them
+    // the results don't wait for them long and never fail because of them.
+    // If the query is an artist's name, he is shown as soon as he is found.
     const artistsReady = fetch(`${API_BASE_URL}/artists?q=${encodeURIComponent(query)}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (token === searchToken && data) lastSearchArtists = data.results || []; })
+      .then((data) => {
+        if (token !== searchToken || !data) return;
+        lastSearchArtists = data.results || [];
+        renderFilteredResults();
+      })
       .catch(() => {});
     try {
       const url = `${API_BASE_URL}/search?q=${encodeURIComponent(query)}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      await Promise.race([artistsReady, new Promise((done) => setTimeout(done, 1200))]);
+      await Promise.race([artistsReady, new Promise((done) => setTimeout(done, 800))]);
       if (token !== searchToken) return; // a newer query already won
       document.body.classList.remove("search-loading");
       lastSearchResults = data.results || [];
       renderFilteredResults();
-      if (!lastSearchArtists) artistsReady.then(() => { if (token === searchToken && lastSearchArtists && lastSearchResults) renderFilteredResults(); });
     } catch (err) {
       if (token !== searchToken) return;
       document.body.classList.remove("search-loading");
@@ -1911,10 +2950,16 @@
   searchInput.addEventListener("input", () => {
     searchClear.hidden = searchInput.value.length === 0;
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => runSearch(searchInput.value), 350);
+    debounceTimer = setTimeout(() => runSearch(searchInput.value), 250);
   });
   searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { clearTimeout(debounceTimer); runSearch(searchInput.value); searchInput.blur(); }
+    if (e.key === "Enter") {
+      clearTimeout(debounceTimer);
+      runSearch(searchInput.value);
+      searchInput.blur();
+      const q = searchInput.value.trim();
+      if (q.length >= 2) { rememberSearch({ k: "q", text: q }); track("search_submit", { q: q.slice(0, 80) }); }
+    }
   });
   searchClear.addEventListener("click", () => {
     searchInput.value = "";
@@ -1923,11 +2968,29 @@
     searchInput.focus();
   });
   $("search-retry-btn").addEventListener("click", () => runSearch(searchInput.value));
+  $("search-history-clear").addEventListener("click", () => {
+    state.searchHistory = [];
+    persist();
+    renderSearchHistory();
+    haptic("light");
+  });
+  // a track played from the results goes to «Недавнее» too
+  stateResults.addEventListener("click", (e) => {
+    const row = e.target.closest(".track-row[data-track-id]");
+    if (!row || e.target.closest(".row-action")) return;
+    const t = (lastSearchResults || []).find((x) => x.id === row.dataset.trackId);
+    if (t) {
+      rememberSearch({ k: "t", track: slimTrack(t) });
+      const rank = (lastSearchResults || []).indexOf(t);
+      track("search_pick", { q: (lastSearchQuery || "").trim().slice(0, 80), kind: "track", rank, n: (lastSearchResults || []).length });
+    }
+  });
 
   // ============================================================
   // LIBRARY («Моё»)
   // ============================================================
   function renderLibrary() {
+    if (isDesktop()) renderSidebar();
     $("library-fav-count").textContent = pluralTracks(state.favorites.length);
     const grid = $("playlists-grid");
     grid.innerHTML = "";
@@ -2334,7 +3397,7 @@
     el.innerHTML = "";
     if (photo) {
       const img = document.createElement("img");
-      img.src = photo;
+      img.src = proxyArtwork(photo);
       img.alt = "";
       el.appendChild(img);
     } else {
@@ -2355,19 +3418,48 @@
 
   function renderProfile() {
     $("profile-name").textContent = displayName();
-    $("profile-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : "Вход через Telegram";
+    $("profile-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : (tgUser ? "Telegram" : "Открой Нотку из Telegram, чтобы войти");
     renderAvatarInto("profile-avatar-btn", "profile-initial");
+
+    // цифры слушателя прямо на профиле; тап открывает статистику
+    const S = statsFor("all");
+    const heard = S.tracks.length > 0 && S.seconds >= 1;
+    const minutes = Math.max(1, Math.round(S.seconds / 60));
+    $("profile-stats").classList.toggle("is-empty", !heard);
+    if (heard) {
+      countUp($("pf-minutes"), minutes);
+      countUp($("pf-tracks"), S.tracks.length);
+      countUp($("pf-artists"), S.artists.length);
+      $("pf-minutes-l").textContent = plural(minutes, "минута", "минуты", "минут");
+      $("pf-tracks-l").textContent = plural(S.tracks.length, "трек", "трека", "треков");
+      $("pf-artists-l").textContent = plural(S.artists.length, "исполнитель", "исполнителя", "исполнителей");
+    }
+
+    // под каждым пунктом то, что в нём сейчас выбрано
+    const crossfade = Store.getSetting("crossfade") || 0;
+    const atmo = lookValue("atmo");
+    const theme = PLAYER_THEMES[lookValue("playerTheme")];
+    $("pf-sub-account").textContent = `${displayName()}${tgUser && tgUser.username ? ` · @${tgUser.username}` : ""}`;
+    $("pf-sub-stats").textContent = heard ? `${minutes.toLocaleString("ru-RU")} ${plural(minutes, "минута", "минуты", "минут")} за всё время` : "Пока тихо";
+    $("pf-sub-look").textContent = `${atmo === "none" ? "Без атмосферы" : (ATMOS[atmo] && ATMOS[atmo].name) || "Атмосфера"} · плеер «${theme ? theme.name : "Стандарт"}»`;
+    $("pf-sub-sound").textContent = crossfade ? `Плавный переход ${crossfade} с` : "Плавный переход выключен";
+    $("pf-sub-about").textContent = ($("about-version").textContent || "").trim() || "Версия 1.1";
+    $("pf-version").textContent = `Нотка · ${($("about-version").textContent || "Версия 1.1").trim().toLowerCase()}`;
   }
+  function openSupport() {
+    const url = "https://t.me/notka_support";
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+    else window.open(url, "_blank");
+  }
+  $("profile-stats").addEventListener("click", () => showScreen("stats"));
+  $("pf-invite").addEventListener("click", () => shareInvite());
+  $("pf-support").addEventListener("click", openSupport);
   $("profile-back-btn").addEventListener("click", goBack);
   $("menu-stats").addEventListener("click", () => showScreen("stats"));
   $("menu-account").addEventListener("click", () => showScreen("account"));
   $("menu-sound").addEventListener("click", () => showScreen("sound"));
   $("menu-about").addEventListener("click", () => showScreen("about"));
-  $("about-support-btn").addEventListener("click", () => {
-    const url = "https://t.me/notka_support";
-    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
-    else window.open(url, "_blank");
-  });
+  $("about-support-btn").addEventListener("click", openSupport);
 
   // ============================================================
   // ACCOUNT (name/avatar from Telegram, local listening stats)
@@ -2376,11 +3468,176 @@
     $("account-name").textContent = displayName();
     renderAvatarInto("account-avatar", "account-initial");
     const platforms = { ios: "iPhone", android: "Android", android_x: "Android", tdesktop: "Telegram Desktop", macos: "Mac", weba: "Telegram Web", webk: "Telegram Web" };
-    $("account-sessions-count").textContent = (tg && platforms[tg.platform]) || "Браузер";
+    const where = (tg && platforms[tg.platform]) || "";
+    const hhmm = (t) => new Date(t).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    let syncValue = "Включена", syncNote = "Любимое и плейлисты общие на всех устройствах";
+    if (!syncOn()) {
+      syncValue = "Выключена";
+      syncNote = "Нотка открыта не из Telegram. Открой её через бота @notka_app_bot, и всё объединится";
+    } else if (syncStatus.code === "auth") {
+      syncValue = "Не работает";
+      syncNote = "Сессия устарела. Закрой Нотку и открой её заново из Telegram. Нажми, чтобы попробовать ещё раз";
+    } else if (syncStatus.code === "big") {
+      syncValue = "Не работает";
+      syncNote = "Слишком много данных в аккаунте. Удали ненужные плейлисты, или напиши в поддержку";
+    } else if (syncStatus.code === "net") {
+      syncValue = "Нет связи";
+      syncNote = "Попробуем ещё раз сами. Нажми, чтобы проверить сейчас";
+    } else if (syncStatus.code === "ok") {
+      syncNote = `Последний раз в ${hhmm(syncStatus.at)}${where ? " · это " + where : ""}. Нажми, чтобы обновить сейчас`;
+    } else {
+      syncNote = "Проверяем…";
+    }
+    $("account-analytics-val").textContent = state.settings.analyticsOff ? "Выключено" : "Включено";
+    $("account-sessions-count").textContent = syncValue;
+    $("account-sync-sub").textContent = syncNote;
+    const tgName = tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") : "";
+    const customName = !!Store.getAccountName(), customPhoto = !!Store.getAccountAvatar();
+    $("account-sub").textContent = tgUser && tgUser.username ? `@${tgUser.username}` : "";
+    $("acc-name-val").textContent = displayName();
+    $("acc-photo-val").textContent = customPhoto ? "Своё" : (tgUser && tgUser.photo_url ? "Из Telegram" : "Не выбрано");
+    $("acc-tg-val").textContent = tgUser ? (tgUser.username ? `@${tgUser.username}` : (tgName || "Подключён")) : "Не подключён";
+    $("account-restore-tg").hidden = !(tgUser && (customName || customPhoto));
+    $("acc-favs").textContent = String(state.favorites.length);
+    $("acc-lists").textContent = String(state.playlists.length);
+    $("acc-follows").textContent = String(state.followedArtists.length);
+    const logoutBtn = $("account-logout");
+    if (logoutBtn) logoutBtn.hidden = !localStorage.getItem("notka_auth_token");
   }
+  $("account-analytics-row").addEventListener("click", () => {
+    Store.setSetting("analyticsOff", !state.settings.analyticsOff);
+    if (state.settings.analyticsOff) eventQueue.length = 0;
+    haptic("light");
+    showToast(state.settings.analyticsOff ? "Выключено" : "Включено, спасибо");
+    renderAccountScreen();
+  });
+  $("account-sessions-row").addEventListener("click", () => {
+    if (!syncOn()) { showToast("Открой Нотку из Telegram, чтобы включить синхронизацию"); return; }
+    syncDeadAt = 0;
+    haptic("light");
+    setSyncStatus("idle");
+    syncNow();
+  });
+  $("account-row-name").addEventListener("click", () => $("account-name-row").click());
+  $("account-row-photo").addEventListener("click", () => changeAccountAvatar());
+  $("account-restore-tg").addEventListener("click", () => {
+    Store.setAccountName(null);
+    Store.setAccountAvatar(null);
+    renderAccountScreen();
+    renderProfile();
+    haptic("success");
+    showToast("Имя и фото из Telegram");
+  });
+  const accLogoutBtn = $("account-logout");
+  if (accLogoutBtn) {
+    accLogoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("notka_auth_token");
+      localStorage.removeItem("notka_auth_user");
+      location.reload();
+    });
+  }
+
+  // копия данных одним текстом: на устройстве хранится всё, и так оно переезжает на новый телефон
+  const BACKUP_PREFIX = "NOTKA1:";
+  function buildBackup() {
+    const keepCover = (p) => (p.cover && p.cover.length > 30000 ? Object.assign({}, p, { cover: null }) : p);
+    const data = {
+      v: 1, at: Date.now(),
+      accountName: state.accountName, favorites: state.favorites, playlists: state.playlists.map(keepCover),
+      followedArtists: state.followedArtists, followedMeta: state.followedMeta, playlistFlags: state.playlistFlags,
+      settings: state.settings, listens: listensView(), events: state.events,
+    };
+    return BACKUP_PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function readBackup(text) {
+    const raw = String(text || "").replace(/\s+/g, "");
+    if (!raw.startsWith(BACKUP_PREFIX)) throw new Error("not a backup");
+    const data = JSON.parse(decodeURIComponent(escape(atob(raw.slice(BACKUP_PREFIX.length)))));
+    if (!data || data.v !== 1 || !Array.isArray(data.favorites) || !Array.isArray(data.playlists)) throw new Error("bad backup");
+    return data;
+  }
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; }
+    } catch (e) { /* the fallback below */ }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (e) { return false; }
+  }
+  $("account-backup").addEventListener("click", async () => {
+    const text = buildBackup();
+    if (await copyText(text)) { haptic("success"); showToast("Копия скопирована. Сохрани её, например, в «Избранное»"); return; }
+    // буфер недоступен: показываем текст, его можно скопировать руками
+    $("restore-title").textContent = "Копия данных";
+    $("restore-text").textContent = "Не получилось скопировать само. Выдели весь текст и скопируй его.";
+    $("restore-input").value = text;
+    $("restore-confirm").hidden = true;
+    openOverlay("restore-modal");
+    setTimeout(() => { $("restore-input").focus(); $("restore-input").select(); }, 80);
+  });
+  $("account-restore").addEventListener("click", () => {
+    $("restore-title").textContent = "Восстановить из копии";
+    $("restore-text").textContent = "Вставь текст копии. Любимое, плейлисты, подписки и статистика на этом устройстве будут заменены.";
+    $("restore-input").value = "";
+    $("restore-confirm").hidden = false;
+    openOverlay("restore-modal");
+    setTimeout(() => $("restore-input").focus(), 80);
+  });
+  $("restore-cancel").addEventListener("click", () => closeOverlay("restore-modal"));
+  $("restore-confirm").addEventListener("click", () => {
+    let data;
+    try { data = readBackup($("restore-input").value); } catch (e) { haptic("error"); showToast("Это не похоже на копию Нотки"); return; }
+    state.accountName = data.accountName || null;
+    state.favorites = data.favorites;
+    state.playlists = data.playlists;
+    state.followedArtists = data.followedArtists || [];
+    state.followedMeta = data.followedMeta || {};
+    state.playlistFlags = data.playlistFlags || {};
+    state.settings = Object.assign(state.settings, data.settings || {});
+    state.listens = data.listens || { seconds: 0, plays: 0, tracks: {}, artists: {} };
+    // the restored file holds the whole sum: this device carries it, the others' counters start over
+    state.remoteListens = null;
+    state.listensResetPending = true;
+    listensRev++;
+    if (data.events) state.events = data.events;
+    persist();
+    closeOverlay("restore-modal");
+    haptic("success");
+    showToast("Данные восстановлены");
+    setTimeout(() => location.reload(), 700);
+  });
+  $("account-reset-stats").addEventListener("click", () => openOverlay("reset-stats-modal"));
+  $("reset-stats-cancel").addEventListener("click", () => closeOverlay("reset-stats-modal"));
+  $("reset-stats-confirm").addEventListener("click", () => {
+    state.listens = { seconds: 0, plays: 0, tracks: {}, artists: {}, days: {} };
+    state.remoteListens = null; // and the other devices' counters too: it is one account
+    state.listensResetPending = true;
+    listensRev++;
+    persist();
+    closeOverlay("reset-stats-modal");
+    haptic("success");
+    showToast("Статистика сброшена");
+  });
   function setSwitch(id, on) {
     const el = $(id);
     if (el) el.setAttribute("aria-checked", on ? "true" : "false");
+  }
+  // in Telegram the data is kept under the account, so the screens say so
+  if (syncOn()) {
+    const swap = (el) => {
+      if (/хранятся на этом устройстве/.test(el.textContent)) {
+        el.textContent = el.textContent
+          .replace("Любимое и плейлисты хранятся на этом устройстве", "Любимое, плейлисты и статистика хранятся в аккаунте и совпадают на всех устройствах")
+          .replace("Любимое, плейлисты и статистика хранятся на этом устройстве", "Любимое, плейлисты и статистика хранятся в твоём аккаунте Telegram и совпадают на всех устройствах");
+      }
+    };
+    document.querySelectorAll("p, span, div, li").forEach((el) => { if (!el.children.length) swap(el); });
+    document.querySelectorAll(".fineprint").forEach((el) => { if (/на этом устройстве/.test(el.textContent)) el.textContent = "Считается по всем твоим устройствам"; });
   }
   $("account-back-btn").addEventListener("click", goBack);
   $("account-invite-btn").addEventListener("click", shareInvite);
@@ -2403,19 +3660,74 @@
   // ============================================================
   // SOUND & DOWNLOADS
   // ============================================================
+  // the crossfade, drawn: the first track fades out while the next fades in, over as many seconds as are set
+  function paintCrossfade(val) {
+    const o = (val / 12) * 150; // overlap, in the width of the drawing (300)
+    const l = 150 - o / 2, r = 150 + o / 2;
+    $("xf-path-a").setAttribute("d", `M0,84 L0,22 L${l.toFixed(1)},22 L${r.toFixed(1)},84 Z`);
+    $("xf-path-b").setAttribute("d", `M300,84 L300,22 L${r.toFixed(1)},22 L${l.toFixed(1)},84 Z`);
+    $("crossfade-value").textContent = val === 0 ? "Выкл" : String(val);
+    $("crossfade-unit").textContent = val === 0 ? "" : "сек";
+    $("crossfade-slider").style.setProperty("--p", `${(val / 12) * 100}%`);
+  }
   function renderSoundScreen() {
     const crossfade = Store.getSetting("crossfade") || 0;
     $("crossfade-slider").value = crossfade;
-    $("crossfade-value").textContent = crossfade === 0 ? "Выключен" : `${crossfade} сек`;
+    paintCrossfade(crossfade);
     $("crossfade-note").textContent = volumeWorks
-      ? "Трек мягко затухает в конце и появляется в начале."
+      ? "Трек мягко затухает в конце, а следующий уже набирает громкость."
       : "На этом устройстве Telegram не даёт менять громкость — переход не сработает.";
+    const sw = $("toggle-normalize");
+    const on = loudness.supported && !!Store.getSetting("loudness");
+    sw.disabled = !loudness.supported;
+    sw.setAttribute("aria-checked", on ? "true" : "false");
+    $("normalize-sub").textContent = loudness.supported ? "Все треки звучат одинаково громко" : "Здесь это не работает: Нотка открыта не через наш сервер";
+    revealIn("screen-sound", true);
   }
+  $("toggle-normalize").addEventListener("click", () => {
+    const sw = $("toggle-normalize");
+    if (sw.disabled) return;
+    const on = sw.getAttribute("aria-checked") !== "true";
+    sw.setAttribute("aria-checked", on ? "true" : "false");
+    Store.setSetting("loudness", on);
+    haptic("select");
+    loudness.refresh();
+  });
   $("sound-back-btn").addEventListener("click", goBack);
+
+  // «Лёгкий режим»: меньше размытия и анимаций для слабых телефонов
+  function renderPerfSwitch() {
+    const mn = $("toggle-minimal");
+    if (mn) mn.setAttribute("aria-checked", isMinimal() ? "true" : "false");
+    const sw = $("toggle-lite");
+    if (!sw) return;
+    const lite = perfProbe.isLite();
+    sw.setAttribute("aria-checked", lite ? "true" : "false");
+    const sub = $("lite-sub");
+    if (sub) sub.textContent = lite && perfProbe.mode() === "auto"
+      ? "Включился сам: Нотка тормозила на этом телефоне"
+      : "Меньше размытия и анимаций: плавнее и меньше греется";
+  }
+  document.addEventListener("notka:perf", renderPerfSwitch);
+  $("toggle-minimal").addEventListener("click", () => {
+    const on = $("toggle-minimal").getAttribute("aria-checked") !== "true";
+    Store.setSetting("minimal", on);
+    $("toggle-minimal").setAttribute("aria-checked", on ? "true" : "false");
+    haptic("select");
+    applyLook();
+  });
+  $("toggle-lite").addEventListener("click", () => {
+    const on = $("toggle-lite").getAttribute("aria-checked") !== "true";
+    perfProbe.set(on);
+    haptic("select");
+    renderPerfSwitch();
+    showToast(on ? "Лёгкий режим включён" : "Лёгкий режим выключен");
+  });
   $("crossfade-slider").addEventListener("input", (e) => {
     const val = parseInt(e.target.value, 10) || 0;
     Store.setSetting("crossfade", val);
-    $("crossfade-value").textContent = val === 0 ? "Выключен" : `${val} сек`;
+    paintCrossfade(val);
+    haptic("select");
   });
 
   // ============================================================
@@ -2443,6 +3755,44 @@
     showToast(on ? "Предпросмотр «Нотки Плюс» включён — смотри в профиле" : "Предпросмотр «Нотки Плюс» выключен");
   });
   $("menu-plus").addEventListener("click", () => showScreen("plus"));
+  // страница Плюса: переключатели внутри карточек-примеров (неделя / месяц, настроение)
+  function setupPlusPage() {
+    document.querySelectorAll("#plus-panels .px-seg").forEach((seg) => {
+      if (seg.id === "plus-stage-tabs") return; // у тем плеера свой обработчик ниже
+      const card = seg.closest(".px-card");
+      seg.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-k]");
+        if (!btn) return;
+        seg.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === btn));
+        card.querySelectorAll(".v").forEach((v) => v.classList.toggle("is-on", v.dataset.v === btn.dataset.k));
+        haptic("select");
+      });
+    });
+  }
+  setupPlusPage();
+  const plusAtmoBtn = $("plus-atmo-btn");
+  if (plusAtmoBtn) plusAtmoBtn.addEventListener("click", () => showScreen("look"));
+
+  // настоящие цифры слушателя и его инициал для витрин «Итоги» и «Друг Нотки»
+  function fillPlusLive() {
+    const l = listensView() || {};
+    const vals = { minutes: Math.round((l.seconds || 0) / 60), plays: l.plays || 0, tracks: Object.keys(l.tracks || {}).length, artists: Object.keys(l.artists || {}).length };
+    const words = { minutes: ["минута", "минуты", "минут"], plays: ["прослушивание", "прослушивания", "прослушиваний"], tracks: ["трек", "трека", "треков"], artists: ["исполнитель", "исполнителя", "исполнителей"] };
+    document.querySelectorAll("#plus-panels [data-stat]").forEach((el) => {
+      const k = el.dataset.stat, n = vals[k];
+      el.textContent = n ? n.toLocaleString("ru-RU") : "♪";
+      const w = document.querySelector(`#plus-panels [data-word="${k}"]`);
+      if (w) w.textContent = n ? (k === "minutes" ? plural(n, ...words[k]) + " с Ноткой" : plural(n, ...words[k])) : "пока тихо, начни слушать";
+    });
+    const pxStats = $("px-stats");
+    if (pxStats) pxStats.classList.toggle("is-empty", !vals.minutes && !vals.tracks && !vals.artists);
+    const initial = ($("profile-initial") && $("profile-initial").textContent) || "Н";
+    document.querySelectorAll("#plus-panels .fr-initial").forEach((el) => { el.textContent = initial; });
+    document.querySelectorAll("#plus-panels [data-ago]").forEach((el) => {
+      el.textContent = new Date(Date.now() - Number(el.dataset.ago) * 864e5).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+    });
+  }
+
   $("plus-back-btn").addEventListener("click", goBack);
 
   // Who has Плюс. Real subscriptions will come from the server once
@@ -2451,7 +3801,7 @@
   // Real Плюс comes from the server (a promo code now, a payment later): it
   // answers for the Telegram user behind this Mini App. The last answer is
   // remembered, so the app doesn't wait for the network to look right.
-  const tgInitData = (tg && tg.initData) || "";
+  const tgInitData = tgInitRaw;
   function plusUntil() {
     try { return +localStorage.getItem("notka_plus_until") || 0; } catch (e) { return 0; }
   }
@@ -2490,9 +3840,13 @@
     applyLook();
   }
   async function refreshPlus() {
-    if (!tgInitData) return;
+    const tok = localStorage.getItem("notka_auth_token");
+    if (!tgInitData && !tok) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/plus/status`, { headers: { "X-Telegram-Init-Data": tgInitData } });
+      const headers = {};
+      if (tgInitData) headers["X-Telegram-Init-Data"] = tgInitData;
+      if (tok) headers["X-Auth-Token"] = tok;
+      const res = await fetch(`${API_BASE_URL}/plus/status`, { headers });
       if (!res.ok) return;
       const data = await res.json();
       if (data.known) rememberPlus(data.until);
@@ -2501,7 +3855,20 @@
   function longDate(seconds) {
     return new Date(seconds * 1000).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
   }
-  let plusPlan = "month";
+  const PLUS_PLANS = {
+    year: { then: "749 ₽ в год" },
+    quarter: { then: "229 ₽ за 3 месяца" },
+    month: { then: "89 ₽ в месяц" },
+  };
+  let plusPlan = "year";
+  // плашка с пробным периодом: в первый заход, потом на каждый десятый, и если не заходил 3 дня и больше
+  function planBarVisit() {
+    let visits = 0, last = 0;
+    try { visits = +localStorage.getItem("notka_plus_visits") || 0; last = +localStorage.getItem("notka_plus_last") || 0; } catch (e) { /* no storage: always show */ }
+    const show = visits % 10 === 0 || (last && Date.now() - last > 3 * 86400000);
+    try { localStorage.setItem("notka_plus_visits", String(visits + 1)); localStorage.setItem("notka_plus_last", String(Date.now())); } catch (e) { /* once more next time */ }
+    $("plus-bar").classList.toggle("is-skipped", !show && !hasPlus());
+  }
   function syncPlusUI() {
     const on = hasPlus();
     const real = hasRealPlus();
@@ -2510,22 +3877,19 @@
     $("plus-bar").classList.toggle("is-active", on);
     $("plus-bar").classList.toggle("is-real", real);
     $("plus-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";
+    $("plan-buy-btn").textContent = on ? "Выключить Плюс" : "Попробовать 7 дней бесплатно";
+    $("plan-buy-btn").hidden = real;
+    $("plan-state").hidden = !on;
+    $("plan-state").textContent = real ? `Плюс включён до ${longDate(plusUntil())}` : "Плюс включён в режиме предпросмотра. Оплата не списывалась.";
     $("plus-bar-note").textContent = real
       ? `Плюс включён до ${longDate(plusUntil())}`
       : on
       ? "Плюс включён в режиме предпросмотра. Оплата не списывалась."
-      : `Потом ${plusPlan === "year" ? "600 ★ в год" : "75 ★ в месяц"}. Отмена в любой момент.`;
+      : `Потом ${PLUS_PLANS[plusPlan].then}`;
   }
-  $("plus-plans").addEventListener("click", (e) => {
-    const plan = e.target.closest(".plus-plan");
-    if (!plan) return;
-    plusPlan = plan.dataset.plan;
-    $("plus-plans").querySelectorAll(".plus-plan").forEach((p) => {
-      p.classList.toggle("is-on", p === plan);
-      p.setAttribute("aria-checked", p === plan ? "true" : "false");
-    });
+  $("plus-bar-close").addEventListener("click", () => {
     haptic("light");
-    syncPlusUI();
+    $("plus-bar").classList.add("is-dismissed");
   });
 
   // The stage on top of the page: the themes play live, with the cover of
@@ -2546,12 +3910,13 @@
     $("plus-cd-art").style.backgroundImage = art;
     $("plus-cassette-title").textContent = track ? track.title || "Без названия" : "Твоя музыка";
     $("plus-cassette-artist").textContent = track ? track.artist || "" : "в Нотке Плюс";
-    // the listener's own minutes; a newcomer has none yet, and a zero would read as a verdict
-    const minutes = Math.round(state.listens.seconds / 60);
-    $("plus-recap-num").textContent = minutes ? minutes.toLocaleString("ru-RU") : "♪";
-    $("plus-recap-word").textContent = minutes ? plural(minutes, "минута", "минуты", "минут") : "твои итоги";
+    fillPlusLive();
+    fillPlusShowcase();
+    planBarVisit();
     syncPlusUI();
+    $("plus-bar").classList.remove("is-dismissed"); // плашка возвращается при каждом заходе
     revealIn("screen-plus", true);
+    setTimeout(perfProbe, 1800);
     clearInterval(plusStageTimer);
     plusStageTimer = setInterval(() => {
       if (currentScreen !== "plus") { clearInterval(plusStageTimer); return; }
@@ -2574,14 +3939,123 @@
     else showToast("Тема включена. Запусти любой трек и открой плеер");
   });
 
-  $("plus-buy-btn").addEventListener("click", () => {
+  $("plan-opts").addEventListener("click", (e) => {
+    const opt = e.target.closest(".plan-opt");
+    if (!opt) return;
+    plusPlan = opt.dataset.plan;
+    $("plan-opts").querySelectorAll(".plan-opt").forEach((o) => {
+      o.classList.toggle("is-on", o === opt);
+      o.setAttribute("aria-checked", o === opt ? "true" : "false");
+    });
+    haptic("light");
+    syncPlusUI();
+  });
+  const togglePlusPreview = () => {
     const on = !hasPlus();
     try { localStorage.setItem("notka_plus_local", on ? "1" : "0"); } catch (e) { return; }
     haptic(on ? "success" : "light");
     showToast(on ? "Плюс включён для предпросмотра. Оплата не списывалась" : "Плюс выключен");
     syncPlusUI();
     if (on) keepTriedLook(); else { endLookTry(); applyLook(); }
-  });
+  };
+  $("plus-buy-btn").addEventListener("click", togglePlusPreview);
+  $("plan-buy-btn").addEventListener("click", togglePlusPreview);
+
+  // когда внизу страницы виден сам план с кнопкой, плавающая плашка не нужна
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver((entries) => {
+      $("plus-bar").classList.toggle("is-covered", entries.some((e) => e.isIntersecting));
+    }, { root: $("screen-plus"), threshold: 0.6 }).observe($("plan-buy-btn"));
+  }
+
+  // Real covers for the Plus page: the header's deck of glass cards and the
+  // example lists in the panels. A cover is looked up once through the same
+  // search the app uses, then kept on this device.
+  const PLUS_COVERS_KEY = "notka_plus_covers_v1";
+  let plusCoverCache = {};
+  try { plusCoverCache = JSON.parse(localStorage.getItem(PLUS_COVERS_KEY) || "{}") || {}; } catch (e) { plusCoverCache = {}; }
+  const plusCoverPending = new Map();
+  function savePlusCovers() {
+    try { localStorage.setItem(PLUS_COVERS_KEY, JSON.stringify(plusCoverCache)); } catch (e) { /* kept for this session only */ }
+  }
+  function plusCoverFor(query, artistHint) {
+    const key = query.trim().toLowerCase();
+    if (plusCoverCache[key]) return Promise.resolve(plusCoverCache[key]);
+    if (plusCoverPending.has(key)) return plusCoverPending.get(key);
+    const p = (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}&limit=12`);
+        if (!res.ok) return null;
+        const list = ((await res.json()).results || []).filter((t) => t.artwork);
+        const hint = (artistHint || "").toLowerCase().split(/\s+/)[0];
+        const hit = hint ? list.find((t) => (t.artist || "").toLowerCase().split(/[,&]/)[0].includes(hint)) : list[0];
+        if (!hit) return null;
+        const rec = { title: hit.title, artist: hit.artist, artwork: hit.artwork };
+        plusCoverCache[key] = rec;
+        savePlusCovers();
+        return rec;
+      } catch (e) {
+        return null;
+      } finally {
+        plusCoverPending.delete(key);
+      }
+    })();
+    plusCoverPending.set(key, p);
+    return p;
+  }
+  const PLUS_DECK_QUERIES = [
+    ["The Weeknd Blinding Lights", "The Weeknd"], ["Кино Группа крови", "Кино"], ["Dua Lipa Houdini", "Dua"],
+    ["Coldplay Yellow", "Coldplay"], ["Imagine Dragons Believer", "Imagine"], ["Billie Eilish lovely", "Billie"], ["Nirvana Smells Like Teen Spirit", "Nirvana"],
+    ["Linkin Park Numb", "Linkin"], ["Ed Sheeran Shape of You", "Ed"],
+  ];
+  const cssUrl = (u) => `url("${String(u).replace(/"/g, "%22")}")`;
+
+  // the header: a canvas of horizontal mini players laid out evenly over the
+  // whole width and seen in perspective, as if they lay on a table
+  let plusDeckTracks = [];
+  // примеры на странице Плюса: настоящие карточки с настоящими обложками (свои треки слушателя, затем известные)
+  function renderPlusPage() {
+    const pool = plusDeckTracks;
+    const n = pool.length;
+    if (!n) return;
+    const at = (i) => pool[((i % n) + n) % n];
+    const fillRow = (li, t) => {
+      li.querySelector(".px-cv").style.backgroundImage = cssUrl(hiResArtwork(t.artwork));
+      li.querySelector("b").textContent = t.title || "";
+      li.querySelector("em").textContent = t.artist || "";
+    };
+    document.querySelectorAll("#px-stack .px-mini").forEach((el, i) => {
+      fillRow(el, at(i));
+      el.querySelector("u").style.width = [58, 34, 76][i] + "%";
+    });
+    const sets = { week: [0, 1, 2], month: [3, 4, 5], quarter: [6, 7, 8], bright: [0, 3, 6], calm: [1, 4, 7], work: [2, 5, 8], sad: [3, 6, 0] };
+    document.querySelectorAll("#plus-panels .px-views .v").forEach((v) => {
+      const idx = sets[v.dataset.v];
+      if (!idx) return;
+      v.querySelectorAll(".px-row").forEach((li, j) => fillRow(li, at(idx[j])));
+    });
+  }
+  async function fillPlusShowcase() {
+    const seen = new Set(), pool = [];
+    const add = (t) => {
+      if (!t || !t.title || !t.artwork || seen.has(t.artwork) || pool.length >= 6) return;
+      seen.add(t.artwork);
+      pool.push({ title: t.title, artist: t.artist, artwork: t.artwork });
+    };
+    if (currentTrack) add(currentTrack);
+    (state.favorites || []).forEach(add);
+    (state.recent || []).forEach(add);
+    plusDeckTracks = pool.slice();
+    if (plusDeckTracks.length >= 5) renderPlusPage();
+    // fill up with well-known tracks and their real covers (looked up once, then kept)
+    const found = await Promise.all(PLUS_DECK_QUERIES.map(([q, a]) => plusCoverFor(q, a)));
+    for (const rec of found) {
+      if (!rec || plusDeckTracks.length >= 13 || seen.has(rec.artwork)) continue;
+      seen.add(rec.artwork);
+      plusDeckTracks.push(rec);
+    }
+    renderPlusPage();
+  }
 
   // ============================================================
   // HOW НОТКА LOOKS — the player theme, the color of the light, the
@@ -2597,9 +4071,13 @@
     rose: { name: "Роза", palette: { core: "#FFE1EC", warm: "#FF6FA3", mid: "#C94BD6", deep: "#5B2A9E" } },
     neon: { name: "Неон", palette: { core: "#E8FFF9", warm: "#2CF5C2", mid: "#9B5CFF", deep: "#2A1A8F" } },
     gold: { name: "Золото", palette: { core: "#FFF3C9", warm: "#FFC24B", mid: "#FF7A3D", deep: "#7A2E1E" } },
-    mono: { name: "Серебро", palette: { core: "#FFFFFF", warm: "#C9C4D6", mid: "#8E88A0", deep: "#3B3650" } },
+    mono: { name: "Серебро", palette: { core: "#FFFFFF", warm: "#C9C4D6", mid: "#8E88A0", deep: "#3B3650" }, free: true },
+    // спокойные цвета без Плюса: для тех, у кого розовый режет глаза
+    graphite: { name: "Графит", palette: { core: "#E4E6EA", warm: "#9AA0AB", mid: "#5F6672", deep: "#23262D" }, free: true },
+    midnight: { name: "Полночь", palette: { core: "#D5E0F2", warm: "#5F7FB8", mid: "#3A4F86", deep: "#141C34" }, free: true },
+    moss: { name: "Мох", palette: { core: "#DDE8DA", warm: "#7FA386", mid: "#4A6E5B", deep: "#16261F" }, free: true },
   };
-  const BG_PATTERNS = { light: "Свет", prism: "Призма", rings: "Кольца", stars: "Искры", calm: "Покой" };
+  const BG_PATTERNS = { light: "Свет", prism: "Призма", aurora: "Сияние", horizon: "Горизонт", lava: "Лава" };
   // light: "track" | "preset:<id>" | "pinned" (the palette and cover are in lightPinned)
   const LOOK_DEFAULTS = { playerTheme: "standard", light: "track", bgPattern: "light", atmo: "none" };
   // «Атмосфера»: seasons and nature. Plus ones come with Нотка Плюс; the
@@ -2670,7 +4148,8 @@
     if (!a.loot) return hasPlus();
     return ownsItem("atmo_" + id) || (plusPreview() && hasPlus());
   }
-  const lookAllowed = (key, value) => value === LOOK_DEFAULTS[key] || (key === "atmo" ? atmoOwned(value) : hasPlus());
+  const freeLight = (v) => typeof v === "string" && v.startsWith("preset:") && !!(LIGHT_PRESETS[v.slice(7)] || {}).free;
+  const lookAllowed = (key, value) => value === LOOK_DEFAULTS[key] || (key === "atmo" ? atmoOwned(value) : (key === "light" && freeLight(value)) || hasPlus());
   const LOOK_TRY_MS = 60000;
   let lookTried = {}; // what is switched on for a try, without Плюс
   let lookTryTimer = null;
@@ -2681,9 +4160,13 @@
     if (key === "atmo") return value === "none" || !!ATMOS[value];
     return value === "track" || value === "pinned" || (typeof value === "string" && value.startsWith("preset:") && !!LIGHT_PRESETS[value.slice(7)]);
   }
+  // Seasonal atmospheres (Halloween, New Year…) wear only their own event page and the try-on screen.
+  // Everywhere else the app keeps the brand look: rose and peach light on the plum ground.
+  const SEASONS_ONLY_ON_EVENT_PAGE = true;
   function lookValue(key) {
     if (key === "atmo" && currentScreen === "event" && eventById(currentEventId)) return eventById(currentEventId).atmo;
     if (key in lookTried) return lookTried[key];
+    if (key === "atmo" && SEASONS_ONLY_ON_EVENT_PAGE && currentScreen !== "look") return LOOK_DEFAULTS.atmo;
     const saved = Store.getSetting(key);
     return lookKnown(key, saved) && lookAllowed(key, saved) ? saved : LOOK_DEFAULTS[key];
   }
@@ -2696,21 +4179,28 @@
     if (mode.startsWith("preset:")) { palette = LIGHT_PRESETS[mode.slice(7)].palette; art = null; }
     else if (mode === "pinned" && pinnedLight()) { palette = pinnedLight().palette; art = pinnedLight().artwork; }
     const atmo = lookValue("atmo");
-    if (atmo !== "none") { palette = atmoPalette(atmo); art = null; } // the season's own light
+    if (atmo !== "none") { palette = atmoPalette(atmo); art = null; } // the season's own light (only on its event page)
+    if (isMinimal()) art = null; // минимализм: ровный фон без размытой обложки под светом
     showArtUnderLight(art || null);
     applyPalette(palette);
   }
+  // «Минимализм»: ровный тёмный фон без света и атмосфер (в духе Spotify). Бесплатный, хранится в настройках.
+  const isMinimal = () => !!Store.getSetting("minimal");
   function applyLook() {
+    document.documentElement.classList.toggle("minimal", isMinimal());
+    const minSw = $("toggle-minimal");
+    if (minSw) minSw.setAttribute("aria-checked", isMinimal() ? "true" : "false");
     const theme = lookValue("playerTheme");
     document.body.dataset.playerTheme = theme;
     document.body.dataset.bg = lookValue("bgPattern");
+    $("light").dataset.bg = document.body.dataset.bg; // the light alone wears the pattern: the little previews must not follow it
     const atmo = lookValue("atmo");
     document.body.dataset.atmo = atmo;
     const atmoSet = atmo === "none" ? {} : Object.assign(atmoSettings(atmo), currentScreen === "event" ? { bats: "often", life: "both" } : {});
     // every setting is also an attribute of the body, for the style sheet to answer
     Object.keys(document.body.dataset).filter((k) => /^atmo[A-Z]/.test(k)).forEach((k) => delete document.body.dataset[k]);
     Object.entries(atmoSet).forEach(([k, v]) => { document.body.dataset["atmo" + k[0].toUpperCase() + k.slice(1)] = v; });
-    if (window.Atmosphere) Atmosphere.set(atmo, atmoSet);
+    if (window.Atmosphere) Atmosphere.set(isMinimal() ? "none" : atmo, isMinimal() ? {} : atmoSet);
     document.querySelectorAll("#atmo-stage .atmo-card").forEach((c) => { c.classList.toggle("is-on", c.dataset.atmo === atmo); c.setAttribute("aria-pressed", c.dataset.atmo === atmo ? "true" : "false"); });
     renderAtmoOptions(atmo, atmoSet);
     paintLight();
@@ -2798,8 +4288,7 @@
       b.dataset.atmo = id;
       const view = document.createElement("span");
       view.className = "atmo-view";
-      if (id === "none") view.textContent = "Без атмосферы";
-      else for (let i = 0; i < 3; i++) {
+      if (id !== "none") for (let i = 0; i < 3; i++) {
         const piece = document.createElement("i");
         piece.style.cssText = `--x:${[18, 52, 84][i]}%;--d:${[5.2, 6.8, 8.4][i]}s;--w:${[-1.2, -3.4, -5.2][i]}s`;
         view.appendChild(piece);
@@ -2828,7 +4317,7 @@
     if (!box) return;
     if (atmo === "none") {
       atmoOptsFor = null;
-      box.innerHTML = '<p class="atmo-hint">Выбери атмосферу, и здесь появятся её настройки: свет, погода, детали.</p>';
+      box.innerHTML = "";
       return;
     }
     const key = atmo + JSON.stringify(current);
@@ -2846,8 +4335,32 @@
     setAtmoSetting(atmo, c.dataset.setting, c.dataset.v);
     applyLook();
   });
+  // every pattern is shown as a little screen with the same light on it
+  function renderPatterns() {
+    const box = $("look-patterns");
+    if (box.children.length) return;
+    const orbs = ["violet", "magenta", "orange", "rim", "rim-b", "core"].map((n) => `<span class="orb orb-${n}"></span>`).join("");
+    const ui = '<span class="pv-ui"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d1"></i><i class="e1"></i></span>';
+    box.innerHTML = Object.entries(BG_PATTERNS).map(([id, name]) => `<button class="pattern-opt" type="button" data-bg="${id}"><span class="pattern-thumb" data-bg="${id}" aria-hidden="true"><span class="pv"><span class="light-group"><span class="light-shape"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>${orbs}</span>${ui}</span></span><span class="pattern-name">${name}</span></button>`).join("");
+  }
+  // Every pattern card is a small living light (several blurred, blended orbs). Seven of them
+  // moving at once, under the real light, is what froze weak phones the moment a pattern was
+  // picked. Only the cards that are on the screen move.
+  let patternWatch = null;
+  function watchPatternCards() {
+    if (patternWatch || !("IntersectionObserver" in window)) return;
+    patternWatch = new IntersectionObserver((entries) => {
+      entries.forEach((en) => en.target.classList.toggle("is-off", !en.isIntersecting));
+    }, { root: null, threshold: 0.05 });
+    document.querySelectorAll("#look-patterns .pattern-opt").forEach((el) => {
+      el.classList.add("is-off");
+      patternWatch.observe(el);
+    });
+  }
   function renderLookScreen() {
     renderAtmoStage();
+    renderPatterns();
+    watchPatternCards();
     const colors = $("look-colors");
     if (!colors.children.length) {
       const swatch = (value, name, p) => {
@@ -2903,6 +4416,7 @@
     });
     $("look-covers-title").hidden = covers.children.length === 0;
     applyLook();
+    renderPerfSwitch();
     revealIn("screen-look", true);
     // the theme that is on stands in view
     const on = stage.querySelector(".look-slide.is-on");
@@ -2912,6 +4426,7 @@
     const slide = e.target.closest(".look-slide");
     if (!slide) return;
     haptic("light");
+    slide.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
     setPlayerTheme(slide.dataset.theme);
   });
   $("look-colors").addEventListener("click", (e) => {
@@ -2928,6 +4443,27 @@
   });
   $("menu-look").addEventListener("click", () => showScreen("look"));
   $("look-back-btn").addEventListener("click", goBack);
+
+  // once, after the first screen: what the app remembers (it is also the answer to «what do you store?»)
+  (function dataNotice() {
+    const box = $("data-notice");
+    if (!box || Store.getSetting("dataNoticeSeen")) return;
+    let tries = 0;
+    const attempt = () => {
+      if (Store.getSetting("dataNoticeSeen")) return;
+      if (currentScreen === "splash" || currentScreen === "onboarding" || tries++ > 40) {
+        if (tries <= 40) setTimeout(attempt, 1500);
+        return;
+      }
+      box.hidden = false;
+    };
+    setTimeout(attempt, 2500);
+    $("data-notice-ok").addEventListener("click", () => {
+      box.hidden = true;
+      Store.setSetting("dataNoticeSeen", true);
+      haptic("light");
+    });
+  })();
 
   applyLook();
   syncPlusUI();
@@ -3056,18 +4592,26 @@
     applyLook();
   }
   async function syncEvents() {
+    const tok = localStorage.getItem("notka_auth_token");
     for (const ev of activeEvents()) {
       const progress = {};
       ev.tasks.forEach((t) => { if (!t.locked) progress[t.id] = taskValue(ev.id, t); });
       try {
-        const res = await fetch(`${API_BASE_URL}/events/sync`, { method: "POST", headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitData }, body: JSON.stringify({ event: ev.id, progress }) });
+        const headers = { "content-type": "application/json" };
+        if (tgInitData) headers["X-Telegram-Init-Data"] = tgInitData;
+        if (tok) headers["X-Auth-Token"] = tok;
+        const res = await fetch(`${API_BASE_URL}/events/sync`, { method: "POST", headers, body: JSON.stringify({ event: ev.id, progress }) });
         if (res.ok) mergeMine(ev, await res.json(), false);
       } catch (e) { /* the next change tries again */ }
     }
   }
   async function refreshEvents() {
     try {
-      const res = await fetch(`${API_BASE_URL}/events`, { headers: { "X-Telegram-Init-Data": tgInitData } });
+      const headers = {};
+      if (tgInitData) headers["X-Telegram-Init-Data"] = tgInitData;
+      const tok = localStorage.getItem("notka_auth_token");
+      if (tok) headers["X-Auth-Token"] = tok;
+      const res = await fetch(`${API_BASE_URL}/events`, { headers });
       if (!res.ok) return;
       eventsCfg = (await res.json()).events || [];
       try { localStorage.setItem(EVENTS_CACHE, JSON.stringify(eventsCfg)); } catch (e) { /* the list is fetched again */ }
@@ -3320,9 +4864,13 @@
     $("promo-confirm").classList.add("is-busy");
     let data = null, problem = null;
     try {
+      const headers = { "content-type": "application/json" };
+      if (tgInitData) headers["X-Telegram-Init-Data"] = tgInitData;
+      const tok = localStorage.getItem("notka_auth_token");
+      if (tok) headers["X-Auth-Token"] = tok;
       const res = await fetch(`${API_BASE_URL}/plus/redeem`, {
         method: "POST",
-        headers: { "content-type": "application/json", "X-Telegram-Init-Data": tgInitData },
+        headers,
         body: JSON.stringify({ code }),
       });
       const body = await res.json();
@@ -3366,7 +4914,7 @@
   // What was heard in a period: "all" comes from the running totals, a
   // number of days — from the per-day records (kept for a month).
   function statsFor(period) {
-    const L = state.listens;
+    const L = listensView();
     let seconds = L.seconds, plays = L.plays, tracks, artists;
     if (period === "all") {
       tracks = Object.values(L.tracks).map((x) => ({ track: x.track, plays: x.plays, seconds: x.seconds }));
@@ -3399,21 +4947,21 @@
   // An artist's face: the photo we already know, else the cover of their
   // most played track — and the real photo is fetched once and remembered.
   function artistRef(name) {
-    const a = state.listens.artists[name] || {};
+    const a = listensView().artists[name] || {};
     if (a.artistId) return { artistId: a.artistId, source: a.source };
-    const hit = Object.values(state.listens.tracks).find((x) => x.track.artist === name && x.track.artistId);
+    const hit = Object.values(listensView().tracks).find((x) => x.track.artist === name && x.track.artistId);
     return hit ? { artistId: hit.track.artistId, source: hit.track.source } : {};
   }
   function artistFace(name) {
-    const a = state.listens.artists[name] || {};
+    const a = listensView().artists[name] || {};
     if (a.photo) return a.photo;
     if (state.followedMeta[name] && state.followedMeta[name].photo) return state.followedMeta[name].photo;
-    const own = Object.values(state.listens.tracks).filter((x) => x.track.artist === name && x.track.artwork).sort((x, y) => y.seconds - x.seconds)[0];
+    const own = Object.values(listensView().tracks).filter((x) => x.track.artist === name && x.track.artwork).sort((x, y) => y.seconds - x.seconds)[0];
     return own ? own.track.artwork : null;
   }
   const artistPhotoAsked = new Set();
   async function fetchArtistPhoto(name) {
-    const a = state.listens.artists[name];
+    const a = listensView().artists[name];
     if (!a || a.photo || artistPhotoAsked.has(name)) return null;
     artistPhotoAsked.add(name);
     const ref = artistRef(name);
@@ -3464,7 +5012,7 @@
     body.hidden = empty;
     $("stats-lede").hidden = !empty;
     if (empty) {
-      $("stats-lede").textContent = state.listens.plays
+      $("stats-lede").textContent = listensView().plays
         ? (statsPeriod === 7 ? "За эту неделю пока тихо. Включи что-нибудь — и цифры появятся." : "За этот месяц пока тихо. Включи что-нибудь — и цифры появятся.")
         : "Послушай пару треков — и здесь появится твоя статистика.";
       return;
@@ -3585,6 +5133,652 @@
   $("stats-back-btn").addEventListener("click", goBack);
 
   // ============================================================
+  // ИТОГИ: карточки месяца и всего времени, которыми можно поделиться
+  // ============================================================
+  let recapPeriod = "30";
+  let recapCards = [];
+  function recapData() {
+    const all = recapPeriod === "all";
+    const S = statsFor(all ? "all" : 30);
+    if (!S.tracks.length || S.seconds < 1) return [];
+    const minutes = Math.max(1, Math.round(S.seconds / 60));
+    const cards = [{ type: "minutes", kicker: all ? "Всё время в Нотке" : "Твой месяц в Нотке", minutes, word: `${plural(minutes, "минута", "минуты", "минут")} музыки`, note: minutesNote(minutes), tracks: S.tracks.length, artists: S.artists.length }];
+    const top = S.artists[0];
+    if (top) {
+      const m = Math.max(1, Math.round(top.seconds / 60));
+      cards.push({ type: "artist", kicker: "Исполнитель № 1", name: top.name, photo: artistFace(top.name), sub: `${m} ${plural(m, "минута", "минуты", "минут")} вместе` });
+    }
+    if (S.tracks.length >= 2) cards.push({ type: "tracks", kicker: "Чаще всего играло", rows: S.tracks.slice(0, 5).map((x) => ({ title: x.track.title, sub: x.track.artist || "", art: x.track.artwork, seed: x.track.id })) });
+    if (S.artists.length >= 3) cards.push({ type: "artists", kicker: "Твоя пятёрка", rows: S.artists.slice(0, 5).map((a) => { const m = Math.max(1, Math.round(a.seconds / 60)); return { title: a.name, sub: `${m} ${plural(m, "минута", "минуты", "минут")}`, art: artistFace(a.name), seed: a.name }; }) });
+    return cards;
+  }
+  function recapCardEl(card, i) {
+    const el = document.createElement("article");
+    el.className = "rcp-card";
+    el.dataset.v = String(i % 4);
+    const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+    const top = mk("div", "rcp-top");
+    const brand = mk("span", "rcp-brand");
+    brand.innerHTML = '<svg aria-hidden="true"><use href="#logo-note"/></svg>';
+    brand.appendChild(document.createTextNode("нотка"));
+    top.append(brand, mk("span", "rcp-pill", card.kicker));
+    el.appendChild(top);
+    if (card.type === "minutes") {
+      const num = mk("b", "rcp-num", card.minutes.toLocaleString("ru-RU"));
+      if (String(card.minutes).length >= 4) num.classList.add("is-long");
+      el.append(num, mk("span", "rcp-word", card.word), mk("p", "rcp-note", card.note));
+      const plate = mk("div", "rcp-plate");
+      [[card.tracks, plural(card.tracks, "трек", "трека", "треков")], [card.artists, plural(card.artists, "исполнитель", "исполнителя", "исполнителей")]].forEach(([n, w]) => {
+        const st = mk("span", "rcp-stat");
+        st.append(mk("b", "", String(n)), mk("span", "", w));
+        plate.appendChild(st);
+      });
+      el.appendChild(plate);
+    } else if (card.type === "artist") {
+      el.classList.add("is-artist");
+      const head = mk("div", "rcp-artist-head");
+      head.append(mk("b", "rcp-name", card.name), mk("span", "rcp-word", card.sub));
+      const disc = mk("div", "rcp-disc");
+      const cv = mk("span");
+      setCoverEl(cv, card.photo ? hiResArtwork(card.photo) : null, card.name);
+      disc.appendChild(cv);
+      el.append(head, disc);
+    } else {
+      const list = mk("div", "rcp-list");
+      card.rows.forEach((r, n) => {
+        const row = mk("div", "rcp-row" + (card.type === "artists" ? " is-round" : ""));
+        const cv = mk("span", "cover");
+        setCoverEl(cv, r.art ? hiResArtwork(r.art) : null, r.seed);
+        const t = mk("span", "t");
+        t.append(mk("b", "", r.title), mk("em", "", r.sub));
+        row.append(mk("i", "", String(n + 1)), cv, t);
+        list.appendChild(row);
+      });
+      el.appendChild(list);
+    }
+    return el;
+  }
+  function renderRecap() {
+    recapCards = recapData();
+    const empty = !recapCards.length;
+    $("recap-body").hidden = empty;
+    $("recap-empty").hidden = !empty;
+    if (empty) return;
+    const deck = $("recap-deck");
+    deck.textContent = "";
+    recapCards.forEach((c, i) => deck.appendChild(recapCardEl(c, i)));
+    deck.scrollLeft = 0;
+    const dots = $("recap-dots");
+    dots.textContent = "";
+    recapCards.forEach((_, i) => { const d = document.createElement("i"); if (i === 0) d.className = "is-on"; dots.appendChild(d); });
+    revealIn("screen-recap", true);
+  }
+  function recapIndex() {
+    const deck = $("recap-deck");
+    const first = deck.firstElementChild;
+    if (!first) return 0;
+    const step = first.offsetWidth + 12;
+    return Math.max(0, Math.min(recapCards.length - 1, Math.round(deck.scrollLeft / step)));
+  }
+  $("recap-deck").addEventListener("scroll", () => {
+    const i = recapIndex();
+    $("recap-dots").querySelectorAll("i").forEach((d, n) => d.classList.toggle("is-on", n === i));
+  }, { passive: true });
+  $("recap-periods").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    recapPeriod = chip.dataset.period;
+    $("recap-periods").querySelectorAll(".chip").forEach((c) => {
+      c.classList.toggle("active", c === chip);
+      c.setAttribute("aria-selected", c === chip ? "true" : "false");
+    });
+    haptic("light");
+    renderRecap();
+  });
+  $("recap-back-btn").addEventListener("click", goBack);
+  $("recap-modal-close").addEventListener("click", () => closeOverlay("recap-modal"));
+  function openRecap() {
+    if (!hasPlus()) { showToast("Итоги входят в Нотку Плюс"); showScreen("plus"); return; }
+    showScreen("recap");
+  }
+  $("stats-recap-btn").addEventListener("click", openRecap);
+  $("plus-recap-btn").addEventListener("click", openRecap);
+
+  // карточка как картинка
+  const loadShareImgOnce = (url) => new Promise((resolve) => {
+    if (!url) { resolve(null); return; }
+    url = proxyArtwork(url);
+    const img = new Image();
+    const timer = setTimeout(() => resolve(null), 8000);
+    img.crossOrigin = "anonymous";
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = () => { clearTimeout(timer); resolve(null); };
+    img.src = url;
+  });
+  // обложка иногда не успевает с первого раза: одна повторная попытка
+  const loadShareImg = async (url) => (await loadShareImgOnce(url)) || (await loadShareImgOnce(url));
+  function coverFit(ctx, img, x, y, w, h) {
+    const k = Math.max(w / img.width, h / img.height);
+    const iw = w / k, ih = h / k;
+    ctx.drawImage(img, (img.width - iw) / 2, (img.height - ih) / 2, iw, ih, x, y, w, h);
+  }
+  function roundPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function wrapLines(ctx, text, maxW, maxLines) {
+    const words = String(text).split(/\s+/);
+    const lines = [];
+    let line = "";
+    words.forEach((w) => {
+      const test = line ? line + " " + w : w;
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+    });
+    if (line) lines.push(line);
+    return lines.slice(0, maxLines);
+  }
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  function lumOf(color) {
+    try {
+      const c = document.createElement("canvas"); c.width = c.height = 1;
+      const x = c.getContext("2d", { willReadFrequently: true });
+      x.fillStyle = color; x.fillRect(0, 0, 1, 1);
+      const d = x.getImageData(0, 0, 1, 1).data;
+      return (0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2]) / 255;
+    } catch (e) { return 0.5; }
+  }
+  function themeColors() {
+    const css = getComputedStyle(document.documentElement);
+    const col = (n, d) => (css.getPropertyValue(n) || d).trim() || d;
+    return { core: col("--c-core", "#FFE9DF"), warm: col("--c-warm", "#FFA6B8"), mid: col("--c-mid", "#FF4FA0"), deep: col("--c-deep", "#44112F") };
+  }
+  // логотип Нотки для картинок: знак из двух модулей (прямоугольник и четверть круга)
+  const LOGO_PATHS = [new Path2D("M120 120C86.8629 120 60 93.1371 60 60V0H120V120Z"), new Path2D("M0 120H60V60C60 26.8629 33.1371 0 0 0V120Z")];
+  function drawLogo(ctx, x, y, size, color) {
+    ctx.save();
+    ctx.translate(x, y);
+    const k = size / 120;
+    ctx.scale(k, k);
+    ctx.fillStyle = color;
+    LOGO_PATHS.forEach((p) => ctx.fill(p));
+    ctx.restore();
+  }
+  const SHARE_FONT = "Onest, system-ui, -apple-system, sans-serif";
+  const BRAND_FONT = "Unbounded, Onest, system-ui, sans-serif";
+  // вертикальная плашка из стекла, как в карточках с цитатами
+  function glassPlate(ctx, x, y, w, h, r, strong) {
+    roundPath(ctx, x, y, w, h, r);
+    ctx.fillStyle = strong ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.13)"; ctx.fill();
+    ctx.strokeStyle = strong ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.24)"; ctx.lineWidth = 2.5; ctx.stroke();
+  }
+  async function renderRecapImage(card, index) {
+    try { await document.fonts.load("800 100px Onest"); await document.fonts.load("700 46px Unbounded"); } catch (e) { /* the system font is fine */ }
+    const W = 1080, H = 1350, F = SHARE_FONT;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    ctx.textBaseline = "alphabetic";
+    const th = themeColors();
+    const deep = rgbOf(th.deep), warm = rgbOf(th.warm), mid = rgbOf(th.mid);
+    ctx.fillStyle = rgba(mixRgb(deep, [12, 10, 18], 0.6), 1); ctx.fillRect(0, 0, W, H);
+    const v = index % 4;
+    const lights = [[[120, 80, 780, warm, 0.8], [1080, 800, 740, mid, 0.66]], [[1060, 80, 760, warm, 0.8], [0, 900, 740, mid, 0.66]], [[540, 1350, 860, warm, 0.76], [0, 120, 700, mid, 0.66]], [[0, 1350, 780, warm, 0.78], [1080, 150, 740, mid, 0.66]]][v];
+    lights.forEach(([x, y, r, col, al]) => glowAt(ctx, x, y, r, col, al));
+    const pad = 84;
+    // метка и подпись периода
+    drawLogo(ctx, pad, 76, 60, "rgba(255,255,255,0.92)");
+    ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.font = `800 44px ${F}`;
+    ctx.font = `700 46px ${BRAND_FONT}`; try { ctx.letterSpacing = "-2px"; } catch (e) { /* the plain spacing is fine */ }
+    ctx.fillText("нотка", pad + 76, 126);
+    try { ctx.letterSpacing = "0px"; } catch (e) { /* ok */ }
+    ctx.font = `700 40px ${F}`;
+    const kick = cutText(ctx, card.kicker, 520);
+    const kw = ctx.measureText(kick).width + 64;
+    glassPlate(ctx, W - 60 - kw, 64, kw, 90, 45, false);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(kick, W - 60 - kw + 32, 124);
+    ctx.fillStyle = "#fff";
+    if (card.type === "minutes") {
+      const num = card.minutes.toLocaleString("ru-RU");
+      const size = num.length >= 6 ? 290 : num.length >= 4 ? 350 : 420;
+      ctx.font = `800 ${size}px ${F}`;
+      ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 36;
+      ctx.fillText(num, pad - 10, 640);
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+      ctx.font = `800 82px ${F}`;
+      ctx.fillText(card.word, pad, 750);
+      ctx.fillStyle = "rgba(255,255,255,0.78)"; ctx.font = `500 46px ${F}`;
+      wrapLines(ctx, card.note, W - pad * 2, 3).forEach((l, i) => ctx.fillText(l, pad, 835 + i * 60));
+      const px = 60, ph = 190, py = H - 60 - ph, pw = W - 120;
+      glassPlate(ctx, px, py, pw, ph, 56, false);
+      const stats = [[card.tracks, plural(card.tracks, "трек", "трека", "треков")], [card.artists, plural(card.artists, "исполнитель", "исполнителя", "исполнителей")]];
+      stats.forEach(([n, w], i) => {
+        const cx = px + pw * (i * 2 + 1) / 4;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#fff"; ctx.font = `800 84px ${F}`; ctx.fillText(String(n), cx, py + 98);
+        ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `500 40px ${F}`; ctx.fillText(w, cx, py + 154);
+        ctx.textAlign = "left";
+      });
+      ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fillRect(px + pw / 2 - 1, py + 40, 2, ph - 80);
+    } else if (card.type === "artist") {
+      ctx.font = `800 132px ${F}`;
+      const lines = wrapLines(ctx, card.name, W - pad * 2, 3);
+      ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 30;
+      ctx.fillStyle = "#fff";
+      lines.forEach((l, i) => ctx.fillText(l, pad, 300 + i * 126));
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+      ctx.font = `800 62px ${F}`; ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillText(card.sub, pad, 300 + lines.length * 126 + 22);
+      const img = await loadShareImg(card.photo ? hiResArtwork(card.photo) : null);
+      const dx = 690, dy = 1400, dr = 640;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 70; ctx.shadowOffsetY = 24;
+      ctx.fillStyle = "#1a0b16"; ctx.beginPath(); ctx.arc(dx, dy, dr + 12, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = rgba(mid, 1); ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
+      if (img) { ctx.translate(dx, dy); ctx.rotate(-0.22); coverFit(ctx, img, -dr, -dr, dr * 2, dr * 2); ctx.rotate(0.22); ctx.translate(-dx, -dy); }
+      ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.lineWidth = 2;
+      for (let rr = 140; rr < dr; rr += 14) { ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.stroke(); }
+      const sheen = ctx.createLinearGradient(dx - dr, dy - dr, dx + dr * 0.6, dy + dr * 0.6);
+      sheen.addColorStop(0, "rgba(255,255,255,0.24)"); sheen.addColorStop(0.5, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(255,255,255,0.08)");
+      ctx.fillStyle = sheen; ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
+      ctx.restore();
+    } else {
+      const round = card.type === "artists";
+      const imgs = await Promise.all(card.rows.map((r) => loadShareImg(r.art ? hiResArtwork(r.art) : null)));
+      const rh = 168, gap = 20, x0 = 60, w0 = W - 120, y0 = 250;
+      card.rows.forEach((r, i) => {
+        const y = y0 + i * (rh + gap);
+        glassPlate(ctx, x0, y, w0, rh, 48, i === 0);
+        ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = `800 52px ${F}`; ctx.textAlign = "center";
+        ctx.fillText(String(i + 1), x0 + 54, y + rh / 2 + 18);
+        ctx.textAlign = "left";
+        const s = 120, cx = x0 + 100, cy = y + (rh - s) / 2;
+        ctx.save();
+        if (round) { ctx.beginPath(); ctx.arc(cx + s / 2, cy + s / 2, s / 2, 0, Math.PI * 2); ctx.closePath(); } else roundPath(ctx, cx, cy, s, s, 30);
+        ctx.clip();
+        if (imgs[i]) coverFit(ctx, imgs[i], cx, cy, s, s); else { ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(cx, cy, s, s); }
+        ctx.restore();
+        const tx = cx + s + 30, tmax = x0 + w0 - tx - 36;
+        ctx.fillStyle = "#fff"; ctx.font = `800 52px ${F}`;
+        ctx.fillText(cutText(ctx, r.title, tmax), tx, y + 76);
+        ctx.fillStyle = "rgba(255,255,255,0.74)"; ctx.font = `500 40px ${F}`;
+        ctx.fillText(cutText(ctx, r.sub, tmax), tx, y + 128);
+      });
+    }
+    return canvasToBlob(canvas);
+  }
+
+  // PNG of a big canvas can come back empty on a phone short of memory: then a JPEG, which is lighter
+  function canvasToBlob(canvas) {
+    return new Promise((resolve) => {
+      try {
+        canvas.toBlob((b) => {
+          if (b) return resolve(b);
+          try { canvas.toBlob((b2) => resolve(b2), "image/jpeg", 0.92); } catch (e) { resolve(null); }
+        }, "image/png");
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  // Inside Telegram (Android above all) a plain «download» link in the web view saves nothing and
+  // says nothing. Telegram's own «save file» does the job, but takes a link: the picture is put on
+  // the server for a quarter of an hour and the link is handed over.
+  async function saveImageViaTelegram(blob, name) {
+    if (!(tg && typeof tg.downloadFile === "function" && tgAtLeast("8.0") && tgInitRaw)) return false;
+    try {
+      const res = await fetch(`${API_BASE_URL}/card`, {
+        method: "POST",
+        headers: { "content-type": blob.type || "image/png", "X-Telegram-Init-Data": tgInitRaw },
+        body: blob,
+      });
+      if (!res.ok) return false;
+      const { url } = await res.json();
+      const base = (API_BASE_URL || window.location.origin).replace(/\/$/, "");
+      const ext = blob.type === "image/jpeg" ? ".jpg" : ".png";
+      const fileName = name.replace(/\.[a-z]+$/i, "") + ext;
+      return await new Promise((resolve) => {
+        try { tg.downloadFile({ url: base + url, file_name: fileName }, (ok) => resolve(!!ok)); }
+        catch (e) { resolve(false); }
+      });
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // отправка картинки: только сама картинка, без подписи.
+  // На телефоне открывается системное «Поделиться»; там, где его нет (компьютер, Telegram Desktop),
+  // показываем картинку с кнопками «Скачать» и «Скопировать».
+  let lastShareBlob = null, lastShareName = "notka.png";
+  async function shareImageBlob(blob, name) {
+    const file = new File([blob], name, { type: blob.type || "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); haptic("success"); return; }
+      catch (e) { if (e && e.name === "AbortError") return; /* else the next way */ }
+    }
+    if (await saveImageViaTelegram(blob, name)) { haptic("success"); showToast("Картинка сохранена"); return; }
+    lastShareBlob = blob; lastShareName = name;
+    $("recap-preview").src = URL.createObjectURL(blob);
+    openOverlay("recap-modal");
+  }
+  $("recap-modal-download").addEventListener("click", async () => {
+    if (!lastShareBlob) return;
+    if (await saveImageViaTelegram(lastShareBlob, lastShareName)) { showToast("Картинка сохранена"); return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(lastShareBlob);
+    a.download = lastShareName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast("Если картинка не сохранилась, нажми на неё и удерживай");
+  });
+  $("recap-modal-copy").addEventListener("click", async () => {
+    if (!lastShareBlob) return;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": lastShareBlob })]);
+      showToast("Скопировано. Вставь в чат");
+    } catch (e) {
+      showToast("Не получилось скопировать, нажми «Скачать»");
+    }
+  });
+  $("recap-share-btn").addEventListener("click", async () => {
+    const btn = $("recap-share-btn");
+    if (btn.disabled) return;
+    const index = recapIndex();
+    const card = recapCards[index];
+    if (!card) return;
+    btn.disabled = true;
+    haptic("light");
+    try {
+      const blob = await renderRecapImage(card, index);
+      if (!blob) throw new Error("no image");
+      await shareImageBlob(blob, "notka-itogi.png");
+    } catch (e) {
+      showToast("Не получилось собрать картинку. Попробуй ещё раз");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ============================================================
+  // ЦИТАТА ИЗ ПЕСНИ: выбираешь строки в тексте и получаешь карточку
+  // ============================================================
+  let quotePicking = false;
+  const quotePicked = new Set();
+  let quoteStyle = "light";
+  let quoteCtx = { before: [], after: [], frac: null };
+  let quoteLines = [];
+  let quoteTrack = null;
+  let quoteToken = 0;
+  let quoteUrl = "";
+  const QUOTE_MAX = 2;
+  function quoteBarText() {
+    const n = quotePicked.size;
+    $("quote-bar-text").textContent = n ? `${n} ${plural(n, "строка", "строки", "строк")} выбрано` : "Выбери 1–2 строки";
+    $("quote-bar-make").disabled = !n;
+  }
+  function startQuotePick() {
+    if (!lyricsOpen || !lyricsData || !lyricsData.lines.length) return;
+    quotePicking = true;
+    quotePicked.clear();
+    lyricsList.classList.add("is-picking");
+    document.body.classList.add("quote-picking");
+    $("player-quote-btn").setAttribute("aria-pressed", "true");
+    $("quote-bar").hidden = false;
+    quoteBarText();
+    haptic("light");
+  }
+  function endQuotePick() {
+    quotePicking = false;
+    quotePicked.clear();
+    lyricsList.classList.remove("is-picking");
+    document.body.classList.remove("quote-picking");
+    lyricsList.querySelectorAll(".is-picked").forEach((li) => li.classList.remove("is-picked"));
+    $("player-quote-btn").setAttribute("aria-pressed", "false");
+    $("quote-bar").hidden = true;
+  }
+  function toggleQuoteLine(li) {
+    const i = +li.dataset.i;
+    if (quotePicked.has(i)) { quotePicked.delete(i); li.classList.remove("is-picked"); }
+    else {
+      if (quotePicked.size >= QUOTE_MAX) { showToast(`Можно выбрать до ${QUOTE_MAX} строк`); return; }
+      quotePicked.add(i); li.classList.add("is-picked");
+    }
+    haptic("select");
+    quoteBarText();
+  }
+  $("player-quote-btn").addEventListener("click", () => { if (quotePicking) endQuotePick(); else startQuotePick(); });
+  $("quote-bar-cancel").addEventListener("click", endQuotePick);
+
+  function rgbOf(color) {
+    try {
+      const c = document.createElement("canvas"); c.width = c.height = 1;
+      const x = c.getContext("2d", { willReadFrequently: true });
+      x.fillStyle = color; x.fillRect(0, 0, 1, 1);
+      const d = x.getImageData(0, 0, 1, 1).data;
+      return [d[0], d[1], d[2]];
+    } catch (e) { return [120, 80, 120]; }
+  }
+  const rgba = (rgb, a) => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
+  const mixRgb = (a, b, k) => a.map((v, i) => Math.round(v * (1 - k) + b[i] * k));
+  function glowAt(ctx, x, y, r, rgb, alpha) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgba(rgb, alpha)); g.addColorStop(1, rgba(rgb, 0));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1080, 1350);
+  }
+  function fitText(ctx, lines, maxW, sizes, maxH, lhK) {
+    for (const size of sizes) {
+      ctx.font = `800 ${size}px ${SHARE_FONT}`;
+      let wrapped = [];
+      lines.forEach((ln) => { wrapped = wrapped.concat(wrapLines(ctx, ln, maxW, 9)); });
+      if (wrapped.length * size * lhK <= maxH) return { size, wrapped };
+    }
+    const size = sizes[sizes.length - 1];
+    ctx.font = `800 ${size}px ${SHARE_FONT}`;
+    let wrapped = [];
+    lines.forEach((ln) => { wrapped = wrapped.concat(wrapLines(ctx, ln, maxW, 9)); });
+    return { size, wrapped: wrapped.slice(0, Math.floor(maxH / (size * lhK))) };
+  }
+  function cutText(ctx, str, maxW) {
+    let t = String(str);
+    while (ctx.measureText(t).width > maxW && t.length > 3) t = t.slice(0, -2);
+    return t === String(str) ? t : t.trimEnd() + "…";
+  }
+  async function renderQuoteImage(track, lines, style) {
+    try { await document.fonts.load("800 100px Onest"); await document.fonts.load("700 46px Unbounded"); } catch (e) { /* the system font is fine */ }
+    const W = 1080, H = 1350, F = SHARE_FONT;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    ctx.textBaseline = "alphabetic";
+    const th = themeColors();
+    const art = track.artwork ? hiResArtwork(track.artwork) : null;
+    const img = await loadShareImg(art);
+    let pal = null;
+    try { pal = art ? await paletteFromArtwork(track.artwork) : null; } catch (e) { pal = null; }
+    pal = pal || th;
+    const deep = rgbOf(pal.deep), warm = rgbOf(pal.warm), mid = rgbOf(pal.mid), core = rgbOf(pal.core);
+    const night = [26, 11, 22];
+    // фон: тёмный и живой свет, как в самой Нотке
+    ctx.fillStyle = rgba(mixRgb(deep, night, 0.6), 1); ctx.fillRect(0, 0, W, H);
+    if (style === "light") { glowAt(ctx, 160, 260, 760, warm, 0.8); glowAt(ctx, 960, 700, 720, mid, 0.65); glowAt(ctx, 560, 90, 420, core, 0.35); }
+    else { glowAt(ctx, 900, 1150, 980, warm, 0.75); glowAt(ctx, 120, 220, 760, mid, 0.6); glowAt(ctx, 540, 640, 420, core, 0.2); }
+    const pad = 84;
+    // метка Нотки
+    drawLogo(ctx, pad, 76, 60, "rgba(255,255,255,0.92)");
+    ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = `800 44px ${F}`;
+    ctx.font = `700 46px ${BRAND_FONT}`; try { ctx.letterSpacing = "-2px"; } catch (e) { /* the plain spacing is fine */ }
+    ctx.fillText("нотка", pad + 76, 126);
+    try { ctx.letterSpacing = "0px"; } catch (e) { /* ok */ }
+
+    if (style === "light") {
+      // как текст в плеере Нотки: слева, поющаяся строка горит и чуть крупнее, соседние приглушены
+      const cw = W - pad * 2;
+      const prev = quoteCtx.before.length ? quoteCtx.before[quoteCtx.before.length - 1] : "";
+      const next = quoteCtx.after.length ? quoteCtx.after[0] : "";
+      const regionTop = 190, regionBottom = H - 60 - 250 - 36, regionH = regionBottom - regionTop;
+      let layout = null;
+      for (const size of [82, 76, 70, 64, 58, 52, 48]) {
+        const big = Math.round(size * 1.3);
+        const wrapGroup = (arr, cap, fs) => { ctx.font = `700 ${fs}px ${F}`; return arr.reduce((acc, ln) => acc.concat(wrapLines(ctx, ln, cw, 9)), []).slice(0, cap); };
+        const g = [wrapGroup(prev ? [prev] : [], 2, size), wrapGroup(lines, 9, big), wrapGroup(next ? [next] : [], 2, size)];
+        const gaps = (g[0].length ? 1 : 0) + (g[2].length ? 1 : 0);
+        const h = (g[0].length + g[2].length) * size * 1.2 + g[1].length * big * 1.14 + gaps * size * 0.5;
+        layout = { size, big, g, h };
+        if (h <= regionH) break;
+      }
+      const { size: S, big: BIG, g: groups, h: blockH } = layout;
+      let y = regionTop + (regionH - Math.min(blockH, regionH)) / 2;
+      groups.forEach((grp, gi) => {
+        if (!grp.length) return;
+        const fs = gi === 1 ? BIG : S;
+        ctx.font = `${gi === 1 ? 800 : 700} ${fs}px ${F}`;
+        ctx.fillStyle = gi === 1 ? "#fff" : gi === 0 ? "rgba(255,255,255,0.36)" : "rgba(255,255,255,0.5)";
+        if (gi === 1) { ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 2; }
+        const lhh = gi === 1 ? fs * 1.14 : fs * 1.2;
+        grp.forEach((ln) => { ctx.fillText(ln, pad, y + fs * 0.88); y += lhh; });
+        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        y += S * 0.5;
+      });
+      // плеер
+      const sx = 60, sh = 250, sy = H - 60 - sh, sw = W - 120;
+      roundPath(ctx, sx, sy, sw, sh, 64);
+      ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.26)"; ctx.lineWidth = 2.5; ctx.stroke();
+      const cs = 154, cx0 = sx + 34, cy0 = sy + 30;
+      ctx.save(); roundPath(ctx, cx0, cy0, cs, cs, 36); ctx.clip();
+      if (img) coverFit(ctx, img, cx0, cy0, cs, cs); else { ctx.fillStyle = rgba(warm, 1); ctx.fillRect(cx0, cy0, cs, cs); }
+      ctx.restore();
+      const tx = cx0 + cs + 34, tmax = sw - (tx - sx) - 34 - 130 - 24;
+      ctx.fillStyle = "#fff"; ctx.font = `800 58px ${F}`;
+      ctx.fillText(cutText(ctx, track.title || "", tmax), tx, cy0 + 70);
+      ctx.fillStyle = "rgba(255,255,255,0.74)"; ctx.font = `500 46px ${F}`;
+      ctx.fillText(cutText(ctx, track.artist || "", tmax), tx, cy0 + 130);
+      const bx = sx + sw - 34 - 65, by = cy0 + cs / 2;
+      ctx.fillStyle = "#F4EFFF"; ctx.beginPath(); ctx.arc(bx, by, 65, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#16101f";
+      roundPath(ctx, bx - 23, by - 27, 15, 54, 5); ctx.fill();
+      roundPath(ctx, bx + 8, by - 27, 15, 54, 5); ctx.fill();
+      const frac = quoteCtx.frac == null ? 0.38 : Math.max(0.03, Math.min(0.97, quoteCtx.frac));
+      const px0 = sx + 38, pw = sw - 76, py = sy + sh - 44;
+      roundPath(ctx, px0, py, pw, 11, 6); ctx.fillStyle = "rgba(255,255,255,0.24)"; ctx.fill();
+      roundPath(ctx, px0, py, Math.max(11, pw * frac), 11, 6); ctx.fillStyle = "#fff"; ctx.fill();
+    } else {
+      // цитата и большая пластинка с тонармом, как в темах плеера
+      const fit = fitText(ctx, lines, W - pad * 2, [118, 108, 98, 90, 82, 74, 66, 58, 50], 440, 1.1);
+      const lh = fit.size * 1.1;
+      const textH = fit.wrapped.length * lh;
+      const top = 230 + Math.max(0, (440 - textH) / 2);
+      ctx.fillStyle = "#fff"; ctx.font = `800 ${fit.size}px ${F}`;
+      ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 24;
+      fit.wrapped.forEach((ln, i) => ctx.fillText(ln, pad, top + fit.size * 0.88 + i * lh));
+      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+      // пластинка
+      const dx = 690, dy = 1390, dr = 630;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 70; ctx.shadowOffsetY = 24;
+      ctx.fillStyle = "#1a0b16"; ctx.beginPath(); ctx.arc(dx, dy, dr + 12, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = rgba(mid, 1); ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
+      if (img) { ctx.translate(dx, dy); ctx.rotate(-0.22); coverFit(ctx, img, -dr, -dr, dr * 2, dr * 2); ctx.rotate(0.22); ctx.translate(-dx, -dy); }
+      ctx.strokeStyle = "rgba(0,0,0,0.22)"; ctx.lineWidth = 2;
+      for (let rr = 140; rr < dr; rr += 14) { ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.stroke(); }
+      const sheen = ctx.createLinearGradient(dx - dr, dy - dr, dx + dr * 0.6, dy + dr * 0.6);
+      sheen.addColorStop(0, "rgba(255,255,255,0.24)"); sheen.addColorStop(0.5, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(255,255,255,0.08)");
+      ctx.fillStyle = sheen; ctx.fillRect(dx - dr, dy - dr, dr * 2, dr * 2);
+      ctx.restore();
+      ctx.fillStyle = rgba(warm, 1); ctx.beginPath(); ctx.arc(dx, dy, 92, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(dx, dy, 92, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#1a0b16"; ctx.beginPath(); ctx.arc(dx, dy, 16, 0, Math.PI * 2); ctx.fill();
+      // тонарм
+      const ax = 985, ay = 850, hx = 790, hy = 1215;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+      ctx.strokeStyle = "#F4EFFF"; ctx.lineCap = "round"; ctx.lineWidth = 18;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = "#16101f"; ctx.beginPath(); ctx.arc(ax, ay, 46, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#F4EFFF"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(ax, ay, 46, 0, Math.PI * 2); ctx.stroke();
+      ctx.translate(hx, hy); ctx.rotate(Math.atan2(hy - ay, hx - ax) - Math.PI / 2);
+      ctx.fillStyle = "#F4EFFF"; roundPath(ctx, -26, -6, 52, 96, 14); ctx.fill();
+      ctx.restore();
+      // название и исполнитель на стеклянной плашке
+      const pw = 560, ph = 150, px = W - 60 - pw, py = 56;
+      roundPath(ctx, px, py, pw, ph, 52);
+      ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.26)"; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.font = `800 52px ${F}`;
+      ctx.fillText(cutText(ctx, track.title || "", pw - 72), px + 36, py + 68);
+      ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `500 42px ${F}`;
+      ctx.fillText(cutText(ctx, track.artist || "", pw - 72), px + 36, py + 118);
+    }
+    return canvasToBlob(canvas);
+  }
+  async function paintQuotePreview() {
+    const token = ++quoteToken;
+    $("quote-preview").style.opacity = "0.4";
+    let blob = null;
+    try { blob = await renderQuoteImage(quoteTrack, quoteLines, quoteStyle); } catch (e) { blob = null; }
+    if (token !== quoteToken) return;
+    if (!blob) {
+      $("quote-preview").style.opacity = "";
+      showToast("Не получилось собрать картинку. Нажми стиль ещё раз");
+      return;
+    }
+    if (quoteUrl) URL.revokeObjectURL(quoteUrl);
+    quoteUrl = URL.createObjectURL(blob);
+    $("quote-preview").src = quoteUrl;
+    $("quote-preview").style.opacity = "";
+    $("quote-preview").dataset.ready = "1";
+  }
+  new MutationObserver(() => document.body.classList.toggle("quote-sheet-open", $("quote-sheet").classList.contains("open")))
+    .observe($("quote-sheet"), { attributes: true, attributeFilter: ["class"] });
+  $("quote-bar-make").addEventListener("click", () => {
+    if (!quotePicked.size || !currentTrack || !lyricsData) return;
+    quoteTrack = currentTrack;
+    const idx = [...quotePicked].sort((a, b) => a - b);
+    quoteLines = idx.map((i) => lyricsData.lines[i].text);
+    const all = lyricsData.lines;
+    quoteCtx = {
+      before: all.slice(Math.max(0, idx[0] - 2), idx[0]).map((l) => l.text).filter(Boolean),
+      after: all.slice(idx[idx.length - 1] + 1, idx[idx.length - 1] + 3).map((l) => l.text).filter(Boolean),
+      frac: lyricsData.synced && (quoteTrack.duration || audio.duration) ? all[idx[0]].t / (quoteTrack.duration || audio.duration) : null,
+    };
+    $("quote-preview").dataset.ready = "";
+    openOverlay("quote-sheet");
+    paintQuotePreview();
+  });
+  $("quote-styles").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    quoteStyle = chip.dataset.style;
+    $("quote-styles").querySelectorAll(".chip").forEach((c) => { c.classList.toggle("active", c === chip); c.setAttribute("aria-selected", c === chip ? "true" : "false"); });
+    haptic("light");
+    paintQuotePreview();
+  });
+  $("quote-share-btn").addEventListener("click", async () => {
+    const btn = $("quote-share-btn");
+    if (btn.disabled || !quoteTrack) return;
+    btn.disabled = true;
+    try {
+      const blob = await renderQuoteImage(quoteTrack, quoteLines, quoteStyle);
+      if (!blob) throw new Error("no image");
+      closeOverlay("quote-sheet");
+      await shareImageBlob(blob, "notka-citata.png");
+      endQuotePick();
+    } catch (e) {
+      showToast("Не получилось собрать картинку. Попробуй ещё раз");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+
+  // ============================================================
   // PLAYBACK
   // ============================================================
   const audio = $("audio");
@@ -3594,6 +5788,7 @@
   let originalQueue = [];
   let currentQueueIndex = -1;
   let mymixActive = false;
+  let currentMixKey = null; // which mix the queue is (see saveMixResume), null outside a mix
   let currentContextLabel = "Нотка";
   let isLoading = false;
   let isStarting = false; // between a tap and the first sound of that track
@@ -3601,6 +5796,7 @@
   let resolveAbort = null;
   let failStreak = 0;
   let shuffleOn = false;
+  const queuedIds = new Set(); // tracks put in the queue by hand (see queueTrack)
   let currentSource = null; // "fav" | "pl:<id>" | "album:<title>" | "artist:<name>" | "mix"
 
   // A list's «Слушать» plays it in order; pressed again it pauses/resumes.
@@ -3663,6 +5859,9 @@
     $("mp-play-btn").setAttribute("aria-label", label);
     $("player-play-btn").setAttribute("aria-label", label);
     if ("mediaSession" in navigator) navigator.mediaSession.playbackState = on ? "playing" : "paused";
+    if (window.NotkaAndroid && window.NotkaAndroid.updatePlaybackState) {
+      try { window.NotkaAndroid.updatePlaybackState(on); } catch (e) {}
+    }
     // Closing the Mini App mid-song would silently kill the music.
     if (tg && tgAtLeast("6.2")) {
       try { on ? tg.enableClosingConfirmation() : tg.disableClosingConfirmation(); } catch (e) { /* ignore */ }
@@ -3680,6 +5879,8 @@
     card.classList.toggle("playing", current && !audio.paused);
     $("mymix-sub").textContent = current
       ? `${currentTrack.title || "Без названия"} · ${currentTrack.artist || ""}`
+      : mixResumeFor("mymix")
+        ? `Продолжить: ${mixResumeFor("mymix").track.title || "Без названия"} · ${mixResumeFor("mymix").track.artist || ""}`
       : state.favorites.length || state.playlists.length
         ? "Похожее на твои любимые треки и плейлисты"
         : "Отметь треки сердцем — и микс подберёт похожее";
@@ -3707,6 +5908,8 @@
     const on = !!currentTrack && Store.isFavorite(currentTrack.id);
     $("player-fav-btn").setAttribute("aria-pressed", on ? "true" : "false");
     $("player-fav-btn").setAttribute("aria-label", on ? "Убрать из любимого" : "В любимое");
+    $("mp-fav-btn").setAttribute("aria-pressed", on ? "true" : "false");
+    $("mp-fav-btn").setAttribute("aria-label", on ? "Убрать из любимого" : "В любимое");
   }
 
   function setMediaSession(track) {
@@ -3721,8 +5924,14 @@
           ? [{ src: hiResArtwork(track.artwork), sizes: "544x544", type: "image/jpeg" }, { src: track.artwork, sizes: "120x120", type: "image/jpeg" }]
           : [],
       });
+      if (window.NotkaAndroid && window.NotkaAndroid.updateTrack) {
+        try {
+          window.NotkaAndroid.updateTrack(track.title || "Нотка", track.artist || "", track.album || currentContextLabel || "Нотка", track.artwork || "", true);
+        } catch (e) {}
+      }
     } catch (e) { /* older WebViews */ }
   }
+
   if ("mediaSession" in navigator) {
     const ms = navigator.mediaSession;
     const safe = (action, fn) => { try { ms.setActionHandler(action, fn); } catch (e) { /* unsupported */ } };
@@ -3733,8 +5942,29 @@
     safe("seekto", (d) => { if (d && typeof d.seekTime === "number") audio.currentTime = d.seekTime; });
   }
 
+  // Если трек не играет, ищем ему замену: тот же трек от другой загрузки (другой источник, тот же исполнитель, та же длина)
+  const altTried = new Set();
+  async function findEquivalent(track) {
+    try {
+      const q = `${track.artist || ""} ${track.title || ""}`.trim();
+      if (!q) return null;
+      const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const norm = (s) => String(s || "").toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+      const t0 = norm(track.title), a0 = norm(track.artist);
+      const firstWord = (s) => s.split(" ")[0] || "";
+      return (data.results || []).find((c) => c.id !== track.id && c.sourceId !== track.sourceId
+        && norm(c.title) === t0
+        && (!a0 || norm(c.artist).includes(firstWord(a0)) || a0.includes(firstWord(norm(c.artist))))
+        && (!track.duration || !c.duration || Math.abs(c.duration - track.duration) <= 10)) || null;
+    } catch (e) { return null; }
+  }
+
   async function playTrack(track, queue, opts) {
     opts = opts || {};
+    // leaving a mix for something else: keep its place
+    if (currentMixKey && !opts.keepQueue && opts.mixKey !== currentMixKey) saveMixResume();
     const token = ++playToken;
     if (resolveAbort) resolveAbort.abort();
     resolveAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -3742,6 +5972,7 @@
     currentTrackId = track.id;
     currentTrack = track;
     if (!opts.keepQueue) {
+      queuedIds.clear();
       originalQueue = queue && queue.length ? queue.slice() : [track];
       currentQueue = shuffleOn ? withShuffledTail(originalQueue, track) : originalQueue.slice();
     }
@@ -3749,6 +5980,7 @@
     if (!opts.keepQueue) {
       mymixActive = !!opts.mymix;
       currentSource = opts.source || null;
+      currentMixKey = opts.mixKey || null;
     }
     // Where this track is playing "from" — shown in the full-player header
     // ("Мой микс" / an album or playlist name / "Поиск"…). When neither is
@@ -3778,7 +6010,7 @@
       // The backend downloads the track (or finds it already on disk) and
       // only then says "ready" — so a track that can't be played comes
       // back as an error with a reason, not as a silent player.
-      const res = await fetch(`${API_BASE_URL}/prepare?${trackQuery(track)}`, resolveAbort ? { signal: resolveAbort.signal } : undefined);
+      const res = await fetch(`${API_BASE_URL}/prepare?${prepareQuery(track)}`, resolveAbort ? { signal: resolveAbort.signal } : undefined);
       if (token !== playToken) return;
       if (!res.ok) {
         let code = null;
@@ -3794,9 +6026,11 @@
       // those links are tied to the IP that resolved them (this computer),
       // so a phone hitting them over the internet gets cut off mid-stream.
       audio.src = `${API_BASE_URL}/stream?${trackQuery(track)}`;
+      if (opts.startAt > 2) audio.addEventListener("loadedmetadata", () => { try { audio.currentTime = opts.startAt; } catch (e) { /* starts over */ } }, { once: true });
       await audio.play();
       if (token !== playToken) return;
       rememberRecent(track);
+      track_play(track, opts);
       failStreak = 0;
       isStarting = false;
       setLoading(false);
@@ -3805,10 +6039,31 @@
     } catch (err) {
       if (token !== playToken || (err && err.name === "AbortError")) return;
       console.error(err);
+      track("play_error", { id: track.id, code: (err && err.code) || "net", retried: !!opts.retried });
+      // a source answers «no» now and then for one request: the same track once more,
+      // before it is given up on and skipped
+      if (!opts.retried && !(err && err.code === "TRACK_NOT_FOUND")) {
+        await new Promise((r) => setTimeout(r, 1200));
+        if (token !== playToken) return;
+        playTrack(track, currentQueue, { keepQueue: true, retried: true, altTried: opts.altTried, startAt: opts.startAt });
+        return;
+      }
       isStarting = false;
       setLoading(false);
       setPlaying(false);
       haptic("error");
+      // выбранная запись не играет (источник отказал): пробуем равноценную с тем же названием и исполнителем
+      if (!opts.altTried && !altTried.has(track.id)) {
+        altTried.add(track.id);
+        const alt = await findEquivalent(track);
+        if (token !== playToken) return;
+        if (alt) {
+          const swap = (arr) => { const i = arr.findIndex((t) => t.id === track.id); if (i >= 0) arr[i] = alt; };
+          swap(currentQueue); swap(originalQueue);
+          playTrack(alt, currentQueue, { keepQueue: true, altTried: true });
+          return;
+        }
+      }
       const hasNext = currentQueueIndex >= 0 && currentQueueIndex < currentQueue.length - 1;
       if (hasNext && failStreak < 3) {
         failStreak++;
@@ -3823,8 +6078,16 @@
     }
   }
 
+  function track_play(t, opts) {
+    track("play", { id: t.id, a: (t.artist || "").slice(0, 60), src: String((opts && opts.source) || currentSource || "").slice(0, 20), ctx: String(currentContextLabel || "").slice(0, 30) });
+  }
+
   function trackQuery(track) {
     return `source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}`;
+  }
+  // the same, with what the server needs to remember how the track sounds (once, in the background)
+  function prepareQuery(track) {
+    return `${trackQuery(track)}&title=${encodeURIComponent((track.title || "").slice(0, 160))}&artist=${encodeURIComponent((track.artist || "").slice(0, 160))}&duration=${Math.round(track.duration || 0)}`;
   }
 
   // While a track plays, the backend gets the next one ready, so the
@@ -3834,7 +6097,7 @@
     const next = currentQueue[currentQueueIndex + 1];
     if (!next || next.id === preparedId) return;
     preparedId = next.id;
-    fetch(`${API_BASE_URL}/prepare?${trackQuery(next)}`).catch(() => {});
+    fetch(`${API_BASE_URL}/prepare?${prepareQuery(next)}`).catch(() => {});
   }
 
   function withShuffledTail(queue, current) {
@@ -3852,15 +6115,37 @@
     else audio.pause();
   }
 
+  // Плейлист, любимое, альбом, исполнитель не кончаются: по порядку идут сначала, вперемешку
+  // перемешиваются заново. «Мой микс» дополняется похожими сам; поиск и «Недавнее» просто останавливаются.
+  function loopFinishedQueue() {
+    if (!currentTrack || !currentSource || currentSource === "mix" || originalQueue.length < 2) return false;
+    let next;
+    if (shuffleOn) {
+      next = shuffled(originalQueue);
+      if (next[0].id === currentTrack.id) next.push(next.shift()); // тот же трек подряд не ставим
+    } else {
+      next = originalQueue.slice();
+    }
+    currentQueue = next;
+    playTrack(next[0], next, { keepQueue: true });
+    renderQueueSheet();
+    return true;
+  }
+
   function playAdjacent(delta, opts) {
     opts = opts || {};
     if (!currentQueue.length || currentQueueIndex < 0) return;
+    if (delta > 0 && currentQueueIndex >= currentQueue.length - 1 && repeatMode !== "all" && loopFinishedQueue()) return;
     let nextIndex = currentQueueIndex + delta;
     if (nextIndex >= currentQueue.length && repeatMode === "all") nextIndex = 0;
     if (nextIndex < 0 && delta < 0 && audio.currentTime > 3) { audio.currentTime = 0; return; }
     if (nextIndex < 0 || nextIndex >= currentQueue.length) {
       if (!opts.auto) showToast(delta > 0 ? "Это последний трек" : "Это первый трек");
       return;
+    }
+    if (delta > 0 && !opts.auto && currentTrack && audio.currentTime >= 0) {
+      track("skip", { id: currentTrack.id, heard: Math.round(audio.currentTime || 0), dur: Math.round(audio.duration || currentTrack.duration || 0) });
+      noteListened(currentTrack, audio.currentTime || 0);
     }
     playTrack(currentQueue[nextIndex], currentQueue, { keepQueue: true });
   }
@@ -3923,6 +6208,7 @@
     lyricsList.innerHTML = "";
     lyricsList.classList.toggle("is-synced", !!data.synced);
     $("lyrics-note").textContent = data.lines.length ? "" : "Для этого трека текста пока нет.";
+    document.body.classList.toggle("has-lyrics", data.lines.length > 0);
     const frag = document.createDocumentFragment();
     data.lines.forEach((line, i) => {
       const li = document.createElement("li");
@@ -3933,27 +6219,42 @@
     });
     lyricsList.appendChild(frag);
     lyricsBox.scrollTop = 0;
-    syncLyrics(true);
+    syncLyrics(true, true);
   }
 
+  let lyricsFetchTimer = 0;
+  let lyricsAbort = null;
   async function loadLyrics() {
     const track = currentTrack;
     if (!lyricsOpen || !track || lyricsTrackId === track.id) return;
     lyricsTrackId = track.id;
+    // flipping through tracks: what was still being asked for the passed one is dropped, and the old
+    // text's scroll stops, so only the track that stays costs a request and a redraw
+    clearTimeout(lyricsFetchTimer);
+    if (lyricsAbort) { lyricsAbort.abort(); lyricsAbort = null; }
+    cancelAnimationFrame(lyricsGlide);
     if (lyricsCache.has(track.id)) { renderLyrics(lyricsCache.get(track.id)); return; }
     if (!track.title) { renderLyrics({ lines: [], synced: false }); return; }
     lyricsData = null;
+    document.body.classList.remove("has-lyrics");
+    endQuotePick();
     lyricsList.innerHTML = "";
     $("lyrics-note").textContent = "";
     $("lyrics-skeleton").hidden = false;
     lyricsBox.scrollTop = 0;
     let data = null;
+    // wait a moment: a quick flip to the next track makes this one's request pointless
+    await new Promise((resolve) => { lyricsFetchTimer = setTimeout(resolve, 350); });
+    if (lyricsTrackId !== track.id) return;
+    const abort = new AbortController();
+    lyricsAbort = abort;
     try {
       const q = `title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist || "")}`
         + (track.duration ? `&duration=${Math.round(track.duration)}` : "") + `&${trackQuery(track)}`;
-      const res = await fetch(`${API_BASE_URL}/lyrics?${q}`);
+      const res = await fetch(`${API_BASE_URL}/lyrics?${q}`, { signal: abort.signal });
       if (res.ok) data = await res.json();
     } catch (e) { /* shown as "couldn't load" below */ }
+    if (lyricsAbort === abort) lyricsAbort = null;
     if (lyricsTrackId !== track.id) return;
     $("lyrics-skeleton").hidden = true;
     if (!data || !Array.isArray(data.lines)) {
@@ -3965,7 +6266,27 @@
     renderLyrics(data);
   }
 
-  function syncLyrics(jump) {
+  // The text glides: the new line rises to its place along an eased curve (not the
+  // browser's stock smooth scroll, which starts and stops abruptly), and the
+  // lines around it fade and grow by their distance from the sung one.
+  let lyricsGlide = 0;
+  function glideLyrics(to, instant) {
+    cancelAnimationFrame(lyricsGlide);
+    const from = lyricsBox.scrollTop, dist = to - from;
+    if (instant || Math.abs(dist) < 2) { lyricsBox.scrollTop = to; return; }
+    const ms = clamp(520 + Math.abs(dist) * 0.55, 620, 1150);
+    const t0 = performance.now();
+    const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+    const startedTouch = lyricsTouchedAt;
+    const step = (now) => {
+      if (lyricsTouchedAt !== startedTouch) return; // a hand took over: leave the text alone
+      const k = Math.min(1, (now - t0) / ms);
+      lyricsBox.scrollTop = from + dist * ease(k);
+      if (k < 1) lyricsGlide = requestAnimationFrame(step);
+    };
+    lyricsGlide = requestAnimationFrame(step);
+  }
+  function syncLyrics(jump, instant) {
     if (!lyricsOpen || !lyricsData || !lyricsData.synced || currentScreen !== "player") return;
     const lines = lyricsData.lines;
     const t = audio.currentTime + 0.25; // light a line a touch early, as the ear expects
@@ -3977,20 +6298,26 @@
     for (let k = 0; k < items.length; k++) {
       items[k].classList.toggle("is-active", k === i);
       items[k].classList.toggle("is-past", k < i);
+      // how bright a line is depends on how far it is from the sung one
+      const d = k - i;
+      const lo = k === i ? 1 : d < 0 ? Math.max(0.2, 0.42 + d * 0.06) : Math.max(0.26, 0.58 - d * 0.08);
+      items[k].style.setProperty("--lo", lo.toFixed(2));
+      items[k].style.setProperty("--bl", `${Math.min(2.2, Math.abs(d) * 0.55).toFixed(1)}px`);
     }
-    // don't pull the text away from someone who is scrolling it by hand
-    if (!jump && Date.now() - lyricsTouchedAt < 3000) return;
+    // don't pull the text away from someone who is scrolling it by hand or picking lines
+    if (quotePicking || (!jump && Date.now() - lyricsTouchedAt < 3000)) return;
     const top = i < 0 ? 0 : Math.max(0, items[i].offsetTop - lyricsBox.clientHeight * 0.3);
-    lyricsBox.scrollTo({ top, behavior: jump ? "auto" : "smooth" });
+    glideLyrics(top, instant);
   }
 
   function setLyricsOpen(on) {
     lyricsOpen = on;
     document.body.classList.toggle("lyrics-open", on);
     lyricsBox.inert = !on;
+    if (!on) { endQuotePick(); lyricsActive = -1; }
     $("player-lyrics-btn").setAttribute("aria-pressed", on ? "true" : "false");
     syncPrism();
-    if (on) { loadLyrics(); syncLyrics(true); }
+    if (on) { loadLyrics(); syncLyrics(true, true); }
   }
   $("player-lyrics-btn").addEventListener("click", () => { haptic("light"); setLyricsOpen(!lyricsOpen); });
   ["touchstart", "wheel"].forEach((type) => lyricsBox.addEventListener(type, () => { lyricsTouchedAt = Date.now(); }, { passive: true }));
@@ -4023,6 +6350,7 @@
   lyricsBox.addEventListener("touchcancel", endLyricsPull);
   lyricsList.addEventListener("click", (e) => {
     const li = e.target.closest(".lyrics-line");
+    if (li && quotePicking) { toggleQuoteLine(li); return; }
     if (!li || !lyricsData || !lyricsData.synced) return;
     try { audio.currentTime = lyricsData.lines[+li.dataset.i].t; } catch (err) { return; }
     lyricsTouchedAt = 0;
@@ -4153,6 +6481,34 @@
   });
   syncModeButtons();
 
+  // «Играть следующим» / «В конец очереди»: добавленное встаёт сразу после играющего,
+  // в том порядке, в каком его добавляли (второе «следующим» идёт после первого).
+  function queueTrack(track, atEnd) {
+    if (!track) return;
+    if (!currentTrack || !currentQueue.length) {
+      queuedIds.clear();
+      playTrack(track, [track], { context: "Очередь" });
+      return;
+    }
+    if (track.id === currentTrack.id) { showToast("Этот трек уже играет"); return; }
+    const had = currentQueue.findIndex((t) => t.id === track.id);
+    if (had >= 0) currentQueue.splice(had, 1); // not twice in the queue
+    currentQueueIndex = currentQueue.findIndex((t) => t.id === currentTrack.id);
+    let pos;
+    if (atEnd) pos = currentQueue.length;
+    else {
+      pos = currentQueueIndex + 1;
+      while (pos < currentQueue.length && queuedIds.has(currentQueue[pos].id)) pos++;
+    }
+    currentQueue.splice(pos, 0, track);
+    queuedIds.add(track.id);
+    preparedId = null;
+    prepareNextTrack();
+    renderQueueSheet();
+    haptic("success");
+    showToast(atEnd ? "Добавлено в конец очереди" : "Сыграет следующим");
+  }
+
   function renderQueueSheet() {
     const list = $("queue-list");
     if (!list) return;
@@ -4194,6 +6550,14 @@
     showToast(on ? "Добавлено в любимое" : "Убрано из любимого");
     syncPlayerFav();
     refreshCurrentScreen();
+  });
+  $("menu-track-next").addEventListener("click", () => {
+    closeOverlay("track-menu-sheet");
+    if (trackMenuTrack) queueTrack(trackMenuTrack, false);
+  });
+  $("menu-track-queue").addEventListener("click", () => {
+    closeOverlay("track-menu-sheet");
+    if (trackMenuTrack) queueTrack(trackMenuTrack, true);
   });
   $("menu-track-share").addEventListener("click", () => {
     closeOverlay("track-menu-sheet");
@@ -4320,25 +6684,60 @@
     renderArtistShell(artistName);
     showScreen("artist", isBack ? { replace: true } : { params: { artistName, contextTracks, meta } });
 
+    // a track without its own artist id (it came from SoundCloud when YouTube Music was slow, or
+    // from an old list): find the artist by name, so the page still gets albums and the full list
+    if (!(meta.artistId && meta.source)) {
+      try {
+        const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), 12000) : 0;
+        let data = null;
+        try {
+          const res = await fetch(`${API_BASE_URL}/artists?q=${encodeURIComponent(artistName)}&limit=5`, ctrl ? { signal: ctrl.signal } : undefined);
+          data = res.ok ? await res.json() : null;
+        } finally { clearTimeout(timer); }
+        if (token !== artistToken) return;
+        const want = artistName.trim().toLowerCase();
+        const hit = ((data && data.results) || []).find((a) => (a.name || "").trim().toLowerCase() === want);
+        if (hit && hit.id && hit.source) {
+          meta = Object.assign({}, meta, { artistId: hit.id, source: hit.source });
+          currentArtistMeta.artistId = hit.id;
+          currentArtistMeta.source = hit.source;
+        }
+      } catch (e) { /* the page falls back to what the search finds */ }
+    }
+
     if (meta.artistId && meta.source) {
       try {
-        const url = `${API_BASE_URL}/artist?source=${encodeURIComponent(meta.source)}&id=${encodeURIComponent(meta.artistId)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const artist = await res.json();
+        const base = `${API_BASE_URL}/artist?source=${encodeURIComponent(meta.source)}&id=${encodeURIComponent(meta.artistId)}`;
+        // the request can never hang for good: after the limit the page falls back to the search-based one
+        const getArtist = async (fast, ms) => {
+          const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+          const timer = ctrl ? setTimeout(() => ctrl.abort(), ms) : 0;
+          try {
+            const res = await fetch(fast ? `${base}&fast=1` : base, ctrl ? { signal: ctrl.signal } : undefined);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+          } finally { clearTimeout(timer); }
+        };
+        const paint = (artist) => {
+          currentArtistTracks = artist.topTracks || [];
+          currentArtistMeta.photo = artist.photo || null;
+          // an iTunes artist comes back as its fuller YouTube Music page
+          if (artist.id && artist.source) { currentArtistMeta.artistId = artist.id; currentArtistMeta.source = artist.source; }
+          $("artist-name").textContent = artist.name || artistName;
+          setCoverEl($("artist-avatar"), artist.photo, artistName);
+          $("artist-listeners").textContent = artist.subscribers || `${pluralTracks(currentArtistTracks.length)} в Нотке`;
+          const list = $("artist-tracks");
+          list.innerHTML = "";
+          currentArtistTracks.slice(0, 8).forEach((t) => list.appendChild(buildTrackRow(t, { queue: currentArtistTracks, context: artist.name || artistName })));
+          renderArtistAlbumsRow(artist.albums || [], artist.source || meta.source);
+          updateSourceButtons();
+        };
+        // first the short page (about a second), then the full one replaces it by itself
+        const quick = await getArtist(true, 20000);
         if (token !== artistToken) return; // another artist was opened meanwhile
-        currentArtistTracks = artist.topTracks || [];
-        currentArtistMeta.photo = artist.photo || null;
-        // an iTunes artist comes back as its fuller YouTube Music page
-        if (artist.id && artist.source) { currentArtistMeta.artistId = artist.id; currentArtistMeta.source = artist.source; }
-        $("artist-name").textContent = artist.name || artistName;
-        setCoverEl($("artist-avatar"), artist.photo, artistName);
-        $("artist-listeners").textContent = artist.subscribers || `${pluralTracks(currentArtistTracks.length)} в Нотке`;
-        const list = $("artist-tracks");
-        list.innerHTML = "";
-        currentArtistTracks.slice(0, 8).forEach((t) => list.appendChild(buildTrackRow(t, { queue: currentArtistTracks, context: artist.name || artistName })));
-        renderArtistAlbumsRow(artist.albums || [], artist.source || meta.source);
-        updateSourceButtons();
+        paint(quick);
+        getArtist(false, 40000).then((full) => { if (token === artistToken) paint(full); }).catch((e) => console.warn("artist: full page not loaded", e));
         return;
       } catch (e) {
         if (token !== artistToken) return;
@@ -4361,6 +6760,19 @@
     renderArtistFallbackTracks(artistName, tracks);
   }
   $("artist-back-btn").addEventListener("click", goBack);
+  {
+    const pa = $("player-artist");
+    pa.setAttribute("role", "link");
+    pa.tabIndex = 0;
+    const openFromPlayer = () => {
+      const t = currentTrack;
+      if (!t || !t.artist) return;
+      haptic("light");
+      openArtistScreen(t.artist, currentQueue.length ? currentQueue : [t], { artistId: t.artistId, source: t.source });
+    };
+    pa.addEventListener("click", openFromPlayer);
+    pa.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFromPlayer(); } });
+  }
   $("artist-play-btn").addEventListener("click", () => {
     if (!currentArtistTracks.length) { showToast("Нет треков"); return; }
     playOrToggle(`artist:${$("artist-name").textContent}`, currentArtistTracks, $("artist-name").textContent);
@@ -4456,6 +6868,9 @@
   const progressFill = $("player-progress-fill");
   const progressThumb = $("player-progress-thumb");
   const miniProgress = $("mp-progress");
+  const miniScrub = $("mp-scrub");
+  const miniTimeCur = $("mp-time-cur");
+  const miniTimeTot = $("mp-time-tot");
 
   let isScrubbing = false;
 
@@ -4522,6 +6937,62 @@
   };
   artWrap.addEventListener("pointerup", endArtGrab);
   artWrap.addEventListener("pointercancel", endArtGrab);
+
+  // ---- свайп по плееру: влево — следующий трек, вправо — предыдущий
+  const playerScreen = $("screen-player");
+  let swipe = null;
+  const swipeTargets = () => [document.querySelector(".player-art-wrap"), document.querySelector(".player-meta")];
+  playerScreen.addEventListener("pointerdown", (e) => {
+    if (!currentTrack || e.pointerType === "mouse" && e.button !== 0) return;
+    if (document.body.classList.contains("quote-picking") || openOverlays.length) return;
+    if (e.target.closest("button, input, a, textarea, #player-progress-track, .scrub-times, .theme-try")) return;
+    // у винила, диска и кассеты палец на самой обложке крутит и перематывает, свайп тут не нужен
+    if (artTheme() !== "standard" && !document.body.classList.contains("lyrics-open")) {
+      const el = artTheme() === "cassette" ? playerCassette : $("player-art");
+      const r = el.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return;
+    }
+    swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, locked: false, t: performance.now() };
+  });
+  playerScreen.addEventListener("pointermove", (e) => {
+    if (!swipe || e.pointerId !== swipe.id) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    if (!swipe.locked) {
+      if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; } // это вертикальный жест: текст, закрытие
+      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      swipe.locked = true;
+      try { playerScreen.setPointerCapture(e.pointerId); } catch (err) { /* works without capture */ }
+    }
+    swipe.dx = dx;
+    const k = Math.max(-1, Math.min(1, dx / 220));
+    swipeTargets().forEach((el) => { if (!el) return; el.style.transition = "none"; el.style.transform = `translateX(${dx * 0.55}px)`; el.style.opacity = String(1 - Math.abs(k) * 0.55); });
+  });
+  const endSwipe = (e) => {
+    if (!swipe || (e && e.pointerId !== swipe.id)) return;
+    const s = swipe;
+    swipe = null;
+    if (!s.locked) return;
+    const speed = Math.abs(s.dx) / Math.max(1, performance.now() - s.t);
+    const go = e && e.type === "pointerup" && (Math.abs(s.dx) > 80 || (Math.abs(s.dx) > 40 && speed > 0.5));
+    swipeTargets().forEach((el) => { if (!el) return; el.style.transition = ""; el.style.transform = ""; el.style.opacity = ""; });
+    if (!go) return;
+    haptic("light");
+    const dir = s.dx < 0 ? 1 : -1;
+    const token0 = playToken;
+    playAdjacent(dir);
+    // новый трек въезжает с той стороны, куда ушёл прежний
+    if (playToken !== token0) {
+      swipeTargets().forEach((el) => {
+        if (!el) return;
+        el.classList.remove("swipe-in-left", "swipe-in-right");
+        void el.offsetWidth;
+        el.classList.add(dir > 0 ? "swipe-in-right" : "swipe-in-left");
+        setTimeout(() => el.classList.remove("swipe-in-left", "swipe-in-right"), 450);
+      });
+    }
+  };
+  playerScreen.addEventListener("pointerup", endSwipe);
+  playerScreen.addEventListener("pointercancel", endSwipe);
   let lastPositionSync = 0;
 
   // Telegram's in-app WebView frequently misjudges the *real* length of
@@ -4554,11 +7025,15 @@
     const p = Math.max(0, Math.min(100, pct));
     progressFill.style.width = `${p}%`;
     progressThumb.style.left = `${p}%`;
-    miniProgress.style.width = `${p}%`;
+    miniScrub.style.setProperty("--mp", (p / 100).toFixed(4));
     playerCassette.style.setProperty("--p", (p / 100).toFixed(3)); // the tape moves from reel to reel
     progressTrack.setAttribute("aria-valuenow", String(Math.round(p)));
     progressTrack.setAttribute("aria-valuetext", formatDuration(seconds));
     $("player-time-current").textContent = formatDuration(seconds);
+    if (document.body.classList.contains("is-desktop")) {
+      miniTimeCur.textContent = formatDuration(seconds);
+      miniTimeTot.textContent = formatDuration(effectiveDuration());
+    }
   }
   function resetProgress(track) {
     renderProgress(0, 0);
@@ -4566,6 +7041,7 @@
   }
 
   function finishCurrentTrack() {
+    if (currentTrack) { track("complete", { id: currentTrack.id }); noteListened(currentTrack, 9999); }
     audio.pause();
     renderProgress(0, 0);
     if (sleepAfterTrack) { stopBySleep(); return; }
@@ -4576,6 +7052,7 @@
     }
     const hasNext = currentQueueIndex >= 0 && currentQueueIndex < currentQueue.length - 1;
     if (hasNext || (repeatMode === "all" && currentQueue.length)) { playAdjacent(1, { auto: true }); return; }
+    if (loopFinishedQueue()) return;
     // The queue is over: rewind, so ▶ plays this track again from the top.
     try { audio.currentTime = 0; } catch (e) { /* not seekable yet */ }
     updateMymixCardUI();
@@ -4592,6 +7069,7 @@
       const d = t - statLast;
       if (d > 0 && d < 2) {
         const L = state.listens;
+        listensRev++;
         L.seconds += d;
         statHeard += d;
         eventNote("listen", d / 60, true);
@@ -4622,15 +7100,110 @@
   audio.addEventListener("loadstart", () => { statLast = null; statHeard = 0; statCounted = false; });
   audio.addEventListener("seeking", () => { statLast = null; });
 
+
+  // ============================================================
+  // ВЫРАВНИВАНИЕ ГРОМКОСТИ: первые секунды трека измеряем, дальше подтягиваем или
+  // приглушаем до общего уровня. Работает через Web Audio, поэтому и там, где
+  // Telegram не даёт менять громкость. Включается в «Звук и загрузки».
+  // ============================================================
+  const loudness = (() => {
+    const KEY = "notka_gain";
+    const TARGET = 0.12, MIN = 0.45, MAX = 1.7;
+    let ctx = null, gainNode = null, analyser = null, buf = null, timer = null, sumSq = 0, frames = 0, trackId = null;
+    let cache = {};
+    try { cache = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { cache = {}; }
+    const sameOrigin = (() => { try { return !API_BASE_URL || new URL(API_BASE_URL, location.href).origin === location.origin; } catch (e) { return false; } })();
+    const supported = sameOrigin && !!(window.AudioContext || window.webkitAudioContext);
+    const enabled = () => !!Store.getSetting("loudness");
+    function ensure() {
+      if (ctx) return true;
+      if (!supported) return false;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        ctx = new AC();
+        const src = ctx.createMediaElementSource(audio);
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        buf = new Float32Array(analyser.fftSize);
+        gainNode = ctx.createGain();
+        const limiter = ctx.createDynamicsCompressor();
+        limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.003; limiter.release.value = 0.15;
+        src.connect(analyser); analyser.connect(gainNode); gainNode.connect(limiter); limiter.connect(ctx.destination);
+        return true;
+      } catch (e) { ctx = null; return false; }
+    }
+    function setGain(g, fast) {
+      if (!gainNode) return;
+      gainNode.gain.setTargetAtTime(g, ctx.currentTime, fast ? 0.02 : 0.5);
+    }
+    function remember(id, g) {
+      cache[id] = Math.round(g * 100) / 100;
+      const keys = Object.keys(cache);
+      if (keys.length > 400) delete cache[keys[0]];
+      try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch (e) { /* kept for this session */ }
+    }
+    function stop() { clearInterval(timer); timer = null; }
+    function onPlaying(track) {
+      stop();
+      if (!enabled() || !track || !ensure()) { setGain(1, true); return; }
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      trackId = track.id; sumSq = 0; frames = 0;
+      if (cache[trackId]) { setGain(cache[trackId], true); return; }
+      setGain(1, true);
+      timer = setInterval(() => {
+        if (audio.paused || audio.volume < userVolume * 0.99 || trackId !== (currentTrack && currentTrack.id)) return; // during a fade the level isn't the track's own
+        analyser.getFloatTimeDomainData(buf);
+        let s = 0;
+        for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+        const rms = Math.sqrt(s / buf.length);
+        if (rms < 0.006) return; // silence between notes isn't loudness
+        sumSq += rms * rms; frames++;
+        if (frames >= 45) { // about five seconds of real sound
+          stop();
+          const g = Math.max(MIN, Math.min(MAX, TARGET / Math.sqrt(sumSq / frames)));
+          remember(trackId, g);
+          setGain(g, false);
+        }
+      }, 120);
+    }
+    function reset() { stop(); }
+    function refresh() { if (!enabled()) { stop(); setGain(1, false); } else if (!audio.paused && currentTrack) onPlaying(currentTrack); }
+    return { supported, onPlaying, reset, refresh, enabled };
+  })();
+  audio.addEventListener("playing", () => loudness.onPlaying(currentTrack));
+  audio.addEventListener("loadstart", () => loudness.reset());
+
   // «Плавный переход»: fade in at the start, fade out at the end
   const volumeWorks = (() => { try { const p = document.createElement("audio"); p.volume = 0.5; return Math.abs(p.volume - 0.5) < 0.01; } catch (e) { return false; } })();
+  // the listener's own level (the computer's bar); a fade works under it
+  let userVolume = 1;
+  try { const v = parseFloat(localStorage.getItem("notka_volume")); if (v >= 0 && v <= 1) userVolume = v; } catch (e) { /* storage may be blocked */ }
   function applyFade(t, dur) {
     if (!volumeWorks) return;
     const f = Store.getSetting("crossfade") || 0;
-    if (!f || !dur) { if (audio.volume !== 1) audio.volume = 1; return; }
+    if (!f || !dur) { if (audio.volume !== userVolume) audio.volume = userVolume; return; }
     const v = Math.max(0, Math.min(1, t / f, (dur - t) / f));
-    audio.volume = Math.max(0.02, v);
+    audio.volume = Math.max(0.02, v) * userVolume;
   }
+  function setUserVolume(v, remember) {
+    userVolume = Math.max(0, Math.min(1, v));
+    if (volumeWorks) audio.volume = userVolume;
+    if (remember) { try { localStorage.setItem("notka_volume", String(userVolume)); } catch (e) { /* ignore */ } }
+    $("mp-vol").value = String(Math.round(userVolume * 100));
+    $("mp-vol").style.setProperty("--v", `${Math.round(userVolume * 100)}%`);
+    $("mp-mute-btn").classList.toggle("is-muted", userVolume === 0);
+    $("mp-mute-btn").setAttribute("aria-label", userVolume === 0 ? "Включить звук" : "Выключить звук");
+  }
+  let volumeBeforeMute = 0.8;
+  $("mp-vol").addEventListener("input", (e) => { setUserVolume(e.target.value / 100, true); if (userVolume > 0) volumeBeforeMute = userVolume; });
+  $("mp-mute-btn").addEventListener("click", () => {
+    if (userVolume > 0) { volumeBeforeMute = userVolume; setUserVolume(0, true); } else setUserVolume(volumeBeforeMute || 0.8, true);
+  });
+  setUserVolume(userVolume, false);
+  $("mp-prev-btn").addEventListener("click", () => playAdjacent(-1));
+  $("mp-next-btn").addEventListener("click", () => playAdjacent(1));
+  $("mp-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
+  $("mp-fav-btn").addEventListener("click", () => $("player-fav-btn").click());
 
   audio.addEventListener("timeupdate", () => {
     recordListening();
@@ -4648,12 +7221,19 @@
     renderProgress((audio.currentTime / dur) * 100, audio.currentTime);
     $("player-time-total").textContent = formatDuration(dur);
     const now = Date.now();
+    if (currentMixKey && !isStarting && now - lastMixSave > 8000) saveMixResume();
     if ("mediaSession" in navigator && navigator.mediaSession.setPositionState && now - lastPositionSync > 4000) {
       lastPositionSync = now;
       try { navigator.mediaSession.setPositionState({ duration: dur, position: Math.min(audio.currentTime, dur), playbackRate: 1 }); } catch (e) { /* ignore */ }
     }
   });
   audio.addEventListener("ended", finishCurrentTrack);
+  // Telegram freezes a page it has put away: «ended» may come late or not at all. On the way
+  // back the player is put in line with what the sound did.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !currentTrack || isStarting) return;
+    if (audio.ended) finishCurrentTrack();
+  });
 
   // Scrubbing: works both as a tap-to-seek and a drag-to-seek (pointer
   // events cover mouse, touch and pen in one handler, which is what makes
@@ -4686,6 +7266,48 @@
   }
   progressTrack.addEventListener("pointerup", endScrub);
   progressTrack.addEventListener("pointercancel", () => { isScrubbing = false; progressTrack.classList.remove("is-scrubbing"); });
+  // the same seek from the mini player's bottom edge. A touch low in the
+  // strip (on the line itself) seeks at once; higher up it seeks only when
+  // dragged sideways, so a plain tap there still opens the player.
+  // how far from the strip's ends the dot sits at 0 % and 100 % (from the stylesheet: it differs between the phone's strip and the computer's bar)
+  const miniInset = () => parseFloat(getComputedStyle(miniScrub).getPropertyValue("--tl")) || 21;
+  const MINI_LINE_ZONE = 20; // px from the bottom edge that count as «on the line»
+  let miniGrab = null;
+  function miniPct(e) {
+    const r = miniScrub.getBoundingClientRect();
+    const inset = miniInset();
+    return Math.min(1, Math.max(0, (e.clientX - r.left - inset) / Math.max(1, r.width - inset * 2)));
+  }
+  function miniStart() {
+    if (!miniGrab || miniGrab.on) return;
+    miniGrab.on = true;
+    isScrubbing = true;
+    miniScrub.classList.add("is-scrubbing");
+    haptic("select");
+  }
+  miniScrub.addEventListener("pointerdown", (e) => {
+    const r = miniScrub.getBoundingClientRect();
+    miniGrab = { id: e.pointerId, x: e.clientX, on: false, dead: !effectiveDuration() };
+    try { miniScrub.setPointerCapture(e.pointerId); } catch (err) { /* works without capture too */ }
+    if (!miniGrab.dead && r.bottom - e.clientY <= MINI_LINE_ZONE) { miniStart(); renderScrubPosition(miniPct(e)); }
+  });
+  miniScrub.addEventListener("pointermove", (e) => {
+    if (!miniGrab || miniGrab.dead || e.pointerId !== miniGrab.id) return;
+    if (!miniGrab.on && Math.abs(e.clientX - miniGrab.x) > 8) miniStart();
+    if (miniGrab.on) renderScrubPosition(miniPct(e));
+  });
+  miniScrub.addEventListener("pointerup", (e) => {
+    const g = miniGrab;
+    miniGrab = null;
+    if (!g) return;
+    miniScrub.classList.remove("is-scrubbing");
+    if (!g.on) { $("mini-open-btn").click(); return; } // a plain tap above the line opens the player
+    isScrubbing = false;
+    const dur = effectiveDuration();
+    if (dur) audio.currentTime = miniPct(e) * dur;
+  });
+  miniScrub.addEventListener("pointercancel", () => { miniGrab = null; isScrubbing = false; miniScrub.classList.remove("is-scrubbing"); });
+
   progressTrack.addEventListener("keydown", (e) => {
     const dur = effectiveDuration();
     if (!dur) return;
@@ -4771,6 +7393,171 @@
     }
   }
 
+  function initAuthScreen() {
+    const userStep = $("auth-step-user");
+    const codeStep = $("auth-step-code");
+    const userInput = $("auth-username-input");
+    const codeInput = $("auth-code-input");
+    const userErr = $("auth-user-error");
+    const codeErr = $("auth-code-error");
+    const reqBtn = $("auth-request-code-btn");
+    const verifyBtn = $("auth-verify-code-btn");
+    const changeBtn = $("auth-change-user-btn");
+    const targetUserLabel = $("auth-code-target-user");
+
+    let currentReqUser = "";
+
+    function showUserError(msg) {
+      if (userErr) {
+        userErr.textContent = msg;
+        userErr.hidden = false;
+      }
+    }
+    function hideUserError() {
+      if (userErr) userErr.hidden = true;
+    }
+    function showCodeError(msg) {
+      if (codeErr) {
+        codeErr.textContent = msg;
+        codeErr.hidden = false;
+      }
+    }
+    function hideCodeError() {
+      if (codeErr) codeErr.hidden = true;
+    }
+
+    if (userInput) {
+      userInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (reqBtn) reqBtn.click();
+        }
+      });
+      userInput.addEventListener("input", hideUserError);
+    }
+
+    if (codeInput) {
+      codeInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (verifyBtn) verifyBtn.click();
+        }
+      });
+      codeInput.addEventListener("input", (e) => {
+        hideCodeError();
+        const val = codeInput.value.replace(/\D/g, "");
+        codeInput.value = val;
+        if (val.length === 6 && verifyBtn) {
+          verifyBtn.click();
+        }
+      });
+    }
+
+    if (reqBtn) {
+      reqBtn.addEventListener("click", async () => {
+        const u = (userInput ? userInput.value : "").trim().replace(/^@/, "");
+        if (!u) {
+          showUserError("Введи юзернейм в Telegram");
+          haptic("notification", "warning");
+          return;
+        }
+        hideUserError();
+        reqBtn.disabled = true;
+        const origText = reqBtn.textContent;
+        reqBtn.textContent = "Отправка кода...";
+        try {
+          const res = await fetch(`${API_BASE_URL}/auth/request-code`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ username: u }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            showUserError(data.message || "Пользователь не найден");
+            haptic("notification", "error");
+            return;
+          }
+          currentReqUser = u;
+          haptic("notification", "success");
+          if (targetUserLabel) targetUserLabel.textContent = `@${data.username || u}`;
+          if (userStep) userStep.hidden = true;
+          if (codeStep) codeStep.hidden = false;
+          if (codeInput) {
+            codeInput.value = "";
+            setTimeout(() => codeInput.focus(), 100);
+          }
+        } catch (err) {
+          showUserError("Ошибка подключения к серверу");
+          haptic("notification", "error");
+        } finally {
+          reqBtn.disabled = false;
+          reqBtn.textContent = origText;
+        }
+      });
+    }
+
+    if (verifyBtn) {
+      verifyBtn.addEventListener("click", async () => {
+        const c = (codeInput ? codeInput.value : "").trim();
+        if (!c || c.length < 6) {
+          showCodeError("Введи 6-значный код подтверждения");
+          haptic("notification", "warning");
+          return;
+        }
+        hideCodeError();
+        verifyBtn.disabled = true;
+        const origText = verifyBtn.textContent;
+        verifyBtn.textContent = "Проверка...";
+        try {
+          const res = await fetch(`${API_BASE_URL}/auth/verify-code`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ username: currentReqUser, code: c }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            showCodeError(data.message || "Неверный код");
+            haptic("notification", "error");
+            return;
+          }
+          haptic("notification", "success");
+          localStorage.setItem("notka_auth_token", data.token);
+          if (data.user) {
+            localStorage.setItem("notka_auth_user", JSON.stringify(data.user));
+            tgUser = data.user;
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+              window.Telegram.WebApp.initDataUnsafe.user = data.user;
+            }
+          }
+          if (data.sync) {
+            unionIntoLocal(data.sync);
+            persist();
+          }
+          Store.markOnboardingSeen();
+          showToast(`Добро пожаловать, ${data.user ? (data.user.name || data.user.username) : "!"}`);
+          showScreen("home", { replace: true });
+          renderProfile();
+          if (syncOn()) scheduleSync(1000);
+        } catch (err) {
+          showCodeError("Ошибка подтверждения кода");
+          haptic("notification", "error");
+        } finally {
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = origText;
+        }
+      });
+    }
+
+    if (changeBtn) {
+      changeBtn.addEventListener("click", () => {
+        hideCodeError();
+        if (codeStep) codeStep.hidden = true;
+        if (userStep) userStep.hidden = false;
+        if (userInput) userInput.focus();
+      });
+    }
+  }
+
   function boot() {
     showScreen("splash", { replace: true });
     const link = deepLinkTarget();
@@ -4783,12 +7570,19 @@
       splash.classList.add("is-leaving");
       setTimeout(() => {
         splash.classList.remove("is-leaving");
-        if (viaLink) Store.markOnboardingSeen();
-        if (Store.isOnboardingSeen()) showScreen("home", { replace: true });
-        else showScreen("onboarding", { replace: true });
-        openDeepLink();
+        initAuthScreen();
+        const authToken = localStorage.getItem("notka_auth_token");
+        if (!tgInitRaw && !authToken) {
+          showScreen("auth", { replace: true });
+        } else {
+          Store.markOnboardingSeen();
+          showScreen("home", { replace: true });
+          openDeepLink();
+          if (syncOn()) scheduleSync(1000);
+        }
       }, 450);
     });
   }
   boot();
+
 })();
