@@ -184,12 +184,19 @@ def needs_signin(exc: Exception) -> bool:
 _cookie_stats = {"used": 0, "failed": 0, "last_failed_at": 0.0}
 
 # Refusals that come from the address a request left from (not from the video): another route may pass.
-_ROUTE_MARKERS = _SIGNIN_MARKERS + ("403", "forbidden", "page needs to be reloaded", "http error 429", "too many requests")
+# «Video unavailable» too: the proxy's address sits in a region the big labels closed their releases
+# (since 2022) for, while the same video is public from the server's own address.
+_ROUTE_MARKERS = _SIGNIN_MARKERS + (
+    "403", "forbidden", "page needs to be reloaded", "http error 429", "too many requests",
+    "video unavailable", "not available", "not made this video available", "blocked it",
+)
+# a video that is gone for everybody is not asked twice
+_GONE_MARKERS = ("private video", "has been removed", "account associated with this video has been terminated", "copyright claim")
 
 
 def _worth_other_route(exc: Exception) -> bool:
     text = str(exc).lower()
-    return any(marker in text for marker in _ROUTE_MARKERS) and "age-restricted" not in text and "video unavailable" not in text
+    return any(marker in text for marker in _ROUTE_MARKERS) and not any(marker in text for marker in _GONE_MARKERS)
 
 
 def _note_route_rescue() -> None:
