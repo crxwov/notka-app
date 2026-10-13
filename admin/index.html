@@ -25,14 +25,7 @@
   .btn:hover { background: rgba(255, 255, 255, 0.1); }
   .btn.primary { background: linear-gradient(135deg, var(--rose), #ff7a5c); border: 0; font-weight: 700; color: #fff; }
   .muted { color: var(--text2); }
-  /* login */
-  #login { max-width: 360px; margin: 18vh auto 0; text-align: center; }
-  #login h1 { font-size: 28px; letter-spacing: -0.03em; margin-bottom: 6px; }
-  #login input { width: 100%; margin: 18px 0 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); outline: none; }
-  #login input:focus { border-color: var(--rose); }
-  #login .err { color: #ff8a9a; min-height: 20px; margin-bottom: 8px; font-size: 14px; }
   /* cards */
-  .grid { display: grid; gap: 14px; }
   .cards { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); margin-bottom: 20px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 16px 14px; backdrop-filter: blur(10px); }
   .card .v { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
@@ -70,20 +63,11 @@
 </head>
 <body>
 <div class="wrap">
-  <section id="login" hidden>
-    <h1>Нотка</h1>
-    <p class="muted">Панель владельца</p>
-    <input id="pw" type="password" placeholder="Пароль" autocomplete="current-password" />
-    <p class="err" id="err"></p>
-    <button class="btn primary" id="go" type="button" style="width: 100%; padding: 12px">Войти</button>
-  </section>
-
-  <div id="app" hidden>
+  <div id="app">
     <header class="top">
       <div class="brand">Нотка <small id="stamp"></small></div>
       <div style="display: flex; gap: 8px">
         <button class="btn" id="refresh" type="button">Обновить</button>
-        <button class="btn" id="out" type="button">Выйти</button>
       </div>
     </header>
 
@@ -134,7 +118,7 @@ const dateOf = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString("ru-RU", { d
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
-  if (res.status === 401) throw new Error("login");
+  if (res.status === 401) throw new Error("unauthorized");
   if (!res.ok) throw new Error("http " + res.status);
   return res.json();
 }
@@ -233,31 +217,15 @@ function render(d) {
 async function load() {
   try {
     const d = await api("/admin/api/summary");
-    $("login").hidden = true; $("app").hidden = false;
     render(d);
   } catch (e) {
-    if (e.message === "login") { $("app").hidden = true; $("login").hidden = false; $("pw").focus(); }
-    else { $("app").hidden = false; $("stamp").textContent = "не получилось загрузить, попробуй обновить"; }
+    $("stamp").textContent = "не получилось загрузить, попробуй обновить";
   }
 }
-async function login() {
-  $("err").textContent = "";
-  try {
-    const res = await fetch("/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: $("pw").value }) });
-    if (res.status === 429) { $("err").textContent = "Слишком много попыток. Подожди 15 минут."; return; }
-    if (res.status === 503) { $("err").textContent = "Панель закрыта: на сервере не задан пароль."; return; }
-    if (!res.ok) { $("err").textContent = "Неверный пароль"; return; }
-    $("pw").value = "";
-    load();
-  } catch (e) { $("err").textContent = "Нет связи с сервером"; }
-}
-$("go").addEventListener("click", login);
-$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 $("refresh").addEventListener("click", load);
-$("out").addEventListener("click", async () => { await fetch("/admin/logout", { method: "POST" }); load(); });
 $("q").addEventListener("input", () => DATA && drawTable());
 load();
-setInterval(() => { if (!$("app").hidden && document.visibilityState === "visible") load(); }, 120000);
+setInterval(() => { if (document.visibilityState === "visible") load(); }, 120000);
 </script>
 </body>
 </html>

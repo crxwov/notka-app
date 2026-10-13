@@ -337,35 +337,8 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
             metrics.count("inline_send")
         return FileResponse(path, media_type="audio/mpeg", headers={"cache-control": "public, max-age=86400"})
 
-    # ---- the admin site: /admin, behind a password ----
+    # ---- the admin site: /admin, protected by reverse proxy Basic Auth ----
     admin_page = Path(__file__).resolve().parent.parent.parent / "admin" / "index.html"
-    admin_fails: dict[str, list[float]] = {}
-
-    def _admin_key() -> bytes | None:
-        password = os.environ.get("ADMIN_PASSWORD", "").strip()
-        if len(password) < 8:
-            return None  # no password set: the site stays closed
-        return hashlib.sha256((password + "|" + os.environ.get("BOT_TOKEN", "")).encode()).digest()
-
-    def _admin_sign(exp: int) -> str:
-        key = _admin_key() or b""
-        return f"{exp}.{hmac.new(key, str(exp).encode(), hashlib.sha256).hexdigest()}"
-
-    def _admin_ok(request: Request) -> bool:
-        if _admin_key() is None:
-            return False
-        value = request.cookies.get("notka_admin", "")
-        exp, _, mac = value.partition(".")
-        try:
-            if int(exp) < time.time():
-                return False
-        except ValueError:
-            return False
-        return hmac.compare_digest(value, _admin_sign(int(exp)))
-
-    def _client_ip(request: Request) -> str:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        return (forwarded.split(",")[0].strip() or (request.client.host if request.client else "?"))
 
     @router.get("/admin")
     @router.get("/admin/")
@@ -373,39 +346,15 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         return FileResponse(admin_page, media_type="text/html", headers={"cache-control": "no-store"})
 
     @router.post("/admin/login")
-    async def admin_login(request: Request):
-        key = _admin_key()
-        if key is None:
-            return JSONResponse({"error": {"code": "CLOSED"}}, status_code=503)
-        ip = _client_ip(request)
-        now = time.time()
-        fails = [t for t in admin_fails.get(ip, []) if now - t < 900]
-        if len(fails) >= 6:
-            return JSONResponse({"error": {"code": "TOO_MANY"}}, status_code=429)
-        try:
-            body = await request.json()
-            given = str(body.get("password") or "")
-        except ValueError:
-            given = ""
-        want = os.environ.get("ADMIN_PASSWORD", "").strip()
-        if not hmac.compare_digest(given.encode(), want.encode()):
-            admin_fails[ip] = fails + [now]
-            return JSONResponse({"error": {"code": "WRONG"}}, status_code=401)
-        exp = int(now + 7 * 86400)
-        response = JSONResponse({"ok": True})
-        response.set_cookie("notka_admin", _admin_sign(exp), max_age=7 * 86400, httponly=True, secure=True, samesite="strict", path="/")
-        return response
+    async def admin_login():
+        return JSONResponse({"ok": True})
 
     @router.post("/admin/logout")
     async def admin_logout():
-        response = JSONResponse({"ok": True})
-        response.delete_cookie("notka_admin", path="/")
-        return response
+        return JSONResponse({"ok": True})
 
     @router.get("/admin/api/summary")
     async def admin_summary(request: Request):
-        if not _admin_ok(request):
-            return JSONResponse({"error": {"code": "LOGIN"}}, status_code=401)
         data = await asyncio.to_thread(admin_stats.summary)
         return JSONResponse(data, headers={"cache-control": "no-store"})
 
