@@ -705,3 +705,9 @@ body.player-pulling .light-group { transition-duration: 0.3s, 0.3s; }
 .row-heart[aria-pressed="true"] { color: var(--liked); }
 .sheet-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 6px 14px; font-size: 15px; color: var(--text-2); }
 .sheet-switch > span { flex: 1; min-width: 0; }
+
+/* название альбома под исполнителем в плеере: открывает альбом */
+.player-album { font-size: 14px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; width: fit-content; max-width: 100%; cursor: pointer; transition: color 0.15s, opacity 0.15s; }
+.player-album:hover { color: var(--text-2); }
+.player-album:active { opacity: 0.6; }
+body:not(.is-desktop).lyrics-open .player-album { display: none; }

@@ -6044,6 +6044,9 @@
   function setFullPlayerFor(track) {
     $("player-title").textContent = track.title || "Без названия";
     $("player-artist").textContent = track.artist || "Неизвестный исполнитель";
+    const albumEl = $("player-album");
+    albumEl.textContent = track.album || "";
+    albumEl.hidden = !track.album;
     setCoverEl($("player-art"), hiResArtwork(track.artwork), track.id);
     // the cassette theme wears the cover as its label
     const art = hiResArtwork(track.artwork);
@@ -7114,6 +7117,19 @@
     };
     pa.addEventListener("click", openFromPlayer);
     pa.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFromPlayer(); } });
+  }
+  {
+    // the album's name under the artist opens the album (as the artist's name opens the artist)
+    const al = $("player-album");
+    const openAlbumFromPlayer = () => {
+      const t = currentTrack;
+      if (!t || !t.album) return;
+      haptic("light");
+      if (t.albumId) openAlbumById(t.source, t.albumId, t.album, t.artist);
+      else openAlbumScreen(t);
+    };
+    al.addEventListener("click", openAlbumFromPlayer);
+    al.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAlbumFromPlayer(); } });
   }
   $("artist-play-btn").addEventListener("click", () => {
     if (!currentArtistTracks.length) { showToast("Нет треков"); return; }
