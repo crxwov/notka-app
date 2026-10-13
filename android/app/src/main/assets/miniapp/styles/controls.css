@@ -1,0 +1,187 @@
+/* ==========================================================
+   CONTROLS
+   ========================================================== */
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--text);
+  transition: background-color 0.2s, transform 0.2s var(--ease-out);
+}
+.icon-btn:active { transform: scale(0.92); background: var(--surface-1); }
+.icon-btn-sm { width: 36px; height: 36px; }
+
+.round-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.25s var(--ease-out), background-color 0.2s;
+}
+.round-btn:active { transform: scale(0.93); }
+.round-light { background: var(--btn-light); color: var(--bg); }
+.round-quiet { background: var(--surface-2); color: var(--text); }
+.round-quiet[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: transform 0.25s var(--ease-out), background-color 0.2s, opacity 0.2s;
+}
+.pill-btn:active { transform: scale(0.97); }
+.pill-primary { background: var(--btn-light); color: var(--bg); }
+.pill-quiet { background: var(--surface-2); color: var(--text); }
+.pill-block { width: 100%; }
+.pill-btn .tag { margin-left: 2px; }
+
+.text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.text-btn:active { color: var(--text); }
+.text-btn-icon svg { margin-left: -2px; }
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  background: var(--surface-2);
+  color: var(--text-2);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.tag-soon { color: var(--text-2); }
+
+/* fields */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+  padding: 0 8px 0 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.05));
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  color: var(--text-2);
+  width: 100%;
+}
+.field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+}
+.field input::placeholder { color: var(--text-3); }
+.field input::-webkit-search-cancel-button { display: none; }
+.field:focus-within { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 0 0 1.5px rgba(255, 227, 184, 0.55); }
+.field-btn { font-size: 17px; text-align: left; }
+.field-btn:active { transform: scale(0.985); }
+.field-clear { color: var(--text-2); }
+
+/* switches */
+.switch {
+  width: 51px;
+  height: 31px;
+  border-radius: 999px;
+  background: rgba(236, 228, 255, 0.16);
+  position: relative;
+  flex-shrink: 0;
+  transition: background-color 0.25s;
+}
+.switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform 0.3s var(--ease-out);
+}
+.switch[aria-checked="true"] { background: var(--text); }
+.switch[aria-checked="true"] span { background: var(--bg); }
+.switch[aria-checked="true"] span { transform: translateX(20px); }
+
+.range {
+  width: 100%;
+  accent-color: var(--text);
+  margin: 10px 0 2px;
+}
+
+/* ==========================================================
+   LIQUID GLASS — only where it floats over the light
+   ========================================================== */
+.glass, .round-glass {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.07) 100%),
+    linear-gradient(125deg, color-mix(in srgb, var(--c-warm) 20%, transparent), color-mix(in srgb, var(--c-deep) 30%, transparent));
+  -webkit-backdrop-filter: blur(22px) saturate(190%) brightness(1.08);
+  backdrop-filter: blur(22px) saturate(190%) brightness(1.08);
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.5),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.1),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    0 12px 32px -8px rgba(4, 2, 10, 0.55);
+}
+/* specular rim: bright at the top-left, fading round the edge */
+.glass::before, .round-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.05) 38%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 0.28));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+.round-glass { color: var(--text); }
+
+/* glass answers the finger: a soft specular bloom where it was touched */
+.glass::after, .round-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 0%), rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 55%);
+  opacity: 0;
+  transition: opacity 0.6s var(--ease-out);
+  pointer-events: none;
+}
+.glass.is-touched::after, .round-glass.is-touched::after { opacity: 1; transition-duration: 0.08s; }
+

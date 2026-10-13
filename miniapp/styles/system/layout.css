@@ -1,0 +1,264 @@
+/* ==========================================================
+   THE PLAYER BAR (computer): the phone's glass pill, unchanged in look
+   (cover, title, play, the thin line at the bottom), only wider, with the
+   extra controls added on its right.
+   ========================================================== */
+.mini-center, .mini-transport, .mini-seek { display: contents; } /* the phone's single row */
+.mini-desk { display: none; }
+.mini-scrub { --tl: 21px; }
+body.is-desktop .mini-desk { display: flex; align-items: center; flex: 0 0 auto; }
+/* three zones: the track on the left, the transport exactly in the middle, the rest on the right */
+body.is-desktop .mini-player,
+body.is-desktop.no-tabbar .mini-player {
+  --bar-x: max(40px, calc((100vw - var(--side) - 1120px) / 2)); /* the edges of the page's column */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: 16px;
+  left: calc(var(--side) + var(--bar-x));
+  right: var(--bar-x);
+  bottom: calc(var(--sab) + 16px);
+  padding-right: 14px;
+}
+body.is-desktop .mini-main { grid-column: 1; cursor: pointer; }
+body.is-desktop .mini-transport { grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 10px; }
+body.is-desktop .mini-right { grid-column: 3; justify-content: flex-end; align-items: center; gap: 2px; min-width: 0; }
+body.is-desktop .mini-time { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); opacity: 0.85; white-space: nowrap; }
+body.is-desktop #mp-time-cur::after { content: "\00a0/\00a0"; }
+body.is-desktop #mp-time-tot { margin-right: 10px; }
+body.is-desktop .mini-scrub:hover .mini-progress { transform: scaleY(0.5); }
+body.is-desktop .mini-scrub:hover .mini-thumb { opacity: 1; transform: scale(1); }
+.mini-ctrl { width: 40px; height: 40px; color: var(--text); background: none; border: 0; box-shadow: none; cursor: pointer; transition: color 0.2s, background-color 0.2s, transform 0.15s var(--ease-out); }
+.mini-ctrl:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
+.mini-ctrl:active { transform: scale(0.92); }
+.mini-ctrl[aria-pressed="true"] { color: var(--liked); }
+.mini-vol { display: flex; align-items: center; gap: 2px; margin-left: 4px; }
+.mini-vol .vol-off { display: none; }
+.mini-vol .is-muted .vol-on { display: none; }
+.mini-vol .is-muted .vol-off { display: block; }
+.vol-slider { -webkit-appearance: none; appearance: none; width: 92px; height: 28px; background: transparent; cursor: pointer; --v: 100%; }
+.vol-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--text) 0 var(--v), rgba(255, 255, 255, 0.22) var(--v) 100%); }
+.vol-slider::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.22); }
+.vol-slider::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--text); }
+.vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.vol-slider::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+
+/* ==========================================================
+   THE LYRICS (computer): nothing but the words — the side panel steps
+   aside and the text takes nearly the whole window.
+   ========================================================== */
+body.is-desktop.lyrics-open { --side: 0px; }
+body.is-desktop.lyrics-open .tabbar { display: none; }
+body.is-desktop.lyrics-open .screen-player { --pad-x: max(48px, calc((100vw - 1180px) / 2)); }
+body.is-desktop.lyrics-open .player-art-wrap { width: 100%; }
+body.is-desktop.lyrics-open .lyrics { padding-top: 40px; }
+body.is-desktop.lyrics-open .lyrics-lines.is-synced .lyrics-line { font-size: clamp(34px, 3.4vw, 52px); }
+body.is-desktop.lyrics-open .lyrics-lines:not(.is-synced) .lyrics-line { font-size: clamp(26px, 2.4vw, 34px); }
+
+/* the lyrics: the controls fold into one slim row at the bottom (track left, transport and seek in the middle, buttons right) */
+body.is-desktop.lyrics-open .screen-player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 560px) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "bar bar bar" "lyr lyr lyr" "meta ctrl foot" "meta scrub foot" "meta times foot";
+  column-gap: 32px;
+  padding-bottom: calc(var(--sab) + 22px);
+}
+body.is-desktop.lyrics-open .screen-player > :not(.player-prism) { width: auto; margin-left: 0; margin-right: 0; }
+body.is-desktop.lyrics-open .player-bar { grid-area: bar; }
+body.is-desktop.lyrics-open .player-art-wrap { grid-area: lyr; min-height: 0; }
+body.is-desktop.lyrics-open .player-meta { grid-area: meta; align-self: center; margin: 0; }
+body.is-desktop.lyrics-open .player-controls { grid-area: ctrl; margin: 6px 0 0; gap: 20px; }
+body.is-desktop.lyrics-open .scrub { grid-area: scrub; }
+body.is-desktop.lyrics-open .scrub-times { grid-area: times; }
+body.is-desktop.lyrics-open .player-foot { grid-area: foot; align-self: center; justify-content: flex-end; gap: 10px; }
+body.is-desktop.lyrics-open .ctrl { width: 52px; height: 52px; }
+body.is-desktop.lyrics-open .ctrl-play { width: 64px; height: 64px; }
+body.is-desktop.lyrics-open .player-title { font-size: 20px; }
+body.is-desktop.lyrics-open .player-artist { font-size: 15px; }
+
+/* a long title shrinks to its column and ends in an ellipsis; it never runs under the buttons */
+body.is-desktop.lyrics-open .player-meta-text { flex: 0 1 auto; min-width: 0; }
+body.is-desktop.lyrics-open .player-meta { gap: 16px; justify-self: stretch; min-width: 0; max-width: 100%; }
+body.is-desktop.lyrics-open .player-meta-text .player-title, body.is-desktop.lyrics-open .player-meta-text .player-artist { max-width: 100%; }
+
+/* the home page on a computer: the greeting is the page's heading, the avatar sits on its line */
+body.is-desktop #screen-home .home-top { position: absolute; top: calc(var(--sat) + 26px); right: var(--pad-x); z-index: 2; margin: 0; }
+body.is-desktop #screen-home .avatar-btn { width: 52px; height: 52px; }
+body.is-desktop #screen-home .avatar-btn .avatar { width: 48px; height: 48px; font-size: 20px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
+body.is-desktop #screen-home .avatar-btn:hover .avatar { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4); }
+body.is-desktop .home-greet { font-size: 40px; line-height: 1.1; font-weight: 800; letter-spacing: -0.035em; color: var(--text); margin: 0 72px 6px 0; }
+
+body.is-desktop .mix-sub { max-width: 56ch; font-size: 16px; }
+
+/* a narrower window: the bar gives up its extras so nothing runs into the buttons */
+@media (max-width: 1180px) { body.is-desktop .vol-slider { display: none; } }
+@media (max-width: 1000px) { body.is-desktop .mini-right .mini-time { display: none; } }
+
+/* «Нотка Плюс»: one readable column (plans and prices were stretched across the whole window) */
+body.is-desktop #screen-plus { --pad-x: max(40px, calc((100vw - var(--side) - 760px) / 2)); }
+
+/* «Под настроение»: the lights are bigger and have room, not phone-sized specks in a wide empty field */
+body.is-desktop #screen-mood { --pad-x: max(40px, calc((100vw - var(--side) - 1000px) / 2)); }
+body.is-desktop .mood-orb { width: calc(var(--s) * 1.5); height: calc(var(--s) * 1.5); font-size: 20px; }
+body.is-desktop .mood-orb .orb-plus { height: 22px; font-size: 12px; padding: 0 9px; }
+body.is-desktop .mood-cloud.is-live { height: clamp(460px, 62vh, 620px); margin-left: 0; margin-right: 0; }
+body.is-desktop .mood-genres { gap: 14px; }
+body.is-desktop .mood-genre { padding: 22px 10px 18px; font-size: 18px; }
+body.is-desktop .mood-genre i { width: 60px; height: 60px; }
+
+/* «Нотка Плюс» on a computer: a centred header and a larger drum (the JS spaces the items by --pw-k) */
+body.is-desktop #screen-plus { --pw-k: 1.12; }
+body.is-desktop #screen-plus .plus-brand { justify-content: center; }
+body.is-desktop #screen-plus .plus-title { font-size: 48px; text-align: center; }
+body.is-desktop #screen-plus .pw { height: calc(226px * var(--pw-k) + 132px); margin-top: 12px; }
+body.is-desktop #screen-plus .pw-track { height: calc(196px * var(--pw-k)); perspective: 1000px; }
+body.is-desktop #screen-plus .pw-item { width: calc(156px * var(--pw-k)); height: calc(156px * var(--pw-k)); margin: calc(-78px * var(--pw-k)) 0 0 calc(-78px * var(--pw-k)); }
+body.is-desktop #screen-plus .pw-dots { top: calc(200px * var(--pw-k)); }
+body.is-desktop #screen-plus .pw-copies { top: calc(226px * var(--pw-k) + 6px); height: 130px; }
+body.is-desktop #screen-plus .pw-name { font-size: 38px; }
+body.is-desktop #screen-plus .pw-desc { max-width: 480px; font-size: 17px; }
+
+/* the background light belongs to the page, not to the whole window: on a computer its centre is the middle of the content (right of the side panel) and it is larger for a wide window */
+body.is-desktop .light-group { left: calc(50% + var(--side) / 2); --size: min(64vw, 920px); }
+
+/* the glow behind the Plus header was a box the width of the phone's column (with its colours hung to the sides): on a computer it spans the page and is centred on the title */
+body.is-desktop #screen-plus .plus-hero::before {
+  left: calc(-1 * var(--pad-x));
+  right: calc(-1 * var(--pad-x));
+  top: -120px;
+  height: 540px;
+  background:
+    radial-gradient(34% 46% at 33% 36%, rgba(234, 115, 250, 0.24), transparent 72%),
+    radial-gradient(34% 46% at 67% 40%, rgba(254, 26, 124, 0.2), transparent 72%),
+    radial-gradient(42% 50% at 50% 52%, rgba(250, 156, 143, 0.18), transparent 74%);
+  -webkit-mask-image: linear-gradient(#000 40%, transparent);
+  mask-image: linear-gradient(#000 40%, transparent);
+}
+
+/* the dark fade above the bar was a strip with hard sides on a wide page; the bar is a card of its own here */
+body.is-desktop .plus-bar::before { display: none; }
+
+/* the Plus header on a computer: a wider canvas of four columns, the title centred over it */
+body.is-desktop #screen-plus .plus-hero { padding-top: 200px; text-align: center; }
+body.is-desktop #screen-plus .plus-showcase { height: 350px; }
+body.is-desktop #screen-plus .ps-deck { width: 1560px; grid-template-columns: repeat(4, minmax(0, 1fr)); top: -4px; gap: 14px; transform: translateX(-50%) perspective(820px) rotateX(58deg) rotateZ(-9deg); }
+body.is-desktop #screen-plus .ps-tile { height: 92px; padding: 12px 16px 17px 12px; border-radius: 24px; gap: 14px; }
+body.is-desktop #screen-plus .ps-cover { width: 66px; height: 66px; border-radius: 15px; }
+body.is-desktop #screen-plus .ps-meta b { font-size: 18px; }
+body.is-desktop #screen-plus .ps-meta em { font-size: 15px; }
+body.is-desktop #screen-plus .ps-play { width: 44px; height: 44px; }
+body.is-desktop #screen-plus .ps-play svg { width: 20px; height: 20px; }
+body.is-desktop #screen-plus .ps-bar { left: 92px; right: 16px; bottom: 11px; height: 4px; }
+body.is-desktop #screen-plus .ps-tile:nth-child(n+19) { display: flex; }
+
+/* ----- «Нотка Плюс»: more glass, an even row of atmospheres, a promo code that can be seen ----- */
+.plan-card {
+  background:
+    radial-gradient(120% 70% at 12% 0%, color-mix(in srgb, var(--c-mid) 38%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03) 42%),
+    rgba(26, 18, 36, 0.62);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: inset 0 1.5px 0.5px rgba(255, 255, 255, 0.38), inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 30px 60px -26px rgba(0, 0, 0, 0.7);
+}
+.plan-opt { background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.plan-opt.is-on { background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 2px var(--c-warm); }
+.tm-list li { background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.pd-chips .chip { background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.pd-chips .chip.active { background: var(--btn-light); box-shadow: 0 6px 18px -8px rgba(255, 255, 255, 0.5); }
+
+/* atmospheres: equal cards, none enlarged, the picked one only outlined, nothing cut off */
+.pd-atmo { padding: 6px; align-items: start; }
+.pd-atmo.demo-seasons .atmo-card, .pd-atmo.demo-seasons .atmo-card.is-on { transform: none; opacity: 0.78; }
+.pd-atmo.demo-seasons .atmo-card.is-on { opacity: 1; }
+.pd-atmo.demo-seasons .atmo-view { height: 140px; outline-offset: 3px; }
+.pd-atmo .at-name { text-align: center; margin-top: 2px; }
+body.is-desktop .pd-atmo { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+body.is-desktop .pd-atmo.demo-seasons .atmo-view { height: 190px; }
+
+/* the promo code: a button, not a grey line */
+.plus-promo-link {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 420px; height: 52px; margin: 18px auto 6px;
+  border-radius: 999px; font-size: 15.5px; font-weight: 700; color: var(--text);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.34), inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 14px 26px -16px rgba(0, 0, 0, 0.7);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  transition: transform 0.2s var(--ease-out), background-color 0.2s;
+}
+.plus-promo-link::before {
+  content: ""; width: 20px; height: 20px; flex: 0 0 auto; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 1 0-6V6H3Z'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 1 0-6V6H3Z'/></svg>") center / contain no-repeat;
+}
+.plus-promo-link:active { transform: scale(0.98); }
+@media (hover: hover) { .plus-promo-link:hover { background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1)); } }
+
+/* the text: lines change smoothly: their brightness and size ease over (the scroll itself is eased in the script) */
+.lyrics-lines.is-synced .lyrics-line {
+  transform-origin: 0 55%;
+  transform: scale(0.93);
+  transition: opacity 0.75s var(--ease-out), transform 0.8s var(--ease-out), text-shadow 0.8s var(--ease-out), background-color 0.2s var(--ease-out);
+}
+.lyrics-lines.is-synced .lyrics-line.is-active { will-change: transform; }
+.perf-lite .lyrics-lines.is-synced .lyrics-line { transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out); }
+.lyrics-lines.is-synced .lyrics-line.is-active { transform: scale(1); }
+.lyrics-lines.is-synced:not(.is-picking) .lyrics-line { opacity: var(--lo, 0.5); }
+.lyrics-lines.is-synced:not(.is-picking) .lyrics-line:active { opacity: 0.7; }
+
+/* окно на компьютере не в фокусе: фоновые анимации замирают (см. idle-guard в app.js) */
+html.app-idle *, html.app-idle *::before, html.app-idle *::after { animation-play-state: paused !important; }
+
+/* «Минимализм»: ровный тёмный фон, как в Spotify. Свет, атмосферы и лучи плеера убраны; стекло (мини-плеер, кнопки) остаётся прежним */
+html.minimal { --bg: #121212; }
+html.minimal, html.minimal body { background: #121212; }
+html.minimal .light { background: #121212; }
+html.minimal .light-art, html.minimal .light-group, html.minimal .light-spill, html.minimal .light-grain,
+html.minimal #atmo-back, html.minimal #atmo-front, html.minimal #player-prism { display: none !important; }
+html.minimal .light::before, html.minimal .light::after { content: none !important; }
+/* имя исполнителя под названием в плеере открывает его страницу */
+#player-artist { cursor: pointer; width: fit-content; max-width: 100%; transition: color 0.15s, opacity 0.15s; }
+#player-artist:hover { color: var(--text); }
+#player-artist:active { opacity: 0.6; }
+/* минимализм: меню «…», окна и активная вкладка без цвета трека */
+html.minimal .sheet, html.minimal .modal {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02) 40%),
+    linear-gradient(135deg, rgba(32, 32, 32, 0.92), rgba(22, 22, 22, 0.95));
+}
+html.minimal .tab.active { background: rgba(255, 255, 255, 0.12); }
+/* минимализм: экран загрузки без цветных пятен, только знак и слово на ровном фоне */
+html.minimal .screen-splash::before { display: none; }
+html.minimal .splash-word { background: #EDEDED; -webkit-background-clip: text; background-clip: text; filter: none; }
+html.minimal .glass-note::before { display: none; }
+html.minimal .gn-body { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(255, 255, 255, 0.2); }
+html.minimal .gn-shine { display: none; }
+
+/* ПК: знак и слово на экране открытия крупнее (в окне 900+ px 96 px терялись) */
+body.is-desktop .splash-mark { width: clamp(190px, 24vmin, 320px); height: clamp(190px, 24vmin, 320px); }
+body.is-desktop .splash-word { margin-top: clamp(34px, 4vmin, 52px); font-size: clamp(50px, 6.4vmin, 84px); }
+/* свечение вокруг играющей обложки в «Недавнем» больше не обрезается краями полки: запас внутри, компенсация полями */
+#home-recent { padding: 14px 24px 40px; margin: -14px -24px -36px; scroll-padding-inline: 24px; }
+
+/* шапка Плюса: чёткие плееры (слабая перспектива: у сильной ближний ряд растягивался в 1.8 раза и мылился),
+   свет по цветам играющего трека, края полотна и затемнения над плашкой не обрезаются */
+#screen-plus .ps-deck { transform: translateX(-50%) perspective(2400px) rotateX(58deg) rotateZ(-9deg); }
+body.is-desktop #screen-plus .ps-deck { transform: translateX(-50%) perspective(4800px) rotateX(58deg) rotateZ(-9deg); }
+#screen-plus .plus-showcase {
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 22%, #000 46%, transparent 80%), linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(180deg, transparent 0, #000 22%, #000 46%, transparent 80%), linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+  mask-composite: intersect;
+}
+.plus-hero::before {
+  background:
+    radial-gradient(58% 60% at 18% 40%, color-mix(in srgb, var(--c-mid) 38%, transparent), transparent 70%),
+    radial-gradient(52% 56% at 86% 55%, color-mix(in srgb, var(--c-warm) 32%, transparent), transparent 70%),
+    radial-gradient(46% 50% at 52% 70%, color-mix(in srgb, var(--c-core) 24%, transparent), transparent 72%);
+}
+body.is-desktop #screen-plus .plus-hero::before {
+  background:
+    radial-gradient(34% 46% at 33% 36%, color-mix(in srgb, var(--c-mid) 34%, transparent), transparent 72%),
+    radial-gradient(34% 46% at 67% 40%, color-mix(in srgb, var(--c-warm) 30%, transparent), transparent 72%),
+    radial-gradient(42% 50% at 50% 52%, color-mix(in srgb, var(--c-core) 22%, transparent), transparent 74%);
+}
+.plus-bar::before { left: -20px; right: -20px; top: -56px; height: 56px; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.8) 85%); }
