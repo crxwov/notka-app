@@ -82,6 +82,35 @@ def _subscribers(client, artist_id: str | None) -> int | None:
     return value
 
 
+_name_cache: dict[str, tuple[float, int]] = {}
+
+
+def _saved_artist_subscribers(client, track: dict) -> int | None:
+    """How big the saved track's artist is. A remake's author often has no artist page at all
+    (no id): then the name is looked up, and only an artist that really is not there counts as 0."""
+    artist_id = track.get("artistId")
+    if artist_id:
+        return _subscribers(client, artist_id)
+    name = _norm(str(track.get("artist") or ""))
+    if not name:
+        return None
+    now = time.time()
+    hit = _name_cache.get(name)
+    if hit and now - hit[0] < _SUBS_TTL:
+        return hit[1]
+    best = 0
+    try:
+        for found in client.search(str(track.get("artist")), filter="artists", limit=5) or []:
+            if _norm(found.get("artist") or found.get("title") or "") != name:
+                continue
+            subs = parse_subscribers(found.get("subscribers")) or _subscribers(client, found.get("browseId"))
+            best = max(best, subs or 0)
+    except Exception:  # noqa: BLE001
+        return None
+    _name_cache[name] = (now, best)
+    return best
+
+
 def _artist_names(item_artists) -> list[str]:
     return [_norm(a.get("name", "")) for a in (item_artists or []) if isinstance(a, dict)]
 
@@ -104,7 +133,7 @@ def _one(client, track: dict) -> dict | None:
     base = base_title(title)
     if len(base) < 2 or is_variant(title):
         return None
-    saved_subs = _subscribers(client, track.get("artistId"))
+    saved_subs = _saved_artist_subscribers(client, track)
     if saved_subs is None:
         return None  # nothing to compare the artist with: left alone
     try:
