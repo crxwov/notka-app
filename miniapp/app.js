@@ -2355,6 +2355,67 @@
     });
     box.classList.toggle("is-empty", covers.length === 0);
   }
+  // the button beats with the music: the tempo of the playing track (from its sound profile, 96 bpm when not yet known)
+  let beatFor = null;
+  async function paintBeat() {
+    const card = $("mymix-card");
+    if (!card) return;
+    if (!mymixActive || !currentTrack) { beatFor = null; return; }
+    const t = currentTrack;
+    if (beatFor === t.id) return;
+    beatFor = t.id;
+    let bpm = 96;
+    try {
+      const res = await fetch(`${API_BASE_URL}/profile?source=${encodeURIComponent(t.source)}&id=${encodeURIComponent(t.sourceId)}&artist=${encodeURIComponent(t.artist || "")}`);
+      if (res.ok) { const j = await res.json(); const tempo = j && j.sound && j.sound.tempo; if (tempo > 50 && tempo < 220) bpm = tempo; }
+    } catch (e) { /* the default pulse */ }
+    if (beatFor !== t.id) return;
+    while (bpm > 150) bpm /= 2; // a fast track pulses on every second beat
+    while (bpm < 70) bpm *= 2;
+    card.style.setProperty("--beat", `${(60 / bpm).toFixed(3)}s`);
+  }
+  // real level of the music drives the button where the device allows (desktop); elsewhere the beat above does
+  let vizRaf = 0;
+  function vizLoop() {
+    vizRaf = 0;
+    const card = $("mymix-card");
+    if (!card || audio.paused || currentScreen !== "home" || document.hidden) { if (card) card.classList.remove("is-live"); return; }
+    const lv = loudness.level();
+    if (lv != null) {
+      card.classList.add("is-live");
+      card.style.setProperty("--lvl", lv.toFixed(3));
+    }
+    vizRaf = requestAnimationFrame(vizLoop);
+  }
+  function syncViz() {
+    const card = $("mymix-card");
+    if (!card) return;
+    try {
+      if (!audio.paused && mymixActive && currentScreen === "home" && !vizRaf && loudness.startViz()) vizRaf = requestAnimationFrame(vizLoop);
+    } catch (e) { /* the level is a nicety; the beat animation stays */ }
+    if (audio.paused) card.classList.remove("is-live");
+  }
+  // (the audio element is made further down: the listeners are attached once the script has run)
+  setTimeout(() => {
+    audio.addEventListener("play", syncViz);
+    audio.addEventListener("pause", () => { const c = $("mymix-card"); if (c) c.classList.remove("is-live"); });
+  }, 0);
+  // a press on the button: it squishes, a wave goes out from where the finger is, the phone answers
+  document.addEventListener("pointerdown", (e) => {
+    const btn = e.target.closest && e.target.closest("#mymix-play-btn");
+    if (!btn) return;
+    const wave = btn.querySelector(".mix-wave");
+    const r = btn.getBoundingClientRect();
+    if (wave) {
+      wave.style.setProperty("--x", `${e.clientX - r.left}px`);
+      wave.style.setProperty("--y", `${e.clientY - r.top}px`);
+      wave.classList.remove("go");
+      void wave.offsetWidth;
+      wave.classList.add("go");
+    }
+    haptic("medium");
+  }, { passive: true });
+
   // «Обновить»: a new mix instead of the kept one
   let mixRefreshing = false;
   async function refreshMymix() {
@@ -6118,6 +6179,8 @@
         : "Отметь треки сердцем — и микс подберёт похожее";
     $("mymix-play-btn").setAttribute("aria-label", mymixActive && currentTrack && !audio.paused ? "Пауза" : "Включить «Мой микс»");
     paintMixArt();
+    paintBeat();
+    syncViz();
   }
 
   function setMiniPlayerFor(track) {
@@ -7800,6 +7863,7 @@
     const KEY = "notka_gain";
     const TARGET = 0.12, MIN = 0.45, MAX = 1.7;
     let ctx = null, gainNode = null, analyser = null, buf = null, timer = null, sumSq = 0, frames = 0, trackId = null;
+    let vizAnalyser = null;
     let cache = {};
     try { cache = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { cache = {}; }
     const sameOrigin = (() => { try { return !API_BASE_URL || new URL(API_BASE_URL, location.href).origin === location.origin; } catch (e) { return false; } })();
@@ -7819,6 +7883,10 @@
         const limiter = ctx.createDynamicsCompressor();
         limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.003; limiter.release.value = 0.15;
         src.connect(analyser); analyser.connect(gainNode); gainNode.connect(limiter); limiter.connect(ctx.destination);
+        vizAnalyser = ctx.createAnalyser();
+        vizAnalyser.fftSize = 256;
+        vizAnalyser.smoothingTimeConstant = 0.78;
+        src.connect(vizAnalyser);
         return true;
       } catch (e) { ctx = null; return false; }
     }
@@ -7858,7 +7926,19 @@
     }
     function reset() { stop(); }
     function refresh() { if (!enabled()) { stop(); setGain(1, false); } else if (!audio.paused && currentTrack) onPlaying(currentTrack); }
-    return { supported, onPlaying, reset, refresh, enabled };
+    // the level of the music for the button on the home page: 0..1 from the low end of the spectrum (null when not available)
+    const vizBuf = new Uint8Array(128);
+    function level() {
+      if (!vizAnalyser) return null;
+      vizAnalyser.getByteFrequencyData(vizBuf);
+      let s = 0;
+      for (let i = 1; i < 12; i++) s += vizBuf[i];
+      const avg = s / 11;
+      // the spectrum's bass is almost always high: only what rises above its usual level moves the button
+      return Math.max(0, Math.min(1, (avg - 105) / 120));
+    }
+    function startViz() { if (isDesktop() && supported && !audio.paused && ensure() && ctx.state === "suspended") ctx.resume().catch(() => {}); return !!vizAnalyser; }
+    return { supported, onPlaying, reset, refresh, enabled, level, startViz };
   })();
   audio.addEventListener("playing", () => loudness.onPlaying(currentTrack));
   audio.addEventListener("loadstart", () => loudness.reset());

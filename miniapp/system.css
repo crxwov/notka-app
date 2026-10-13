@@ -816,3 +816,32 @@ body.is-desktop .pi-artist { aspect-ratio: 16 / 7; max-height: 300px; }
 .mix-refresh.is-spinning svg { animation: spin 0.9s linear infinite; }
 .mix-hero.is-building .mix-play-xl::after { width: 40px; height: 40px; border-width: 4px; }
 body.is-desktop .mix-stage { width: 340px; height: 210px; }
+
+/* кнопка микса живая: в такт трека (темп из профиля трека), на десктопе по реальному уровню звука; на нажатие сжимается,
+   от пальца идёт волна. Только transform и opacity, всё останавливается на паузе. */
+.mix-glow {
+  position: absolute; left: 50%; top: 50%; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; z-index: 2; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c-core) 70%, transparent), color-mix(in srgb, var(--c-warm) 40%, transparent) 55%, transparent 72%);
+  opacity: 0; transform: scale(1);
+}
+.mix-hero.playing .mix-glow { animation: mix-glow-beat var(--beat, 0.62s) cubic-bezier(0.1, 0.8, 0.3, 1) infinite; }
+@keyframes mix-glow-beat { 0% { transform: scale(1); opacity: 0.75; } 100% { transform: scale(2.1); opacity: 0; } }
+.mix-hero.playing .mix-play-xl { animation: mix-btn-beat var(--beat, 0.62s) cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
+@keyframes mix-btn-beat { 0% { transform: scale(1.07); } 45% { transform: scale(1); } 100% { transform: scale(1); } }
+.mix-hero.playing .mix-fan i:nth-child(1) { animation: mix-fan-l var(--beat, 0.62s) cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
+.mix-hero.playing .mix-fan i:nth-child(2) { animation: mix-fan-r var(--beat, 0.62s) cubic-bezier(0.2, 0.9, 0.3, 1) infinite; }
+@keyframes mix-fan-l { 0% { translate: -5px 0; } 50%, 100% { translate: 0 0; } }
+@keyframes mix-fan-r { 0% { translate: 5px 0; } 50%, 100% { translate: 0 0; } }
+/* with a real level (desktop) the music itself moves the button, smoothly */
+.mix-hero.is-live .mix-glow { animation: none; opacity: calc(var(--lvl, 0) * 0.9); transform: scale(calc(1 + var(--lvl, 0) * 1.1)); transition: opacity 0.08s linear, transform 0.08s linear; }
+.mix-hero.is-live .mix-play-xl { animation: none; transform: scale(calc(1 + var(--lvl, 0) * 0.1)); transition: transform 0.08s linear; }
+.mix-hero.is-live .mix-fan i:nth-child(1), .mix-hero.is-live .mix-fan i:nth-child(2) { animation: none; }
+.mix-play-xl:active { transform: scale(0.88); transition: transform 0.12s var(--ease-out); }
+.mix-wave { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; pointer-events: none; }
+.mix-wave::after {
+  content: ""; position: absolute; left: var(--x, 50%); top: var(--y, 50%); width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c-mid) 55%, transparent), transparent); opacity: 0; transform: scale(0);
+}
+.mix-wave.go::after { animation: mix-wave 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@keyframes mix-wave { 0% { transform: scale(0); opacity: 0.9; } 100% { transform: scale(11); opacity: 0; } }
+.perf-lite .mix-hero.playing .mix-glow, .perf-lite .mix-hero.playing .mix-fan i { animation: none; }

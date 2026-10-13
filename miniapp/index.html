@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css?v=143" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=102" />
+<link rel="stylesheet" href="system.css?v=103" />
 <link rel="stylesheet" href="plus.css?v=9" />
 <script src="telegram-web-app.js?v=1"></script>
 </head>
@@ -137,7 +137,9 @@
       <div class="mix-stage">
         <div class="mix-fan" id="mix-art" aria-hidden="true"><i></i><i></i><i></i></div>
         <svg class="mix-progress" viewBox="0 0 132 132" aria-hidden="true"><circle class="mp-track" cx="66" cy="66" r="62"/><circle class="mp-fill" id="mix-progress" cx="66" cy="66" r="62"/></svg>
+        <span class="mix-glow" aria-hidden="true"></span>
         <button class="mix-play-xl" id="mymix-play-btn" type="button" aria-label="Включить «Мой микс»">
+          <span class="mix-wave" aria-hidden="true"></span>
           <svg class="ic-play" width="44" height="44" aria-hidden="true"><use href="#i-play"/></svg>
           <svg class="ic-pause" width="40" height="40" aria-hidden="true"><use href="#i-pause"/></svg>
         </button>
@@ -709,12 +711,6 @@
       <button class="mood-orb" type="button" data-mood="sleep" style="--h:262;--s:104px;--dy:-10px;--d:7.3s"><span>Для сна</span></button>
       <button class="mood-orb" type="button" data-mood="workout" style="--h:4;--s:100px;--dy:-4px;--d:5.0s"><span>Спорт</span></button>
       <button class="mood-orb" type="button" data-mood="romance" style="--h:342;--s:120px;--dy:10px;--d:6.1s"><span>Романтика</span></button>
-    </div>
-    <h2 class="mood-h" data-reveal>Или жанр на русском</h2>
-    <div class="mood-genres" id="mood-genres" data-reveal>
-      <button class="mood-genre" type="button" data-mood="ru_pop" style="--h:300"><i aria-hidden="true"></i>Поп</button>
-      <button class="mood-genre" type="button" data-mood="ru_rock" style="--h:12"><i aria-hidden="true"></i>Рок</button>
-      <button class="mood-genre" type="button" data-mood="ru_hiphop" style="--h:46"><i aria-hidden="true"></i>Хип-хоп</button>
     </div>
     <p class="mood-note" id="mood-note" data-reveal>Три настроения открыты всем, остальные — в Нотке Плюс. Без Плюса там сыграют три трека на пробу.</p>
   </main>
@@ -1393,6 +1389,6 @@
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
 <script src="mix.js?v=1"></script>
-<script src="app.js?v=188"></script>
+<script src="app.js?v=189"></script>
 </body>
 </html>
