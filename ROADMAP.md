@@ -32,7 +32,11 @@ Audio streaming throughput and track latency overhauled:
 - Cache size expanded to 40 GB on NVMe storage (`AUDIO_CACHE_MAX_MB=40000`).
 - sing-box routing updated to include SoundCloud (`soundcloud.com`, `sndcdn.com`), eliminating 15s timeouts on RKN blocks.
 - Client-side preloading accelerated: `<audio preload="auto">` in Mini App, pre-warming for opened playlists/favorites and queue ahead of playback.
-- Admin panel `/admin` enhanced with live Audio Cache & Preloader telemetry widget.
+- Fixed glass buttons distortion ("ВОТ ЭТИ КНОПКИ АХУЕЛИ") & lighting desync:
+  - Root cause: `perfGuard()` had a 60-frame median probe that triggered false positives during asset loading or rapid track skips, permanently saving `notka_perf="lite"` in `localStorage`.
+  - In `perf-lite`, `.glass` and `.field` were assigned a hardcoded muddy purple `rgba(58, 42, 92, 0.78)` and `-webkit-backdrop-filter: none`, breaking search bar, mini-player, and bottom nav on iOS/Android.
+  - Fix: removed automatic false-positive downgrade in `perfGuard`, cleared stale auto-lite flags on start, replaced hardcoded purple with elegant dark frosted surfaces in fallbacks, and made `lightForTrack` and `brandPaletteFor` derive dynamic hues synchronously with token cancellation.
+  - Deployed v197 (`app.js`), v145 (`styles.css`).
 
 ## Findings and Decisions
 - Audio cache hit response time reduced from ~19s to 12–15 ms.
