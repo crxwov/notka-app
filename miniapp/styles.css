@@ -1771,7 +1771,7 @@ body[data-screen="splash"] .light-spill { opacity: 0; }
   box-shadow: 0 30px 60px -18px rgba(4, 2, 10, 0.75), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   transition: transform 0.7s var(--ease-out), opacity 0.45s var(--ease-out), filter 0.6s var(--ease-out);
 }
-body:not(.is-playing) .player-art { transform: scale(0.94); }
+body:not(.is-playing):not(.is-loading) .player-art { transform: scale(0.94); }
 
 .player-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
 .player-meta-text { flex: 1; min-width: 0; }

@@ -746,16 +746,35 @@
 
   function setCoverEl(el, url, seed) {
     if (!el) return;
-    el.innerHTML = "";
-    el.style.background = "";
     if (url) {
-      const img = document.createElement("img");
-      img.src = url;
-      img.alt = "";
-      img.loading = "lazy";
-      img.onerror = () => { img.remove(); el.style.background = fallbackCover(seed); };
-      el.appendChild(img);
+      el.style.background = "";
+      let img = el.querySelector("img");
+      if (img) {
+        if (img.getAttribute("src") === url) return;
+        const next = new Image();
+        next.onload = () => {
+          if (el.contains(img)) {
+            img.src = url;
+          }
+        };
+        next.onerror = () => {
+          if (el.contains(img)) {
+            img.remove();
+            el.style.background = fallbackCover(seed);
+          }
+        };
+        next.src = url;
+      } else {
+        el.innerHTML = "";
+        img = document.createElement("img");
+        img.src = url;
+        img.alt = "";
+        img.loading = "lazy";
+        img.onerror = () => { img.remove(); el.style.background = fallbackCover(seed); };
+        el.appendChild(img);
+      }
     } else {
+      el.innerHTML = "";
       el.style.background = fallbackCover(seed);
     }
   }
@@ -993,30 +1012,49 @@
   // the strips Telegram draws around the app and the browser's bar
   let groundPainted = "";
   let groundProbe = null;
+  let groundTimer = null;
   function paintGround(deep) {
-    let color;
-    const root = document.documentElement;
-    if (root.classList.contains("minimal")) color = "#121212";
-    else if (document.body.dataset.atmo && document.body.dataset.atmo !== "none") color = getComputedStyle(document.body).getPropertyValue("--bg").trim() || BG_COLOR;
-    else {
-      // any CSS colour (the cover's palette is "hsl(...)"): the browser turns it into rgb()
-      if (!groundProbe) { groundProbe = document.createElement("i"); groundProbe.style.display = "none"; document.body.appendChild(groundProbe); }
-      groundProbe.style.color = "";
-      groundProbe.style.color = String(deep);
-      const m = getComputedStyle(groundProbe).color.match(/[\d.]+/g);
-      if (!m || m.length < 3) return;
-      const base = [10, 7, 9];
-      color = "#" + [0, 1, 2].map((k) => Math.round(+m[k] * 0.3 + base[k] * 0.7).toString(16).padStart(2, "0")).join("");
-    }
-    if (color === groundPainted) return;
-    groundPainted = color;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", color);
-    if (!tg) return;
-    try {
-      if (tgAtLeast("6.1")) { tg.setHeaderColor(color); tg.setBackgroundColor(color); }
-      if (tgAtLeast("7.10") && tg.setBottomBarColor) tg.setBottomBarColor(color);
-    } catch (e) { /* the colours of Telegram's own strips are a nicety */ }
+    clearTimeout(groundTimer);
+    groundTimer = setTimeout(() => {
+      let color;
+      const root = document.documentElement;
+      if (root.classList.contains("minimal")) color = "#121212";
+      else if (document.body.dataset.atmo && document.body.dataset.atmo !== "none") color = getComputedStyle(document.body).getPropertyValue("--bg").trim() || BG_COLOR;
+      else {
+        let rgb = null;
+        if (typeof deep === "string" && deep.startsWith("#")) {
+          const h = deep.slice(1);
+          if (h.length === 6) rgb = [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+        } else if (typeof deep === "string" && deep.startsWith("hsl")) {
+          const parts = deep.match(/[\d.]+/g);
+          if (parts && parts.length >= 3) {
+            const h = +parts[0] / 360, s = +parts[1] <= 1 ? +parts[1] : +parts[1] / 100, l = +parts[2] <= 1 ? +parts[2] : +parts[2] / 100;
+            const a = s * Math.min(l, 1 - l);
+            const f = (n) => { const k = (n + h * 12) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+            rgb = [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+          }
+        }
+        if (!rgb) {
+          if (!groundProbe) { groundProbe = document.createElement("i"); groundProbe.style.display = "none"; document.body.appendChild(groundProbe); }
+          groundProbe.style.color = "";
+          groundProbe.style.color = String(deep);
+          const m = getComputedStyle(groundProbe).color.match(/[\d.]+/g);
+          if (!m || m.length < 3) return;
+          rgb = [+m[0], +m[1], +m[2]];
+        }
+        const base = [10, 7, 9];
+        color = "#" + [0, 1, 2].map((k) => Math.round(rgb[k] * 0.3 + base[k] * 0.7).toString(16).padStart(2, "0")).join("");
+      }
+      if (color === groundPainted) return;
+      groundPainted = color;
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", color);
+      if (!tg) return;
+      try {
+        if (tgAtLeast("6.1")) { tg.setHeaderColor(color); tg.setBackgroundColor(color); }
+        if (tgAtLeast("7.10") && tg.setBottomBarColor) tg.setBottomBarColor(color);
+      } catch (e) { /* the colours of Telegram's own strips are a nicety */ }
+    }, 120);
   }
 
   // ---- rays in the player (PrismaticBurst port) ----
@@ -1120,16 +1158,20 @@
     if (!lightArt || url === artUrlShown) return;
     artUrlShown = url;
     document.body.classList.toggle("has-art", !!url);
-    lightArt.classList.remove("is-shown");
-    setTimeout(async () => {
-      if (artUrlShown !== url) return;
-      if (!url) { lightArt.style.backgroundImage = ""; return; }
+    if (!url) {
+      lightArt.classList.remove("is-shown");
+      lightArt.style.backgroundImage = "";
+      return;
+    }
+    (async () => {
       const tiny = await tinyArt(url);
       if (artUrlShown !== url) return;
       lightArt.classList.toggle("is-raw", !tiny);
       lightArt.style.backgroundImage = `url("${(tiny || url).replace(/"/g, "%22")}")`;
-      requestAnimationFrame(() => lightArt.classList.add("is-shown"));
-    }, 450);
+      if (!lightArt.classList.contains("is-shown")) {
+        lightArt.classList.add("is-shown");
+      }
+    })();
   }
 
   // What the playing track gives the light. «Оформление» can put a chosen
@@ -2065,11 +2107,13 @@
     // new content and not on every return to Home
     const sig = recent.map((t) => t.id).join("|");
     if (shelf.dataset.sig === sig) return;
+    const isUpdate = !!shelf.dataset.sig;
     shelf.dataset.sig = sig;
     shelf.innerHTML = "";
     recent.forEach((t, i) => {
       const card = shelfCard(t.artwork, t.id, t.title || "Без названия", t.artist || "", () => playTrack(t, recent, { context: "Недавнее" }));
       card.style.setProperty("--i", Math.min(i, 6));
+      if (isUpdate) card.style.animation = "none";
       shelf.appendChild(card);
     });
     shelf.scrollLeft = 0;
@@ -6706,7 +6750,7 @@
   $("player-play-btn").addEventListener("click", togglePlayPause);
   $("player-back-btn").addEventListener("click", goBack);
   $("player-more-btn").addEventListener("click", () => { if (currentTrack) openTrackMenu(currentTrack); });
-  $("player-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
+  $("player-queue-btn").addEventListener("click", () => { renderQueueSheet(true); openOverlay("queue-sheet"); });
 
   // «Текст»: the lyrics take the cover's place in the player. They are
   // fetched only while that view is open; when a source has timings, the
@@ -6888,20 +6932,28 @@
     // (the small player's own entrance animation stays switched off here: putting it back now would
     // start it again, and the player would blink after it was put away; updateDock() puts it back
     // when the element is hidden, so the next real appearance has its entrance)
-    pullDock().forEach((el) => { el.style.transition = ""; el.style.opacity = ""; el.style.animation = ""; });
+    pullDock().forEach((el) => {
+      el.style.transition = "";
+      el.style.opacity = "";
+      if (el.hidden) el.style.animation = "";
+      else el.style.animation = "none";
+    });
     document.body.classList.remove("player-pulling");
     if (currentScreen === "player") {
       document.body.dataset.screen = "player";
     }
   };
   cancelPlayerPull = () => {
+    const wasPulling = !!(playerPull || pullTimeout || document.body.classList.contains("player-pulling") || pullBehind);
     if (playerPull) {
       if (playerPull.raf) cancelAnimationFrame(playerPull.raf);
       playerPull = null;
     }
-    pullReset();
-    if (currentScreen === "player") {
-      updateDock();
+    if (wasPulling) {
+      pullReset();
+      if (currentScreen === "player") {
+        updateDock();
+      }
     }
   };
   function pullBegin() {
@@ -7213,7 +7265,8 @@
     showToast(atEnd ? "Добавлено в конец очереди" : "Сыграет следующим");
   }
 
-  function renderQueueSheet() {
+  function renderQueueSheet(force) {
+    if (!force && !openOverlays.includes("queue-sheet")) return;
     const list = $("queue-list");
     if (!list) return;
     list.innerHTML = "";
@@ -7977,8 +8030,9 @@
       swipeTargets().forEach((el) => {
         if (!el) return;
         el.classList.remove("swipe-in-left", "swipe-in-right");
-        void el.offsetWidth;
-        el.classList.add(dir > 0 ? "swipe-in-right" : "swipe-in-left");
+        requestAnimationFrame(() => {
+          el.classList.add(dir > 0 ? "swipe-in-right" : "swipe-in-left");
+        });
         setTimeout(() => el.classList.remove("swipe-in-left", "swipe-in-right"), 450);
       });
     }
@@ -8211,7 +8265,7 @@
   setUserVolume(userVolume, false);
   $("mp-prev-btn").addEventListener("click", () => playAdjacent(-1));
   $("mp-next-btn").addEventListener("click", () => playAdjacent(1));
-  $("mp-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
+  $("mp-queue-btn").addEventListener("click", () => { renderQueueSheet(true); openOverlay("queue-sheet"); });
   $("mp-fav-btn").addEventListener("click", () => $("player-fav-btn").click());
   $("mp-fav-ph").addEventListener("click", (e) => { e.stopPropagation(); $("player-fav-btn").click(); });
 
