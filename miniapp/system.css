@@ -392,8 +392,9 @@ body.is-desktop .mini-scrub:hover .mini-thumb { opacity: 1; transform: scale(1);
    THE LYRICS (computer): nothing but the words — the side panel steps
    aside and the text takes nearly the whole window.
    ========================================================== */
-body.is-desktop.lyrics-open { --side: 0px; }
-body.is-desktop.lyrics-open .tabbar { display: none; }
+/* только на экране плеера: иначе после выхода из текста боковая панель пропадала на всех страницах */
+body.is-desktop.lyrics-open[data-screen="player"] { --side: 0px; }
+body.is-desktop.lyrics-open[data-screen="player"] .tabbar { display: none; }
 body.is-desktop.lyrics-open .screen-player { --pad-x: max(48px, calc((100vw - 1180px) / 2)); }
 body.is-desktop.lyrics-open .player-art-wrap { width: 100%; }
 body.is-desktop.lyrics-open .lyrics { padding-top: 40px; }

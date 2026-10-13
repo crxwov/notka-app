@@ -1298,6 +1298,8 @@
     opts = opts || {};
     const prev = currentScreen;
     currentScreen = name;
+    // leaving the player puts the words away (the layout of the words hides the side panel: it must not outlive the player)
+    if (name !== "player" && document.body.classList.contains("lyrics-open")) setLyricsOpen(false);
     Object.entries(screens).forEach(([key, el]) => {
       if (!el) return;
       el.hidden = key !== name;
