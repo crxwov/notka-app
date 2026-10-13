@@ -137,7 +137,7 @@
   }
 
   // слабые телефоны: сами замеряем плавность и при тормозах выключаем дорогое размытие фона.
-  // Режим хранится на устройстве: "auto" (по замеру), "lite" (включён вручную), "full" (выключен вручную).
+  // Режим хранится на устройстве: "auto", "lite" (включён вручную), "full" (выключен вручную).
   function perfGuard() {
     const root = document.documentElement;
     const KEY = "notka_perf";
@@ -145,35 +145,14 @@
     const read = (k) => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } };
     const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* storage may be blocked */ } };
     let mode = read(MODE_KEY) || "auto";
-    if (mode === "lite" || (mode === "auto" && read(KEY) === "lite")) root.classList.add("perf-lite");
-    let probing = false;
-    let tries = 0;
-    function probe() {
-      if (mode !== "auto" || probing || root.classList.contains("perf-lite") || tries >= 3) return;
-      if (document.hidden) { setTimeout(probe, 4000); return; }
-      probing = true;
-      tries += 1;
-      const dts = [];
-      let last = 0;
-      const tick = (t) => {
-        // кадр после паузы вкладки (или свёрнутого окна) не считаем: он не про тормоза
-        if (last && t - last < 250) dts.push(t - last);
-        last = t;
-        if (dts.length < 60) { requestAnimationFrame(tick); return; }
-        probing = false;
-        dts.sort((a, b) => a - b);
-        // медиана дольше 26 мс: меньше ~38 кадров в секунду
-        if (dts[dts.length >> 1] > 26) {
-          root.classList.add("perf-lite");
-          write(KEY, "lite");
-          document.dispatchEvent(new CustomEvent("notka:perf", { detail: { lite: true, auto: true } }));
-        } else if (tries < 3) {
-          setTimeout(probe, 15000); // повторный замер уже под нагрузкой (плеер, список, свет)
-        }
-      };
-      requestAnimationFrame(tick);
+    // Очищаем ошибочный флаг "lite" при авто-режиме, возвращая полноценный дизайн и размытие
+    if (mode === "auto") {
+      write(KEY, "");
+      root.classList.remove("perf-lite");
+    } else if (mode === "lite") {
+      root.classList.add("perf-lite");
     }
-    setTimeout(probe, 3000);
+    const probe = () => {};
     probe.isLite = () => root.classList.contains("perf-lite");
     probe.mode = () => mode;
     probe.set = (lite) => {
@@ -1087,7 +1066,12 @@
   const BRAND_HUES = [14, 24, 34, 336, 348, 6, 318];
   function brandPaletteFor(seed) {
     const h = BRAND_HUES[hashString(seed) % BRAND_HUES.length];
-    return { core: hsl(h, 0.9, 0.9), warm: hsl(h, 0.76, 0.62), mid: hsl((h + 340) % 360, 0.5, 0.52), deep: "#44112F" };
+    return {
+      core: hsl(h, 0.9, 0.9),
+      warm: hsl(h, 0.76, 0.62),
+      mid: hsl((h + 340) % 360, 0.5, 0.52),
+      deep: hsl((h + 350) % 360, 0.42, 0.18)
+    };
   }
 
   // The cover under the light is only ever seen as a haze. A big picture blurred by 72px
@@ -1150,20 +1134,30 @@
 
   // What the playing track gives the light. «Оформление» can put a chosen
   // palette or one pinned cover in its place (see paintLight).
-  const DEFAULT_PALETTE = { core: "#FFE9DF", warm: "#FFA6B8", mid: "#FF4FA0", deep: "#44112F" };
+  const DEFAULT_PALETTE = { core: "#FFE9DF", warm: "#FFA6B8", mid: "#FF4FA0", deep: "#361625" };
   let trackLight = { palette: null, art: null };
+  let lightToken = 0;
 
   async function lightForTrack(track) {
-    trackLight = { palette: trackLight.palette, art: track.artwork ? hiResArtwork(track.artwork) : null };
+    const myToken = ++lightToken;
+    const cached = track.artwork && paletteCache.get(track.artwork);
+    trackLight = {
+      palette: cached || brandPaletteFor(track.id),
+      art: track.artwork ? hiResArtwork(track.artwork) : null
+    };
     paintLight();
-    let palette = await paletteFromArtwork(track.artwork);
-    if (!palette && track.artwork && !paletteCache.has(track.artwork)) {
-      await new Promise((r) => setTimeout(r, 1200));
-      palette = await paletteFromArtwork(track.artwork); // one more try on a flaky network
+    if (!cached && track.artwork) {
+      let palette = await paletteFromArtwork(track.artwork);
+      if (!palette && !paletteCache.has(track.artwork)) {
+        await new Promise((r) => setTimeout(r, 800));
+        palette = await paletteFromArtwork(track.artwork);
+      }
+      if (myToken !== lightToken || !currentTrack || currentTrack.id !== track.id) return;
+      if (palette) {
+        trackLight.palette = palette;
+        paintLight();
+      }
     }
-    if (!currentTrack || currentTrack.id !== track.id) return;
-    trackLight.palette = palette || brandPaletteFor(track.id);
-    paintLight();
   }
 
   // ============================================================
@@ -6872,7 +6866,7 @@
     // (the small player's own entrance animation stays switched off here: putting it back now would
     // start it again, and the player would blink after it was put away; updateDock() puts it back
     // when the element is hidden, so the next real appearance has its entrance)
-    pullDock().forEach((el) => { el.style.transition = ""; el.style.opacity = ""; });
+    pullDock().forEach((el) => { el.style.transition = ""; el.style.opacity = ""; el.style.animation = ""; });
     document.body.classList.remove("player-pulling");
   };
   function pullBegin() {
