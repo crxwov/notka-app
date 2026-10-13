@@ -2,15 +2,25 @@
 .env
 env_setup.txt
 
-# то, что ставится и скачивается само
+# виртуальное окружение и зависимости
 venv/
 cache/
 __pycache__/
 *.pyc
 
-# скриншоты проверок дизайна (десятки мегабайт)
-.impeccable/review/
-.impeccable/hook.cache.json
+# ИИ файлы, агентские протоколы и дорожные карты
+AGENTS.md
+**/AGENTS.md
+ROADMAP*.md
+**/ROADMAP*.md
+.impeccable/
+
+# скриншоты, референсы и старые черновики
+/*.png
+рефернсы/
+что хочу.txt
+eval_webview.py
+cdp_eval.ps1
 
 # данные пользователей (у кого Плюс, промокоды)
 data/
@@ -18,13 +28,10 @@ data/
 # вспомогательные скрипты с доступами
 deploy/ssh_client.py
 
-# временные скриншоты и скрипты отладки в корне
-/*.png
-eval_webview.py
-cdp_eval.ps1
-
 # артефакты сборки Android
 android/build/
 
-# приостановленные дорожные карты
-ROADMAP.*.paused.md
+# кэши тестов
+.pytest_cache/
+.coverage
+*.log
