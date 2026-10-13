@@ -6413,20 +6413,44 @@
   $("player-lyrics-btn").addEventListener("click", () => { haptic("light"); setLyricsOpen(!lyricsOpen); });
   ["touchstart", "wheel"].forEach((type) => lyricsBox.addEventListener(type, () => { lyricsTouchedAt = Date.now(); }, { passive: true }));
 
-  // A swipe down folds the player away (to the small one at the bottom), the text with it. On the cover
-  // from anywhere but the controls; over the text only when it is at its very top, so that the same
-  // gesture further down just scrolls it. The player follows the finger and either leaves or settles back.
+  // A swipe down puts the player away like a card: it follows the finger, shrinks a little and rounds off,
+  // the page it came from shows underneath; let go far enough and it slides down and away, otherwise it
+  // settles back. On the cover from anywhere but the controls; over the text only when it is at its very
+  // top, so that the same gesture further down just scrolls the words.
   let playerPull = null;
+  let pullBehind = null;
   const pullScreen = $("screen-player"); // (the swipe code further down names it too, but declares it later)
-  const pullTarget = () => pullScreen;
+  const pullStyle = (dy, animate) => {
+    const k = Math.min(1, dy / 600);
+    pullScreen.style.transition = animate ? "transform 0.34s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.34s, opacity 0.34s" : "none";
+    pullScreen.style.transform = `translateY(${dy}px) scale(${(1 - k * 0.1).toFixed(3)})`;
+    pullScreen.style.borderRadius = `${Math.round(Math.min(1, dy / 90) * 30)}px`;
+    pullScreen.style.opacity = ""; // the card stays solid: what is under it must not show through
+  };
+  const pullReset = () => {
+    pullScreen.style.transition = "";
+    pullScreen.style.transform = "";
+    pullScreen.style.borderRadius = "";
+    pullScreen.style.opacity = "";
+    document.body.classList.remove("player-pulling");
+  };
+  function pullBegin() {
+    const below = navStack[navStack.length - 2];
+    const el = below && below.name !== "player" ? screens[below.name] : null;
+    pullBehind = el || screens.home || null;
+    if (pullBehind) pullBehind.hidden = false; // the page under the card
+    document.body.classList.add("player-pulling");
+  }
   pullScreen.addEventListener("touchstart", (e) => {
     playerPull = null;
     if (e.touches.length !== 1 || !currentTrack || currentScreen !== "player") return;
     if (document.body.classList.contains("quote-picking") || openOverlays.length) return;
     if (e.target.closest("#player-progress-track, .scrub, .scrub-times, button, input, a, .theme-try")) return;
+    // over the words it has to be their very top (the text follows the song, so it rarely is): the
+    // top bar and the title block below the words always fold the player
     if (e.target.closest("#player-lyrics") && lyricsBox.scrollTop > 0) return;
     if (artGrab) return; // a record or a cassette is being turned by the finger
-    playerPull = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0, locked: false, t: performance.now() };
+    playerPull = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0, locked: false, t: performance.now(), inText: !!e.target.closest("#player-lyrics") };
   }, { passive: true });
   pullScreen.addEventListener("touchmove", (e) => {
     if (!playerPull) return;
@@ -6435,28 +6459,44 @@
       if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { playerPull = null; return; } // sideways: the other swipe
       if (dy < -10) { playerPull = null; return; } // upwards: the text scrolls
       if (dy < 12) return;
-      if (lyricsOpen && lyricsBox.scrollTop > 0) { playerPull = null; return; }
+      if (lyricsOpen && playerPull.inText && lyricsBox.scrollTop > 0) { playerPull = null; return; }
       playerPull.locked = true;
       lyricsTouchedAt = Date.now();
+      pullBegin();
     }
     playerPull.dy = Math.max(0, dy);
-    const el = pullTarget();
-    el.style.transition = "none";
-    el.style.transform = `translateY(${playerPull.dy * 0.8}px)`;
-    el.style.opacity = String(Math.max(0.35, 1 - playerPull.dy / 520));
+    pullStyle(playerPull.dy * 0.9, false);
   }, { passive: true });
   const endPlayerPull = (e) => {
     if (!playerPull) return;
     const p = playerPull;
     playerPull = null;
     if (!p.locked) return;
-    const el = pullTarget();
     const speed = p.dy / Math.max(1, performance.now() - p.t);
     const go = e && e.type === "touchend" && (p.dy > 120 || (p.dy > 50 && speed > 0.55));
-    el.style.transition = "";
-    el.style.transform = "";
-    el.style.opacity = "";
-    if (go) { haptic("light"); goBack(); }
+    if (!go) {
+      // back into place; the page under it is put away again
+      pullStyle(0, true);
+      setTimeout(() => {
+        pullReset();
+        if (pullBehind && currentScreen === "player") pullBehind.hidden = true;
+        pullBehind = null;
+      }, 360);
+      return;
+    }
+    haptic("light");
+    // slides down and away, then the app really goes back (its own entrance animation is skipped: the page is
+    // already there, a second one would flicker)
+    pullStyle(window.innerHeight * 1.02, true);
+    setTimeout(() => {
+      document.body.classList.add("no-screen-anim");
+      goBack();
+      pullBehind = null;
+      requestAnimationFrame(() => {
+        pullReset();
+        requestAnimationFrame(() => document.body.classList.remove("no-screen-anim"));
+      });
+    }, 300);
   };
   pullScreen.addEventListener("touchend", endPlayerPull);
   pullScreen.addEventListener("touchcancel", endPlayerPull);
