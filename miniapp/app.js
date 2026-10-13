@@ -1163,6 +1163,8 @@
   // ============================================================
   // Screens, navigation, dock
   // ============================================================
+  let cancelPlayerPull = () => {};
+  let cancelSwipe = () => {};
   const screens = {
     splash: $("screen-splash"),
     onboarding: $("screen-onboarding"),
@@ -1300,6 +1302,8 @@
 
   function showScreen(name, opts) {
     opts = opts || {};
+    cancelPlayerPull();
+    cancelSwipe();
     const prev = currentScreen;
     currentScreen = name;
     // leaving the player puts the words away (the layout of the words hides the side panel: it must not outlive the player)
@@ -1349,8 +1353,9 @@
         activeEl.classList.remove("screen-anim");
         void activeEl.offsetWidth;
         activeEl.classList.add("screen-anim");
-        if (prev !== name) activeEl.scrollTop = 0;
+        if (prev !== name || name === "player") activeEl.scrollTop = 0;
       }
+      if (name === "player") activeEl.scrollTop = 0;
     }
     updateDock();
     syncBackButton();
@@ -6417,6 +6422,8 @@
 
   async function playTrack(track, queue, opts) {
     opts = opts || {};
+    cancelPlayerPull();
+    if (screens.player) screens.player.scrollTop = 0;
     // leaving a mix for something else: keep its place
     if (currentMixKey && !opts.keepQueue && opts.mixKey !== currentMixKey) saveMixResume();
     const token = ++playToken;
@@ -6843,6 +6850,7 @@
   let playerPull = null;
   let pullBehind = null;
   let pullBehindName = null;
+  let pullTimeout = null;
   const pullScreen = $("screen-player"); // (the swipe code further down names it too, but declares it later)
   const pullDock = () => [bottomNav, miniPlayer];
   const pullStyle = (dy, animate, fade) => {
@@ -6858,18 +6866,46 @@
     pullDock().forEach((el) => { el.style.transition = animate ? "opacity 0.3s ease-out" : "none"; el.style.opacity = fade ? "1" : appear; });
   };
   const pullReset = () => {
+    if (pullTimeout) {
+      clearTimeout(pullTimeout);
+      pullTimeout = null;
+    }
     pullScreen.style.transition = "";
     pullScreen.style.transform = "";
     pullScreen.style.opacity = "";
     pullScreen.style.willChange = "";
-    if (pullBehind) { pullBehind.style.transition = ""; pullBehind.style.opacity = ""; pullBehind.style.willChange = ""; }
+    if (pullBehind) {
+      pullBehind.style.transition = "";
+      pullBehind.style.opacity = "";
+      pullBehind.style.willChange = "";
+      pullBehind.classList.remove("no-enter");
+      if (currentScreen === "player") {
+        pullBehind.hidden = true;
+      }
+      pullBehind = null;
+    }
+    pullBehindName = null;
     // (the small player's own entrance animation stays switched off here: putting it back now would
     // start it again, and the player would blink after it was put away; updateDock() puts it back
     // when the element is hidden, so the next real appearance has its entrance)
     pullDock().forEach((el) => { el.style.transition = ""; el.style.opacity = ""; el.style.animation = ""; });
     document.body.classList.remove("player-pulling");
+    if (currentScreen === "player") {
+      document.body.dataset.screen = "player";
+    }
+  };
+  cancelPlayerPull = () => {
+    if (playerPull) {
+      if (playerPull.raf) cancelAnimationFrame(playerPull.raf);
+      playerPull = null;
+    }
+    pullReset();
+    if (currentScreen === "player") {
+      updateDock();
+    }
   };
   function pullBegin() {
+    if (typeof cancelSwipe === "function") cancelSwipe();
     const below = navStack[navStack.length - 2];
     pullBehindName = below && below.name !== "player" && screens[below.name] ? below.name : "home";
     pullBehind = screens[pullBehindName] || null;
@@ -6895,11 +6931,15 @@
     document.body.classList.add("player-pulling");
   }
   pullScreen.addEventListener("touchstart", (e) => {
+    if (document.body.classList.contains("player-pulling")) {
+      cancelPlayerPull();
+    }
+    if (swipe && swipe.locked) return;
     playerPull = null;
     if (e.touches.length !== 1 || !currentTrack || currentScreen !== "player") return;
     if (document.body.classList.contains("quote-picking") || openOverlays.length) return;
     if (isDesktop()) return;
-    if (e.target.closest("#player-progress-track, .scrub, .scrub-times, button, input, a, .theme-try")) return;
+    if (e.target.closest("#player-progress-track, .scrub, .scrub-times, button, input, a, .theme-try, #player-info")) return;
     if (e.target.closest("#player-lyrics") && lyricsBox.scrollTop > 0) return;
     if (artGrab) return; // a record or a cassette is being turned by the finger
     if (pullScreen.scrollTop > 2) return; // the track's information is being scrolled
@@ -6907,6 +6947,13 @@
     playerPull = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0, locked: false, t: performance.now(), inText: !!e.target.closest("#player-lyrics"), raf: 0 };
   }, { passive: true });
   pullScreen.addEventListener("touchmove", (e) => {
+    if (swipe && swipe.locked) {
+      if (playerPull) {
+        if (playerPull.raf) cancelAnimationFrame(playerPull.raf);
+        playerPull = null;
+      }
+      return;
+    }
     if (!playerPull) return;
     const dx = e.touches[0].clientX - playerPull.x, dy = e.touches[0].clientY - playerPull.y;
     if (!playerPull.locked) {
@@ -6928,7 +6975,7 @@
     if (!playerPull) return;
     const p = playerPull;
     playerPull = null;
-    cancelAnimationFrame(p.raf);
+    if (p.raf) cancelAnimationFrame(p.raf);
     if (!p.locked) { pullScreen.style.willChange = ""; return; }
     const speed = p.dy / Math.max(1, performance.now() - p.t);
     const go = e && e.type === "touchend" && (p.dy > 120 || (p.dy > 50 && speed > 0.55));
@@ -6938,20 +6985,24 @@
       if (pullBehind) pullBehind.style.opacity = "0";
       pullDock().forEach((el) => { el.style.opacity = "0"; });
       document.body.dataset.screen = "player";
-      setTimeout(() => {
-        if (currentScreen === "player" && pullBehind) pullBehind.hidden = true;
+      if (pullTimeout) clearTimeout(pullTimeout);
+      pullTimeout = setTimeout(() => {
+        pullTimeout = null;
         pullReset();
-        pullBehind = null;
         updateDock(); // the tab bar and the small player as the player page has them (none)
       }, 360);
       return;
     }
     haptic("light");
     pullStyle(window.innerHeight * 0.6, true, true);
-    setTimeout(() => {
+    if (pullTimeout) clearTimeout(pullTimeout);
+    pullTimeout = setTimeout(() => {
+      pullTimeout = null;
       // the app really goes back; the page is already there and stays as it was
       goBack({ keep: true });
-      requestAnimationFrame(() => { pullReset(); pullBehind = null; });
+      requestAnimationFrame(() => {
+        pullReset();
+      });
     }, 340);
   };
   pullScreen.addEventListener("touchend", endPlayerPull);
@@ -7859,25 +7910,49 @@
   const playerScreen = $("screen-player");
   let swipe = null;
   const swipeTargets = () => [document.querySelector(".player-art-wrap"), document.querySelector(".player-meta")];
+  cancelSwipe = () => {
+    if (swipe) {
+      try { playerScreen.releasePointerCapture(swipe.id); } catch (err) {}
+      swipe = null;
+    }
+    swipeTargets().forEach((el) => {
+      if (!el) return;
+      el.classList.remove("swipe-in-left", "swipe-in-right");
+      el.style.transition = "";
+      el.style.transform = "";
+      el.style.opacity = "";
+    });
+  };
   playerScreen.addEventListener("pointerdown", (e) => {
-    if (!currentTrack || e.pointerType === "mouse" && e.button !== 0) return;
+    if (!currentTrack || (e.pointerType === "mouse" && e.button !== 0)) return;
     if (document.body.classList.contains("quote-picking") || openOverlays.length) return;
-    if (e.target.closest("button, input, a, textarea, #player-progress-track, .scrub-times, .theme-try")) return;
+    if (e.target.closest("button, input, a, textarea, #player-progress-track, .scrub-times, .theme-try, #player-info")) return;
+    if (pullScreen.scrollTop > 5) return;
+    if (playerPull && playerPull.locked) return;
+    if (document.body.classList.contains("player-pulling")) {
+      cancelPlayerPull();
+    }
     // у винила, диска и кассеты палец на самой обложке крутит и перематывает, свайп тут не нужен
     if (artTheme() !== "standard" && !document.body.classList.contains("lyrics-open")) {
       const el = artTheme() === "cassette" ? playerCassette : $("player-art");
       const r = el.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return;
     }
+    swipeTargets().forEach((el) => { if (el) el.classList.remove("swipe-in-left", "swipe-in-right"); });
     swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, locked: false, t: performance.now() };
   });
   playerScreen.addEventListener("pointermove", (e) => {
     if (!swipe || e.pointerId !== swipe.id) return;
+    if (playerPull && playerPull.locked) {
+      cancelSwipe();
+      return;
+    }
     const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
     if (!swipe.locked) {
       if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; } // это вертикальный жест: текст, закрытие
       if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
       swipe.locked = true;
+      cancelPlayerPull(); // взаимное исключение: при начале горизонтального свайпа отменяем любой pull
       try { playerScreen.setPointerCapture(e.pointerId); } catch (err) { /* works without capture */ }
     }
     swipe.dx = dx;
