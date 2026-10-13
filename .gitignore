@@ -2,20 +2,42 @@
 .env
 env_setup.txt
 
-# то, что ставится и скачивается само
+# виртуальное окружение и зависимости
 venv/
-/cache/
+cache/
 __pycache__/
 *.pyc
 
-# скриншоты проверок дизайна (десятки мегабайт)
-.impeccable/review/
-.impeccable/hook.cache.json
+# ИИ файлы, агентские протоколы и дорожные карты
+AGENTS.md
+**/AGENTS.md
+ROADMAP*.md
+**/ROADMAP*.md
+.impeccable/
+
+# скриншоты, референсы и старые черновики
+/*.png
+рефернсы/
+что хочу.txt
+eval_webview.py
+cdp_eval.ps1
 
 # данные пользователей (у кого Плюс, промокоды)
 data/
 
-# тяжёлые материалы дизайна и 3D, чужие референсы — хранятся только на компьютере
+# вспомогательные скрипты с доступами
+deploy/ssh_client.py
+
+# артефакты сборки Android
+android/build/
+
+# кэши тестов
+.pytest_cache/
+.coverage
+*.log
+/cache/
+.impeccable/review/
+.impeccable/hook.cache.json
 /3D иконки/
 /3д референсы/
 /рефернсы/

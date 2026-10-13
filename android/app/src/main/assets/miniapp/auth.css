@@ -1,0 +1,210 @@
+/* ============ AUTH SCREEN (Telegram Login) ============ */
+.screen-auth {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: calc(var(--tg-safe-area-inset-top, 24px) + 24px) 24px calc(var(--tg-safe-area-inset-bottom, 24px) + 24px);
+  background: radial-gradient(circle at 50% 20%, rgba(139, 92, 246, 0.22) 0%, transparent 65%), #0C0A12;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.auth-mark-wrap {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(195, 143, 255, 0.25), rgba(139, 92, 246, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 32px rgba(139, 92, 246, 0.25);
+}
+
+.auth-title {
+  font-family: "Unbounded", system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.auth-sub {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #8E88A0;
+  margin: 0 0 28px 0;
+  padding: 0 6px;
+}
+
+.auth-step {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field-wrap {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 4px 18px;
+  transition: all 0.2s ease;
+}
+
+.auth-field-wrap:focus-within {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: #8B5CF6;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+.auth-at {
+  font-size: 18px;
+  font-weight: 600;
+  color: #C38FFF;
+  margin-right: 6px;
+  user-select: none;
+}
+
+.auth-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 17px;
+  color: #FFFFFF;
+  padding: 12px 0;
+}
+
+.auth-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.auth-code-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  font-family: monospace, system-ui;
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 8px;
+  color: #FFFFFF;
+  padding: 14px 0;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.auth-code-input:focus {
+  border-color: #C38FFF;
+  box-shadow: 0 0 24px rgba(195, 143, 255, 0.35);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.auth-code-hint {
+  font-size: 13px;
+  color: #B5AFC8;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.auth-code-hint b {
+  color: #FFFFFF;
+}
+
+.auth-primary-btn {
+  background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 50%, #D946EF 100%);
+  border: none;
+  border-radius: 26px;
+  height: 52px;
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.35);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.auth-primary-btn:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+.auth-secondary-btn {
+  background: transparent;
+  border: none;
+  color: #8E88A0;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.auth-secondary-btn:active {
+  color: #FFFFFF;
+}
+
+.auth-error {
+  font-size: 13px;
+  color: #FF6B6B;
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.25);
+  border-radius: 14px;
+  padding: 10px 14px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.auth-success {
+  font-size: 13px;
+  color: #4ADE80;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: 14px;
+  padding: 10px 14px;
+  line-height: 1.4;
+}
+
+.auth-text-btn {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 18px;
+  color: #C38FFF;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.auth-text-btn:active {
+  background: rgba(139, 92, 246, 0.2);
+  transform: scale(0.98);
+}
