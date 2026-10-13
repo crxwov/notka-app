@@ -554,6 +554,7 @@ html.app-idle *, html.app-idle *::before, html.app-idle *::after { animation-pla
 
 /* «Минимализм»: ровный тёмный фон, как в Spotify. Свет, атмосферы и лучи плеера убраны; стекло (мини-плеер, кнопки) остаётся прежним */
 html.minimal { --bg: #121212; }
+html.minimal, html.minimal body { background: #121212; }
 html.minimal .light { background: #121212; }
 html.minimal .light-art, html.minimal .light-group, html.minimal .light-spill, html.minimal .light-grain,
 html.minimal #atmo-back, html.minimal #atmo-front, html.minimal #player-prism { display: none !important; }

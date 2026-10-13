@@ -93,7 +93,8 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  /* the lowest layer wears the light's own colour, darkened: blue light, deep blue ground (not a fixed plum) */
+  background: color-mix(in srgb, var(--c-deep) 30%, #0A0709);
 }
 
 body {
@@ -145,7 +146,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--c-deep) 30%, #0A0709);
   transition: --c-core 1.4s var(--ease-in-out), --c-warm 1.4s var(--ease-in-out),
     --c-mid 1.4s var(--ease-in-out), --c-deep 1.4s var(--ease-in-out);
 }
@@ -246,7 +247,9 @@ body[data-bg="horizon"][data-screen] .light-group { --y: 92vh; --s: 1; }
 /* ЛАВА: a field of five big soft blobs fills the whole screen, one colour each, and they wander (the manner of Apple Music) */
 body[data-bg="lava"][data-screen] .light-group { --y: 50vh; --s: 1; }
 :is(.light, .pattern-thumb)[data-bg="lava"] .light-group { width: var(--lw, 150vw); height: var(--lh, 120vh); }
-body[data-bg="lava"] .light { background: color-mix(in srgb, var(--c-deep) 24%, var(--bg)); }
+body[data-bg="lava"] .light { background: color-mix(in srgb, var(--c-deep) 30%, #0A0709); }
+/* a season's own ground stays its own */
+html:not(.minimal) body[data-atmo]:not([data-atmo="none"]) .light { background: var(--bg); }
 :is(.light, .pattern-thumb)[data-bg="lava"] .orb { opacity: 1; }
 :is(.light, .pattern-thumb)[data-bg="lava"] .orb-violet { inset: 38% 28% -22% -22%; animation-name: lava-a; }
 :is(.light, .pattern-thumb)[data-bg="lava"] .orb-magenta { inset: 18% -26% 18% 40%; animation-name: lava-b; }

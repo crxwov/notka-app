@@ -996,6 +996,36 @@
     s.setProperty("--c-deep", p.deep);
     prismPalette = p;
     if (prism) prism.setGradient([p.deep, p.mid, p.warm, p.core]);
+    paintGround(p.deep);
+  }
+  // the lowest layer: the light's deep colour darkened (the same mix as the style sheet's), also for
+  // the strips Telegram draws around the app and the browser's bar
+  let groundPainted = "";
+  let groundProbe = null;
+  function paintGround(deep) {
+    let color;
+    const root = document.documentElement;
+    if (root.classList.contains("minimal")) color = "#121212";
+    else if (document.body.dataset.atmo && document.body.dataset.atmo !== "none") color = getComputedStyle(document.body).getPropertyValue("--bg").trim() || BG_COLOR;
+    else {
+      // any CSS colour (the cover's palette is "hsl(...)"): the browser turns it into rgb()
+      if (!groundProbe) { groundProbe = document.createElement("i"); groundProbe.style.display = "none"; document.body.appendChild(groundProbe); }
+      groundProbe.style.color = "";
+      groundProbe.style.color = String(deep);
+      const m = getComputedStyle(groundProbe).color.match(/[\d.]+/g);
+      if (!m || m.length < 3) return;
+      const base = [10, 7, 9];
+      color = "#" + [0, 1, 2].map((k) => Math.round(+m[k] * 0.3 + base[k] * 0.7).toString(16).padStart(2, "0")).join("");
+    }
+    if (color === groundPainted) return;
+    groundPainted = color;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", color);
+    if (!tg) return;
+    try {
+      if (tgAtLeast("6.1")) { tg.setHeaderColor(color); tg.setBackgroundColor(color); }
+      if (tgAtLeast("7.10") && tg.setBottomBarColor) tg.setBottomBarColor(color);
+    } catch (e) { /* the colours of Telegram's own strips are a nicety */ }
   }
 
   // ---- rays in the player (PrismaticBurst port) ----
