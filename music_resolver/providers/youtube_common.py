@@ -183,6 +183,23 @@ def needs_signin(exc: Exception) -> bool:
 
 _cookie_stats = {"used": 0, "failed": 0, "last_failed_at": 0.0}
 
+# Refusals that come from the address a request left from (not from the video): another route may pass.
+_ROUTE_MARKERS = _SIGNIN_MARKERS + ("403", "forbidden", "page needs to be reloaded", "http error 429", "too many requests")
+
+
+def _worth_other_route(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(marker in text for marker in _ROUTE_MARKERS) and "age-restricted" not in text and "video unavailable" not in text
+
+
+def _note_route_rescue() -> None:
+    try:
+        from music_resolver.services import metrics
+
+        metrics.count("yt_direct_rescue")
+    except Exception:
+        pass
+
 
 def _note_cookie_use(ok: bool, exc: Exception | None = None) -> None:
     """Counted, so the owner's watchdog can say «the cookies have gone stale» (see run_server)."""
@@ -250,7 +267,7 @@ class YtDlpResolver:
         info = await asyncio.to_thread(self._extract, target)
         return self._to_resolved(info)
 
-    def _base_opts(self, use_cookies: bool = True, force_file: bool = False) -> dict:
+    def _base_opts(self, use_cookies: bool = True, force_file: bool = False, no_proxy: bool = False) -> dict:
         if use_cookies and time.time() < _cookie_pause_until:
             use_cookies = False
         opts = {
@@ -278,7 +295,7 @@ class YtDlpResolver:
             file_cookies
             or (use_cookies and self.settings.ytdlp_cookies_from_browser and not self.settings.ytdlp_cookie_file)
         )
-        if self.settings.ytdlp_proxy and not using_browser_cookies:
+        if self.settings.ytdlp_proxy and not using_browser_cookies and not no_proxy:
             # Cookies are tied to the IP they were issued to (this
             # machine's real address). Sending them through YTDLP_PROXY
             # (a datacenter proxy with a different egress IP) is exactly
@@ -365,8 +382,8 @@ class YtDlpResolver:
             raise AppError(ErrorCode.INVALID_SOURCE_URL, "Unsupported or invalid YouTube URL")
         return await asyncio.to_thread(self._download_sync, target, dest_dir, dest_stem)
 
-    def _download_opts(self, use_cookies: bool, outtmpl: str, force_file: bool = False) -> dict:
-        opts = self._base_opts(use_cookies=use_cookies, force_file=force_file)
+    def _download_opts(self, use_cookies: bool, outtmpl: str, force_file: bool = False, no_proxy: bool = False) -> dict:
+        opts = self._base_opts(use_cookies=use_cookies, force_file=force_file, no_proxy=no_proxy)
         opts["skip_download"] = False
         opts["outtmpl"] = outtmpl
         opts["retries"] = 3
@@ -394,6 +411,27 @@ class YtDlpResolver:
                     info, filepath = self._run_download(self._download_opts(use_cookies=False, outtmpl=outtmpl), target, dest_dir, tmp_stem)
                 except Exception as exc2:
                     raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc2
+            elif self.settings.ytdlp_proxy and _worth_other_route(exc):
+                # The proxy's address is shared with many others and YouTube turns it away in waves
+                # («not a bot», 403): the same track is asked once more straight from this server.
+                # What the server's own address does is not worse than a refusal, so it is tried first.
+                try:
+                    info, filepath = self._run_download(
+                        self._download_opts(use_cookies=False, outtmpl=outtmpl, no_proxy=True), target, dest_dir, tmp_stem
+                    )
+                    _note_route_rescue()
+                except Exception as exc_direct:
+                    if needs_signin(exc_direct) and cookie_file_path():
+                        try:
+                            info, filepath = self._run_download(
+                                self._download_opts(use_cookies=True, outtmpl=outtmpl, force_file=True), target, dest_dir, tmp_stem
+                            )
+                            _note_cookie_use(True)
+                        except Exception as exc_cookies:
+                            _note_cookie_use(False, exc_cookies)
+                            raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc_cookies
+                    else:
+                        raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc_direct
             elif needs_signin(exc) and cookie_file_path():
                 # YouTube wants a signed-in visitor: the account cookies are used for this one track
                 try:
