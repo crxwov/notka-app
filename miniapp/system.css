@@ -608,12 +608,8 @@ body.is-desktop #screen-plus .plus-hero::before {
 .plus-bar::before { left: -20px; right: -20px; top: -56px; height: 56px; background: linear-gradient(180deg, transparent, rgba(12, 10, 18, 0.8) 85%); }
 
 /* «Текст» на телефоне: слова занимают почти весь экран. Пока он открыт, нижний блок сжимается
-   (название в одну строку, кнопки меньше), а список уходит чуть под него и тает у кнопок. */
-.player-meta, .player-controls, .ctrl, .ctrl-play, .player-foot .foot-btn, .player-title, .player-artist {
-  transition-property: margin, width, height, font-size, opacity, transform;
-  transition-duration: 0.4s;
-  transition-timing-function: var(--ease-out);
-}
+   (название в одну строку, кнопки меньше), а список уходит чуть под него и тает у кнопок.
+   Размеры меняются сразу, без анимации: плавное изменение размеров пересчитывает раскладку каждый кадр. */
 body:not(.is-desktop).lyrics-open .player-bar { margin-bottom: 0; }
 body:not(.is-desktop).lyrics-open .player-art-wrap { padding-top: 6px; padding-bottom: 0; }
 body:not(.is-desktop).lyrics-open .player-meta { margin-bottom: 2px; }
