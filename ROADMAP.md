@@ -47,6 +47,24 @@ Audio streaming throughput and track latency overhauled:
     - Protected `#player-info` and scrolled positions from initiating accidental track-skip swipes (`pullScreen.scrollTop > 5`).
     - Enforced `.player-main` `height: 100%; min-height: 100%; box-sizing: border-box;` in `system.css`.
     - Deployed v198 (`app.js`), v146 (`styles.css`), v112 (`system.css`).
+- Fixed track switch interface flicker and layout twitching ("перекосоебывает интерфейс и он моргает"):
+  - Root causes identified and resolved:
+    1. Entrance animation replay: `cancelPlayerPull()` was called unconditionally on every `playTrack()`, invoking `pullReset()`, which set `el.style.animation = ""`. This caused `#mini-player` to immediately re-trigger `@keyframes screen-in 0.4s` (jumping to `opacity: 0, translateY(10px)`), making the mini-player blink and drop on the Home screen on every Next Track click.
+    2. Background ambient lighting blackout: `showArtUnderLight()` immediately removed `.is-shown` and waited 450ms, causing the entire ambient light haze behind the app to collapse into pitch black and slowly fade back in on every track change.
+    3. Shelf entrance replay: `rememberRecent()` called `renderRecent()` on Home screen, wiping `shelf.innerHTML` and recreating cards, which re-triggered `@keyframes card-in 0.75s` on all recent cards with staggered delays.
+    4. Synchronous layout thrashing: `paintGround()` called `getComputedStyle` and made rapid duplicate IPC calls to `tg.setHeaderColor` / `tg.setBottomBarColor`, while `void el.offsetWidth` was called during swipe transitions.
+    5. Cover blank flash: `setCoverEl` wiped `el.innerHTML = ""` before the new cover image loaded.
+    6. Heavy background DOM rebuild: `renderQueueSheet()` rebuilt 50-100 rows in the DOM inside `playTrack` even when the queue sheet was closed.
+  - Solutions:
+    - `cancelPlayerPull()` only runs reset if a pull was actually active.
+    - `pullReset()` maintains `animation: none` on visible dock elements.
+    - `showArtUnderLight()` preloads tiny blurred canvas without removing `.is-shown`, crossfading smoothly.
+    - `renderRecent()` skips entrance animations (`animation: none`) on updates when the shelf is already mounted.
+    - `renderQueueSheet(force)` skips re-rendering when the queue sheet is not open.
+    - `paintGround()` debounced by 120ms with pure-math HSL/hex parser, avoiding duplicate Telegram native frame paints.
+    - `setCoverEl()` preloads new images off-screen and smoothly swaps `img.src`.
+    - Softened swipe keyframes and replaced forced reflows with `requestAnimationFrame`.
+  - Deployed v199 (`app.js`), v147 (`styles.css`), v113 (`system.css`).
 
 ## Findings and Decisions
 - Audio cache hit response time reduced from ~19s to 12–15 ms.
