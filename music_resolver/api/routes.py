@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import os
 import re
 import secrets
@@ -10,6 +11,8 @@ import time
 import uuid
 from pathlib import Path
 from urllib.parse import quote
+
+logger = logging.getLogger("notka.api")
 
 import httpx
 from fastapi import APIRouter, Header, Query, Request
