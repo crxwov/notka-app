@@ -166,6 +166,7 @@ async def find_credits(title: str, artist: str, duration: int | None) -> dict:
 
     groups: dict = {}
     sources: list[str] = []
+    partial = False  # a source did not answer in time: the result is not kept for long
     async with httpx.AsyncClient(timeout=10, headers={"User-Agent": _UA}) as client:
         try:
             deezer = await _deezer(client, title, artist, duration)
@@ -194,9 +195,10 @@ async def find_credits(title: str, artist: str, duration: int | None) -> dict:
                         groups[key] = value
         if isrc:
             try:
-                mb = await asyncio.wait_for(_musicbrainz(client, isrc), timeout=12)
+                mb = await asyncio.wait_for(_musicbrainz(client, isrc), timeout=24)
             except Exception:  # noqa: BLE001
                 mb = {}
+                partial = True
             if mb:
                 sources.append("MusicBrainz")
                 for key, value in mb.items():
@@ -205,6 +207,8 @@ async def find_credits(title: str, artist: str, duration: int | None) -> dict:
     has_people = any(groups.get(k) for k in ("writers", "producers", "engineers", "other"))
     # the performers alone (one artist) are not worth a block: they are the artist the listener sees
     result = {"found": bool(has_people or len(groups.get("performers", [])) > 1 or groups.get("label")), "sources": sources, **groups}
+    if partial:
+        return result  # asked again next time
     try:
         path.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
     except OSError:
