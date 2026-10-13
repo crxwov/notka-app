@@ -45,7 +45,7 @@ def _norm(text: str) -> str:
 
 
 def _path(title: str, artist: str, duration: int) -> Path:
-    key = f"c1|{_norm(title)}|{_norm(artist)}|{round((duration or 0) / 3)}"
+    key = f"c2|{_norm(title)}|{_norm(artist)}|{round((duration or 0) / 3)}"
     return _CACHE_DIR / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".json")
 
 
@@ -119,6 +119,22 @@ async def _musicbrainz(client: httpx.AsyncClient, isrc: str) -> dict:
     return out
 
 
+def _genius_group(label: str) -> str | None:
+    """Where a Genius role goes. Video crew, copyright lines, labels and the like are left out."""
+    text = label.lower()
+    if text.startswith("video") or "copyright" in text or any(w in text for w in ("label", "publisher", "distributor", "mixed at", "mastered at", "recorded at", "studio", "company")):
+        return None
+    if any(w in text for w in ("writer", "lyricist", "composer", "songwriter", "arranger", "author")):
+        return "writers"
+    if "producer" in text or "programmer" in text:
+        return "producers"
+    if any(w in text for w in ("mixing", "mastering", "recording", "engineer")):
+        return "engineers"
+    if any(w in text for w in ("vocal", "guitar", "bass", "drum", "piano", "keyboard", "synth", "violin", "percussion", "strings", "saxophone", "trumpet", "cello", "mellotron", "choir", "rap")):
+        return "performers"
+    return None
+
+
 async def _genius(client: httpx.AsyncClient, token: str, title: str, artist: str) -> dict:
     headers = {"Authorization": f"Bearer {token}"}
     res = await client.get("https://api.genius.com/search", params={"q": f"{artist} {title}"}, headers=headers)
@@ -142,8 +158,9 @@ async def _genius(client: httpx.AsyncClient, token: str, title: str, artist: str
         _add(out, "producers", [a.get("name") for a in s.get("producer_artists", [])])
         _add(out, "performers", [a.get("name") for a in s.get("featured_artists", [])])
         for perf in s.get("custom_performances", []):
-            group = _ROLE_GROUPS.get(str(perf.get("label", "")).lower().split()[0] if perf.get("label") else "")
-            _add(out, group or "other", [a.get("name") for a in perf.get("artists", [])])
+            group = _genius_group(str(perf.get("label") or ""))
+            if group:
+                _add(out, group, [a.get("name") for a in perf.get("artists", [])])
         if s.get("release_date"):
             out["released"] = s["release_date"]
         return out
@@ -204,7 +221,11 @@ async def find_credits(title: str, artist: str, duration: int | None) -> dict:
                 for key, value in mb.items():
                     _add(groups, key, value)
 
-    has_people = any(groups.get(k) for k in ("writers", "producers", "engineers", "other"))
+    for key in ("performers", "writers", "producers", "engineers"):
+        if isinstance(groups.get(key), list):
+            groups[key] = groups[key][:12]
+    groups.pop("other", None)
+    has_people = any(groups.get(k) for k in ("writers", "producers", "engineers"))
     # the performers alone (one artist) are not worth a block: they are the artist the listener sees
     result = {"found": bool(has_people or len(groups.get("performers", [])) > 1 or groups.get("label")), "sources": sources, **groups}
     if partial:
