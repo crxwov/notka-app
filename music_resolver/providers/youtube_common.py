@@ -189,6 +189,8 @@ _cookie_stats = {"used": 0, "failed": 0, "last_failed_at": 0.0}
 _ROUTE_MARKERS = _SIGNIN_MARKERS + (
     "403", "forbidden", "page needs to be reloaded", "http error 429", "too many requests",
     "video unavailable", "not available", "not made this video available", "blocked it",
+    # the route itself is down (the proxy is not answering, the connection drops)
+    "proxy", "timed out", "timeout", "connection", "unable to download api page", "unable to download webpage",
 )
 # a video that is gone for everybody is not asked twice
 _GONE_MARKERS = ("private video", "has been removed", "account associated with this video has been terminated", "copyright claim")
@@ -197,6 +199,25 @@ _GONE_MARKERS = ("private video", "has been removed", "account associated with t
 def _worth_other_route(exc: Exception) -> bool:
     text = str(exc).lower()
     return any(marker in text for marker in _ROUTE_MARKERS) and not any(marker in text for marker in _GONE_MARKERS)
+
+
+# The server's own address answers faster than the shared proxy and is refused less often, so it goes
+# first; after a refusal (bot check, 403) the proxy goes first for a few minutes, then direct again.
+_direct_bad_until = 0.0
+_DIRECT_PAUSE_SECONDS = 300
+
+
+def _direct_first() -> bool:
+    return time.time() >= _direct_bad_until
+
+
+def _mark_direct(ok: bool) -> None:
+    global _direct_bad_until
+    _direct_bad_until = 0.0 if ok else time.time() + _DIRECT_PAUSE_SECONDS
+
+
+def _is_format_error(exc: Exception) -> bool:
+    return "requested format is not available" in str(exc).lower()
 
 
 def _note_route_rescue() -> None:
@@ -274,7 +295,7 @@ class YtDlpResolver:
         info = await asyncio.to_thread(self._extract, target)
         return self._to_resolved(info)
 
-    def _base_opts(self, use_cookies: bool = True, force_file: bool = False, no_proxy: bool = False) -> dict:
+    def _base_opts(self, use_cookies: bool = True, force_file: bool = False, no_proxy: bool = False, fast: bool = False) -> dict:
         if use_cookies and time.time() < _cookie_pause_until:
             use_cookies = False
         opts = {
@@ -317,6 +338,10 @@ class YtDlpResolver:
             opts["proxy"] = self.settings.ytdlp_proxy
         if self.settings.ytdlp_force_ipv6:
             opts["force_ipv6"] = True
+        if fast:
+            # the plain audio file (itag 140) is all that is wanted: the HLS/DASH manifests are one
+            # more round trip to YouTube each, about a third of a second for nothing
+            opts["extractor_args"] = {"youtube": {"skip": ["hls", "dash", "translated_subs"]}}
         return opts
 
     def _uses_browser_cookies(self) -> bool:
@@ -389,8 +414,8 @@ class YtDlpResolver:
             raise AppError(ErrorCode.INVALID_SOURCE_URL, "Unsupported or invalid YouTube URL")
         return await asyncio.to_thread(self._download_sync, target, dest_dir, dest_stem)
 
-    def _download_opts(self, use_cookies: bool, outtmpl: str, force_file: bool = False, no_proxy: bool = False) -> dict:
-        opts = self._base_opts(use_cookies=use_cookies, force_file=force_file, no_proxy=no_proxy)
+    def _download_opts(self, use_cookies: bool, outtmpl: str, force_file: bool = False, no_proxy: bool = False, fast: bool = False) -> dict:
+        opts = self._base_opts(use_cookies=use_cookies, force_file=force_file, no_proxy=no_proxy, fast=fast)
         opts["skip_download"] = False
         opts["outtmpl"] = outtmpl
         opts["retries"] = 3
@@ -401,12 +426,65 @@ class YtDlpResolver:
         opts["postprocessors"] = []  # audio-only selector, nothing to merge/remux
         return opts
 
+    def _download_routed(self, target: str, dest_dir: Path, tmp_stem: str, outtmpl: str) -> tuple[dict, str]:
+        """The server with a proxy configured: the fastest route first, the other one when it is refused.
+
+        Order: own address with the short lookup, the same without the shortcut (a format the shortcut
+        hides), then the proxy the same way. A video that is gone for everybody is asked only once.
+        """
+        direct_first = _direct_first()
+        routes = [direct_first, not direct_first]  # no_proxy flag of each route
+        last: Exception | None = None
+        for index, no_proxy in enumerate(routes):
+            for fast in (True, False):
+                try:
+                    opts = self._download_opts(use_cookies=False, outtmpl=outtmpl, no_proxy=no_proxy, fast=fast)
+                    # a route that does not answer is given up quickly: there is another one to try
+                    # (the first route does not retry at all: the other route is the retry)
+                    opts["retries"] = 0 if index == 0 else 1
+                    opts["extractor_retries"] = 0 if index == 0 else 1
+                    opts["socket_timeout"] = min(float(opts.get("socket_timeout") or 10), 10.0)
+                    result = self._run_download(opts, target, dest_dir, tmp_stem)
+                    if no_proxy:
+                        _mark_direct(True)
+                    if index > 0:
+                        _note_route_rescue()
+                    return result
+                except Exception as exc:  # noqa: BLE001 - yt-dlp raises many kinds
+                    last = exc
+                    if fast and _is_format_error(exc):
+                        continue  # the same route without the shortcut
+                    if no_proxy and _worth_other_route(exc):
+                        _mark_direct(False)
+                    break
+            if last is not None and not _worth_other_route(last):
+                break  # gone for everybody, or not a matter of the route
+        assert last is not None
+        raise last
+
     def _download_sync(self, target: str, dest_dir: Path, dest_stem: str) -> tuple[Path, str]:
         # Download to a unique temp name first so a concurrent request for a
         # *different* track never collides with this one, then the caller
         # atomically renames it into place.
         tmp_stem = f"{dest_stem}.part-{uuid.uuid4().hex}"
         outtmpl = str(dest_dir / (tmp_stem + ".%(ext)s"))
+        if self.settings.ytdlp_proxy and not self._uses_browser_cookies():
+            try:
+                info, filepath = self._download_routed(target, dest_dir, tmp_stem, outtmpl)
+            except Exception as exc:
+                if needs_signin(exc) and cookie_file_path():
+                    # YouTube wants a signed-in visitor: the account cookies are used for this one track
+                    try:
+                        info, filepath = self._run_download(
+                            self._download_opts(use_cookies=True, outtmpl=outtmpl, force_file=True), target, dest_dir, tmp_stem
+                        )
+                        _note_cookie_use(True)
+                    except Exception as exc_cookies:
+                        _note_cookie_use(False, exc_cookies)
+                        raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc_cookies
+                else:
+                    raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc
+            return self._finish_download(info, filepath)
         opts = self._download_opts(use_cookies=True, outtmpl=outtmpl)
         try:
             info, filepath = self._run_download(opts, target, dest_dir, tmp_stem)
@@ -451,6 +529,9 @@ class YtDlpResolver:
                     raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc2
             else:
                 raise AppError(ErrorCode.RESOLVE_FAILED, "yt-dlp failed to download playback") from exc
+        return self._finish_download(info, filepath)
+
+    def _finish_download(self, info: dict, filepath: str) -> tuple[Path, str]:
         final_path = Path(filepath)
         if not final_path.exists():
             # requested_downloads carries the post-merge path in some yt-dlp
