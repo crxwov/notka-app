@@ -278,9 +278,13 @@ class CachePreloader:
     def start(self) -> None:
         if self._running:
             return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
         self._running = True
-        self._worker_task = asyncio.create_task(self._worker_loop())
-        self._periodic_scan_task = asyncio.create_task(self._periodic_scan_loop())
+        self._worker_task = loop.create_task(self._worker_loop())
+        self._periodic_scan_task = loop.create_task(self._periodic_scan_loop())
         print("[preloader] Started background playlist audio preloader")
 
     def stop(self) -> None:

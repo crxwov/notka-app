@@ -330,7 +330,10 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         download_fn=audio_file,
         is_cached_fn=_is_track_cached,
     )
-    cache_preloader.start()
+
+    @router.on_event("startup")
+    async def _start_preloader():
+        cache_preloader.start()
 
     def audio_response(data_path: Path, mime: str) -> FileResponse:
         return FileResponse(
