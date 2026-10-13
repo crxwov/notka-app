@@ -21,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 from music_resolver.models import candidate_to_track
 
 MIN_SUBSCRIBERS = 100_000
+MAX_REMAKER_SUBSCRIBERS = 50_000  # the author of a remake is small; a big artist's own song is never swapped
 RATIO = 15  # the original's artist is at least this many times bigger
 MAX_TRACKS = 15
 
@@ -135,14 +136,14 @@ def _one(client, track: dict) -> dict | None:
     if len(base) < 2 or is_variant(title):
         return None
     saved_subs = _saved_artist_subscribers(client, track)
-    if saved_subs is None:
-        return None  # nothing to compare the artist with: left alone
+    if saved_subs is None or saved_subs > MAX_REMAKER_SUBSCRIBERS:
+        return None  # an unknown artist, or one too big to be a remake's author: left alone
     try:
         found = client.search(base, filter="songs", limit=10) or []
     except Exception:  # noqa: BLE001
         return None
     duration = track.get("duration") or 0
-    qualified: list[tuple[int, dict]] = []
+    qualified: list[tuple[int, dict, str]] = []
     for item in found:
         video_id = item.get("videoId")
         if not video_id or video_id == track.get("sourceId"):
@@ -162,10 +163,15 @@ def _one(client, track: dict) -> dict | None:
         subs = _subscribers(client, artist_id)
         if subs is None or subs < MIN_SUBSCRIBERS or subs < RATIO * max(saved_subs, 1):
             continue
-        qualified.append((subs, item))
+        qualified.append((subs, item, artist_id))
     if not qualified:
         return None
-    qualified.sort(key=lambda pair: -pair[0])
+    # one artist with several songs of the name is one candidate, not several
+    per_artist: dict[str, tuple[int, dict]] = {}
+    for subs, item, artist_id in qualified:
+        if artist_id not in per_artist:
+            per_artist[artist_id] = (subs, item)
+    qualified = sorted(per_artist.values(), key=lambda pair: -pair[0])
     # two comparably big artists with a song of that name: which one was meant is not known, nothing is proposed
     if len(qualified) > 1 and qualified[0][0] < 10 * qualified[1][0]:
         return None
