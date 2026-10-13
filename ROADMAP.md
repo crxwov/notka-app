@@ -32,9 +32,10 @@ Build and deploy a full-featured Android mobile application for Notka (`Нотк
 7. Completed — Live device deployment & end-to-end verification on connected TECNO CH6i phone (Telegram auth flow, negative case validation, code confirmation, full database sync, background streaming over HTTPS, MediaSession notification).
 8. Completed — Artwork & CDN bypass proxy (`GET /artwork`) with disk caching, CORS headers for canvas Living Light shader, and mobile token propagation for Plus/Events/Analytics.
 9. Completed — Git repository commit, tag, and first GitHub beta release `v0.0.1` (`0.0.1`) with standalone Android APK asset attached.
+10. Completed — Multi-branch workflow setup: user branch `app-dev`, agent branch `tg-app`, production deploy branch `main` with bidirectional sync protocol (`AGENTS.md`).
 
 ## Current State
-Released v0.0.1 Beta on GitHub with APK asset (https://github.com/asyaandreeva209-collab/notka/releases/tag/v0.0.1). Production VPS and connected test device fully synchronized.
+Repository branching strategy configured: `app-dev` (user app development), `tg-app` (agent Telegram app development), and `main` (production deployment). Active working branch for agent set to `tg-app`. All branches pushed to remote origin.
 
 ## Findings / Decisions
 - **Connected Device**: TECNO CH6i (`08357252AA002939`, Android 13, API 33, 1080x2460 display).
