@@ -24,9 +24,20 @@ Fix what real users reported after the app was dropped into the uwc'29 chat (130
 
 ## Current State
 Deployed to Russian server (`5.227.61.107:6767`, egor-vm) under domain `https://notka.duckdns.org`.
-Restored clean production bundle from `main` (commit `21b86ee`, based on Leksik's `8af503d` + Swagger docs security fix + cache buster bump v195 for app.js, v144 for styles.css, v111 for system.css). Removed the broken modular experimental code from the server that was causing the loading screen to hang. Outbound YouTube and Telegram traffic routed cleanly via sing-box TUN mode through Hysteria 2 (`de.deytt.space:8443`). Caddy reverse proxy active with HTTP Basic Auth + fail2ban on `/admin*`. UFW and sysctl security hardening active. Old server `94.156.179.229` 301-redirects to `https://notka.duckdns.org`.
+Restored clean production bundle from `main` (commit `7cc75a5`, cache buster v196 for app.js, v144 for styles.css, v111 for system.css).
+Audio streaming throughput and track latency overhauled:
+- Background cache preloader active (`cache_preloader.py`): discovers all 1,600+ tracks from user playlists/favorites and pre-downloads them to NVMe storage quietly in the background without interfering with active user playback.
+- Instant NVMe cache lookup (`_disk_cache_map`): cached tracks serve in 12–15 ms directly from disk.
+- Persistent iTunes matching: `itunes_catalog.json` now preserves iTunes -> YouTube matched video IDs across restarts.
+- Cache size expanded to 40 GB on NVMe storage (`AUDIO_CACHE_MAX_MB=40000`).
+- sing-box routing updated to include SoundCloud (`soundcloud.com`, `sndcdn.com`), eliminating 15s timeouts on RKN blocks.
+- Client-side preloading accelerated: `<audio preload="auto">` in Mini App, pre-warming for opened playlists/favorites and queue ahead of playback.
+- Admin panel `/admin` enhanced with live Audio Cache & Preloader telemetry widget.
 
 ## Findings and Decisions
+- Audio cache hit response time reduced from ~19s to 12–15 ms.
+- User playlist tracks (~1,600 tracks) take only ~5–6 GB of disk space on the 88 GB free NVMe volume.
+- User playback has 100% priority: background preloader yields whenever a user requests or streams a track.
 - Yandex API refuses non-Russian IPs. Fix: `YANDEX_PROXY` in `/opt/notka/app/.env` (proxys.io shared IPv4, 30 days, expires ~2026-11-11). Fallback relay kept in `deploy/yandex_relay*`.
 - VK playlists cannot be read without an account login. Owner said "drop it for now". Options kept: paste-a-list import, or a dedicated VK account (against VK rules).
 - Domain purchase postponed by owner (hackov: server IP is visible).
