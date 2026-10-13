@@ -6101,9 +6101,6 @@
   let lyricsTouchedAt = 0;
 
   function renderLyrics(data) {
-    karaokeStop();
-    KARAOKE.i = -1;
-    KARAOKE.spans = [];
     $("lyrics-skeleton").hidden = true;
     lyricsData = data;
     lyricsActive = -1;
@@ -6175,105 +6172,6 @@
     };
     lyricsGlide = requestAnimationFrame(step);
   }
-  // ---- Word by word: only when the source knows when each word is sung (line.w = [[from, to, text]]).
-  // Without that the line is simply lit as a whole: words are never guessed. ----
-  const KARAOKE = { i: -1, spans: [], times: [], raf: 0 };
-  function karaokeTimes(wordList) {
-    // a word is lit from its own start to its end (a very short one still takes a moment to be seen),
-    // never past the start of the next word
-    return wordList.map((w, k) => {
-      const next = wordList[k + 1];
-      let to = Math.max(w[1], w[0] + 0.14);
-      if (next) to = Math.min(to, Math.max(next[0], w[0] + 0.05));
-      return [w[0], to];
-    });
-  }
-  // audio.currentTime moves in coarse steps (a few times a second); read as it is, the light
-  // jumps. Between two readings the time is carried on by the clock, never far past the next one.
-  const KCLOCK = { base: 0, at: 0, last: -1 };
-  function karaokeClockStep(c, reading, nowMs, paused, rate) {
-    if (reading !== c.last) { c.last = reading; c.base = reading; c.at = nowMs; }
-    if (paused) return reading;
-    const est = c.base + ((nowMs - c.at) / 1000) * (rate || 1);
-    return Math.min(est, c.base + 0.45);
-  }
-  const smoothstep = (p) => p * p * (3 - 2 * p);
-  function karaokeStop() {
-    cancelAnimationFrame(KARAOKE.raf);
-    KARAOKE.raf = 0;
-  }
-  function karaokeClear() {
-    karaokeStop();
-    if (KARAOKE.i >= 0 && lyricsData) {
-      const li = lyricsList.children[KARAOKE.i];
-      const line = lyricsData.lines[KARAOKE.i];
-      if (li && line) li.textContent = line.text;
-    }
-    KARAOKE.i = -1;
-    KARAOKE.spans = [];
-    KARAOKE.times = [];
-  }
-  let karaokeLastFrame = 0;
-  function karaokeTick(frameNow, force) {
-    KARAOKE.raf = 0;
-    if (KARAOKE.i < 0 || !lyricsOpen || currentScreen !== "player") return;
-    const clock = performance.now();
-    // the word light is repainted text: on a phone 30 frames a second look the same and cost half
-    if (!force && clock - karaokeLastFrame < 30) {
-      if (!audio.paused) KARAOKE.raf = requestAnimationFrame(karaokeTick);
-      return;
-    }
-    karaokeLastFrame = clock;
-    const now = karaokeClockStep(KCLOCK, audio.currentTime, clock, audio.paused, audio.playbackRate) + 0.1;
-    const spans = KARAOKE.spans, times = KARAOKE.times;
-    for (let k = 0; k < spans.length; k++) {
-      const [from, to] = times[k];
-      let p = now >= to ? 1 : now <= from ? 0 : smoothstep((now - from) / (to - from));
-      p = Math.round(p * 100) / 100; // a word is repainted only when its light moved a visible step
-      const el = spans[k];
-      if (el._p !== p) {
-        el._p = p;
-        el.style.setProperty("--p", p);
-        const sung = p > 0 && p < 1;
-        if (el._now !== sung) { el._now = sung; el.classList.toggle("is-now", sung); }
-      }
-    }
-    if (!audio.paused) KARAOKE.raf = requestAnimationFrame(karaokeTick);
-  }
-  function karaokeStart(i) {
-    karaokeClear();
-    if (i < 0 || !lyricsData || !lyricsData.synced) return;
-    const li = lyricsList.children[i];
-    const line = lyricsData.lines[i];
-    if (!li || !line || !line.text || line.text.length > 160) return;
-    // no word timings: the whole line is lit, no guessing
-    const ws = Array.isArray(line.w) ? line.w.filter((w) => String(w[2]).trim()) : [];
-    if (!ws.length) return;
-    const times = karaokeTimes(ws);
-    const frag = document.createDocumentFragment();
-    const spans = [];
-    ws.forEach((w) => {
-      const piece = String(w[2]);
-      const lead = piece.match(/^\s*/)[0], trail = piece.match(/\s*$/)[0];
-      const core = piece.trim();
-      if (lead) frag.appendChild(document.createTextNode(lead));
-      const sp = document.createElement("span");
-      sp.className = "kw";
-      sp.textContent = core;
-      frag.appendChild(sp);
-      spans.push(sp);
-      if (trail) frag.appendChild(document.createTextNode(trail));
-    });
-    li.textContent = "";
-    li.appendChild(frag);
-    KARAOKE.i = i;
-    KARAOKE.spans = spans;
-    KARAOKE.times = times;
-    karaokeTick(0, true);
-  }
-  audio.addEventListener("play", () => { if (KARAOKE.i >= 0 && !KARAOKE.raf) KARAOKE.raf = requestAnimationFrame(karaokeTick); });
-  audio.addEventListener("seeked", () => { if (KARAOKE.i >= 0) karaokeTick(0, true); });
-
   function syncLyrics(jump, instant) {
     if (!lyricsOpen || !lyricsData || !lyricsData.synced || currentScreen !== "player") return;
     const lines = lyricsData.lines;
@@ -6283,7 +6181,6 @@
     if (i === lyricsActive && !jump) return;
     lyricsActive = i;
     const items = lyricsList.children;
-    karaokeStart(i);
     for (let k = 0; k < items.length; k++) {
       items[k].classList.toggle("is-active", k === i);
       items[k].classList.toggle("is-past", k < i);
@@ -6292,7 +6189,6 @@
       const lo = k === i ? 1 : d < 0 ? Math.max(0.2, 0.42 + d * 0.06) : Math.max(0.26, 0.58 - d * 0.08);
       items[k].style.setProperty("--lo", lo.toFixed(2));
       items[k].style.setProperty("--bl", `${Math.min(2.2, Math.abs(d) * 0.55).toFixed(1)}px`);
-      items[k].classList.toggle("is-near", k !== i && Math.abs(d) <= 3); // only the lines beside the sung one are blurred
     }
     // don't pull the text away from someone who is scrolling it by hand or picking lines
     if (quotePicking || (!jump && Date.now() - lyricsTouchedAt < 3000)) return;
@@ -6304,7 +6200,7 @@
     lyricsOpen = on;
     document.body.classList.toggle("lyrics-open", on);
     lyricsBox.inert = !on;
-    if (!on) { endQuotePick(); karaokeClear(); lyricsActive = -1; }
+    if (!on) { endQuotePick(); lyricsActive = -1; }
     $("player-lyrics-btn").setAttribute("aria-pressed", on ? "true" : "false");
     syncPrism();
     if (on) { loadLyrics(); syncLyrics(true, true); }
