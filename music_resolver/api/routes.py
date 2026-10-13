@@ -884,6 +884,35 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         asyncio.create_task(_warm_one(source, id))
         return {"queued": True}
 
+    # ---- saved remakes: the original of a track that a hidden catalog once replaced with a fan remake ----
+    originals_calls: list[float] = []
+
+    @router.post("/originals")
+    async def originals(request: Request):
+        from music_resolver.services import originals as originals_service
+
+        try:
+            body = await request.json()
+        except ValueError:
+            body = {}
+        now = time.time()
+        originals_calls[:] = [t for t in originals_calls if now - t < 60]
+        if len(originals_calls) >= 20:
+            return JSONResponse({"error": {"code": "TOO_MANY"}}, status_code=429)
+        originals_calls.append(now)
+        tracks = [
+            {k: t.get(k) for k in ("id", "sourceId", "title", "artist", "artistId", "duration")}
+            for t in (body.get("tracks") or [])[:originals_service.MAX_TRACKS]
+            if isinstance(t, dict) and t.get("source") == "youtube_music"
+        ]
+        provider = service.manager.get("youtube_music")
+        if not tracks or provider is None or not hasattr(provider, "_client"):
+            return {"replacements": {}}
+        client = provider._client()
+        found = await asyncio.wait_for(asyncio.to_thread(originals_service.find_originals, client, tracks), timeout=45)
+        metrics.count("originals_found", len(found)) if found else None
+        return {"replacements": found}
+
     # ---- what Нотка knows about a track: sound, mood fit, the artist's genres ----
     @router.get("/profile")
     async def track_profile_view(source: str = Query(...), id: str = Query(...), artist: str = Query(default="")) -> dict:
