@@ -1,7 +1,10 @@
 """Song lyrics for the player.
 
-Two sources, in this order:
+Sources, in this order:
 
+0. NetEase Cloud Music — the only one with the time of every WORD
+   (``words: true``, each line carries ``w: [[start, end, text], ...]``);
+   used only when title, artist and length surely match.
 1. LRCLIB (lrclib.net) — an open lyrics database, searched by title and
    artist, so it works for a track from any of our sources. Most of its
    entries are synced (a timestamp per line).
@@ -61,7 +64,7 @@ def _norm(text: str) -> str:
 
 
 def _cache_path(title: str, artist: str, duration: float | None) -> Path:
-    key = f"{_norm(title)}|{_norm(artist)}|{round(duration or 0)}"
+    key = f"w2|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}"  # w2: results may carry word timings
     return _CACHE_DIR / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".json")
 
 
@@ -144,6 +147,73 @@ async def _from_lrclib(title: str, artist: str, duration: float | None) -> dict 
     return _pick_lrclib(items, _clean_title(title), artist, duration) if isinstance(items, list) else None
 
 
+# ---- NetEase Cloud Music: the only open source that knows when each WORD is sung ("yrc").
+# Used only when it is surely the same recording: title, artist and length agree. ----
+_NETEASE_SEARCH = "https://music.163.com/api/search/get"
+_NETEASE_LYRIC = "https://music.163.com/api/song/lyric"
+_NETEASE_HEADERS = {"user-agent": "Mozilla/5.0", "referer": "https://music.163.com/"}
+_YRC_LINE = re.compile(r"^\[(\d+),(\d+)\](.*)$")
+_YRC_WORD = re.compile(r"\((\d+),(\d+),-?\d+\)")
+# «作词：…», «Written by：…», «Producer：…»: the credits NetEase puts in front of the text (a full-width colon early in the line)
+_CJK_CREDIT = re.compile(r"^[^:：]{1,30}[：]|^[一-鿿]+\s*:")
+
+
+def parse_yrc(text: str) -> list[dict]:
+    """Parse NetEase word-timed lyrics: ``[start_ms,dur_ms](start,dur,0)word (start,dur,0)word``."""
+    lines: list[dict] = []
+    for raw in text.splitlines():
+        m = _YRC_LINE.match(raw.strip())
+        if not m:
+            continue  # the {"t":..,"c":[..]} credit lines
+        body = m.group(3)
+        marks = list(_YRC_WORD.finditer(body))
+        words: list[list] = []
+        for k, mark in enumerate(marks):
+            end = marks[k + 1].start() if k + 1 < len(marks) else len(body)
+            piece = body[mark.end():end]
+            if not piece.strip():
+                continue
+            start = int(mark.group(1)) / 1000
+            words.append([round(start, 2), round(start + int(mark.group(2)) / 1000, 2), piece])
+        line_text = "".join(w[2] for w in words).strip()
+        if not words or not line_text or _CJK_CREDIT.match(line_text):
+            continue
+        lines.append({"t": words[0][0], "text": line_text, "w": words})
+    lines.sort(key=lambda line: line["t"])
+    return lines
+
+
+async def _from_netease(title: str, artist: str, duration: float | None) -> dict | None:
+    names = _artist_names(artist)
+    want_title = _norm(_clean_title(title))
+    want_artists = [_norm(n) for n in names]
+    if not want_title:
+        return None
+    query = f"{_clean_title(title)} {names[0] if names else ''}".strip()
+    async with httpx.AsyncClient(timeout=8, headers=_NETEASE_HEADERS) as client:
+        res = await client.post(_NETEASE_SEARCH, data={"s": query, "type": 1, "limit": 8, "offset": 0})
+        if res.status_code != 200:
+            return None
+        songs = (res.json().get("result") or {}).get("songs") or []
+        for song in songs:
+            got_title = _norm(song.get("name") or "")
+            if not got_title or not (got_title in want_title or want_title in got_title):
+                continue
+            got_artists = [_norm(a.get("name") or "") for a in (song.get("artists") or [])]
+            if want_artists and not any(w and g and (w in g or g in w) for w in want_artists for g in got_artists):
+                continue
+            if duration and abs((song.get("duration") or 0) / 1000 - duration) > _SYNC_TOLERANCE_SECONDS:
+                continue
+            lyric = await client.get(_NETEASE_LYRIC, params={"id": song["id"], "lv": 1, "kv": 1, "tv": -1, "yv": 1})
+            if lyric.status_code != 200:
+                continue
+            yrc = ((lyric.json().get("yrc") or {}).get("lyric")) or ""
+            lines = parse_yrc(yrc) if yrc else []
+            if len(lines) >= 3:
+                return {"lines": lines, "synced": True, "words": True}
+    return None
+
+
 def _from_youtube_music_sync(provider, video_id: str) -> dict | None:
     client = provider._client()
     browse_id = (client.get_watch_playlist(videoId=video_id) or {}).get("lyrics")
@@ -163,6 +233,42 @@ def _from_youtube_music_sync(provider, video_id: str) -> dict | None:
     return None
 
 
+def _anchor_words(words_result: dict, lrclib_result: dict | None) -> dict:
+    """Words of one source, line starts of the other.
+
+    Two databases time the same song a few tenths of a second apart. When the line-synced text is
+    there too, each word-timed line is moved so that it starts where the line-synced one does (the
+    words inside it keep their own real timings); a line the other has no match for moves by the
+    typical difference. Without a line-synced text, or when the texts do not match, nothing moves.
+    """
+    anchors = [line for line in (lrclib_result or {}).get("lines", []) if line.get("t") is not None] if (lrclib_result or {}).get("synced") else []
+    if not anchors:
+        return words_result
+    by_text: dict[str, list[float]] = {}
+    for line in anchors:
+        by_text.setdefault(_norm(line["text"]), []).append(line["t"])
+    deltas: list[float | None] = []
+    for line in words_result["lines"]:
+        near = [t for t in by_text.get(_norm(line["text"]), []) if abs(t - line["t"]) <= 3.0]
+        deltas.append(min(near, key=lambda t: abs(t - line["t"])) - line["t"] if near else None)
+    known = sorted(d for d in deltas if d is not None)
+    if len(known) < 3:
+        return words_result
+    typical = known[len(known) // 2]
+    if abs(typical) > 2.0:
+        return words_result
+    lines = []
+    for line, delta in zip(words_result["lines"], deltas):
+        shift = typical if delta is None else delta
+        lines.append({
+            "t": round(line["t"] + shift, 2),
+            "text": line["text"],
+            "w": [[round(a + shift, 2), round(b + shift, 2), text] for a, b, text in line["w"]],
+        })
+    lines.sort(key=lambda line: line["t"])
+    return {"lines": lines, "synced": True, "words": True}
+
+
 async def find_lyrics(
     title: str,
     artist: str,
@@ -179,11 +285,15 @@ async def find_lyrics(
     if _misses.get(path.name, 0) > time.time():
         return _EMPTY
 
-    result: dict | None = None
-    try:
-        result = await _from_lrclib(title, artist, duration)
-    except (httpx.HTTPError, ValueError):
-        result = None
+    # the line-synced text and the word-timed one are asked together; the word-timed one wins when found
+    lrclib_result, netease_result = await asyncio.gather(
+        _from_lrclib(title, artist, duration), _from_netease(title, artist, duration), return_exceptions=True
+    )
+    lrclib_ok = lrclib_result if isinstance(lrclib_result, dict) else None
+    netease_ok = netease_result if isinstance(netease_result, dict) else None
+    result: dict | None = lrclib_ok
+    if netease_ok:
+        result = _anchor_words(netease_ok, lrclib_ok)
     if result is None and youtube_music_provider is not None and video_id:
         try:
             result = await asyncio.wait_for(

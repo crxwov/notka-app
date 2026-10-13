@@ -6175,20 +6175,18 @@
     };
     lyricsGlide = requestAnimationFrame(step);
   }
-  // ---- Word by word: the line being sung lights up as it is sung. The timings in the data
-  // are for whole lines, so the line's time is shared among its words by their length. ----
+  // ---- Word by word: only when the source knows when each word is sung (line.w = [[from, to, text]]).
+  // Without that the line is simply lit as a whole: words are never guessed. ----
   const KARAOKE = { i: -1, spans: [], times: [], raf: 0 };
-  function karaokeTimes(words, start, end) {
-    const chars = words.reduce((n, w) => n + w.length, 0);
-    // a line is sung over nearly all of its own time (that is what the timings say); only when the
-    // next line is far away (a break, a solo) is it sung at the pace of a voice, not stretched over the gap
-    const room = Math.max(0.8, end - start - 0.12);
-    const voice = chars * 0.16 + 1.2;
-    const sing = room <= voice * 1.5 ? room : clamp(voice, 0.8, room);
-    const weights = words.map((w) => Math.max(2, w.length) + 1);
-    const total = weights.reduce((a, b) => a + b, 0);
-    let at = start;
-    return weights.map((w) => { const from = at; at += (sing * w) / total; return [from, at]; });
+  function karaokeTimes(wordList) {
+    // a word is lit from its own start to its end (a very short one still takes a moment to be seen),
+    // never past the start of the next word
+    return wordList.map((w, k) => {
+      const next = wordList[k + 1];
+      let to = Math.max(w[1], w[0] + 0.14);
+      if (next) to = Math.min(to, Math.max(next[0], w[0] + 0.05));
+      return [w[0], to];
+    });
   }
   // audio.currentTime moves in coarse steps (a few times a second); read as it is, the light
   // jumps. Between two readings the time is carried on by the clock, never far past the next one.
@@ -6248,22 +6246,23 @@
     const li = lyricsList.children[i];
     const line = lyricsData.lines[i];
     if (!li || !line || !line.text || line.text.length > 160) return;
-    const parts = line.text.split(/(\s+)/);
-    const words = parts.filter((p) => p && !/^\s+$/.test(p));
-    if (!words.length) return;
-    const next = lyricsData.lines[i + 1];
-    const end = next ? next.t : line.t + Math.max(3, line.text.length * 0.12);
-    const times = karaokeTimes(words, line.t, end);
+    // no word timings: the whole line is lit, no guessing
+    const ws = Array.isArray(line.w) ? line.w.filter((w) => String(w[2]).trim()) : [];
+    if (!ws.length) return;
+    const times = karaokeTimes(ws);
     const frag = document.createDocumentFragment();
     const spans = [];
-    parts.forEach((part) => {
-      if (!part) return;
-      if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(part)); return; }
+    ws.forEach((w) => {
+      const piece = String(w[2]);
+      const lead = piece.match(/^\s*/)[0], trail = piece.match(/\s*$/)[0];
+      const core = piece.trim();
+      if (lead) frag.appendChild(document.createTextNode(lead));
       const sp = document.createElement("span");
       sp.className = "kw";
-      sp.textContent = part;
+      sp.textContent = core;
       frag.appendChild(sp);
       spans.push(sp);
+      if (trail) frag.appendChild(document.createTextNode(trail));
     });
     li.textContent = "";
     li.appendChild(frag);
