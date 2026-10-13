@@ -145,7 +145,25 @@ def _date_ts(key: str) -> float:
         return 0.0
 
 
-def summary() -> dict:
+def _cache_disk_stats() -> dict:
+    audio_dir = DATA_DIR.parent / "cache" / "audio_v2"
+    count = 0
+    total_bytes = 0
+    if audio_dir.exists():
+        for f in audio_dir.iterdir():
+            if f.suffix == ".bin":
+                try:
+                    total_bytes += f.stat().st_size
+                    count += 1
+                except OSError:
+                    pass
+    return {
+        "files_count": count,
+        "size_mb": round(total_bytes / (1024 * 1024), 1),
+    }
+
+
+def summary(preloader_status: dict | None = None) -> dict:
     now = time.time()
     today = metrics.day_key(now)
     registry = metrics.users()
@@ -302,6 +320,10 @@ def summary() -> dict:
             h = time.gmtime(r["last_seen"] + 3 * 3600).tm_hour
             activity_hours[h] += 1
 
+    cache_info = _cache_disk_stats()
+    if preloader_status:
+        cache_info.update(preloader_status)
+
     for r in rows:
         r.pop("_days", None)
     rows.sort(key=lambda r: r["last_seen"] or 0, reverse=True)
@@ -310,6 +332,7 @@ def summary() -> dict:
         "today": today,
         "cards": summary_cards,
         "system": _system_stats(),
+        "cache": cache_info,
         "audio_dna": _audio_dna(),
         "genres": _top_genres(),
         "demographics": demographics,

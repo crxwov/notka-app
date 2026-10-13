@@ -3473,6 +3473,11 @@
     fillTrackList(list, favs, "fav", (track) => buildTrackRow(track, { queue: favs, context: "Любимые треки" }));
     $("favorites-group-btn").setAttribute("aria-pressed", isGroupedByAlbum("fav") ? "true" : "false");
     updateSourceButtons();
+    if (state.favorites && state.favorites.length) {
+      state.favorites.slice(0, 2).forEach((t) => {
+        fetch(`${API_BASE_URL}/warm?${trackQuery(t)}`).catch(() => {});
+      });
+    }
   }
   // «По альбомам»: a view of a list with the tracks of one album gathered under the album's name (the list itself keeps its order)
   const GROUP_KEY = "notka_group_albums";
@@ -3551,6 +3556,11 @@
     $("playlist-group-btn").setAttribute("aria-pressed", grouped ? "true" : "false");
     updateSourceButtons();
     if (!keepStack) showScreen("playlist");
+    if (tracks && tracks.length) {
+      tracks.slice(0, 2).forEach((t) => {
+        fetch(`${API_BASE_URL}/warm?${trackQuery(t)}`).catch(() => {});
+      });
+    }
   }
 
   $("playlist-back-btn").addEventListener("click", goBack);
@@ -6552,6 +6562,8 @@
     if (!next || next.id === preparedId) return;
     preparedId = next.id;
     fetch(`${API_BASE_URL}/prepare?${prepareQuery(next)}`).catch(() => {});
+    const afterNext = currentQueue[currentQueueIndex + 2];
+    if (afterNext) fetch(`${API_BASE_URL}/warm?${trackQuery(afterNext)}`).catch(() => {});
   }
 
   function withShuffledTail(queue, current) {

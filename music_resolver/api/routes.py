@@ -21,6 +21,7 @@ from music_resolver.models import AlbumResponse, ArtistResponse, ResolveResponse
 from music_resolver.services.lyrics import find_lyrics
 from music_resolver.services.music_service import MusicService
 from music_resolver.services import admin_stats, auth_store, events_store, metrics, mood_mix, plus_store, sync_store, track_profile
+from music_resolver.services.cache_preloader import CachePreloader
 from music_resolver.services.playlist_import import read_playlist
 from music_resolver.utils.remux import defragment, defragment_all, ffmpeg_exe
 
@@ -53,8 +54,37 @@ _DOWNLOAD_TOTAL = max(1, int(os.environ.get("DOWNLOAD_PARALLEL") or 2))
 _download_slots = asyncio.Semaphore(_DOWNLOAD_TOTAL)
 
 # The cache is trimmed back under this size after each new download, least
-# recently played tracks first. Override with AUDIO_CACHE_MAX_MB in .env.
-_CACHE_MAX_BYTES = int(os.environ.get("AUDIO_CACHE_MAX_MB") or 2048) * 1024 * 1024
+# recently played tracks first. 40 GB holds ~10,000+ tracks cleanly on the Russian NVMe server.
+_CACHE_MAX_BYTES = int(os.environ.get("AUDIO_CACHE_MAX_MB") or 40000) * 1024 * 1024
+_disk_cache_map: dict[str, str] = {}  # f"{source}:{source_id}" -> file_key
+
+
+def _register_cached_key(key: str) -> None:
+    parts = key.split("_")
+    if len(parts) >= 2:
+        _disk_cache_map[f"{parts[0]}:{parts[1]}"] = key
+
+
+def _rebuild_disk_cache_map(service: MusicService | None = None) -> None:
+    _disk_cache_map.clear()
+    if not _CACHE_DIR.exists():
+        return
+    itunes_provider = service.manager.get("itunes") if service else None
+    for path in _CACHE_DIR.glob("*.bin"):
+        try:
+            if path.stat().st_size <= 0:
+                continue
+            stem = path.stem
+            parts = stem.split("_")
+            if len(parts) >= 2:
+                src, sid = parts[0], parts[1]
+                _disk_cache_map[f"{src}:{sid}"] = stem
+                if src == "itunes" and len(parts) >= 3 and itunes_provider:
+                    matched_vid = parts[-1]
+                    if hasattr(itunes_provider, "_match_cache") and sid not in itunes_provider._match_cache:
+                        itunes_provider._match_cache[sid] = matched_vid
+        except OSError:
+            continue
 
 
 def _prune_cache() -> None:
@@ -78,6 +108,9 @@ def _prune_cache() -> None:
         path.unlink(missing_ok=True)
         path.with_suffix(".mime").unlink(missing_ok=True)
         total -= size
+        parts = path.stem.split("_")
+        if len(parts) >= 2:
+            _disk_cache_map.pop(f"{parts[0]}:{parts[1]}", None)
 
 
 def _cached_file(key: str) -> tuple[Path, str] | None:
@@ -90,6 +123,59 @@ def _cached_file(key: str) -> tuple[Path, str] | None:
             return data_path, mime
     except OSError:
         pass
+    return None
+
+
+def _is_track_cached(source: str, source_id: str) -> bool:
+    key = _disk_cache_map.get(f"{source}:{source_id}")
+    if key and (_CACHE_DIR / f"{key}.bin").exists():
+        return True
+    safe_prefix = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{source}_{source_id}")
+    if (_CACHE_DIR / f"{safe_prefix}.bin").exists():
+        return True
+    for p in _CACHE_DIR.glob(f"{safe_prefix}_*.bin"):
+        try:
+            if p.is_file() and p.stat().st_size > 0:
+                return True
+        except OSError:
+            pass
+    return False
+
+
+def _find_cached_track(source: str, source_id: str, suffix: str | None = None) -> tuple[Path, str] | None:
+    # 1. Exact match with match suffix
+    if suffix:
+        direct = _cached_file(_cache_key(source, source_id, suffix))
+        if direct:
+            return direct
+
+    # 2. Fast in-memory map lookup
+    key = _disk_cache_map.get(f"{source}:{source_id}")
+    if key:
+        cached = _cached_file(key)
+        if cached:
+            return cached
+
+    # 3. Direct key without suffix
+    direct = _cached_file(_cache_key(source, source_id))
+    if direct:
+        _disk_cache_map[f"{source}:{source_id}"] = _cache_key(source, source_id)
+        return direct
+
+    # 4. Pattern match on disk (e.g. itunes_1441456790_*.bin)
+    safe_prefix = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{source}_{source_id}")
+    for match in _CACHE_DIR.glob(f"{safe_prefix}_*.bin"):
+        try:
+            if match.is_file() and match.stat().st_size > 0:
+                stem = match.stem
+                meta_path = match.with_suffix(".mime")
+                if meta_path.exists():
+                    mime = meta_path.read_text().strip() or "audio/mp4"
+                    os.utime(match)
+                    _disk_cache_map[f"{source}:{source_id}"] = stem
+                    return match, mime
+        except OSError:
+            pass
     return None
 
 
@@ -125,6 +211,7 @@ async def _download_with_ytdlp(download_to_file, source_id: str, key: str, data_
         await asyncio.to_thread(defragment, tmp_path)
         tmp_path.replace(data_path)
         meta_path.write_text(mime)
+        _register_cached_key(key)
     except AppError:
         raise
     except Exception as exc:
@@ -185,6 +272,7 @@ async def _ensure_cached(
                             fh.write(chunk)
             tmp_path.replace(data_path)
             meta_path.write_text(mime)
+            _register_cached_key(key)
             await asyncio.to_thread(_prune_cache)
         except httpx.HTTPError as exc:
             tmp_path.unlink(missing_ok=True)
@@ -200,12 +288,9 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
 
     # tracks cached before audio was rewritten on download (see remux.py)
     threading.Thread(target=defragment_all, args=(_CACHE_DIR,), daemon=True).start()
+    _rebuild_disk_cache_map(service)
 
     def match_suffix_for(provider, source_id: str) -> str | None:
-        # For a catalog-only source (currently just itunes) whose track id
-        # never changes but whose *matched YouTube video* can (see
-        # matched_video_id's docstring), fold that match into the cache key
-        # so a corrected match isn't shadowed by an old cached download.
         matched_video_id = getattr(provider, "matched_video_id", None)
         return matched_video_id(source_id) if matched_video_id else None
 
@@ -225,28 +310,37 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         that is already cached is found without asking the source anything —
         resolving it again would cost seconds for a file we already hold."""
         provider = service.manager.get(source)
+        suffix = match_suffix_for(provider, source_id) if provider else None
+        cached = _find_cached_track(source, source_id, suffix)
+        if cached:
+            return cached
         if provider is not None:
             needs_match = hasattr(provider, "matched_video_id")
-            suffix = match_suffix_for(provider, source_id)
-            if suffix or not needs_match:
-                cached = _cached_file(_cache_key(source, source_id, suffix))
-                if cached:
-                    return cached
             if not needs_match and hasattr(provider, "download_to_file"):
-                # a YouTube track: the downloader looks it up itself, so a
-                # separate resolve first would only repeat that lookup
                 return await _ensure_cached(provider, source, source_id, "", None)
         response = await service.resolve(source=source, id=source_id, url=None)
         if response.playback.type != "url" or not response.playback.url:
             raise AppError(ErrorCode.RESOLVE_FAILED, "Resolved playback cannot be played")
         return await audio_for_resolved(response)
 
+    # Background preloader that keeps all user playlist/favorite tracks permanently cached on local disk
+    cache_preloader = CachePreloader(
+        cache_dir=_CACHE_DIR,
+        data_dir=sync_store.DATA_DIR,
+        download_fn=audio_file,
+        is_cached_fn=_is_track_cached,
+    )
+    cache_preloader.start()
+
     def audio_response(data_path: Path, mime: str) -> FileResponse:
-        # FileResponse answers Range requests itself, reading only the bytes
-        # asked for. no-store: the same /stream URL can point at a corrected
-        # file after a backend update, so the WebView must not replay its own
-        # old copy.
-        return FileResponse(data_path, media_type=mime, headers={"cache-control": "no-store"})
+        return FileResponse(
+            data_path,
+            media_type=mime,
+            headers={
+                "cache-control": "public, max-age=604800, stale-while-revalidate=86400",
+                "accept-ranges": "bytes",
+            },
+        )
 
     # ---- inline mode: «@бот запрос» in any chat puts the song itself into it.
     # Telegram takes the file from an address and wants an ordinary MP3, so the
@@ -355,7 +449,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
 
     @router.get("/admin/api/summary")
     async def admin_summary(request: Request):
-        data = await asyncio.to_thread(admin_stats.summary)
+        data = await asyncio.to_thread(admin_stats.summary, cache_preloader.status())
         return JSONResponse(data, headers={"cache-control": "no-store"})
 
     # ---- the bot (same machine, no forwarding header) reports counters and asks for the summary ----
@@ -378,7 +472,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     async def internal_summary(request: Request):
         if not _internal_ok(request):
             return JSONResponse({"error": {"code": "NO"}}, status_code=403)
-        return await asyncio.to_thread(admin_stats.summary)
+        return await asyncio.to_thread(admin_stats.summary, cache_preloader.status())
 
     @router.get("/inline-thumb/{source}/{source_id}.jpg")
     async def inline_thumb(source: str, source_id: str, c: str = ""):
@@ -641,7 +735,10 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         device = body.get("device") if isinstance(body.get("device"), dict) else {}
         metrics.touch_user(user_id, metrics.profile_from_init_data(x_telegram_init_data) if x_telegram_init_data else None, device.get("id"))
         try:
-            return await asyncio.to_thread(sync_store.exchange, user_id, body)
+            cur = await asyncio.to_thread(sync_store.exchange, user_id, body)
+            if cache_preloader and isinstance(body.get("shared"), dict):
+                cache_preloader.enqueue_from_sync_data(body["shared"])
+            return cur
         except sync_store.TooBig:
             return JSONResponse({"error": {"code": "TOO_BIG"}}, status_code=413)
 
@@ -753,7 +850,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         info = await service.get_artist(source, id, fast=fast)
         return ArtistResponse(**info.model_dump(by_alias=True))
 
-    @router.get("/stream")
+    @router.api_route("/stream", methods=["GET", "HEAD"])
     async def stream(
         request: Request,
         id: str | None = Query(default=None),
@@ -761,6 +858,8 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         url: str | None = Query(default=None),
         mode: str | None = Query(default=None, pattern="^(redirect|json|proxy)$"),
     ):
+        if cache_preloader:
+            cache_preloader.notify_user_playback(20.0)
         stream_mode = mode or settings.stream_response_mode
         if stream_mode == "proxy" and source and id and not url:
             data_path, mime = await audio_file(source, id)
@@ -866,6 +965,8 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         artist: str = Query(default="", max_length=200),
         duration: float | None = Query(default=None, ge=0, le=36000),
     ) -> dict[str, bool]:
+        if cache_preloader:
+            cache_preloader.notify_user_playback(20.0)
         data_path, _mime = await audio_file(source, id)
         metrics.count("play")  # one per started track: the app asks for this once for each
         # the track is on disk now: what it sounds like is measured once, in the background
@@ -912,6 +1013,8 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         if not re.fullmatch(r"[A-Za-z0-9_.\-]{3,64}", id) or not re.fullmatch(r"[a-z_]{3,20}", source):
             return {"queued": False}
         # nothing to do for a track that is on disk already
+        if _is_track_cached(source, id):
+            return {"queued": False}
         provider = service.manager.get(source)
         if provider is None:
             return {"queued": False}

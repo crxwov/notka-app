@@ -317,13 +317,31 @@ class ITunesCatalogProvider:
                 data = json.loads(_DISK_CACHE_PATH.read_text(encoding="utf-8"))
                 self._artist_id_cache.update(data.get("artist_ids") or {})
                 self._albums_cache.update(data.get("albums") or {})
+                self._match_cache.update(data.get("matches") or {})
         except Exception as exc:
             print(f"[itunes] could not read disk cache, starting fresh: {exc}")
+        # Auto-discover matches from existing audio files already on disk
+        try:
+            cache_dir = _DISK_CACHE_PATH.parent / "audio_v2"
+            if cache_dir.exists():
+                for f in cache_dir.glob("itunes_*_*.bin"):
+                    parts = f.stem.split("_")
+                    if len(parts) >= 3 and parts[0] == "itunes":
+                        itunes_id = parts[1]
+                        video_id = parts[-1]
+                        if itunes_id and video_id and itunes_id not in self._match_cache:
+                            self._match_cache[itunes_id] = video_id
+        except Exception as exc:
+            print(f"[itunes] could not scan audio_v2 for matches: {exc}")
 
     def _save_disk_cache(self) -> None:
         try:
             _DISK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            payload = {"artist_ids": self._artist_id_cache, "albums": self._albums_cache}
+            payload = {
+                "artist_ids": self._artist_id_cache,
+                "albums": self._albums_cache,
+                "matches": self._match_cache,
+            }
             _DISK_CACHE_PATH.write_text(json.dumps(payload), encoding="utf-8")
         except Exception as exc:
             print(f"[itunes] could not write disk cache: {exc}")
@@ -415,6 +433,7 @@ class ITunesCatalogProvider:
             info = await self._lookup_track_info(track_id)
             video_id = await self._match_on_youtube(info.title, info.artist, info.duration)
             self._match_cache[track_id] = video_id
+            self._save_disk_cache()
         return video_id
 
     # ---------------- MusicProvider surface ----------------
