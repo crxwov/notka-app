@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 
 from music_resolver.api.routes import create_router
@@ -12,7 +13,14 @@ def create_app(settings: Settings | None = None, service: MusicService | None = 
     settings = settings or load_settings()
     configure_logging(settings.log_level)
 
-    app = FastAPI(title="Music Resolver Backend", version="0.1.0")
+    docs_enabled = os.environ.get("ENABLE_DOCS", "0").strip() == "1"
+    app = FastAPI(
+        title="Music Resolver Backend",
+        version="0.1.0",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
+    )
     service = service or build_music_service(settings)
 
     app.include_router(create_router(service, settings))
