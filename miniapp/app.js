@@ -7172,7 +7172,8 @@
   // and who made the track (credits)
   {
     const credits = $("pi-credits"), source = $("pi-source"), section = $("player-info");
-    const GROUPS = [["writers", "Авторы"], ["producers", "Продюсеры"], ["engineers", "Запись и сведение"], ["performers", "Участвовали"]];
+    // one row per person with all they did, instead of lists by role: producers and authors are often the same people
+    const ROLES = [["producers", "Продюсер"], ["writers", "Автор"], ["engineers", "Звукорежиссёр"], ["performers", "Участвовал"]];
     const infoCache = new Map();
     let infoFor = null, infoTimer = 0;
     const listeners = (v) => {
@@ -7202,21 +7203,52 @@
       }
       credits.innerHTML = "";
       const c = extra.credits;
-      let any = false;
+      const people = new Map();
       if (c && c.found) {
-        GROUPS.forEach(([key, label]) => {
-          let names = (c[key] || []).filter(Boolean);
-          if (key === "performers") names = names.filter((n) => n !== t.artist);
-          if (!names.length) return;
-          any = true;
-          const g = document.createElement("div");
-          g.className = "pi-group";
-          const h = document.createElement("h3"); h.textContent = label;
-          const row = document.createElement("div"); row.className = "pi-chips";
-          names.slice(0, 10).forEach((n) => { const chip = document.createElement("span"); chip.textContent = n; row.appendChild(chip); });
-          g.appendChild(h); g.appendChild(row);
-          credits.appendChild(g);
+        ROLES.forEach(([key, role]) => {
+          (c[key] || []).filter(Boolean).forEach((name) => {
+            const k = name.toLowerCase();
+            if (!people.has(k)) people.set(k, { name, roles: [] });
+            const p = people.get(k);
+            if (!p.roles.includes(role)) p.roles.push(role);
+          });
         });
+      }
+      // the artist's own line stays first when they are among the makers
+      const list = [...people.values()].sort((x, y) => (y.roles.length - x.roles.length) || (x.name === t.artist ? -1 : 0));
+      let any = list.length > 0;
+      if (any) {
+        const head = document.createElement("h3");
+        head.className = "pi-credits-title";
+        head.textContent = "Над треком работали";
+        credits.appendChild(head);
+        const ul = document.createElement("ul");
+        ul.className = "pi-people";
+        const LIMIT = 6;
+        list.forEach((p, k) => {
+          const li = document.createElement("li");
+          if (k >= LIMIT) li.hidden = true;
+          const av = document.createElement("span");
+          av.className = "pi-av";
+          av.textContent = (p.name.trim()[0] || "?").toUpperCase();
+          av.style.setProperty("--h", String(330 + ((p.name.charCodeAt(0) * 37 + p.name.length * 17) % 55))); // rose to coral: the brand's own range
+          const tx = document.createElement("span");
+          tx.className = "pi-person";
+          const n = document.createElement("b"); n.textContent = p.name;
+          const r = document.createElement("i"); r.textContent = p.roles.join(", ");
+          tx.appendChild(n); tx.appendChild(r);
+          li.appendChild(av); li.appendChild(tx);
+          ul.appendChild(li);
+        });
+        credits.appendChild(ul);
+        if (list.length > LIMIT) {
+          const more = document.createElement("button");
+          more.type = "button";
+          more.className = "pi-more";
+          more.textContent = `Показать всех (${list.length})`;
+          more.addEventListener("click", () => { ul.querySelectorAll("li[hidden]").forEach((li) => { li.hidden = false; }); more.remove(); });
+          credits.appendChild(more);
+        }
       }
       source.textContent = any && c.sources && c.sources.length ? `Данные: ${c.sources.join(", ")}` : "";
     }
@@ -7383,7 +7415,7 @@
     const r = el.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    artGrab = { id: e.pointerId, x: e.clientX, y: e.clientY, cx, cy, width: r.width, moved: false, turned: 0, angle: Math.atan2(e.clientY - cy, e.clientX - cx), from: audio.currentTime || 0, to: null, tick: 0 };
+    artGrab = { id: e.pointerId, x: e.clientX, y: e.clientY, cx, cy, width: r.width, moved: false, turned: 0, angle: Math.atan2(e.clientY - cy, e.clientX - cx), from: audio.currentTime || 0, to: null, tick: 0, at: performance.now(), prev: 0 };
     try { artWrap.setPointerCapture(e.pointerId); } catch (err) { /* the gesture still works without capture */ }
   });
   artWrap.addEventListener("pointermove", (e) => {
@@ -7394,6 +7426,7 @@
       g.moved = true;
       isScrubbing = true;
       document.body.classList.add("art-held");
+      scratch.start();
     }
     const dur = effectiveDuration();
     let shift;
@@ -7418,11 +7451,69 @@
       g.to = Math.max(0, Math.min(dur - 0.5, g.from + shift));
       renderProgress((g.to / dur) * 100, g.to);
     }
+    // how fast the hand turns: the scratch follows it
+    const nowMs = performance.now();
+    const turnedNow = artTheme() === "cassette" ? (e.clientX - g.x) * 2 : g.turned;
+    const dt = Math.max(8, nowMs - g.at);
+    scratch.move(((turnedNow - g.prev) / dt) * 1000);
+    g.prev = turnedNow;
+    g.at = nowMs;
   });
+  // ---- the turntable's sound: while a record or a disc is turned by the finger, a scratch is heard (synthesised:
+  // filtered noise whose pitch, loudness and grain follow the speed of the hand). Can be switched off in the settings. ----
+  const scratch = (() => {
+    let ctx = null, gain = null, filter = null, src = null, lfo = null, lfoGain = null, last = 0;
+    const enabled = () => Store.getSetting("scratchSound") !== false;
+    function start() {
+      if (!enabled()) return;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        if (!ctx) {
+          ctx = new AC();
+          const len = ctx.sampleRate * 2;
+          const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (0.55 + 0.45 * Math.sin(i / 37));
+          src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+          filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 900; filter.Q.value = 1.6;
+          gain = ctx.createGain(); gain.gain.value = 0;
+          lfo = ctx.createOscillator(); lfo.type = "sawtooth"; lfo.frequency.value = 18;
+          lfoGain = ctx.createGain(); lfoGain.gain.value = 0;
+          lfo.connect(lfoGain); lfoGain.connect(gain.gain);
+          src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+          src.start(); lfo.start();
+        }
+        if (ctx.state === "suspended") ctx.resume();
+      } catch (e) { ctx = null; }
+    }
+    // speed in degrees per second (or pixels), sign = direction
+    function move(speed) {
+      if (!ctx || !gain || !enabled()) return;
+      const v = Math.min(1, Math.abs(speed) / 900);
+      const now = ctx.currentTime;
+      const level = v < 0.02 ? 0 : 0.05 + v * 0.2;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setTargetAtTime(level, now, 0.03);
+      filter.frequency.setTargetAtTime(500 + v * 3600 + (speed < 0 ? 400 : 0), now, 0.03);
+      src.playbackRate.setTargetAtTime(0.6 + v * 1.6, now, 0.03);
+      lfo.frequency.setTargetAtTime(8 + v * 40, now, 0.05);
+      lfoGain.gain.setTargetAtTime(level * 0.6, now, 0.05);
+    }
+    function stop() {
+      if (!ctx || !gain) return;
+      const now = ctx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setTargetAtTime(0, now, 0.05);
+      lfoGain.gain.setTargetAtTime(0, now, 0.05);
+    }
+    return { start, move, stop };
+  })();
   const endArtGrab = (e) => {
     if (!artGrab || (e && e.pointerId !== artGrab.id)) return;
     const g = artGrab;
     artGrab = null;
+    scratch.stop();
     document.body.classList.remove("art-held");
     artWrap.style.removeProperty("--scrub");
     playerCassette.style.removeProperty("--reel-rot");
@@ -7700,6 +7791,18 @@
   $("mp-queue-btn").addEventListener("click", () => { renderQueueSheet(); openOverlay("queue-sheet"); });
   $("mp-fav-btn").addEventListener("click", () => $("player-fav-btn").click());
   $("mp-fav-ph").addEventListener("click", (e) => { e.stopPropagation(); $("player-fav-btn").click(); });
+
+  // «Звук вертушки»: on unless switched off
+  {
+    const sw = $("toggle-scratch");
+    const paint = () => sw.setAttribute("aria-checked", Store.getSetting("scratchSound") === false ? "false" : "true");
+    paint();
+    sw.addEventListener("click", () => {
+      Store.setSetting("scratchSound", Store.getSetting("scratchSound") === false);
+      haptic("select");
+      paint();
+    });
+  }
 
   // «Новые треки в начало»: one setting, two switches (the settings page and the add-to-playlist sheet)
   function renderAtStartSwitches() {
