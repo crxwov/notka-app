@@ -884,6 +884,20 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         asyncio.create_task(_warm_one(source, id))
         return {"queued": True}
 
+    # ---- who made a track: performers, writers, producers, label (open sources, see services/credits.py) ----
+    @router.get("/credits")
+    async def credits(
+        title: str = Query(..., min_length=1, max_length=300),
+        artist: str = Query(default="", max_length=300),
+        duration: float | None = Query(default=None, ge=0, le=36000),
+    ) -> dict:
+        from music_resolver.services import credits as credits_service
+
+        try:
+            return await asyncio.wait_for(credits_service.find_credits(title, artist, int(duration or 0)), timeout=30)
+        except Exception:  # noqa: BLE001 - the block just does not appear
+            return {"found": False}
+
     # ---- saved remakes: the original of a track that a hidden catalog once replaced with a fan remake ----
     originals_calls: list[float] = []
 

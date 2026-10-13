@@ -13,10 +13,10 @@
      string forces it to fetch the real, current file. Bump this
      number (or just change it) every time styles.css or app.js is
      edited, otherwise Telegram may keep showing the old version. -->
-<link rel="stylesheet" href="styles.css?v=141" />
+<link rel="stylesheet" href="styles.css?v=142" />
 <link rel="stylesheet" href="atmosphere.css?v=8" />
 <link rel="stylesheet" href="events.css?v=10" />
-<link rel="stylesheet" href="system.css?v=94" />
+<link rel="stylesheet" href="system.css?v=95" />
 <link rel="stylesheet" href="plus.css?v=9" />
 <script src="telegram-web-app.js?v=1"></script>
 </head>
@@ -918,6 +918,7 @@
   <!-- ============ FULL-SCREEN PLAYER ============ -->
   <main class="screen screen-player" id="screen-player" hidden>
     <canvas class="player-prism" id="player-prism" aria-hidden="true"></canvas>
+    <div class="player-main">
     <header class="player-bar">
       <button class="round-btn round-glass" id="player-back-btn" type="button" aria-label="Свернуть плеер"><svg width="22" height="22" aria-hidden="true"><use href="#i-down"/></svg></button>
       <div class="player-context">
@@ -984,9 +985,17 @@
     <div class="player-foot">
       <button class="round-btn round-glass foot-btn" id="player-lyrics-btn" type="button" aria-label="Текст песни" aria-pressed="false"><svg width="22" height="22" aria-hidden="true"><use href="#i-lyrics"/></svg></button>
       <button class="round-btn round-glass foot-btn" id="player-quote-btn" type="button" aria-label="Карточка с цитатой" aria-pressed="false"><svg width="22" height="22" aria-hidden="true"><use href="#i-quote"/></svg></button>
-      <button class="round-btn round-glass foot-btn" id="player-info-btn" type="button" aria-label="О треке"><svg width="22" height="22" aria-hidden="true"><use href="#i-info"/></svg></button>
       <button class="round-btn round-glass foot-btn" id="player-queue-btn" type="button" aria-label="Очередь"><svg width="22" height="22" aria-hidden="true"><use href="#i-queue"/></svg></button>
     </div>
+    </div>
+
+    <section class="player-info" id="player-info" aria-label="О треке" hidden>
+      <div class="pi-handle" aria-hidden="true"></div>
+      <h2 class="pi-title">О треке</h2>
+      <dl class="pi-facts" id="pi-facts"></dl>
+      <div class="pi-credits" id="pi-credits"></div>
+      <p class="pi-source" id="pi-source"></p>
+    </section>
   </main>
 
   <!-- ============ mini player + tab bar ============ -->
@@ -1139,18 +1148,6 @@
       <ul class="originals-list" id="originals-list"></ul>
       <button class="pill-btn pill-primary originals-go" id="originals-apply" type="button">Заменить выбранные</button>
       <button class="sheet-row sheet-cancel" id="originals-skip" type="button">Не менять</button>
-    </div>
-  </div>
-
-  <div id="info-sheet" class="sheet-anim" role="dialog" aria-modal="true" aria-labelledby="info-title">
-    <div class="sheet sheet-tall">
-      <span class="sheet-handle" aria-hidden="true"></span>
-      <div class="info-head">
-        <span class="cover cover-md" id="info-cover"></span>
-        <div class="info-head-text"><p class="sheet-title" id="info-title">О треке</p><p class="info-sub" id="info-sub"></p></div>
-      </div>
-      <ul class="info-list" id="info-list"></ul>
-      <button class="sheet-row sheet-cancel" id="info-close" type="button">Закрыть</button>
     </div>
   </div>
 
@@ -1367,6 +1364,6 @@
 <script src="atmosphere.js?v=4"></script>
 <script src="pumpkin.js?v=5"></script>
 <script src="mix.js?v=1"></script>
-<script src="app.js?v=179"></script>
+<script src="app.js?v=180"></script>
 </body>
 </html>

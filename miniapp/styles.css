@@ -1759,12 +1759,12 @@ body[data-screen="splash"] .light-spill { opacity: 0; }
 
 /* the cover takes exactly the room left between the header and the
    controls, so short windows (Telegram Desktop) never overlap it */
-.player-art-wrap { flex: 1 1 0; min-height: 120px; display: flex; align-items: center; justify-content: center; padding: 16px 0; overflow: visible; }
+.player-art-wrap { flex: 1 1 0; min-height: 120px; display: flex; align-items: center; justify-content: center; padding: 8px 0; overflow: visible; }
 .player-art {
   height: 100%;
   width: auto;
   aspect-ratio: 1 / 1;
-  max-height: min(78vw, 340px);
+  max-height: min(calc(100vw - 36px), 440px);
   max-width: 100%;
   border-radius: 24px;
   background: var(--orb-mini);

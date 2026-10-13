@@ -666,36 +666,32 @@ body.player-pulling .light-group { transition-duration: 0.3s, 0.3s; }
 /* страница под сворачиваемым плеером: без входных анимаций карточек и блоков */
 .screen.no-enter, .no-enter .shelf-card, .no-enter [data-reveal], .no-enter [data-reveal] * { animation: none !important; }
 
-/* «В любимое»: сердце пружинит, от него расходятся кольцо и россыпь маленьких сердец цветов бренда */
+/* «В любимое»: сердце мягко пружинит, от него поднимаются несколько маленьких розовых сердечек */
 @keyframes heart-pop {
-  0% { transform: scale(0.4) rotate(-14deg); }
-  34% { transform: scale(1.42) rotate(7deg); }
-  58% { transform: scale(0.88) rotate(-3deg); }
-  78% { transform: scale(1.12) rotate(1deg); }
-  100% { transform: scale(1) rotate(0); }
+  0% { transform: scale(0.72); }
+  42% { transform: scale(1.2); }
+  70% { transform: scale(0.96); }
+  100% { transform: scale(1); }
 }
-@keyframes heart-unlike { 0% { transform: scale(1); } 40% { transform: scale(0.74); } 100% { transform: scale(1); } }
-.heart-pop > .ic-on { animation: heart-pop 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
-.heart-unlike > .ic-off { animation: heart-unlike 0.32s var(--ease-out) both; }
+@keyframes heart-unlike { 0% { transform: scale(1); } 45% { transform: scale(0.82); } 100% { transform: scale(1); } }
+.heart-pop > .ic-on { animation: heart-pop 0.62s cubic-bezier(0.3, 0.7, 0.3, 1) both; }
+.heart-unlike > .ic-off { animation: heart-unlike 0.3s var(--ease-out) both; }
 .heart-burst { position: fixed; z-index: 400; width: 0; height: 0; pointer-events: none; }
 .heart-ring {
-  position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%;
-  border: 2px solid var(--liked);
-  box-shadow: 0 0 24px color-mix(in srgb, var(--liked) 70%, transparent), inset 0 0 14px color-mix(in srgb, var(--liked) 40%, transparent);
-  animation: heart-ring 0.62s ease-out both;
+  position: absolute; left: -20px; top: -20px; width: 40px; height: 40px; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--liked) 60%, transparent);
+  animation: heart-ring 0.7s ease-out both;
 }
-@keyframes heart-ring { from { transform: scale(0.35); opacity: 0.95; } to { transform: scale(2.4); opacity: 0; } }
+@keyframes heart-ring { from { transform: scale(0.6); opacity: 0.7; } to { transform: scale(1.9); opacity: 0; } }
 .heart-spark {
   position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; color: var(--c, var(--liked));
-  opacity: 0; animation: heart-spark 0.9s cubic-bezier(0.15, 0.7, 0.3, 1) both; animation-delay: var(--d, 0s);
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c, var(--liked)) 70%, transparent));
+  opacity: 0; animation: heart-spark 1.25s cubic-bezier(0.22, 0.6, 0.3, 1) both; animation-delay: var(--d, 0s);
 }
 .heart-spark svg { width: 100%; height: 100%; display: block; }
-.heart-spark.dot { width: 6px; height: 6px; left: -3px; top: -3px; border-radius: 50%; background: var(--c, var(--liked)); }
 @keyframes heart-spark {
-  0% { opacity: 0; transform: translate(0, 0) scale(0.2) rotate(0deg); }
-  16% { opacity: 1; }
-  70% { opacity: 1; }
+  0% { opacity: 0; transform: translate(0, 0) scale(0.3) rotate(0deg); }
+  20% { opacity: 0.95; }
+  65% { opacity: 0.85; }
   100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(var(--sc, 1)) rotate(var(--rot, 0deg)); }
 }
 .perf-lite .heart-spark, .perf-lite .heart-ring { display: none; }
@@ -706,15 +702,24 @@ body.player-pulling .light-group { transition-duration: 0.3s, 0.3s; }
 .sheet-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 6px 14px; font-size: 15px; color: var(--text-2); }
 .sheet-switch > span { flex: 1; min-width: 0; }
 
-/* «О треке» */
-.info-head { display: flex; align-items: center; gap: 14px; padding: 4px 6px 12px; }
-.info-head-text { min-width: 0; }
-.info-head-text .sheet-title { margin: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.info-sub { margin: 2px 0 0; font-size: 15px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.info-list { list-style: none; margin: 0 0 12px; padding: 0; }
-.info-row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 6px; border-bottom: 1px solid var(--line); font-size: 16px; }
-.info-row:last-child { border-bottom: 0; }
-.info-row.is-link { cursor: pointer; }
-.info-row.is-link .info-v { color: var(--text); text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.3); text-underline-offset: 3px; }
-.info-k { color: var(--text-2); flex: 0 0 auto; }
-.info-v { text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* плеер на телефоне: экран плеера прокручивается, под ним «О треке». Верхняя часть занимает ровно экран */
+body:not(.is-desktop) .player-main { display: flex; flex-direction: column; flex: 0 0 100%; min-height: 0; }
+body.is-desktop .player-main { display: contents; }
+body.is-desktop .player-info { display: none; }
+body.lyrics-open .player-info { display: none; }
+body:not(.is-desktop).lyrics-open #screen-player { overflow: hidden; }
+.player-info { margin: 18px -4px 8px; padding: 6px 18px 24px; border-radius: 26px; background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.pi-handle { width: 36px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.22); margin: 8px auto 14px; }
+.pi-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+.pi-facts { margin: 0; }
+.pi-row { display: flex; justify-content: space-between; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
+.pi-row dt { color: var(--text-2); flex: 0 0 auto; }
+.pi-row dd { margin: 0; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pi-row.is-link { cursor: pointer; }
+.pi-row.is-link dd { text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.3); text-underline-offset: 3px; }
+.pi-credits { margin-top: 6px; }
+.pi-group { padding: 14px 0 4px; }
+.pi-group h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
+.pi-group p { margin: 0; font-size: 17px; line-height: 1.4; }
+.pi-source { margin: 14px 0 0; font-size: 12px; color: var(--text-3); }
+.pi-source:empty { display: none; }
