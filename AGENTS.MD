@@ -9,7 +9,7 @@ Two human developers: **leksik** created the original product/design/functionali
 3. Inspect task/file/contract overlap. Tell the user about overlapping active work, a stale record, or unknown state before touching the overlapping area. Stale is not permission to take over. Proceed with independent work only.
 4. Publish a detailed reservation in the assigning participant's already-work file BEFORE substantive edits. Update and publish immediately on important changes, about every 60 seconds while active, and on pause/block/completion. Use the scoped publisher described in collaboration.md. If publication fails, report it and suspend overlap-dependent changes.
 5. Only update your own participant file. Multiple agents for the same participant must coordinate an existing active task rather than silently replace it. These files are advisory coordination, not an atomic distributed lock.
-6. todo.md is the shared unfinished backlog. Remove an item only after its acceptance checks pass; record concise results in the current work file/Git. Preserve requirements/blockers of pending work. Do not create ROADMAP*, per-chat plans or duplicate task-memory files.
+6. todo.md is the shared unfinished backlog. Remove an item only after its acceptance checks pass; record concise results in the current work file/Git. Preserve requirements/blockers of pending work. Private local ROADMAPs, per-chat plans and task-memory files are allowed, but MUST NOT be committed or published. Keep extra private plans under ignored .notka-local/; ROADMAP filename variants are also ignored. Shared coordination must remain complete in todo/already-work rather than depend on private files.
 
 ## Git and execution
 

@@ -8,9 +8,14 @@ cache/
 __pycache__/
 *.pyc
 
-# Старые Roadmap и локальные агентские артефакты; общие инструкции/work-state публикуются
+# Личные Roadmap/планы разрешены локально, но не публикуются; общие инструкции/work-state публикуются
 ROADMAP*.md
 **/ROADMAP*.md
+roadmap*.md
+**/roadmap*.md
+Roadmap*.md
+**/Roadmap*.md
+.notka-local/
 .impeccable/
 
 # скриншоты, референсы и старые черновики
