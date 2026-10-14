@@ -6598,7 +6598,7 @@
   }
 
   function trackQuery(track) {
-    return `source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}`;
+    return `source=${encodeURIComponent(track.source)}&id=${encodeURIComponent(track.sourceId)}&v=203`;
   }
   // the same, with what the server needs to remember how the track sounds (once, in the background)
   function prepareQuery(track) {
