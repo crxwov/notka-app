@@ -7423,13 +7423,17 @@
   }
 
   function renderArtistFallbackTracks(name, contextTracks) {
-    const tracks = (contextTracks || []).filter((t) => t.artist === name);
-    currentArtistTracks = tracks;
-    $("artist-listeners").textContent = `${pluralTracks(tracks.length)} в Нотке`;
+    const tracks = (contextTracks || []).filter((t) => (t.artist || "").trim().toLowerCase() === name.trim().toLowerCase());
+    currentArtistTracks = tracks.length ? tracks : (contextTracks || []);
+    $("artist-listeners").textContent = `${pluralTracks(currentArtistTracks.length)} в Нотке`;
     const list = $("artist-tracks");
     list.innerHTML = "";
-    tracks.slice(0, 8).forEach((t) => list.appendChild(buildTrackRow(t, { queue: tracks, context: name })));
+    currentArtistTracks.slice(0, 8).forEach((t) => list.appendChild(buildTrackRow(t, { queue: currentArtistTracks, context: name })));
     renderArtistAlbumsRow([], null);
+    if (!currentArtistMeta.photo && currentArtistTracks[0] && currentArtistTracks[0].artwork) {
+      currentArtistMeta.photo = currentArtistTracks[0].artwork;
+      setCoverEl($("artist-avatar"), currentArtistTracks[0].artwork, name);
+    }
   }
 
   let currentArtistMeta = {};
@@ -7438,8 +7442,9 @@
     if (!artistName) return;
     meta = meta || {};
     const token = ++artistToken;
-    currentArtistMeta = { artistId: meta.artistId || null, source: meta.source || null, photo: null };
+    currentArtistMeta = { artistId: meta.artistId || null, source: meta.source || null, photo: meta.photo || null };
     renderArtistShell(artistName);
+    if (meta.photo) setCoverEl($("artist-avatar"), meta.photo, artistName);
     showScreen("artist", isBack ? { replace: true } : { params: { artistName, contextTracks, meta } });
 
     // a track without its own artist id (it came from SoundCloud when YouTube Music was slow, or
@@ -7455,11 +7460,21 @@
         } finally { clearTimeout(timer); }
         if (token !== artistToken) return;
         const want = artistName.trim().toLowerCase();
-        const hit = ((data && data.results) || []).find((a) => (a.name || "").trim().toLowerCase() === want);
+        let hit = ((data && data.results) || []).find((a) => (a.name || "").trim().toLowerCase() === want);
+        if (!hit && data && data.results && data.results.length) {
+          hit = data.results.find((a) => {
+            const n = (a.name || "").trim().toLowerCase();
+            return n && (want.includes(n) || n.includes(want));
+          }) || data.results[0];
+        }
         if (hit && hit.id && hit.source) {
-          meta = Object.assign({}, meta, { artistId: hit.id, source: hit.source });
+          meta = Object.assign({}, meta, { artistId: hit.id, source: hit.source, photo: hit.photo || meta.photo });
           currentArtistMeta.artistId = hit.id;
           currentArtistMeta.source = hit.source;
+          if (hit.photo && !currentArtistMeta.photo) {
+            currentArtistMeta.photo = hit.photo;
+            setCoverEl($("artist-avatar"), hit.photo, artistName);
+          }
         }
       } catch (e) { /* the page falls back to what the search finds */ }
     }
@@ -7479,11 +7494,11 @@
         };
         const paint = (artist) => {
           currentArtistTracks = artist.topTracks || [];
-          currentArtistMeta.photo = artist.photo || null;
+          currentArtistMeta.photo = artist.photo || meta.photo || null;
           // an iTunes artist comes back as its fuller YouTube Music page
           if (artist.id && artist.source) { currentArtistMeta.artistId = artist.id; currentArtistMeta.source = artist.source; }
           $("artist-name").textContent = artist.name || artistName;
-          setCoverEl($("artist-avatar"), artist.photo, artistName);
+          setCoverEl($("artist-avatar"), currentArtistMeta.photo, artistName);
           $("artist-listeners").textContent = artist.subscribers || `${pluralTracks(currentArtistTracks.length)} в Нотке`;
           const list = $("artist-tracks");
           list.innerHTML = "";
@@ -7499,22 +7514,24 @@
         return;
       } catch (e) {
         if (token !== artistToken) return;
-        console.error(e);
-        showToast("Не удалось загрузить исполнителя");
-        // fall through to the grouped client-side fallback below
+        console.warn("artist: quick lookup failed, trying fallback tracks", e);
+        // fall through to client-side fallback below without showing premature error toast
       }
     }
 
-    let tracks = (contextTracks || []).filter((t) => t.artist === artistName);
+    let tracks = (contextTracks || []).filter((t) => (t.artist || "").trim().toLowerCase() === artistName.trim().toLowerCase());
     if (tracks.length < 2) {
       try {
         const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(artistName)}`);
         const data = await res.json();
-        const extra = (data.results || []).filter((t) => t.artist === artistName);
+        const extra = (data.results || []).filter((t) => (t.artist || "").trim().toLowerCase().includes(artistName.trim().toLowerCase()));
         if (extra.length) tracks = extra;
       } catch (e) { /* ignore — fall back to whatever we had */ }
     }
     if (token !== artistToken) return;
+    if (tracks.length === 0) {
+      showToast("Не удалось загрузить исполнителя");
+    }
     renderArtistFallbackTracks(artistName, tracks);
   }
   $("artist-back-btn").addEventListener("click", goBack);

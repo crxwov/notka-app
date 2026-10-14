@@ -51,6 +51,26 @@ def _length_to_seconds(length: str | None) -> int | None:
         return None
 
 
+_FAN_REMAKE_PATTERNS = re.compile(
+    r"\b(?:slowed|reverb|sped\s+up|speed\s+up|nightcore|type\s+beat|beat|beatz|remake|"
+    r"reproduced|re-produced|re-recorded|flip|fan\s+edit|fan\s+made|fan\s+version|"
+    r"rework|mashup|bass\s+boosted|8d\s+audio|chopped\s+(?:and|&)\s+screwed|ai\s+cover|"
+    r"ai\s+vocal|leak|unreleased|snippet|instrumental\s+remake|tribute|bootleg)\b"
+    r"|\bprod\.?\s+[a-z0-9_]+|\bprod\s+by\b",
+    re.IGNORECASE,
+)
+
+
+def _is_fan_remake(candidate: TrackCandidate, query: str) -> bool:
+    q_lower = query.lower()
+    haystack = f"{candidate.title} {candidate.artist}".lower()
+    match = _FAN_REMAKE_PATTERNS.search(haystack)
+    if not match:
+        return False
+    term = match.group(0).lower().strip()
+    return term not in q_lower
+
+
 def map_search_item(item: dict) -> TrackCandidate | None:
     """Map a single ytmusicapi search() result (filter='songs') to a TrackCandidate."""
     video_id = item.get("videoId")
@@ -481,12 +501,18 @@ class YoutubeMusicProvider:
             raise songs
         if isinstance(videos, BaseException):
             videos = []
-        seen_ids = {c.source_id for c in songs}
-        seen_names = {(c.title.strip().lower(), c.artist.strip().lower()) for c in songs}
-        merged = list(songs)
+        clean_songs = [c for c in songs if not _is_fan_remake(c, query)]
+        merged = clean_songs if clean_songs else list(songs)
+        seen_ids = {c.source_id for c in merged}
+        seen_names = {(c.title.strip().lower(), c.artist.strip().lower()) for c in merged}
         for candidate, video_type in videos:
             name = (candidate.title.strip().lower(), candidate.artist.strip().lower())
-            if video_type not in OFFICIAL_VIDEO_TYPES or candidate.source_id in seen_ids or name in seen_names:
+            if (
+                video_type not in OFFICIAL_VIDEO_TYPES
+                or _is_fan_remake(candidate, query)
+                or candidate.source_id in seen_ids
+                or name in seen_names
+            ):
                 continue
             seen_ids.add(candidate.source_id)
             seen_names.add(name)

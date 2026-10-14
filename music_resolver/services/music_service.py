@@ -81,6 +81,13 @@ class MusicService:
         if not source or not artist_id:
             raise AppError(ErrorCode.INVALID_QUERY, "Both source and id must be provided")
 
+        # Automatically normalize source based on ID format:
+        # Numeric IDs are iTunes catalog IDs; channel IDs starting with UC/MP belong to YouTube Music
+        if artist_id.isdigit() and source != "itunes":
+            source = "itunes"
+        elif (artist_id.startswith("UC") or artist_id.startswith("MP")) and source != "youtube_music":
+            source = "youtube_music"
+
         provider = self.manager.get(source)
         get_artist = getattr(provider, "get_artist", None)
         if provider is None or get_artist is None:

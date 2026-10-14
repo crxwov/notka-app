@@ -40,7 +40,29 @@ class ProviderManager:
             start = time.perf_counter()
             fallback_used = index > 0
             try:
-                results = await asyncio.wait_for(provider.search(query, limit), timeout=min(self.timeout, remaining))
+                itunes = self.get("itunes") if provider.name == "youtube_music" else None
+                if itunes is not None and getattr(itunes, "configured", False):
+                    yt_task = provider.search(query, limit)
+                    it_task = itunes.search(query, limit)
+                    yt_res, it_res = await asyncio.wait_for(
+                        asyncio.gather(yt_task, it_task, return_exceptions=True),
+                        timeout=min(self.timeout, remaining),
+                    )
+                    if isinstance(yt_res, BaseException):
+                        results = it_res if not isinstance(it_res, BaseException) else []
+                    elif isinstance(it_res, BaseException) or not it_res:
+                        results = yt_res
+                    else:
+                        seen = set()
+                        results = []
+                        # Merge official iTunes catalog releases with YouTube Music tracks
+                        for c in it_res + yt_res:
+                            norm_key = (c.title.strip().lower(), c.artist.strip().lower())
+                            if norm_key not in seen:
+                                seen.add(norm_key)
+                                results.append(c)
+                else:
+                    results = await asyncio.wait_for(provider.search(query, limit), timeout=min(self.timeout, remaining))
                 duration_ms = int((time.perf_counter() - start) * 1000)
                 if not results:
                     empty_seen = True

@@ -69,7 +69,6 @@ def _rebuild_disk_cache_map(service: MusicService | None = None) -> None:
     _disk_cache_map.clear()
     if not _CACHE_DIR.exists():
         return
-    itunes_provider = service.manager.get("itunes") if service else None
     for path in _CACHE_DIR.glob("*.bin"):
         try:
             if path.stat().st_size <= 0:
@@ -79,10 +78,6 @@ def _rebuild_disk_cache_map(service: MusicService | None = None) -> None:
             if len(parts) >= 2:
                 src, sid = parts[0], parts[1]
                 _disk_cache_map[f"{src}:{sid}"] = stem
-                if src == "itunes" and len(parts) >= 3 and itunes_provider:
-                    matched_vid = parts[-1]
-                    if hasattr(itunes_provider, "_match_cache") and sid not in itunes_provider._match_cache:
-                        itunes_provider._match_cache[sid] = matched_vid
         except OSError:
             continue
 
@@ -143,12 +138,11 @@ def _is_track_cached(source: str, source_id: str) -> bool:
 
 
 def _find_cached_track(source: str, source_id: str, suffix: str | None = None) -> tuple[Path, str] | None:
-    # 1. Exact match with match suffix
+    # 1. Exact match with match suffix (for matched catalog tracks like itunes)
     if suffix:
-        direct = _cached_file(_cache_key(source, source_id, suffix))
-        if direct:
-            return direct
+        return _cached_file(_cache_key(source, source_id, suffix))
 
+    # For tracks without match suffix (direct sources like youtube_music):
     # 2. Fast in-memory map lookup
     key = _disk_cache_map.get(f"{source}:{source_id}")
     if key:
@@ -162,20 +156,19 @@ def _find_cached_track(source: str, source_id: str, suffix: str | None = None) -
         _disk_cache_map[f"{source}:{source_id}"] = _cache_key(source, source_id)
         return direct
 
-    # 4. Pattern match on disk (e.g. itunes_1441456790_*.bin)
+    # 4. Pattern match on disk (direct file without suffix only)
     safe_prefix = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{source}_{source_id}")
-    for match in _CACHE_DIR.glob(f"{safe_prefix}_*.bin"):
-        try:
-            if match.is_file() and match.stat().st_size > 0:
-                stem = match.stem
-                meta_path = match.with_suffix(".mime")
-                if meta_path.exists():
-                    mime = meta_path.read_text().strip() or "audio/mp4"
-                    os.utime(match)
-                    _disk_cache_map[f"{source}:{source_id}"] = stem
-                    return match, mime
-        except OSError:
-            pass
+    direct_bin = _CACHE_DIR / f"{safe_prefix}.bin"
+    try:
+        if direct_bin.is_file() and direct_bin.stat().st_size > 0:
+            meta_path = direct_bin.with_suffix(".mime")
+            if meta_path.exists():
+                mime = meta_path.read_text().strip() or "audio/mp4"
+                os.utime(direct_bin)
+                _disk_cache_map[f"{source}:{source_id}"] = direct_bin.stem
+                return direct_bin, mime
+    except OSError:
+        pass
     return None
 
 
@@ -310,14 +303,19 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         that is already cached is found without asking the source anything —
         resolving it again would cost seconds for a file we already hold."""
         provider = service.manager.get(source)
-        suffix = match_suffix_for(provider, source_id) if provider else None
-        cached = _find_cached_track(source, source_id, suffix)
-        if cached:
-            return cached
-        if provider is not None:
-            needs_match = hasattr(provider, "matched_video_id")
-            if not needs_match and hasattr(provider, "download_to_file"):
+        needs_match = hasattr(provider, "matched_video_id") if provider else False
+        if not needs_match:
+            cached = _find_cached_track(source, source_id)
+            if cached:
+                return cached
+            if provider is not None and hasattr(provider, "download_to_file"):
                 return await _ensure_cached(provider, source, source_id, "", None)
+        else:
+            suffix = match_suffix_for(provider, source_id) if provider else None
+            if suffix:
+                cached = _find_cached_track(source, source_id, suffix)
+                if cached:
+                    return cached
         response = await service.resolve(source=source, id=source_id, url=None)
         if response.playback.type != "url" or not response.playback.url:
             raise AppError(ErrorCode.RESOLVE_FAILED, "Resolved playback cannot be played")

@@ -56,6 +56,9 @@ _LOOKUP_URL = "https://itunes.apple.com/lookup"
 _DISK_CACHE_PATH = Path(__file__).resolve().parent.parent.parent / "cache" / "itunes_catalog.json"
 
 
+_CATALOG_CACHE_VERSION = 2
+
+
 def _artwork(entry: dict) -> str | None:
     # artworkUrl100 is a small thumbnail — bump it to a larger size the way
     # every iTunes API consumer does, by editing the size in the filename.
@@ -362,27 +365,18 @@ class ITunesCatalogProvider:
                 data = json.loads(_DISK_CACHE_PATH.read_text(encoding="utf-8"))
                 self._artist_id_cache.update(data.get("artist_ids") or {})
                 self._albums_cache.update(data.get("albums") or {})
-                self._match_cache.update(data.get("matches") or {})
+                if data.get("version") == _CATALOG_CACHE_VERSION:
+                    self._match_cache.update(data.get("matches") or {})
+                else:
+                    print(f"[itunes] match cache version changed ({data.get('version')} -> {_CATALOG_CACHE_VERSION}), resetting matches")
         except Exception as exc:
             print(f"[itunes] could not read disk cache, starting fresh: {exc}")
-        # Auto-discover matches from existing audio files already on disk
-        try:
-            cache_dir = _DISK_CACHE_PATH.parent / "audio_v2"
-            if cache_dir.exists():
-                for f in cache_dir.glob("itunes_*_*.bin"):
-                    parts = f.stem.split("_")
-                    if len(parts) >= 3 and parts[0] == "itunes":
-                        itunes_id = parts[1]
-                        video_id = parts[-1]
-                        if itunes_id and video_id and itunes_id not in self._match_cache:
-                            self._match_cache[itunes_id] = video_id
-        except Exception as exc:
-            print(f"[itunes] could not scan audio_v2 for matches: {exc}")
 
     def _save_disk_cache(self) -> None:
         try:
             _DISK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
             payload = {
+                "version": _CATALOG_CACHE_VERSION,
                 "artist_ids": self._artist_id_cache,
                 "albums": self._albums_cache,
                 "matches": self._match_cache,
@@ -566,7 +560,7 @@ class ITunesCatalogProvider:
         query = f"{title} {primary_artist}".strip()
 
         # 1. YouTube catalog search
-        accepted, ranked = await self._search_and_match(self.youtube_provider, query, title, primary_artist)
+        accepted, ranked = await self._search_and_match(self.youtube_provider, query, title, primary_artist, duration)
         via = "catalog"
 
         # 2. YouTube official artist-credited videos
@@ -673,7 +667,7 @@ class ITunesCatalogProvider:
 
     @staticmethod
     async def _search_and_match(
-        provider, query: str, title: str, primary_artist: str
+        provider, query: str, title: str, primary_artist: str, duration: int | None = None
     ) -> tuple[TrackCandidate | None, list[TrackCandidate]]:
         """Search one provider and apply the independent title+artist match
         check. Returns (accepted_or_None, ranked_candidates) — ranked is
@@ -705,6 +699,9 @@ class ITunesCatalogProvider:
                 # has to be filtered out *before* the title+artist checks,
                 # not left for them to catch. Skip it, don't reject the
                 # whole search — a clean upload may well rank lower.
+                continue
+            if duration and candidate.duration and abs(candidate.duration - duration) > 20:
+                # Reject fan snippets, short loops, or extended cuts that don't match the studio track length
                 continue
             if _title_matches(title, candidate.title, primary_artist) and _artist_matches(
                 primary_artist, candidate.title, candidate.artist
@@ -805,7 +802,59 @@ class ITunesCatalogProvider:
         raw_albums = await self._fetch_all_albums(artist_id)
         return self._dedupe_albums(raw_albums)
 
-    async def get_artist(self, artist_id: str) -> ArtistInfo:
+    async def get_artist(self, artist_id: str, fast: bool = False) -> ArtistInfo:
+        if fast:
+            name = None
+            cached_albums = self._albums_cache.get(artist_id)
+            if cached_albums:
+                names = Counter(a.get("artistName") for a in cached_albums if a.get("artistName"))
+                name = names.most_common(1)[0][0] if names else None
+
+            top_tracks: list[TrackCandidate] = []
+            if not name:
+                try:
+                    data = await self._get(_LOOKUP_URL, {"id": artist_id, "entity": "song", "limit": 25})
+                    for item in data.get("results") or []:
+                        if not name and item.get("artistName"):
+                            name = item.get("artistName")
+                        candidate = self._map_track(item) if item.get("wrapperType") == "track" else None
+                        if candidate:
+                            top_tracks.append(candidate)
+                except Exception as exc:
+                    print(f"[itunes] fast lookup failed for artist {artist_id}: {exc}")
+
+            find_artist_id = getattr(self.youtube_provider, "find_artist_id", None)
+            if find_artist_id is not None and name:
+                try:
+                    yt_artist_id = await asyncio.wait_for(find_artist_id(name), timeout=3.5)
+                    if yt_artist_id:
+                        return await self.youtube_provider.get_artist(yt_artist_id, fast=True)
+                except Exception as exc:
+                    print(f"[itunes] fast YouTube lookup failed for artist {name!r}: {exc}")
+
+            if not top_tracks:
+                try:
+                    data = await self._get(_LOOKUP_URL, {"id": artist_id, "entity": "song", "limit": 25})
+                    for item in data.get("results") or []:
+                        candidate = self._map_track(item) if item.get("wrapperType") == "track" else None
+                        if candidate:
+                            top_tracks.append(candidate)
+                except Exception:
+                    pass
+
+            cached_albums = self._albums_cache.get(artist_id)
+            albums = self._dedupe_albums(cached_albums) if cached_albums else []
+
+            return ArtistInfo(
+                id=artist_id,
+                source=SOURCE_NAME,
+                name=name or "Unknown artist",
+                photo=top_tracks[0].artwork if top_tracks else None,
+                subscribers=None,
+                top_tracks=top_tracks,
+                albums=albums,
+            )
+
         raw_albums = await self._fetch_all_albums(artist_id)
         albums = self._dedupe_albums(raw_albums)
         # the name most of the albums carry — a single entry can be a joint release
@@ -820,7 +869,7 @@ class ITunesCatalogProvider:
             try:
                 yt_artist_id = await asyncio.wait_for(find_artist_id(name), timeout=8.0)
                 if yt_artist_id:
-                    return await self.youtube_provider.get_artist(yt_artist_id)
+                    return await self.youtube_provider.get_artist(yt_artist_id, fast=False)
             except Exception as exc:
                 print(f"[itunes] no YouTube Music page for artist {name!r}: {exc}")
 
@@ -840,7 +889,7 @@ class ITunesCatalogProvider:
             id=artist_id,
             source=SOURCE_NAME,
             name=name or "Unknown artist",
-            photo=None,
+            photo=top_tracks[0].artwork if top_tracks else None,
             subscribers=None,
             top_tracks=top_tracks,
             albums=albums,
