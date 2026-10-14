@@ -101,10 +101,10 @@ def score_candidate(query: str, candidate: TrackCandidate, index: int = 0) -> fl
     if album_tokens and (album_tokens & q_tokens) and (artist_tokens & q_tokens):
         score += 0.12
 
-    # If title has NO query tokens and album has NO query tokens, and candidate is not by the queried artist:
-    # A candidate that only matched random words in artist name must not beat real songs
-    if not (clean_title_tokens & q_tokens) and not (album_tokens & q_tokens) and not (artist_tokens and artist_tokens.issubset(q_tokens)):
-        score -= 0.30
+    # If title has NO query tokens and candidate is not by the queried artist:
+    # A candidate that only matched words in an unrelated artist/album name must not beat real songs
+    if not (clean_title_tokens & q_tokens) and not (artist_tokens and artist_tokens.issubset(q_tokens)):
+        score -= 0.35
 
     if candidate.duration and 60 <= candidate.duration <= 600:
         score += 0.04

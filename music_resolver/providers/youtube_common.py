@@ -304,6 +304,8 @@ class YtDlpResolver:
             "noplaylist": True,
             "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
             "socket_timeout": self.settings.provider_timeout,
+            "geo_bypass": True,
+            "geo_bypass_country": "US",
         }
         file_cookies = cookie_file_path() if force_file else None
         if file_cookies:

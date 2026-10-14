@@ -179,6 +179,8 @@ class SoundCloudProvider:
             "concurrent_fragment_downloads": 4,
             "retries": 3,
             "fragment_retries": 3,
+            "geo_bypass": True,
+            "geo_bypass_country": "US",
         }
         if self.settings.ytdlp_proxy:
             opts["proxy"] = self.settings.ytdlp_proxy
