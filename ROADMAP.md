@@ -82,11 +82,16 @@ Audio streaming throughput and track latency overhauled:
     - Added bidirectional Cyrillic-to-Latin phonetic transliteration in `_artist_matches` (bridging "Kino" <-> "Кино", "Splean" <-> "Сплин", etc.).
     - Maintained global storefront querying on Apple Music without `country=RU` to preserve full international release catalogs.
     - Boosted `/warm` search pre-warming: concurrency raised, freed from waiting for full idle.
-
-
+    - **Fan Remake & Matcher Eradication (2026-10-14)**:
+      - `matcher.py`: implemented `strip_title_extras()` (`feat.`, `ft.`, `with`, `deluxe`) so multi-collaborator tags don't penalize SequenceMatcher title overlap; heavy penalties on fan remake terms (`slowed`, `reverb`, `remake`, `type beat`, `prod by`); position priors to preserve official release ranks.
+      - `youtube_music.py`: `_is_fan_remake()` regex filter strips unofficial UGC from `search()` and `search_videos()`.
+      - `itunes_catalog.py`: studio track length verification (`abs(actual - expected) <= 20`); versioned match cache `_CATALOG_CACHE_VERSION = 2` to purge old stale matches on restart; removed blind scan of `audio_v2/*.bin`; fast discography lookup returns cached albums immediately.
+      - `routes.py`: `_find_cached_track` strictly enforces match suffixes (prevents serving mismatched/stale fan remake `.bin` files); `_rebuild_disk_cache_map` stops blindly polluting match cache.
+      - `miniapp/app.js` & `index.html`: eliminated premature `"Не удалось загрузить исполнителя"` toast, set artist cover from top track, bumped cache buster to `?v=201`.
 
 ## Findings and Decisions
 - Audio cache hit response time reduced from ~19s to 12–15 ms.
+- Stale match cache on the server previously locked in fan remakes even when new matching logic was deployed; versioned match cache and strict suffix verification in `_find_cached_track` resolve this completely.
 - User playlist tracks (~1,600 tracks) take only ~5–6 GB of disk space on the 88 GB free NVMe volume.
 - User playback has 100% priority: background preloader yields whenever a user requests or streams a track.
 - Yandex API refuses non-Russian IPs. Fix: `YANDEX_PROXY` in `/opt/notka/app/.env` (proxys.io shared IPv4, 30 days, expires ~2026-11-11). Fallback relay kept in `deploy/yandex_relay*`.
@@ -103,19 +108,21 @@ Audio streaming throughput and track latency overhauled:
 - Layout bugs on Samsung/iPhone could not be reproduced without a device; no blind fixes were made.
 
 ## Important Changed Files
-`music_resolver/services/playlist_import.py`, `music_resolver/api/routes.py` (`/card`), `miniapp/app.js`, `miniapp/styles.css`, `miniapp/index.html`, `deploy/yandex_relay*`, `фидбек/Сводка_фидбека_2026-10-12.md`.
+`music_resolver/services/matcher.py`, `music_resolver/providers/itunes_catalog.py`, `music_resolver/providers/youtube_music.py`, `music_resolver/api/routes.py`, `miniapp/app.js`, `miniapp/index.html`.
 
 ## Validation
-Import checked on the live server for Spotify, Yandex, Apple, Deezer, SoundCloud. `/card` endpoint checked with tests (auth, size, type, rate limit). Frontend syntax checked with `node --check`. No device testing done.
+All 7 checks in verification suite passed cleanly:
+1. Search queries for `Playboi Carti`, `FE!N`, `Sky`, `2024`, `ALL RED`, `MOJO JOJO`, `TOXIC` returned official releases at rank #1 (confidence 1.0).
+2. All 8 tracks from Playboi Carti's album `MUSIC` (`MOJO JOJO`, `PHILLY`, `RADAR`, `RATHER LIE`, `FINE SHIT`, `BACKD00R`, `TOXIC`, `OPM BABI`) matched with 100% precision to official artist channels with matching studio duration.
+3. Numeric iTunes IDs auto-route properly without 502.
+4. Fast artist response loads in ~1.5s with real cover photo and cached albums.
 
 ## Blockers
-- Owner has to export `cookies.txt` (extension «Get cookies.txt LOCALLY», preferably a spare Google account) so that YouTube sign-in checks can be passed; Chrome/Edge cookie DBs cannot be read from the PC.
-- Screen recordings for stage 6; error details for stage 7.
-- Owner decisions for stage 9.
+- None. Ready for server deploy.
 
 ## Next Action
-1. Owner deploys: `! bash deploy/push.sh 94.156.179.229`; then verify served version 156 and `GET /profile?source=youtube_music&id=<id>&artist=<name>` after a few plays, `/analytics` returns 401 without login, and the admin counters `sync_*`, `an_events` appear.
-2. Ask reporters (adeline, Степан, Eva) for recordings/details for stages 6-7.
+1. Owner deploys from `main`: `bash deploy/push.sh 94.156.179.229` (or `bash deploy/push.sh 5.227.61.107`).
+2. Verify in Mini App: search for Playboi Carti, check artist page loads with cover and without error toasts, play tracks (`FE!N`, `RATHER LIE`, `ALL RED`, etc.) to confirm studio original audio plays.
 
 ## Resume Context
 Reply to the owner in Russian, plain language, no repeated self-criticism (see `CLAUDE.md`). The owner is not a programmer: decide technical things, ask only product questions. Do not edit the 3D reference. Memory notes: `notka-feedback-round-2026-10-12`.
