@@ -219,7 +219,7 @@ def _artist_matches(query_artist: str, candidate_title: str, candidate_artist: s
             return True
         q_str = " ".join(sorted(q_lat_tok))
         c_str = " ".join(sorted(c_lat_tok))
-        if SequenceMatcher(None, q_str, c_str).ratio() >= 0.75:
+        if SequenceMatcher(None, q_str, c_str).ratio() >= 0.70:
             return True
     return False
 

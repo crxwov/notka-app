@@ -62,7 +62,7 @@ for attempt in 1 2 3; do
   "${SSH[@]}" "sudo systemctl restart notka && sleep 4 && sudo systemctl is-active notka && curl -s http://127.0.0.1:8080/health" && break
   echo "Перезапуск не подтвердился (попытка $attempt), пробую ещё раз..."; sleep 6
 done
-"${SSH[@]}" "sudo sh -c 'printf \"branch=%s\\ncommit=%s\\nby=%s\\nat=%s\\n\" \"$BRANCH\" \"$(git rev-parse --short HEAD)\" \"$WHO\" \"$(date \"+%Y-%m-%d %H:%M\")\" > /opt/notka/DEPLOY_INFO'"
+"${SSH[@]}" "sudo sh -c 'printf \"branch=%s\\ncommit=%s\\nby=%s\\nat=%s\\n\" \"$BRANCH\" \"$(git rev-parse --short HEAD)\" \"$WHO\" \"\$(date +%Y-%m-%d_%H:%M)\" > /opt/notka/DEPLOY_INFO'"
 echo
 echo "Готово. На сервере записано: ветка $BRANCH, коммит $(git rev-parse --short HEAD), выложил $USER_NAME."
 
