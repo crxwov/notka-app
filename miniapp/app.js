@@ -6457,10 +6457,16 @@
       const norm = (s) => String(s || "").toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
       const t0 = norm(track.title), a0 = norm(track.artist);
       const firstWord = (s) => s.split(" ")[0] || "";
+      const isFanUgc = (title, artist) => {
+        const s = `${title} ${artist}`.toLowerCase();
+        return /\b(slowed|reverb|sped\s+up|speed\s+up|nightcore|type\s+beat|remake|reproduced|mashup|bootleg|flip|fan\s+edit|ai\s+cover)\b|\bprod\s+by\b/i.test(s);
+      };
+      const origHasFan = isFanUgc(track.title || "", track.artist || "");
       return (data.results || []).find((c) => c.id !== track.id && c.sourceId !== track.sourceId
         && norm(c.title) === t0
         && (!a0 || norm(c.artist).includes(firstWord(a0)) || a0.includes(firstWord(norm(c.artist))))
-        && (!track.duration || !c.duration || Math.abs(c.duration - track.duration) <= 10)) || null;
+        && (origHasFan || !isFanUgc(c.title || "", c.artist || ""))
+        && (!track.duration || !c.duration || Math.abs(c.duration - track.duration) <= 12)) || null;
     } catch (e) { return null; }
   }
 
@@ -7749,6 +7755,11 @@
       setCoverEl($("album-cover"), album.cover, albumId);
       renderAlbumTrackList(album.tracks || [], album.title || fallbackTitle || "Альбом");
       updateSourceButtons();
+      if (album.tracks && album.tracks.length) {
+        album.tracks.slice(0, 3).forEach((t) => {
+          fetch(`${API_BASE_URL}/warm?${trackQuery(t)}`).catch(() => {});
+        });
+      }
     } catch (e) {
       if (token !== albumToken) return;
       console.error(e);

@@ -62,12 +62,15 @@ def score_candidate(query: str, candidate: TrackCandidate, index: int = 0) -> fl
     clean_title_norm = normalize_text(clean_title)
     title_norm = normalize_text(candidate.title)
     artist_norm = normalize_text(candidate.artist)
-    full_norm = normalize_text(f"{candidate.title} {candidate.artist}")
+    album_norm = normalize_text(candidate.album or "")
+    full_norm = normalize_text(f"{candidate.title} {candidate.artist} {candidate.album or ''}")
+    title_artist_norm = normalize_text(f"{candidate.title} {candidate.artist}")
     q_tokens = tokens(query)
     full_tokens = tokens(full_norm)
     title_tokens = tokens(candidate.title)
     clean_title_tokens = tokens(clean_title)
     artist_tokens = tokens(candidate.artist)
+    album_tokens = tokens(candidate.album or "")
 
     if not q_tokens or not full_tokens:
         return 0.0
@@ -76,15 +79,16 @@ def score_candidate(query: str, candidate: TrackCandidate, index: int = 0) -> fl
     clean_title_seq = SequenceMatcher(None, q_norm, clean_title_norm).ratio()
     title_seq = SequenceMatcher(None, q_norm, title_norm).ratio()
     full_seq = SequenceMatcher(None, q_norm, full_norm).ratio()
+    title_artist_seq = SequenceMatcher(None, q_norm, title_artist_norm).ratio()
 
     best_title_seq = max(clean_title_seq, title_seq)
 
     # When query specifically searches for the song title (or title is an exact match),
     # don't penalize the candidate simply because its artist name has multiple collaborators
     if best_title_seq >= 0.80 or (clean_title_tokens and clean_title_tokens == q_tokens):
-        best_seq = max(best_title_seq, full_seq)
+        best_seq = max(best_title_seq, title_artist_seq)
     else:
-        best_seq = full_seq
+        best_seq = max(full_seq, title_artist_seq)
 
     score = 0.45 * overlap + 0.35 * best_seq + 0.10 * best_title_seq
 
@@ -94,6 +98,14 @@ def score_candidate(query: str, candidate: TrackCandidate, index: int = 0) -> fl
         score += 0.08
     if artist_tokens and artist_tokens.issubset(q_tokens):
         score += 0.10
+    if album_tokens and (album_tokens & q_tokens) and (artist_tokens & q_tokens):
+        score += 0.12
+
+    # If title has NO query tokens and album has NO query tokens, and candidate is not by the queried artist:
+    # A candidate that only matched random words in artist name must not beat real songs
+    if not (clean_title_tokens & q_tokens) and not (album_tokens & q_tokens) and not (artist_tokens and artist_tokens.issubset(q_tokens)):
+        score -= 0.30
+
     if candidate.duration and 60 <= candidate.duration <= 600:
         score += 0.04
 

@@ -118,7 +118,7 @@ class SoundCloudProvider:
                     artist=_artist_from_info(item),
                     duration=int(duration) if duration else None,
                     artwork=best_thumbnail(item),
-                    source_url=item.get("webpage_url"),
+                    source_url=item.get("webpage_url") or item.get("url"),
                 )
             )
         return results

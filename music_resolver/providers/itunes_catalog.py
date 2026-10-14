@@ -56,7 +56,7 @@ _LOOKUP_URL = "https://itunes.apple.com/lookup"
 _DISK_CACHE_PATH = Path(__file__).resolve().parent.parent.parent / "cache" / "itunes_catalog.json"
 
 
-_CATALOG_CACHE_VERSION = 2
+_CATALOG_CACHE_VERSION = 3
 
 
 def _artwork(entry: dict) -> str | None:
@@ -259,6 +259,13 @@ _UNOFFICIAL_PHRASE_RE = re.compile(
 )
 
 
+_HARD_UNOFFICIAL_TERMS = {
+    "remix", "slowed", "sped", "reverb", "cover", "karaoke",
+    "instrumental", "nightcore", "remake", "reproduced", "tribute",
+    "bootleg", "rework", "mashup", "leak", "unreleased", "snippet", "ai",
+}
+
+
 def _looks_unofficial(candidate_title: str, candidate_artist: str, query_title: str) -> bool:
     """True when a candidate's title/artist carries a fan-edit/cover/remix
     signal that the query itself doesn't ask for — "JACKBOYS - JB2 RADIO
@@ -275,12 +282,12 @@ def _looks_unofficial(candidate_title: str, candidate_artist: str, query_title: 
     query_tok = tokens(query_title)
     if _UNOFFICIAL_PHRASE_RE.search(haystack) and not _UNOFFICIAL_PHRASE_RE.search(query_title or ""):
         return True
-    single_word_hits = set(PENALTY_TERMS) & tokens(haystack)
+    single_word_hits = _HARD_UNOFFICIAL_TERMS & tokens(haystack)
     if single_word_hits - query_tok:
         return True
     # …and the other way round: a track that IS a remix / live cut / sped-up
     # version must not be matched to the plain original.
-    return bool((set(PENALTY_TERMS) & query_tok) - tokens(haystack))
+    return bool((_HARD_UNOFFICIAL_TERMS & query_tok) - tokens(haystack))
 
 
 # How far a video's length may be from the iTunes track's own length and
@@ -466,14 +473,23 @@ class ITunesCatalogProvider:
             raise AppError(ErrorCode.TRACK_NOT_FOUND, "No such track in the catalog")
         return candidate
 
-    async def _matched_video(self, track_id: str) -> str:
+    async def _matched_video(self, track_id: str, allow_soundcloud: bool = True) -> str:
         video_id = self._match_cache.get(track_id)
+        if video_id and not allow_soundcloud and video_id.startswith("sc:"):
+            video_id = None
         if not video_id:
             info = await self._lookup_track_info(track_id)
-            video_id = await self._match_on_youtube(info.title, info.artist, info.duration)
+            video_id = await self._match_on_youtube(info.title, info.artist, info.duration, allow_soundcloud=allow_soundcloud)
             self._match_cache[track_id] = video_id
             self._save_disk_cache()
         return video_id
+
+    async def ensure_matched(self, track_id: str) -> str | None:
+        try:
+            await self._matched_video(track_id)
+            return self.matched_video_id(track_id)
+        except Exception:
+            return None
 
     # ---------------- MusicProvider surface ----------------
 
@@ -495,8 +511,15 @@ class ITunesCatalogProvider:
         target = await self._matched_video(track_id)
         if target.startswith("sc:") and self.soundcloud_provider:
             sc_target = target[3:]
-            sc_resolved = await self.soundcloud_provider.resolve(sc_target)
-            return ResolvedTrack(track=candidate_to_track(info), playback=sc_resolved.playback)
+            try:
+                sc_resolved = await self.soundcloud_provider.resolve(sc_target)
+                return ResolvedTrack(track=candidate_to_track(info), playback=sc_resolved.playback)
+            except Exception as exc:
+                print(f"[itunes] soundcloud playback failed for {track_id} ({sc_target}): {exc}, falling back to YouTube")
+                self._match_cache.pop(track_id, None)
+                self._save_disk_cache()
+                target = await self._matched_video(track_id, allow_soundcloud=False)
+
         yt_resolved = await self.youtube_provider.resolve(target)
         return ResolvedTrack(track=candidate_to_track(info), playback=yt_resolved.playback)
 
@@ -505,7 +528,14 @@ class ITunesCatalogProvider:
         target = await self._matched_video(track_id)
         if target.startswith("sc:") and self.soundcloud_provider:
             sc_target = target[3:]
-            return await self.soundcloud_provider.download_to_file(sc_target, dest_dir, dest_stem)
+            try:
+                return await self.soundcloud_provider.download_to_file(sc_target, dest_dir, dest_stem)
+            except Exception as exc:
+                print(f"[itunes] soundcloud download failed for {track_id} ({sc_target}): {exc}, falling back to YouTube")
+                self._match_cache.pop(track_id, None)
+                self._save_disk_cache()
+                target = await self._matched_video(track_id, allow_soundcloud=False)
+
         return await self.youtube_provider.download_to_file(target, dest_dir, dest_stem)
 
     def can_handle_url(self, url: str) -> bool:
@@ -546,7 +576,9 @@ class ITunesCatalogProvider:
         match = re.search(r"[?&]i=(\d+)", value) or re.search(r"/id(\d+)", value)
         return match.group(1) if match else None
 
-    async def _match_on_youtube(self, title: str, artist: str, duration: int | None = None) -> str:
+    async def _match_on_youtube(
+        self, title: str, artist: str, duration: int | None = None, allow_soundcloud: bool = True
+    ) -> str:
         """Find the playback audio that carries this iTunes track's audio.
 
         Priority order:
@@ -568,7 +600,7 @@ class ITunesCatalogProvider:
             accepted, via = await self._match_among_videos(query, title, artist, primary_artist, duration, official_only=True)
 
         # 3. SoundCloud official release/upload (checked before random YouTube user uploads)
-        if accepted is None and self.soundcloud_provider:
+        if accepted is None and allow_soundcloud and self.soundcloud_provider:
             sc_match = await self._match_on_soundcloud(title, artist, primary_artist, duration)
             if sc_match is not None:
                 accepted = sc_match

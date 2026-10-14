@@ -17,7 +17,7 @@ from music_resolver.providers.youtube_common import (
 
 SOURCE_NAME = "youtube_music"
 # videoType values YouTube Music gives to uploads it credits to the artist
-OFFICIAL_VIDEO_TYPES = {"MUSIC_VIDEO_TYPE_OMV", "MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC"}
+OFFICIAL_VIDEO_TYPES = {"MUSIC_VIDEO_TYPE_OMV", "MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC", "MUSIC_VIDEO_TYPE_ATV"}
 
 
 def _best_thumbnail_url(thumbnails: list[dict] | None) -> str | None:
@@ -804,8 +804,7 @@ class YoutubeMusicProvider:
                             # requests-style proxy map, not a bare URL string —
                             # ytmusicapi hands this straight to requests.Session.
                             kwargs["proxies"] = {"http": proxy_address, "https": proxy_address}
-                        if self.settings.ytmusic_location:
-                            kwargs["location"] = self.settings.ytmusic_location
+                        kwargs["location"] = self.settings.ytmusic_location or "US"
                         # a short timeout: a good answer takes under a second, a
                         # throttled one hangs for ten — better to ask again
                         session = requests.Session()

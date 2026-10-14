@@ -303,19 +303,25 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         that is already cached is found without asking the source anything —
         resolving it again would cost seconds for a file we already hold."""
         provider = service.manager.get(source)
-        needs_match = hasattr(provider, "matched_video_id") if provider else False
-        if not needs_match:
-            cached = _find_cached_track(source, source_id)
-            if cached:
-                return cached
-            if provider is not None and hasattr(provider, "download_to_file"):
-                return await _ensure_cached(provider, source, source_id, "", None)
-        else:
-            suffix = match_suffix_for(provider, source_id) if provider else None
+        suffix = None
+        if provider is not None and hasattr(provider, "matched_video_id"):
+            suffix = match_suffix_for(provider, source_id)
+            if not suffix and hasattr(provider, "ensure_matched"):
+                suffix = await provider.ensure_matched(source_id)
             if suffix:
                 cached = _find_cached_track(source, source_id, suffix)
                 if cached:
                     return cached
+        else:
+            cached = _find_cached_track(source, source_id)
+            if cached:
+                return cached
+
+        # Preferred path: let yt-dlp download directly to disk cache without double-resolving
+        if provider is not None and hasattr(provider, "download_to_file"):
+            suffix = match_suffix_for(provider, source_id) if hasattr(provider, "matched_video_id") else None
+            return await _ensure_cached(provider, source, source_id, "", None, match_suffix=suffix)
+
         response = await service.resolve(source=source, id=source_id, url=None)
         if response.playback.type != "url" or not response.playback.url:
             raise AppError(ErrorCode.RESOLVE_FAILED, "Resolved playback cannot be played")

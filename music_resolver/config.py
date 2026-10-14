@@ -120,7 +120,7 @@ def load_settings() -> Settings:
         # to be auto-detected from the (proxied or not) request IP — keeps
         # search results consistent regardless of which exit node a given
         # proxy happens to use. See ytmusicapi's `location` parameter.
-        ytmusic_location=os.getenv("YTMUSIC_LOCATION") or None,
+        ytmusic_location=os.getenv("YTMUSIC_LOCATION") or "US",
     )
     # The proxies are watched while the server runs: a dead one is dropped
     # (traffic goes direct) and picked up again once it answers.
