@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from urllib.parse import urlparse
 
 from yt_dlp import YoutubeDL
@@ -163,3 +164,32 @@ class SoundCloudProvider:
             expires_at=expires_at_from_url(url),
         )
         return ResolvedTrack(track=track, playback=playback)
+
+    async def download_to_file(self, id_or_url: str, dest_dir: Path, dest_stem: str) -> tuple[Path, str]:
+        target = id_or_url.strip()
+        if not target.startswith("http"):
+            resolved = await self.resolve(target)
+            target = resolved.track.source_url or soundcloud_target(target)
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "format": "bestaudio/best",
+            "outtmpl": str(dest_dir / f"{dest_stem}.%(ext)s"),
+            "overwrites": True,
+            "concurrent_fragment_downloads": 4,
+            "retries": 3,
+            "fragment_retries": 3,
+        }
+        if self.settings.ytdlp_proxy:
+            opts["proxy"] = self.settings.ytdlp_proxy
+
+        def _dl():
+            with YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(target, download=True)
+                ext = info.get("ext") or "m4a"
+                final_path = dest_dir / f"{dest_stem}.{ext}"
+                mime = mime_from_format(info) or "audio/mp4"
+                return final_path, mime
+
+        return await asyncio.to_thread(_dl)
+

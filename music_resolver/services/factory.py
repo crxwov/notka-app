@@ -11,22 +11,24 @@ from music_resolver.services.provider_manager import ProviderManager
 def build_music_service(settings: Settings) -> MusicService:
     youtube_music = YoutubeMusicProvider(settings)
     youtube_web = YoutubeWebProvider(settings)
+    soundcloud = SoundCloudProvider(settings)
     # iTunes Search never plays audio itself (see itunes_catalog.py) — it
-    # only supplies catalog data, and hands playback back to this same
-    # YouTube provider. Third attempt at this role: Spotify's Web API turned
-    # out to require a Premium subscription even for app-only access, and
-    # MusicBrainz's free search cluster turned out to have sustained
-    # overload (routine 503s). Apple's iTunes Search API is also free and
-    # keyless, but backed by Apple's own infrastructure — reliably fast.
-    # youtube_web is wired in as a search-only fallback for when YouTube
-    # Music's own search comes up empty for a track that does exist on
-    # YouTube proper (see itunes_catalog._match_on_youtube).
-    itunes = ITunesCatalogProvider(settings, youtube_provider=youtube_music, youtube_fallback_provider=youtube_web)
+    # only supplies catalog data, and hands playback back to YouTube or
+    # SoundCloud. Apple's iTunes Search API is free and keyless, backed by
+    # Apple's own infrastructure — reliably fast. When YouTube lacks official
+    # audio (e.g. exclusive drops like Playboi Carti's MUSIC), it falls back
+    # to SoundCloud's official artist uploads.
+    itunes = ITunesCatalogProvider(
+        settings,
+        youtube_provider=youtube_music,
+        youtube_fallback_provider=youtube_web,
+        soundcloud_provider=soundcloud,
+    )
     youtube_music.set_catalog_provider(itunes)
 
     available: dict[str, MusicProvider] = {
         "youtube_music": youtube_music,
-        "soundcloud": SoundCloudProvider(settings),
+        "soundcloud": soundcloud,
         "youtube_web": youtube_web,
         "itunes": itunes,
     }

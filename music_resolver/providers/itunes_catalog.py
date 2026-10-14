@@ -160,6 +160,18 @@ def _title_matches(query_title: str, candidate_title: str, primary_artist: str =
     return jaccard >= 0.5 or seq >= 0.75
 
 
+_CYR_TO_LAT = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo", "ж": "zh",
+    "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o",
+    "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f", "х": "kh", "ц": "ts",
+    "ч": "ch", "ш": "sh", "щ": "shch", "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+}
+
+
+def _to_latin(text: str) -> str:
+    return "".join(_CYR_TO_LAT.get(ch, ch) for ch in (text or "").lower())
+
+
 def _artist_matches(query_artist: str, candidate_title: str, candidate_artist: str) -> bool:
     """Independent, artist-only check — a candidate titled identically by a
     different, similarly-named artist ("Travis" vs "Travis Scott") must not
@@ -192,7 +204,21 @@ def _artist_matches(query_artist: str, candidate_title: str, candidate_artist: s
     prefix_clause = _leading_artist_prefix_clause(candidate_title, query_artist) or ""
     c_tok = tokens(candidate_artist) | tokens(prefix_clause)
     overlap = len(q_tok & c_tok) / len(q_tok)
-    return overlap >= 0.8
+    if overlap >= 0.8:
+        return True
+
+    # Transliteration fallback: compare in Latin characters (Kino <-> Кино, Splean <-> Сплин)
+    q_lat_tok = tokens(_to_latin(query_artist))
+    c_lat_tok = tokens(_to_latin(candidate_artist)) | tokens(_to_latin(prefix_clause))
+    if q_lat_tok and c_lat_tok:
+        lat_overlap = len(q_lat_tok & c_lat_tok) / len(q_lat_tok)
+        if lat_overlap >= 0.8:
+            return True
+        q_str = " ".join(sorted(q_lat_tok))
+        c_str = " ".join(sorted(c_lat_tok))
+        if SequenceMatcher(None, q_str, c_str).ratio() >= 0.75:
+            return True
+    return False
 
 
 # Multi-word tells for a fan edit/cover/novelty upload that a plain word-list
@@ -292,7 +318,13 @@ class ITunesCatalogProvider:
 
     name = SOURCE_NAME
 
-    def __init__(self, settings: Settings, youtube_provider, youtube_fallback_provider=None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        youtube_provider,
+        youtube_fallback_provider=None,
+        soundcloud_provider=None,
+    ) -> None:
         self.settings = settings
         self.youtube_provider = youtube_provider
         # Kept for wiring/back-compat only — NOT used to accept matches
@@ -302,6 +334,7 @@ class ITunesCatalogProvider:
         # deliberately formatted to look official. See _match_on_youtube's
         # docstring for why that fallback was removed rather than tuned.
         self.youtube_fallback_provider = youtube_fallback_provider
+        self.soundcloud_provider = soundcloud_provider
         self._last_request_at = 0.0
         self._rate_lock = asyncio.Lock()
         # iTunes track id -> matched youtube video id, so download_to_file
@@ -432,7 +465,7 @@ class ITunesCatalogProvider:
         cached = self._track_info_cache.get(track_id)
         if cached is not None:
             return cached
-        data = await self._get(_LOOKUP_URL, {"id": track_id})
+        data = await self._get(_LOOKUP_URL, {"id": track_id, "country": "RU", "lang": "ru_ru"})
         items = data.get("results") or []
         candidate = self._map_track(items[0]) if items else None
         if candidate is None:
@@ -451,7 +484,7 @@ class ITunesCatalogProvider:
     # ---------------- MusicProvider surface ----------------
 
     async def search(self, query: str, limit: int) -> list[TrackCandidate]:
-        data = await self._get(_SEARCH_URL, {"term": query, "entity": "song", "limit": limit})
+        data = await self._get(_SEARCH_URL, {"term": query, "entity": "song", "limit": limit, "country": "RU", "lang": "ru_ru"})
         results = []
         for item in data.get("results") or []:
             candidate = self._map_track(item)
@@ -465,14 +498,21 @@ class ITunesCatalogProvider:
             raise AppError(ErrorCode.INVALID_SOURCE_URL, "Unsupported or invalid iTunes URL")
 
         info = await self._lookup_track_info(track_id)
-        video_id = await self._matched_video(track_id)
-        yt_resolved = await self.youtube_provider.resolve(video_id)
+        target = await self._matched_video(track_id)
+        if target.startswith("sc:") and self.soundcloud_provider:
+            sc_target = target[3:]
+            sc_resolved = await self.soundcloud_provider.resolve(sc_target)
+            return ResolvedTrack(track=candidate_to_track(info), playback=sc_resolved.playback)
+        yt_resolved = await self.youtube_provider.resolve(target)
         return ResolvedTrack(track=candidate_to_track(info), playback=yt_resolved.playback)
 
     async def download_to_file(self, id_or_url: str, dest_dir: Path, dest_stem: str):
         track_id = self._extract_track_id(id_or_url) or id_or_url
-        video_id = await self._matched_video(track_id)
-        return await self.youtube_provider.download_to_file(video_id, dest_dir, dest_stem)
+        target = await self._matched_video(track_id)
+        if target.startswith("sc:") and self.soundcloud_provider:
+            sc_target = target[3:]
+            return await self.soundcloud_provider.download_to_file(sc_target, dest_dir, dest_stem)
+        return await self.youtube_provider.download_to_file(target, dest_dir, dest_stem)
 
     def can_handle_url(self, url: str) -> bool:
         try:
@@ -482,7 +522,7 @@ class ITunesCatalogProvider:
         return host.endswith("apple.com")
 
     def matched_video_id(self, track_id: str) -> str | None:
-        """Whichever YouTube video id this iTunes track was last matched to
+        """Whichever YouTube video id or SoundCloud target this iTunes track was last matched to
         (populated by resolve()/download_to_file() into _match_cache).
 
         Used by the /stream route to fold the matched video id into the
@@ -494,7 +534,13 @@ class ITunesCatalogProvider:
         with no way to tell the two apart. This is exactly why the wrong
         song kept playing even once the match log showed the right pick.
         """
-        return self._match_cache.get(track_id)
+        val = self._match_cache.get(track_id)
+        if not val:
+            return None
+        if val.startswith("sc:"):
+            clean = re.sub(r"[^A-Za-z0-9_.-]", "_", val[3:])
+            return f"sc_{clean[-40:]}"
+        return val
 
     @staticmethod
     def _extract_track_id(id_or_url: str) -> str | None:
@@ -507,38 +553,36 @@ class ITunesCatalogProvider:
         return match.group(1) if match else None
 
     async def _match_on_youtube(self, title: str, artist: str, duration: int | None = None) -> str:
-        """Find the YouTube video that carries this iTunes track's audio.
+        """Find the playback audio that carries this iTunes track's audio.
 
-        Three passes, most trustworthy first:
-
-        1. YouTube Music's own catalog ("songs") — matched against real
-           releases, so a title+artist hit there is the official audio.
-        2. Videos YouTube Music itself credits to the artist. From a
-           Russian IP the catalog has no major-label releases after 2022
-           (search returns only covers and karaoke for them), while these
-           videos are still there.
-        3. A user upload, and only when it passes all of: its title is the
-           artist plus the song name and nothing else of substance, no
-           cover/remix/live marker, and its length is within a few seconds
-           of the iTunes track's. Text alone can't tell a fan edit from the
-           original ("Yeat - Purpose General (but the beat has every Yeat
-           era)" was once accepted that way) — the length check is what
-           keeps those out, so without a known length this pass is skipped.
-
-        Anything that passes none of them fails honestly instead of playing
-        the wrong audio.
+        Priority order:
+        1. YouTube Music's own catalog ("songs") — official streaming audio.
+        2. Videos YouTube Music itself credits to the artist.
+        3. SoundCloud official/matching track (checked BEFORE random YouTube user uploads!).
+        4. YouTube user upload (strict title + length check, rejecting remakes/beats).
         """
-        # Lead with just the primary artist — a full multi-artist credit
-        # string ("Travis Scott, Quavo, Offset") stuffed into the query
-        # pushes the actual official upload out of the top results.
         primary_artist = artist.split(",")[0].strip() if artist else artist
         primary_artist = re.split(r"\bfeat\.?\b|\bft\.?\b|&", primary_artist, flags=re.IGNORECASE)[0].strip()
         query = f"{title} {primary_artist}".strip()
 
+        # 1. YouTube catalog search
         accepted, ranked = await self._search_and_match(self.youtube_provider, query, title, primary_artist)
         via = "catalog"
+
+        # 2. YouTube official artist-credited videos
         if accepted is None:
-            accepted, via = await self._match_among_videos(query, title, artist, primary_artist, duration)
+            accepted, via = await self._match_among_videos(query, title, artist, primary_artist, duration, official_only=True)
+
+        # 3. SoundCloud official release/upload (checked before random YouTube user uploads)
+        if accepted is None and self.soundcloud_provider:
+            sc_match = await self._match_on_soundcloud(title, artist, primary_artist, duration)
+            if sc_match is not None:
+                accepted = sc_match
+                via = "soundcloud"
+
+        # 4. YouTube user upload as last resort
+        if accepted is None:
+            accepted, via = await self._match_among_videos(query, title, artist, primary_artist, duration, official_only=False)
 
         print(
             f"[itunes match] query={query!r} -> "
@@ -548,11 +592,46 @@ class ITunesCatalogProvider:
             + ")"
         )
         if accepted is None:
-            raise AppError(ErrorCode.TRACK_NOT_FOUND, "Track not found in the official catalog")
+            raise AppError(ErrorCode.TRACK_NOT_FOUND, "Track not found in available catalogs")
+        if via == "soundcloud":
+            return f"sc:{accepted.source_url or accepted.source_id}"
         return accepted.source_id
 
+    async def _match_on_soundcloud(
+        self, title: str, artist: str, primary_artist: str, duration: int | None
+    ) -> TrackCandidate | None:
+        if not self.soundcloud_provider:
+            return None
+        query = f"{title} {primary_artist}".strip()
+        try:
+            candidates = await self.soundcloud_provider.search(query, 8)
+        except Exception as exc:
+            print(f"[itunes match] soundcloud search failed: {exc}")
+            return None
+        if not candidates:
+            return None
+
+        valid = []
+        for c in candidates:
+            if _looks_unofficial(c.title, c.artist, title):
+                continue
+            if not _title_matches(title, c.title, primary_artist):
+                continue
+            if not _artist_matches(primary_artist, c.title, c.artist):
+                continue
+            if duration and c.duration and abs(c.duration - duration) > 25:
+                continue
+            ch = (c.artist or "").lower()
+            if any(bad in ch for bad in ("prod", "beat", "beatz", "remake", "archive", "reverb", "slowed", "type", "edits", "instr")):
+                continue
+            valid.append(c)
+
+        if not valid:
+            return None
+        return min(valid, key=lambda c: abs((c.duration or 0) - duration) if duration and c.duration else 0)
+
     async def _match_among_videos(
-        self, query: str, title: str, artist: str, primary_artist: str, duration: int | None
+        self, query: str, title: str, artist: str, primary_artist: str, duration: int | None, official_only: bool = False
     ) -> tuple[TrackCandidate | None, str]:
         search_videos = getattr(self.youtube_provider, "search_videos", None)
         if search_videos is None:
@@ -579,7 +658,7 @@ class ITunesCatalogProvider:
                     and _duration_close(duration, candidate.duration, _OFFICIAL_VIDEO_TOLERANCE, required=False)
                 ):
                     official.append(candidate)
-            elif _user_upload_title_matches(title, artist, primary_artist, candidate.title) and _duration_close(
+            elif not official_only and _user_upload_title_matches(title, artist, primary_artist, candidate.title) and _duration_close(
                 duration, candidate.duration, _USER_UPLOAD_TOLERANCE, required=True
             ):
                 ch = (candidate.artist or "").lower()
