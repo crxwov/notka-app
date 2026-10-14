@@ -65,11 +65,11 @@ Audio streaming throughput and track latency overhauled:
     - `setCoverEl()` preloads new images off-screen and smoothly swaps `img.src`.
     - Softened swipe keyframes and replaced forced reflows with `requestAnimationFrame`.
   - Deployed v199 (`app.js`), v147 (`styles.css`), v113 (`system.css`).
-- Emergency Hysteria 2 egress tunnel switch:
-  - Switched sing-box outbound from degraded node to `multi.deytt.space:8443` (NL egress `31.76.61.130`).
-  - Applied salamander obfs (`HysteriaObfs2026Secure`), SNI `deytt.space`, `insecure: true`.
-  - Added static host resolution in `/etc/hosts` to prevent boot/DNS deadlock.
-  - Verified YouTube Music (HTTP 200), SoundCloud (HTTP 200), Telegram API (302), track prepare & playback.
+- Hysteria 2 egress tunnel management:
+  - Switched sing-box outbound back to previous server: `de.deytt.space:8443` (Germany `2.26.249.191`).
+  - Restored clean TLS direct config (`server_name: de.deytt.space`, `insecure: false`).
+  - Added static resolution `2.26.249.191 de.deytt.space` in `/etc/hosts`.
+  - Verified egress connectivity: YouTube (HTTP 200), Telegram API (HTTP 302), and live track matching.
 - Resolved Playboi Carti "MUSIC" album playback & fan remakes / unreleased playback issues:
   - Root causes identified from live server logs & deep inspection:
     1. Slow download / HTTP 403 Forbidden: `yt-dlp` lacked a JavaScript runtime on the server, causing YouTube n-sig extraction failure and aggressive stream throttling down to ~100 KiB/s or 403 blocks.
