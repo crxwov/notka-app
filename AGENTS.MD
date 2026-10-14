@@ -1,52 +1,18 @@
-# Правила разработки и ветвления (Git & Workflow Protocol)
+# Shared development context and Git workflow
 
-## Ветки репозитория
+Notka has **two human developers: Lexic and hackov (Egor / crxwov)**. Lexic created the original product, design and functionality; hackov joined later and actively contributes to clients, infrastructure and overall development. Agents assist these developers and must preserve both people's work.
 
-1. **`app-dev`** (Ветка пользователя)
-   - Разработка нативных клиентских приложений (Android APK и сопутствующий клиентский стек).
-   - Ветка принадлежит пользователю.
+Read [collaboration rules](docs/operations/collaboration.md) before edits, integration or release. This is the authoritative home for team/branch coordination; do not duplicate competing policies elsewhere.
 
-2. **`tg-app`** (Ветка агента)
-   - Разработка Telegram Mini App, Telegram-бота, интерфейсов и связанного функционала.
-   - Агент ведёт всю свою работу в этой ветке.
+- `tg-app`: Telegram Mini App, bot and related backend; the agent's default working branch and the original Telegram development context.
+- `app-dev`: human developer's client-app branch, primarily hackov's client work. Do not edit, reset, merge or push it without an applicable request.
+- `main`: shared stable integration/release branch. Integrate only the reviewed scope; a whole branch merge requires all incoming changes to belong to the authorized task.
+- Establish which developer assigned the task and inspect status/remote history before editing. Preserve unrelated dirty files and concurrent commits; never force-push or assume one person's branch supersedes the other's work.
+- Shared API/auth/data changes affect both Telegram and Android. Their UI assets differ; inspect both clients before claiming compatibility.
+- A direct human request to implement, commit or push authorizes that scope. Push to main does not authorize production deployment. Deploy remains a separate owner/release-developer action.
+- Publish reusable knowledge in established docs and keep the active task in ROADMAP.md. Keep unfinished earlier Roadmaps as paused files. Do not commit private chats, credentials, user data or generated caches.
 
-3. **`main`** (Продакшн / стабильная ветка)
-   - Источник правды для деплоя на сервер и релизов.
-   - Ветка, из которой код раскатывается на боевой сервер (`deploy/push.sh`).
-
----
-
-## Процедура деплоя и синхронизации
-
-Когда требуется выкатить изменения на сервер:
-
-1. **Мерж в `main`**:
-   - Переключаемся на ветку `main`:
-     ```bash
-     git checkout main
-     git pull origin main
-     ```
-   - Вливаем изменения из рабочей ветки (`tg-app` или `app-dev`):
-     ```bash
-     git merge tg-app   # или app-dev
-     git push origin main
-     ```
-
-2. **Деплой на сервер**:
-   - Выполняем деплой из ветки `main`:
-     ```bash
-     bash deploy/push.sh <IP-адрес>
-     ```
-
-3. **Синхронизация рабочей ветки**:
-   - Возвращаемся в рабочую ветку и подтягиваем свежие изменения из `main`:
-     ```bash
-     git checkout tg-app   # или app-dev
-     git merge main
-     git push origin tg-app
-     ```
-
----
+Current runtime reference: [verified infrastructure, 2026-10-14](docs/operations/infrastructure-2026-10-14.md). Main app SSH is `ssh -p 6767 notka` (`egor@5.227.61.107`); live app is `https://notka.duckdns.org/app/`. The public nginx/NAT configuration remains unverified. Confirm current state before operational changes; dated evidence is not a timeless guarantee.
 
 <INSTRUCTIONS>
 <!-- codebase-memory-mcp:start -->
@@ -155,8 +121,10 @@ Notka: a music service inside Telegram (Mini App + bot + backend). Detailed docs
 
 | Path | Purpose | Inspect when |
 |---|---|---|
-| `CLAUDE.md` | Project rules: working with the owner, 3D icons, palette | always at start |
+| `CLAUDE.md` | Shared developer context, 3D icons, palette | always at start |
 | `ROADMAP.md` | Persistent task state across chats | resuming work |
+| `docs/operations/collaboration.md` | Two-developer roles, branches, integration/release coordination | always at start |
+| `docs/operations/infrastructure-2026-10-14.md` | Verified runtime topology and investigation limits | infrastructure and release work |
 | `PRODUCT.md`, `DESIGN.md` | Product and visual design contract | UI/UX changes |
 | `miniapp/` (`app.js`, `styles.css`, `index.html`) | The Mini App frontend; bump `?v=` in `index.html` on change | UI, player, queue, import UI |
 | `music_resolver/api/routes.py` | HTTP API (search, stream, import, sync, admin, card) | adding or changing endpoints |
@@ -169,5 +137,8 @@ Notka: a music service inside Telegram (Mini App + bot + backend). Detailed docs
 | `фидбек/` | User feedback screenshots and summaries (untracked) | planning fixes |
 | `3D иконки/`, `брендбук/`, `рефернсы/` | 3D icon kit and brand material | icon/brand work only |
 
-Release: only the owner runs `bash deploy/push.sh 94.156.179.229` (the agent cannot write to the server). Live URL: `https://94-156-179-229.sslip.io/app/`.
+Release: owner/designated release developer runs `bash deploy/push.sh 5.227.61.107` from reviewed `main`. Agents do not deploy as part of commit/push requests. Live URL: `https://notka.duckdns.org/app/`. See collaboration and infrastructure docs above.
 <!-- project-context-map:end -->
+
+<!-- working-protocol:end -->
+</INSTRUCTIONS>

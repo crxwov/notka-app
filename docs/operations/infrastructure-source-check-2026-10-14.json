@@ -1,0 +1,62 @@
+[
+  {
+    "Path": "run_server.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "7f68107d9fa44b44fd641c7558692cb8d8e324092f855d85aa3577f642864d56"
+  },
+  {
+    "Path": "music_resolver/main.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "1e1ff35fb347d94310cf56853e52f0d85ae513683f55302bdf60179c057f1949"
+  },
+  {
+    "Path": "music_resolver/api/routes.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "91ed3ca6d9ca96ced225a79d59f0b635f8c65acfe61d76f0916b27b03f1affe8"
+  },
+  {
+    "Path": "music_resolver/config.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "597e18a7d6d1b8deff4a8be6cb76225c967f6998d6c4f730c438c69213123648"
+  },
+  {
+    "Path": "bot/main.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "1182cf104b2bdf4db436c83008fcc436985d48314c9d7e07ef299bb6026d6e5f"
+  },
+  {
+    "Path": "miniapp/app.js",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "b1b1eaca660b1a9a403c448ba20d729695d53474f1a069def0a183a64eb72eed"
+  },
+  {
+    "Path": "miniapp/index.html",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "7c371b735baa0fa1024bc7bc8809ab9748557b0533cd2c895d21a182a68f255b"
+  },
+  {
+    "Path": "music_resolver/services/auth_store.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "5e6e982db177a15f707178e4073691f4d523b1c6b9d172609d9d26f80fc4bf85"
+  },
+  {
+    "Path": "music_resolver/services/plus_store.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "980cec92b0407b534f66d410d9eca4b09f875fa0b8470df3c4955a25acb79d9a"
+  },
+  {
+    "Path": "music_resolver/services/sync_store.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "5853319b9bbad1435e0f603cb11a8c2fc863d324d9847fde573a9ca26293f260"
+  },
+  {
+    "Path": "music_resolver/services/cache_preloader.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "502df5ade971f6a239a51e4203f27aaf7c942712d661e4b5d1a036bc9539985d"
+  },
+  {
+    "Path": "music_resolver/providers/itunes_catalog.py",
+    "Matched": true,
+    "RemoteNormalizedSHA256": "31a81a919ffc00f14f6ce52ccb85ffc74a582e8e74c594cf87b34ef319b6c5f4"
+  }
+]

@@ -1,82 +1,68 @@
-# Справочник HTTP API (`music_resolver/api/routes/`)
+# Действующий HTTP API (`music_resolver/api/routes.py`)
 
-[← Модели данных и ошибки](models-and-errors.md) · [К оглавлению](../README.md) · [Далее: Аудио-стриминг и кэш →](audio-streaming.md)
+[← Модели и ошибки](models-and-errors.md) · [К оглавлению](../README.md) · [Аудио и кэш →](audio-streaming.md)
 
----
+Backend общий для двух разработчиков и двух клиентов. Изменения маршрутов, авторизации и форматов данных согласуются по [правилам сотрудничества](../operations/collaboration.md); Telegram frontend и Android assets проверяются отдельно.
 
-Все 20 HTTP-маршрутов приложения организованы в модульном пакете `music_resolver/api/routes/` (< 220 строк на модуль).
+Ниже — статический список регистрации маршрутов из текущего routes.py. API не перенесён в модульный пакет routes/. Точные параметры, Pydantic-модели, ограничения и коды ошибок нужно читать в соответствующем обработчике; список не заменяет спецификацию каждого запроса.
 
-## 1. Поиск и каталог
+| Метод | Путь |
+|---|---|
+| GET, HEAD | `/inline/{source}/{source_id}.mp3` |
+| GET | `/admin` |
+| GET | `/admin/` |
+| POST | `/admin/login` |
+| POST | `/admin/logout` |
+| GET | `/admin/api/summary` |
+| POST | `/internal/metric` |
+| GET | `/internal/summary` |
+| GET | `/inline-thumb/{source}/{source_id}.jpg` |
+| GET | `/inline-warm/{source}/{source_id}` |
+| GET | `/health` |
+| GET | `/search` |
+| GET | `/artists` |
+| POST | `/card` |
+| GET | `/card/{name}` |
+| POST | `/analytics` |
+| GET | `/import` |
+| POST | `/auth/request-code` |
+| POST | `/auth/verify-code` |
+| GET | `/auth/me` |
+| POST | `/sync` |
+| GET | `/plus/status` |
+| POST | `/plus/redeem` |
+| GET | `/events` |
+| POST | `/events/sync` |
+| POST | `/events/advance` |
+| POST | `/events/reset` |
+| GET | `/resolve` |
+| GET | `/album` |
+| GET | `/artist` |
+| GET, HEAD | `/stream` |
+| GET | `/radio` |
+| GET | `/lyrics` |
+| POST | `/mood` |
+| GET | `/prepare` |
+| GET | `/warm` |
+| GET | `/credits` |
+| POST | `/originals` |
+| GET | `/profile` |
+| GET | `/download` |
+| GET | `/bot-info` |
+| POST | `/shared` |
+| GET | `/shared/{share_id}` |
 
-| Метод и маршрут | Query / Body параметры | Описание и ответ |
-| :--- | :--- | :--- |
-| `GET /health` | — | Возвращает `{"status": "ok"}`. |
-| `GET /search` | `q` *(str, обяз.)*, `limit` *(int, по умолч. 5, макс. 20)* | Параллельный поиск треков по `youtube_music`, `soundcloud`, `youtube`. Возвращает `SearchResponse` (`{"query": q, "results": [TrackInfo, ...]}`). |
-| `GET /artists` | `q` *(str, обяз.)*, `limit` *(int, по умолч. 8, макс. 20)* | Поиск карточек исполнителей в YouTube Music. Возвращает `{"query": q, "results": [{"id", "name", "avatar", "subscribers"}, ...]}`. |
-| `GET /album` | `id` *(str, обяз.)*, `source` *(опц.)* | Возвращает `AlbumInfo` (метаданные альбома + массив `tracks`). Поддерживает источники `youtube_music` и `itunes`. |
-| `GET /artist` | `id` *(str, обяз.)*, `source` *(опц.)* | Возвращает `ArtistInfo` (`name`, `avatar`, `subscribers`, `top_tracks`, `albums`). |
+## Основные контракты
 
----
+- Поиск/каталог: `/search`, `/artists`, `/album`, `/artist`, `/resolve`, `/radio`, `/mood`. Воспроизведение каталога iTunes подбирает аудио в YouTube/SoundCloud.
+- `/prepare` подготавливает локальный аудиофайл; `/warm` ограниченно прогревает кэш; `/stream` по умолчанию отдаёт локальный файл с Range. GET этих маршрутов может скачивать музыку/изменять кэш и не является чистой диагностикой.
+- `/import` читает метаданные публичного плейлиста. Сам импорт не делает исходный сервис аудиопровайдером.
+- `/auth/request-code`, `/auth/verify-code` — мобильный вход через код, доставляемый ботом. Название send-code из старой документации не является текущим путём.
+- `/auth/me`, `/sync` поддерживают токен мобильной сессии и Telegram initData; `/plus/*`, `/events/*`, `/analytics` в текущем коде используют Telegram initData. Не предполагать поддержку мобильного токена у всех маршрутов.
+- `/admin*` защищается reverse proxy Basic Auth; login/logout handlers не создают самостоятельную серверную сессию. Нельзя считать прямой доступ к backend защищённым тем же паролем.
+- `/internal/*` — подписанный обмен с ботом, не публичная админка.
+- `/shared` сохраняет опубликованный плейлист в cache/shared; текущая реализация не имеет общей квоты/TTL для этого хранилища.
+- `/card` принимает созданные клиентом карточки с проверкой идентичности и ограничениями; `/analytics` записывает ограниченные продуктовые события.
+- `/health` показывает доступность процесса API, но не работоспособность всех провайдеров, бота или воспроизведения.
 
-## 2. Резолвинг, подготовка и стриминг аудио
-
-| Метод и маршрут | Параметры | Описание и ответ |
-| :--- | :--- | :--- |
-| `GET /resolve` | `id`, `source` *(опц.)*, `url` *(опц.)* | Находит аудиопоток трека и возвращает `ResolveResponse` (`track` + `playback` со ссылкой на `/stream`). |
-| `GET /prepare` | `id` *(обяз.)*, `source` *(опц.)* | Скачивает трек на диск сервера в `cache/audio_v2/`, прогоняет через `ffmpeg -movflags +faststart` и возвращает `{"ready": true, "stream_url": "/stream?...", "size": ..., "mime_type": ...}`. |
-| `GET /stream` | `id`, `source`, `url`, `mode` (`proxy` \| `redirect` \| `json`) | Отдаёт подготовленный аудиофайл через `FileResponse` с поддержкой `Range`-запросов (`Accept-Ranges: bytes`, `Cache-Control: no-store`). |
-| `GET /download` | `id` *(обяз.)*, `source` *(опц.)* | Отдаёт аудиофайл как вложение (`Content-Disposition: attachment; filename*=UTF-8''Artist%20-%20Title.m4a`) для сохранения на устройство. |
-
----
-
-## 3. Радио, миксы по настроению, тексты и импорт
-
-### `GET /radio`
-- **Параметры**: `id` *(обяз., сид-трек)*, `source` *(опц.)*, `limit` *(1..50, по умолч. 25)*.
-- **Ответ**: `{"seed": "youtube_music:...", "results": [TrackInfo, ...]}` — бесконечная подборка похожих треков («Моя волна»).
-
-### `POST /mood`
-- **Тело запроса (`MoodRequest`)**:
-  ```json
-  {
-    "mood": "energetic",
-    "seeds": [{"id": "youtube_music:...", "artist": "КИНО", "title": "Группа крови"}],
-    "top_artists": ["КИНО", "Молчат Дома"],
-    "exclude_ids": [],
-    "limit": 25
-  }
-  ```
-- **Допустимые значения `mood`**: `"energetic"` (Бодрый), `"happy"` (Весёлый), `"calm"` (Спокойный), `"sad"` (Грустный).
-- **Ответ**: `{"mood": "energetic", "results": [TrackInfo, ...]}`.
-
-### `GET /lyrics`
-- **Параметры**: `title` *(обяз.)*, `artist` *(опяз.)*, `duration` *(int, опц.)*, `source` *(опц.)*, `id` *(опц.)*.
-- **Ответ**:
-  ```json
-  {
-    "found": true,
-    "source": "lrclib",
-    "synced": true,
-    "plain": "Полный текст...",
-    "lines": [{"time": 12.45, "text": "Строка караоке"}]
-  }
-  ```
-
-### `GET /import`
-- **Параметры**: `url` *(публичная ссылка на плейлист или альбом Spotify, Яндекс Музыки, Apple Music или YouTube)*.
-- **Ответ**: `{"source": "spotify", "title": "...", "cover": "...", "total": 42, "tracks": [{"title", "artist", "duration", "cover"}, ...]}`.
-
----
-
-## 4. Подписка «Нотка Плюс», сезонные ивенты и шеринг
-
-| Метод и маршрут | Заголовки / Тело | Описание и ответ |
-| :--- | :--- | :--- |
-| `GET /plus/status` | `X-Telegram-Init-Data` | Возвращает статус подписки пользователя: `{"active": bool, "until": int, "days_left": int, "source": str, "verified": bool}`. |
-| `POST /plus/redeem` | `X-Telegram-Init-Data`<br>Body: `{"code": "PROMO"}` | Проверяет HMAC-подпись Telegram, применяет промокод (лимит 10 попыток/час на юзера) и начисляет дни Плюса. |
-| `GET /events` | `X-Telegram-Init-Data` | Возвращает список сезонных ивентов, открытые по текущему дню задания, прогресс и разблокированную косметику (`unlocked_cosmetics`). |
-| `POST /events/sync` | `X-Telegram-Init-Data`<br>Body: `{"event_id", "progress", "claimed"}` | Мержит прогресс клиента с сервером (`max`) и автоматически начисляет награды (включая дни Нотка Плюс). |
-| `POST /events/advance` | `X-Telegram-Init-Data`<br>Body: `{"event_id", "task_id", "delta"}` | Увеличивает счётчик выполнения конкретного задания ивента. |
-| `POST /events/reset` | `X-Telegram-Init-Data`<br>Body: `{"event_id"}` | Сбрасывает прогресс пользователя по ивенту и отзывает выданные за этот ивент дни Плюса. |
-| `GET /bot-info` | — | Возвращает `{"username": "notka_music_bot"}` (кэширует ответ Telegram `getMe`) для генерации ссылок `https://t.me/<bot>?start=...`. |
-| `POST /shared`<br>`GET /shared/{share_id}` | Body (`POST`): `{"name", "emoji", "cover", "owner", "tracks"}` | Сохраняет снимок пользовательского плейлиста в `cache/shared/{share_id}.json` и отдаёт его при открытии ссылки другом. |
+Серверная топология, размеры/ограничения и границы live-проверки — в [отчёте об инфраструктуре](../operations/infrastructure-2026-10-14.md). Публичные docs/OpenAPI включаются только при ENABLE_DOCS=1 по текущему main.py; не открывать их в production по умолчанию ради чтения этой документации.

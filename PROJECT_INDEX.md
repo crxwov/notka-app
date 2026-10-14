@@ -1,88 +1,64 @@
 # PROJECT_INDEX
 
-Quick structural index of `notka` for fast navigation.
-For full modular technical and product documentation in Russian, see **[docs/README.md](docs/README.md)**.
+Current source routing index. Documentation: [docs/README.md](docs/README.md).
 
-## Overview
-**Нотка (`Notka`)** is a Telegram Mini App music player (`miniapp/`) paired with an `aiogram` Telegram bot (`bot/`) and a `FastAPI` multi-provider music resolver and audio caching backend (`music_resolver/`).
+## Team and operating context
 
-## Entrypoints & Launchers
-- `start.bat` -> `run_notka.py` — One-click Windows local launcher: loads `.env`, sets `YTDLP_COOKIES_FROM_BROWSER=chrome` by default, boots `uvicorn` (`music_resolver.main:app` + `/app` static mount for `miniapp/`) on `127.0.0.1:$PORT`, creates a `pycloudflared` tunnel (`*.trycloudflare.com`), and launches `python -m bot.main` with `MINIAPP_URL=<tunnel>/app/`.
-- `run_server.py` — Production single-process entrypoint (behind Caddy / reverse proxy): mounts `/app` (`miniapp/`) with `Cache-Control: no-cache`, supervises `bot.main` in a background thread (`RUN_BOT=1` by default), and serves `music_resolver.main:app` via `uvicorn`.
-- `music_resolver/main.py` — FastAPI app factory, CORS config, and `AppError` exception handlers.
-- `bot/main.py` — `aiogram` bot polling entrypoint (`/start` with deep-link payloads `t_`, `p_`, `promo_`; `/id`; `/promo` admin promo management).
+Two developers maintain Notka: **Lexic**, original creator of the product/design/functionality, and **hackov (Egor / crxwov)**, who joined later and contributes to clients, infrastructure and shared development. Agents must preserve both people's work.
 
-## Backend (`music_resolver/`)
-- `config.py` — `Settings` loader from env + startup proxy health check (`_usable_proxy`).
-- `models.py` — Pydantic models (`TrackCandidate`, `TrackInfo`, `PlaybackInfo`, `ResolvedTrack`, `SearchResponse`, `ResolveResponse`, `AlbumSummary`, `AlbumInfo`, `ArtistInfo`).
-- `errors.py` — `ErrorCode` enum, HTTP status mapping, and `AppError`.
-- `api/routes/` — Modularized HTTP route handlers (all <= 220 lines each):
-  - `audio.py` & `audio_cache.py` — `/stream`, `/inline`, `/prepare`, `/download` + disk audio caching in `cache/audio_v2/`.
-  - `search.py` — `/search`, `/artists`, `/resolve`, `/album`, `/artist`, `/radio`, `/mood`.
-  - `auth.py` — Telegram code verification & session endpoints (`/auth/send-code`, `/auth/verify-code`, `/auth/me`, `/sync`).
-  - `plus.py` — `/plus/status` and `/plus/redeem`.
-  - `events.py` — `/events`, `/events/sync`, `/events/advance`, `/events/reset`.
-  - `content.py` — `/lyrics` and `/import`.
-  - `playlists.py` — `/playlists`, `/playlist/create`, `/playlist/edit`.
-  - `media.py` — `/media/artwork`, `/media/cover`.
-  - `admin.py` — `/metrics`, `/bot-info`, admin stats.
-- `services/`
-  - `factory.py` — Wires `MusicService`, `ProviderManager`, `TTLCache`, and all providers.
-  - `music_service.py` — High-level search/resolve/album/artist facade with search & resolve caching.
-  - `provider_manager.py` — Multi-provider search fan-out (`youtube_music`, `soundcloud`, `youtube_web`), deduplication, and fallback resolution.
-  - `matcher.py` — `rapidfuzz` track scoring (`score_track`) and junk/duration filtering.
-  - `mood_mix.py` — Mood mix generator (`energetic`, `happy`, `calm`, `sad`) using YT Music radio seeds, top artists, and audio energy features.
-  - `energy.py` — `ffmpeg` PCM audio feature extractor (`loud`, `punch`, `bright`, `tempo` -> `energy`) persisted in `data/energy.json`.
-  - `lyrics.py` — Synced LRC & plain lyrics fetcher via `lrclib.net` + YouTube Music fallback, cached in `cache/lyrics/`.
-  - `playlist_import.py` — Public playlist/album importer for Spotify, Yandex Music, Apple Music, and YouTube / YouTube Music.
-  - `plus_store.py` — Telegram WebApp `initData` HMAC-SHA256 verifier, Notka Plus subscription store, and promo code manager (`data/plus.json`).
-  - `events_store.py` — Seasonal event engine (`halloween`), daily task unlock/progress, and tier rewards (`data/events.json`).
-- `providers/`
-  - `base.py` — Abstract `BaseProvider`.
-  - `youtube_common.py` — Shared `yt-dlp` extraction, search, cookie fallback, and direct audio download helpers.
-  - `youtube/` (`provider.py`, `mappers.py`, `moods.py`) — Modularized YouTube Music provider (ytmusicapi + yt-dlp).
-  - `itunes/` (`provider.py`, `matcher.py`, `parser.py`, `cache.py`) — Modularized Apple iTunes Search/Lookup provider with 3-pass matcher.
-  - `soundcloud.py` — SoundCloud search (`scsearch`) and stream resolution via `yt-dlp`.
-  - `youtube_web.py` — Standard YouTube search (`ytsearch`) and stream resolution via `yt-dlp`.
-- `utils/`
-  - `ids.py` — Composite ID (`source:source_id`) builder/parser.
-  - `logging.py` — Logging configuration.
-  - `remux.py` — `ffmpeg -movflags +faststart` MP4 defragmenter for reliable Telegram WebView playback.
+- [Collaboration](docs/operations/collaboration.md): roles, tg-app/app-dev/main, integration and release coordination.
+- [AGENTS.MD](AGENTS.MD), [CLAUDE.md](CLAUDE.md): agent and brand rules; ROADMAP.md: current task.
+- [Infrastructure snapshot](docs/operations/infrastructure-2026-10-14.md): verified live state and unverified boundaries, dated 2026-10-14.
 
-## Frontend (`miniapp/`)
-- `index.html` — Single-page Telegram WebApp shell containing 21 screens, floating dock, mini-player, and 14 bottom sheets / modals.
-- `config.js` — `window.NOTKA_CONFIG` (`API_BASE`).
-- `src/` — Modular client architecture (< 465 lines per file):
-  - `core/` (`env.js`, `state.js`, `sync.js`, `analytics.js`, `dom.js`) — Environment, reactive state, cross-device sync, analytics.
-  - `player/` (`engine.js`, `controls.js`, `lighting.js`, `lyrics.js`, `queue.js`, `resolver.js`, `loudness.js`) — Audio engine, living light, synced lyrics.
-  - `ui/` (`navigation.js`, `modals.js`, `track_row.js`, `context_menu.js`) — Navigation, dialogs, bottom sheets, reusable track cards.
-  - `screens/` (`home.js`, `search.js`, `library.js`, `playlist_detail.js`, `playlist_create.js`, `profile.js`, `settings.js`, `appearance.js`, `events.js`, `wave.js`, `stats.js`, `recap.js`, `artist.js`) — Self-contained screen controllers.
-  - `app.js` — Client bootstrapper and dependency coordinator.
-- `styles/` — Modular CSS architecture:
-  - `base.css`, `controls.css`, `components.css`, `player.css`, `animations.css`
-  - `screens/main.css`, `screens/special.css`
-  - `system/desktop.css`, `system/layout.css`
-- `atmosphere/` (`core.js`, `shapes.js`, `themes_nature.js`, `themes_seasonal.js`) — Weather, seasonal themes, and particle canvas effects.
-- `shredder/` (`engine.js`, `drag.js`, `physics.js`, `strips.js`) — Physics-based paper shredder track deletion.
-- `prism.js` — WebGL2 raymarched prismatic light shader (`window.Prism`) with automatic FPS guard.
-- `pumpkin.js` — Interactive liquid-glass Halloween pumpkin SVG (`window.PumpkinArt`).
+## Entrypoints
 
-## Deploy & Tests
-- `deploy/setup.sh`, `deploy/push.sh`, `deploy/README.md` — Production Ubuntu setup (`systemd` + `Caddy` + `Node 20` + `venv`) and SSH push deployment.
-- `tests/` — Automated test suite:
-  - `test_api_routes.py` — Tests for public endpoints (`/health`, `/search`, `/artists`, `/resolve`, `/plus/status`, `/events`).
-  - `test_itunes_provider.py` — iTunes parser, caching, and matching tests.
-  - `test_youtube_provider.py` — YouTube mappers, moods, and provider queries.
-  - `test_models.py` — Pydantic models serialization and conversions.
-  - `test_services.py` — Matcher ranking, auth store verification, plus store grants.
-  - `test_utils.py` — Utility tests (IDs, logging configuration).
-  - `events_store_test.py` — Unit tests for seasonal event engine and quests.
-  - `serve_local.py`, `cdp.mjs`, `e2e.mjs` — Local test server and headless Chromium E2E suite.
+- `start.bat` / `run_notka.py`: Windows local backend, temporary Cloudflare URL and bot. Do not run production's bot token concurrently with its polling process.
+- `run_server.py`: production parent process; loads .env, constructs FastAPI, mounts miniapp, runs loopback Uvicorn, supervises separate bot process, starts watchdog and backups.
+- `music_resolver/main.py`: FastAPI factory, error handlers and static mount. Do not assume CORS configuration exists without checking current code.
+- `bot/main.py`: aiogram long polling, deep links, promo/owner commands, inline audio, login delivery and cookie upload.
 
-## Product & Design Docs
-- `docs/README.md` — Modular technical & product documentation split by subfolder (`getting-started/`, `backend/`, `providers/`, `services/`, `bot/`, `miniapp/`, `operations/`).
-- `PRODUCT.md` — Product vision, audience, feature matrix, and roadmap.
-- `DESIGN.md` — "Живой свет" (Living Light) design system guidelines, palette, typography, and component rules.
+## Backend
 
-## Codebase Graph (`codebase-memory`)
-- Indexed project ID: `C-Users-hackov-notka` (`1434` nodes, `4674` edges, `77` files across Python `36`, JavaScript `7`, CSS `4`, HTML `2`).
+- `music_resolver/api/routes.py`: active HTTP handlers and disk audio caching; source of truth for routes. Same-name `api/routes/` is not an active modular source package in this snapshot.
+- `config.py`, `models.py`, `errors.py`: settings, response models, application errors.
+- `services/factory.py`, `music_service.py`, `provider_manager.py`: provider wiring, caching and search/resolve orchestration.
+- `services/matcher.py`: scoring/filtering using Python difflib and text normalization.
+- `services/cache_preloader.py`: account-track background downloads; `proxy_guard.py`: application proxy checks/fallback.
+- `providers/youtube_music.py`, `youtube_common.py`, `youtube_web.py`: YouTube Music/catalog/radio and yt-dlp search/download paths.
+- `providers/itunes_catalog.py`: iTunes metadata catalog plus audio matching on YouTube/SoundCloud; Apple catalog is not Apple playback.
+- `providers/soundcloud.py`, `base.py`: SoundCloud and provider contract.
+- `services/auth_store.py`, `sync_store.py`, `plus_store.py`, `events_store.py`: sessions, account state, promotions and events in JSON.
+- `services/metrics.py`, `admin_stats.py`: counters, users and owner statistics.
+- `services/playlist_import.py`, `lyrics.py`, `credits.py`: public playlist metadata, lyrics and credits.
+- `services/track_profile.py`, `energy.py`, `mood_mix.py`, `mix_quality.py`, `originals.py`: audio/genre features and discovery.
+- `cache/ttl.py`: process-local TTL cache; `utils/ids.py`, `logging.py`, `remux.py`: IDs, logging, ffmpeg container repair.
+
+## Clients
+
+- `miniapp/index.html`, `config.js`, `app.js`: active Telegram web shell, API base and monolithic application.
+- `miniapp/styles.css`, `system.css`, `plus.css`, `events.css`, `atmosphere.css`: styles actually shipped to the web client.
+- `miniapp/mix.js`, `prism.js`, `atmosphere.js`, `shredder.js`, `pumpkin.js`: mix and visual effects.
+- `android/app/src/main/java/space/notka/app/`: Java WebView, JavaScript bridge, playback service/MediaSession.
+- `android/app/src/main/assets/miniapp/`: separately bundled Android frontend, with modular src and styles. Web deployment does not replace installed APK assets.
+- `admin/index.html`: owner dashboard, protected by reverse proxy Basic Auth rather than independent handler login.
+
+## Data and operations
+
+- `data/`: private account/session/sync/Plus/events/analytics JSON; never add to Git.
+- `cache/`: regenerable audio and metadata, but cache/shared also stores published playlist records. Audio eviction is not a global quota.
+- `backups/`: data archives; current backup scope excludes .env, infrastructure config, cookies and published cache/shared records.
+- `deploy/push.sh`: git archive HEAD deployment, dependency update, restart and health check. Deployment is an explicit separate release action.
+- `deploy/setup.sh`: bootstrap template, not a copy of current nginx/NAT/Caddy/sing-box/Certbot configuration.
+- [Deployment guide](docs/operations/deployment.md): current target and coordination requirements.
+
+## Validation routing
+
+Existing examples (not a claim of complete coverage): `tests/events_store_test.py`, `tests/test_fix_verification.py`, `tests/serve_local.py`, `tests/cdp.mjs`, `tests/e2e.mjs`, `tests/account_sync.mjs` and other focused scripts under tests. Inspect a script before running: some checks can download music, use external services or interact with accounts.
+
+Earlier index entries test_api_routes.py/test_itunes_provider.py/test_youtube_provider.py/test_models.py/test_services.py/test_utils.py do not exist in this checkout. Select checks from actual files and validate on the relevant runtime/device when needed.
+
+## Product and integrations
+
+- `PRODUCT.md`, `DESIGN.md`: product and visual contracts.
+- `docs/`: topical technical docs. The source index and dated live report take priority over obsolete claims of modularization or old server addresses.
+- Codebase Knowledge Graph integration remains in AGENTS.MD. Prefer its tools when available. Recorded project ID: `C-Users-hackov-notka`; previous graph counts are historical and must not be presented as a current inventory.

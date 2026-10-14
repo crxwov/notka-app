@@ -1,62 +1,48 @@
-# Конфигурация и переменные окружения (`.env`)
+# Конфигурация и переменные окружения
 
-[← Обзор архитектуры](overview.md) · [К оглавлению](../README.md) · [Далее: Карта файлов →](project-structure.md)
+[← Обзор](overview.md) · [К оглавлению](../README.md) · [Карта проекта →](project-structure.md)
 
----
+Общие настройки затрагивают работу обоих разработчиков и клиентов. Перед изменениями — [сотрудничество](../operations/collaboration.md); фактические настройки сервера и их ограничения — [инфраструктура](../operations/infrastructure-2026-10-14.md). Не копировать секреты в документы или Git.
 
-Настройки считываются из файла `.env` в корне проекта двумя модулями:
-- `music_resolver/config.py` (`Settings` / `get_settings()`) — настройки бэкенда и провайдеров.
-- `bot/config.py` (`BotSettings` / `get_bot_settings()`) — настройки Telegram-бота.
+`run_server.py` загружает `.env` из каталога приложения. Уже заданное окружение имеет приоритет при обычном load_dotenv. Имена/defaults ниже взяты из текущего кода; это не полный экспорт production `.env`.
 
-## Таблица переменных окружения
+| Переменная | Default / поведение |
+|---|---|
+| `BOT_TOKEN` | Нужен для бота, подписей Telegram и доставки кодов; секрет |
+| `PUBLIC_URL` | Пусто; при включённом боте требуется HTTPS; адрес приложения формируется как PUBLIC_URL/app/ |
+| `MINIAPP_URL` | Родитель задаёт дочернему боту полный URL |
+| `ADMIN_IDS` | Список администраторов; не путать технический доступ бота с ролями двух разработчиков |
+| `RUN_BOT` | `1`; в run_server отключает бота именно строка `0`, а не false/no |
+| `PORT` | `8080`; production Uvicorn в run_server привязан к 127.0.0.1 |
+| `LOG_LEVEL` | `INFO` для настройки logging; uvicorn запускается с warning |
+| `ENABLE_DOCS` | `0`; docs/redoc/openapi включаются только строкой `1` |
+| `PROVIDER_TIMEOUT` | `15.0` секунд |
+| `CACHE_TTL` | `300` секунд поиска |
+| `RESOLVE_CACHE_TTL` | `1800` секунд |
+| `SEARCH_LIMIT` | `25` в Settings; конкретный query limit проверять в handler |
+| `PROVIDER_ORDER` | youtube_music,soundcloud,youtube_web; factory добавляет iTunes |
+| `DISABLED_PROVIDERS` | Пустой список |
+| `STREAM_RESPONSE_MODE` | proxy; допустимы proxy/redirect/json |
+| `AUDIO_CACHE_MAX_MB` | `40000`, умножается на 1024²; только аудиокэш, не весь диск |
+| `DOWNLOAD_PARALLEL` | `2` по исходникам; в серверном срезе — 3 |
+| `YTDLP_PROXY` | Пусто; прикладной прокси скачивания |
+| `ITUNES_PROXY`, `YTMUSIC_PROXY` | Свой адрес либо YTDLP_PROXY |
+| `YTMUSIC_LOCATION` | `US` |
+| `YTDLP_FORCE_IPV6` | False по умолчанию |
+| `YTDLP_COOKIE_FILE` | Путь к cookies; также проверяется data/youtube-cookies.txt, загруженный владельцем через бота |
+| `YTDLP_COOKIES_FROM_BROWSER` | Пусто; локальный launcher может выбирать Chrome |
+| `YANDEX_PROXY` | Отдельный прокси для импортов Яндекса; учётные данные — секрет |
+| `NOTKA_DATA_DIR` | Корневая data/ для основных JSON-хранилищ |
+| `NOTKA_EVENTS_DIR` | Переопределение каталога событий для изолированных тестов; не обычная production настройка |
+| `NOTKA_TEST_USER` | Числовой тестовый fallback идентичности событий; нельзя включать для обычного production |
+| `NOTKA_FAKE_NOW` | Тестовая подмена времени событий |
+| `NOTKA_NO_PROFILING` | Любая непустая строка отключает profiling; значение `0` тоже непустое |
+| `AUDIO_FEATURES_URL` | https://api.reccobeats.com/v1/analysis/audio-features |
 
-### Основные параметры и Telegram
-| Переменная | По умолчанию | Описание |
-| :--- | :--- | :--- |
-| `BOT_TOKEN` | *(обязательна)* | Токен бота от `@BotFather`. Используется ботом, а также бэкендом для проверки HMAC-подписи `X-Telegram-Init-Data` и запроса `getMe` в `/bot-info`. |
-| `ADMIN_IDS` | `""` | Список Telegram ID администраторов через запятую или пробел (например, `123456789,987654321`). Открывает доступ к команде `/promo`. |
-| `PUBLIC_URL` | `http://localhost:8080` | Публичный HTTPS-адрес сервера в продакшене (например, `https://music.example.com`). |
-| `MINIAPP_URL` | авто | Полный URL мини-приложения (`${PUBLIC_URL}/app/`). Выставляется автоматически в `run_notka.py` и `run_server.py`. |
-| `RUN_BOT` | `1` | При значении `0`, `false` или `no` скрипт `run_server.py` запускает только HTTP API без процесса бота. |
-| `HOST` | `127.0.0.1` | Хост привязки `uvicorn`. |
-| `PORT` | `8080` | Порт HTTP-сервера. |
-| `LOG_LEVEL` | `INFO` | Уровень логирования (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
+Имена SEARCH_DEFAULT_LIMIT, SEARCH_MAX_LIMIT, SEARCH_CANDIDATES_PER_PROVIDER, PROVIDER_TIMEOUT_SECONDS, SEARCH_CACHE_TTL_SECONDS, RESOLVE_CACHE_TTL_SECONDS, CACHE_MAX_ITEMS, NOTKA_ALLOW_UNVERIFIED и NOTKA_PLUS_DIR из прежней таблицы не являются описанием текущего Settings/основных хранилищ. HOST не меняет loopback-привязку в нынешнем run_server.py. Правильное имя пути cookies — YTDLP_COOKIE_FILE, в единственном числе.
 
-### Поиск, кэширование и лимиты
-| Переменная | По умолчанию | Описание |
-| :--- | :--- | :--- |
-| `SEARCH_DEFAULT_LIMIT` | `5` | Количество треков в выдаче `/search` по умолчанию. |
-| `SEARCH_MAX_LIMIT` | `20` | Максимально допустимый параметр `limit` в `/search`. |
-| `SEARCH_CANDIDATES_PER_PROVIDER` | `5` | Сколько кандидатов запрашивать у каждого провайдера при поиске. |
-| `PROVIDER_TIMEOUT_SECONDS` | `20.0` | Таймаут ожидания ответа от внешнего провайдера (в секундах). |
-| `SEARCH_CACHE_TTL_SECONDS` | `300` | Время жизни in-memory кэша поисковой выдачи (5 минут). |
-| `RESOLVE_CACHE_TTL_SECONDS` | `900` | Время жизни in-memory кэша резолвинга треков (15 минут). |
-| `CACHE_MAX_ITEMS` | `512` | Максимальное число записей в in-memory `TTLCache`. |
-| `AUDIO_CACHE_MAX_MB` | `2048` | Лимит размера дискового кэша аудиофайлов в `cache/audio_v2/` (в МБ). Старые файлы удаляются по LRU. |
-| `STREAM_CHUNK_SIZE` | `65536` | Размер чанка потоковой отдачи (64 КБ). |
+## Проверка прокси
 
-### Прокси и авторизация YouTube (`yt-dlp`)
-| Переменная | По умолчанию | Описание |
-| :--- | :--- | :--- |
-| `YTDLP_PROXY` | `None` | HTTP/SOCKS прокси для `yt-dlp` (например, `http://127.0.0.1:10808` или `socks5://...`). |
-| `ITUNES_PROXY` | `=YTDLP_PROXY` | Прокси для `ITunesCatalogProvider` (по умолчанию берёт `YTDLP_PROXY`). |
-| `YTMUSIC_PROXY` | `=YTDLP_PROXY` | Прокси для `ytmusicapi` (по умолчанию берёт `YTDLP_PROXY`). |
-| `YTDLP_COOKIES_FILE` | `None` | Абсолютный путь к файлу `cookies.txt` (формат Netscape) для обхода антибот-защиты YouTube на VPS. |
-| `YTDLP_COOKIES_FROM_BROWSER` | `None` (`chrome` в `run_notka.py`) | Браузер (`chrome`, `edge`, `firefox`), из которого `yt-dlp` берёт куки на локальной машине. |
+`_usable_proxy` вызывает `proxy_guard.probe`: HTTP-запрос к YouTube Music с таймаутом 5 секунд; дополнительного системного curl в этом пути нет. При отказе прикладной прокси отключается. ProxyGuard повторяет проверку примерно каждые 60 секунд и переключает настройки при восстановлении.
 
-### Тестовые и отладочные переменные
-| Переменная | По умолчанию | Описание |
-| :--- | :--- | :--- |
-| `NOTKA_ALLOW_UNVERIFIED` | `0` | Если `1`, разрешает передавать `X-Telegram-User-Id` без криптографической подписи `initData` (только для локальной отладки). |
-| `NOTKA_TEST_USER` | `""` | Подменяет `user_id` в эндпоинтах `/events*` для E2E-тестов. |
-| `NOTKA_FAKE_NOW` | `""` | Фиксирует текущую дату `YYYY-MM-DD` в движке сезонных ивентов (`events_store.py`). |
-| `NOTKA_EVENTS_DIR` | `data/` | Директория хранения `events.json`. |
-| `NOTKA_PLUS_DIR` | `data/` | Директория хранения `plus.json`. |
-
----
-
-## Автопроверка живости прокси (`_usable_proxy`)
-
-В `music_resolver/config.py` функция `_usable_proxy(url)` проверяет каждый сконфигурированный прокси один раз при старте сервера:
-- Выполняется пробный запрос к `https://music.youtube.com/` с таймаутом $8\text{ с}$ (с резервной проверкой через системный `curl -x`).
-- Если прокси не отвечает (например, локальный прокси-клиент закрыт), сервер логирует `WARNING: Configured proxy ... is unreachable; disabling proxy` и продолжает работу напрямую без прокси.
+На сервере приложения «без прикладного прокси» не обязательно означает прямой внешний выход: системный TUN sing-box продолжает применять свои правила. В срезе 14.10.2026 YTDLP_PROXY/YTMUSIC_PROXY ссылались на неработающий порт 40001, но TUN и mixed proxy на 1080 отвечали; изменение этой схемы требует отдельной проверки зависимостей.
