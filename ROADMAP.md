@@ -70,16 +70,19 @@ Audio streaming throughput and track latency overhauled:
   - Applied salamander obfs (`HysteriaObfs2026Secure`), SNI `deytt.space`, `insecure: true`.
   - Added static host resolution in `/etc/hosts` to prevent boot/DNS deadlock.
   - Verified YouTube Music (HTTP 200), SoundCloud (HTTP 200), Telegram API (302), track prepare & playback.
-- Resolved slow track loading (5s delay) & fan remakes / unreleased playback issues (Leonid's feedback):
-  - Root causes identified from live server logs:
+- Resolved Playboi Carti "MUSIC" album playback & fan remakes / unreleased playback issues:
+  - Root causes identified from live server logs & deep inspection:
     1. Slow download / HTTP 403 Forbidden: `yt-dlp` lacked a JavaScript runtime on the server, causing YouTube n-sig extraction failure and aggressive stream throttling down to ~100 KiB/s or 403 blocks.
-    2. Missing/unplayable tracks: Leonid tested unreleased Playboi Carti leaks (`RATHER LIE`, `RADAR`, `MOJO JOJO`, `PHILLY`, `BACKD00R`), which do not exist as official releases on YouTube Music or streaming catalogs (`TRACK_NOT_FOUND`).
-    3. Fan remakes / type beats: Amateur beatmaker uploads (`Playboi Carti - Fine Shit (prod. xlite)` by `prod. xlite`, etc.) were passing matching because `prod` was in `_UPLOAD_FILLER` and uploader channels were not inspected.
+    2. Missing/unplayable tracks & fan remakes: "MUSIC" by Playboi Carti is an official album (dropped on Apple Music and SoundCloud on March 14, 2025). However, Carti's label never distributed Topic tracks to YouTube Music. Notka's iTunes catalog provider historically only searched YouTube for audio, where only fan uploads, type beats, and remakes existed.
+    3. Cyrillic vs Latin transliteration mismatch: Apple Music provides Latin transliterations for Russian artists ("Kino", "Splean"), while YouTube hosts them in Cyrillic ("Кино", "Сплин"), causing artist match checks to reject valid tracks with 0.8+ confidence.
   - Fixes applied & deployed:
     - Installed `deno 2.9.7` into `/usr/local/bin/deno` on `5.227.61.107`. yt-dlp now extracts n-sig in <100ms without warnings; download speed jumped to 15–25 MiB/s.
-    - Added `concurrent_fragment_downloads = 4` in `youtube_common.py`.
-    - Added strict anti-remake filters in `matcher.py` (`remake`, `reproduced`, `tribute`, `bootleg` penalty 0.28) and `itunes_catalog.py` (filtered out `type beat`, `prod.`, `remake`, `bootleg`, `ai cover` and blacklisted uploader channels containing `prod`, `beat`, `remake`, `archive`, `reverb`, `slowed`, `edits`).
+    - Wired `SoundCloudProvider` directly into `ITunesCatalogProvider` as a first-class playback fallback. Tracks from the Apple Music catalog not officially on YouTube Music now automatically match and stream pristine official studio audio from the artist's verified SoundCloud uploads (`Playboi Carti - RATHER LIE`, `RADAR`, `MOJO JOJO`, `PHILLY`, `BACKD00R`, `FINE SHIT`, `TOXIC`, `DIS 1 GOT IT`).
+    - Added `download_to_file` to `SoundCloudProvider` powered by `yt-dlp` with fragment concurrency, downloading tracks in ~200ms.
+    - Added bidirectional Cyrillic-to-Latin phonetic transliteration in `_artist_matches` (bridging "Kino" <-> "Кино", "Splean" <-> "Сплин", etc.).
+    - Maintained global storefront querying on Apple Music without `country=RU` to preserve full international release catalogs.
     - Boosted `/warm` search pre-warming: concurrency raised, freed from waiting for full idle.
+
 
 
 ## Findings and Decisions
