@@ -1,6 +1,6 @@
 # Выпуск Нотки на сервер
 
-Нотку совместно разрабатывают **Lexic** и **hackov / Егор / crxwov**. Перед интеграцией или релизом прочитать [правила сотрудничества](../docs/operations/collaboration.md). Общая стабильная ветка — `main`; рабочие — `tg-app` и `app-dev`.
+Нотку совместно разрабатывают **leksik** и **hackov / Егор / crxwov**. Перед интеграцией или релизом прочитать [правила сотрудничества](../docs/operations/collaboration.md). Общая стабильная ветка — `main`; рабочие — `tg-app` и `app-dev`.
 
 Основное руководство: **[docs/operations/deployment.md](../docs/operations/deployment.md)**. Проверенная инфраструктура и границы исследования: **[срез 14.10.2026](../docs/operations/infrastructure-2026-10-14.md)**.
 

@@ -8,9 +8,7 @@ cache/
 __pycache__/
 *.pyc
 
-# ИИ файлы, агентские протоколы и дорожные карты
-AGENTS.md
-**/AGENTS.md
+# Старые Roadmap и локальные агентские артефакты; общие инструкции/work-state публикуются
 ROADMAP*.md
 **/ROADMAP*.md
 .impeccable/

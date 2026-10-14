@@ -4,10 +4,10 @@ Current source routing index. Documentation: [docs/README.md](docs/README.md).
 
 ## Team and operating context
 
-Two developers maintain Notka: **Lexic**, original creator of the product/design/functionality, and **hackov (Egor / crxwov)**, who joined later and contributes to clients, infrastructure and shared development. Agents must preserve both people's work.
+Two developers maintain Notka: **leksik**, original creator of the product/design/functionality, and **hackov (Egor / crxwov)**, who joined later and contributes to clients, infrastructure and shared development. Agents must preserve both people's work.
 
 - [Collaboration](docs/operations/collaboration.md): roles, tg-app/app-dev/main, integration and release coordination.
-- [AGENTS.MD](AGENTS.MD), [CLAUDE.md](CLAUDE.md): agent and brand rules; ROADMAP.md: current task.
+- [AGENTS.MD](AGENTS.MD), [CLAUDE.md](CLAUDE.md): agent and brand rules; todo.md: unfinished backlog; already-work-leksik.md / already-work-crxwov.md: detailed current work/conflict reservations, published about every 60 seconds while active.
 - [Infrastructure snapshot](docs/operations/infrastructure-2026-10-14.md): verified live state and unverified boundaries, dated 2026-10-14.
 
 ## Entrypoints

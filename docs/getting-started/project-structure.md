@@ -2,7 +2,7 @@
 
 [← Конфигурация](configuration.md) · [К оглавлению](../README.md) · [Индекс исходников](../../PROJECT_INDEX.md)
 
-Над проектом работают **Lexic и hackov / Егор / crxwov**. Роли, ветки и согласование общих компонентов описаны в [правилах сотрудничества](../operations/collaboration.md).
+Над проектом работают **leksik и hackov / Егор / crxwov**. Роли, ветки и согласование общих компонентов описаны в [правилах сотрудничества](../operations/collaboration.md).
 
 Ниже — проверенная структура текущего дерева, а не план будущей модульной переработки.
 
@@ -10,7 +10,9 @@
 notka/
 ├── AGENTS.MD, CLAUDE.md            # Общий контекст разработчиков, правила агентов/бренда
 ├── README.md, PROJECT_INDEX.md    # Вход в проект и маршрутизация по реальным исходникам
-├── ROADMAP.md                     # Текущая задача; прежние незавершённые задачи — paused
+├── todo.md                        # Только незавершённые общие планы
+├── already-work-leksik.md         # Текущая работа/занятость leksik
+├── already-work-crxwov.md         # Текущая работа/занятость crxwov
 ├── PRODUCT.md, DESIGN.md          # Продуктовый и визуальный контракт
 ├── requirements.txt              # Python-зависимости
 ├── run_notka.py, start.bat        # Windows и временный Cloudflare URL
