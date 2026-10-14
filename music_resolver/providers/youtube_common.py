@@ -421,6 +421,7 @@ class YtDlpResolver:
         opts["retries"] = 3
         opts["fragment_retries"] = 3
         opts["overwrites"] = True
+        opts["concurrent_fragment_downloads"] = 4
         # YouTube slows a single long request down; ten-megabyte pieces go at full speed
         opts["http_chunk_size"] = 10 * 1024 * 1024
         opts["postprocessors"] = []  # audio-only selector, nothing to merge/remux

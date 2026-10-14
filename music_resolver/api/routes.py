@@ -984,17 +984,17 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
     # so the tap starts them at once. Only when the server is idle (a listener's own request is never
     # held up), one at a time, a few at once at most, and rate-limited. ----
     warm_pending: set[str] = set()
-    warm_slot = asyncio.Semaphore(1)
+    warm_slot = asyncio.Semaphore(2)
     warm_times: list[float] = []
-    WARM_PER_MINUTE = 30
+    WARM_PER_MINUTE = 60
 
     async def _warm_one(source: str, source_id: str) -> None:
         key = f"{source}:{source_id}"
         try:
             async with warm_slot:
-                # wait (briefly) for a moment when every download slot is free
+                # wait (briefly) for a moment when at least one download slot is available
                 for _ in range(16):
-                    if _download_slots._value >= _DOWNLOAD_TOTAL:
+                    if _download_slots._value >= 1:
                         break
                     await asyncio.sleep(0.5)
                 else:
@@ -1011,7 +1011,7 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
         key = f"{source}:{id}"
         now = time.time()
         warm_times[:] = [t for t in warm_times if now - t < 60]
-        if _DOWNLOAD_TOTAL < 2 or key in warm_pending or len(warm_pending) >= 4 or len(warm_times) >= WARM_PER_MINUTE:
+        if key in warm_pending or len(warm_pending) >= 6 or len(warm_times) >= WARM_PER_MINUTE:
             return {"queued": False}
         if not re.fullmatch(r"[A-Za-z0-9_.\-]{3,64}", id) or not re.fullmatch(r"[a-z_]{3,20}", source):
             return {"queued": False}

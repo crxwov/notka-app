@@ -213,7 +213,19 @@ _UNOFFICIAL_PHRASE_RE = re.compile(
     r"|tribute to"
     r"|\b8[- ]?bit\b"
     r"|\bchipmunk(?:ed)?\b"
-    r"|\bemulation\b",
+    r"|\bemulation\b"
+    r"|\btype beat\b"
+    r"|\bremake\b"
+    r"|\bflip\b"
+    r"|\breproduced\b"
+    r"|\bre-produced\b"
+    r"|\bre-recorded\b"
+    r"|\bbootleg\b"
+    r"|\bai cover\b"
+    r"|\bai vocals?\b"
+    r"|\bprod\.?\s+[a-z0-9_]+"
+    r"|\bprod by\b"
+    r"|\binstrumental remake\b",
     re.IGNORECASE,
 )
 
@@ -251,7 +263,7 @@ _USER_UPLOAD_TOLERANCE = 5
 
 # What a user upload's title may say besides the artist and the song name.
 _UPLOAD_FILLER = {
-    "lyric", "ft", "feat", "featuring", "with", "prod", "by", "x", "and", "4k", "explicit", "visualizer",
+    "lyric", "ft", "feat", "featuring", "with", "by", "x", "and", "4k", "explicit", "visualizer",
     "перевод", "текст", "слова", "клип", "с", "c", "русскими", "субтитрами", "субтитры",
 }
 
@@ -570,6 +582,9 @@ class ITunesCatalogProvider:
             elif _user_upload_title_matches(title, artist, primary_artist, candidate.title) and _duration_close(
                 duration, candidate.duration, _USER_UPLOAD_TOLERANCE, required=True
             ):
+                ch = (candidate.artist or "").lower()
+                if any(bad in ch for bad in ("prod", "beat", "beatz", "remake", "archive", "reverb", "slowed", "type", "edits", "instr")):
+                    continue
                 uploads.append(candidate)
         if official:
             return closest(official), "artist-credited video"

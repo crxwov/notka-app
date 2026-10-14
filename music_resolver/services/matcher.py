@@ -19,6 +19,10 @@ PENALTY_TERMS = {
     "edit": 0.08,
     "lyrics": 0.08,
     "visualizer": 0.05,
+    "remake": 0.28,
+    "reproduced": 0.28,
+    "tribute": 0.28,
+    "bootleg": 0.28,
 }
 
 NOISE_WORDS = {"official", "video", "audio", "hd", "hq", "music", "lyrics"}
