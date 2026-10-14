@@ -2,10 +2,6 @@
 
 Shared backlog for leksik and crxwov. Current reservations live in already-work-leksik.md / already-work-crxwov.md. Read fresh origin/main records before starting. An owner below is a suggested planning owner, not an active reservation. Remove a task only when its acceptance criteria pass; keep finished history in Git, not this backlog.
 
-## Active documentation/protocol task
-
-- [ ] COORD-01 — Adopt leksik spelling, shared todo/work files, minute-scale state publication, compact agent entrypoints and retire old Roadmaps after transferring pending requirements. Owner: crxwov. Acceptance: links/instructions consistent; isolated status publisher preserves unrelated staged work/remote files; records and docs published to main; Claude prompt delivered. Details: already-work-crxwov.md.
-
 ## User feedback still requiring acceptance / decisions
 
 - [ ] UI-01 — Validate previous player/queue/gesture/background fixes on actual phones; confirm lyric-card saving and navigation/layout on Samsung. Historical fixes were reported but device acceptance remains incomplete. Obtain current screen recordings and reproduction details; do not assume old undeployed version labels are still current.
