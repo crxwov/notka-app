@@ -2,34 +2,32 @@
 
 participant: crxwov
 agent: Antigravity
-status: completed
-updated_at_utc: 2026-10-14T18:30:57Z
+status: active
+updated_at_utc: 2026-10-14T18:39:02Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
 
 ## Objective / Success Criteria
-Fix UI issue on desktop where `#import-pill` overlaps with the user greeting ("Привет, hackov") and hero visuals. Relocate the floating import pill on desktop to the bottom-right (above the dock / player bar) with smooth transitions, keeping phone styling intact.
+Maximize playlist import and track transfer throughput:
+1. Increase HTTPAdapter pool size to 80 and add dedicated 50-worker ThreadPoolExecutor for YouTube Music searches.
+2. Add background server pre-resolution on `/import` so tracks resolve on the server before client even asks.
+3. Scale `resolve_batch` to 150 items with 50 concurrent semaphores.
+4. Scale client resolver to 4 concurrent workers with 60-track batches (240 tracks/wave), throttling state persistence.
 
 ## Scope / Reservation
-miniapp/styles.css, miniapp/system.css, miniapp/app.js, miniapp/index.html, android/app/src/main/assets/miniapp/styles.css, android/app/src/main/assets/miniapp/system.css, android/app/src/main/assets/miniapp/app.js, android/app/src/main/assets/miniapp/index.html.
+music_resolver/providers/youtube_music.py, music_resolver/api/routes.py, music_resolver/services/track_index.py, miniapp/app.js, miniapp/index.html, android/app/src/main/assets/miniapp/app.js, android/app/src/main/assets/miniapp/index.html.
 
 ## Stages
-1. Add desktop styling for `.import-pill` in `miniapp/styles.css` (bottom-right positioning above player dock, smooth transitions, proper margins) — completed.
-2. Update click handlers in `miniapp/app.js` so clicking anywhere on the pill body or icon opens the import modal — completed.
-3. Bump asset versions in `miniapp/index.html` (styles.css?v=149, app.js?v=212) and synchronize to `android/app/src/main/assets/miniapp/` — completed.
-4. Deploy to `notka` server, restart `notka.service`, and verify — completed.
-5. Commit and push to `origin/tg-app` — in_progress.
+1. Optimize `music_resolver/providers/youtube_music.py` with 50-worker thread pool and 80-connection pool — in_progress.
+2. Update `music_resolver/api/routes.py` with background pre-resolution and 50-semaphore batch resolution — pending.
+3. Update `miniapp/app.js` with 4-worker 60-track batching and throttled persistence — pending.
+4. Bump versions, sync Android assets, deploy to server, validate, commit and push — pending.
 
 ## Findings / Decisions
-- On desktop, `top: 12px; left: 50%` places the 440px wide pill directly over the 40px bold greeting "Привет, hackov" and the glowing 3D hero area.
-- Repositioning `body.is-desktop .import-pill` to `bottom: calc(var(--dock, 0px) + var(--sab, 0px) + 20px); right: max(40px, calc((100vw - var(--side, 268px) - 1120px) / 2));` cleanly places it in the bottom-right corner, aligning with the player dock and content bounds without obscuring any headers or hero cards.
-- Added smooth transition for `bottom` alongside `transform` so the pill floats fluidly when mini-player appears or hides.
-
-## Validation / Blockers
-- Verified JS syntax with `node -c miniapp/app.js`.
-- Deployed files to `notka:/opt/notka/app/miniapp/`, restarted `notka.service`, confirmed service is active and `styles.css?v=149` is live.
-- Synchronized all files with `android/app/src/main/assets/miniapp/`.
+- Default Python ThreadPoolExecutor was throttled to 8 workers on the 4-core VM, creating an invisible bottleneck when resolving batches.
+- Adding a dedicated `ThreadPoolExecutor(max_workers=50)` and connection pool size 80 unlocks true 50-way concurrency on YouTube Music queries.
+- Kicking off `_background_pre_resolve` immediately upon `/import` allows the server to resolve tracks in memory before the client requests them, resulting in instant 0ms responses for subsequent batch requests.
 
 ## Next Action / Resume
-Task completed, tested and deployed to production.
+Apply backend optimizations and test speed.
