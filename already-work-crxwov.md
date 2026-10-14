@@ -3,13 +3,13 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-10-14T11:20:35Z
+updated_at_utc: 2026-10-14T11:21:42Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
 
 ## Objective
-Replace Lexic with leksik; introduce todo.md and two published work-state files; consolidate obsolete Roadmaps/instructions; provide Claude onboarding prompt.
+Replace leksik with leksik; introduce todo.md and two published work-state files; consolidate obsolete Roadmaps/instructions; provide Claude onboarding prompt.
 ## Scope / Conflict Boundaries
 README.md, AGENTS.MD, CLAUDE.md, PROJECT_INDEX.md, .gitignore, docs/operations/collaboration.md, documentation identity/routing references, todo.md, already-work-crxwov.md, already-work-leksik.md. May add a scoped Git-only status publishing helper under deploy. No app runtime/backend/Android changes or production deployment. app-dev untouched.
 ## Stages
