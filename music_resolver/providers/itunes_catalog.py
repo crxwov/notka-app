@@ -465,7 +465,7 @@ class ITunesCatalogProvider:
         cached = self._track_info_cache.get(track_id)
         if cached is not None:
             return cached
-        data = await self._get(_LOOKUP_URL, {"id": track_id, "country": "RU", "lang": "ru_ru"})
+        data = await self._get(_LOOKUP_URL, {"id": track_id})
         items = data.get("results") or []
         candidate = self._map_track(items[0]) if items else None
         if candidate is None:
@@ -484,7 +484,7 @@ class ITunesCatalogProvider:
     # ---------------- MusicProvider surface ----------------
 
     async def search(self, query: str, limit: int) -> list[TrackCandidate]:
-        data = await self._get(_SEARCH_URL, {"term": query, "entity": "song", "limit": limit, "country": "RU", "lang": "ru_ru"})
+        data = await self._get(_SEARCH_URL, {"term": query, "entity": "song", "limit": limit})
         results = []
         for item in data.get("results") or []:
             candidate = self._map_track(item)
