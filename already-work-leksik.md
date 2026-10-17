@@ -2,8 +2,8 @@
 
 participant: leksik
 agent: Claude
-status: idle
-updated_at_utc: 2026-10-17T22:36:06Z
+status: paused
+updated_at_utc: 2026-10-17T23:08:57Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -12,4 +12,4 @@ branch: tg-app
 Нет активной задачи. Работа над баннерами (бот/канал) и промо-роликом приостановлена до завтра; код приложения и сервер не затрагивались.
 
 ## Next Action / Resume
-Возобновить по поручению leksik.
+Завтра (2026-10-19): дождаться фоновой разметки на сервере (/opt/notka-lab), перенести каталог в боевую базу (worker.py merge), проверить «Мой микс» V2 у владельца, затем A/B и обучение на обратной связи. Подробно: память notka-handoff-2026-10-18-mix-v2. Последний выложенный коммит 0adb4e1.
