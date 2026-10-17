@@ -3,7 +3,7 @@
 participant: leksik
 agent: Claude
 status: active
-updated_at_utc: 2026-10-17T15:53:09Z
+updated_at_utc: 2026-10-17T18:53:48Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -18,6 +18,9 @@ branch: tg-app
 
 ## Scope / Reservation
 `music_resolver/services/` (mood_mix, track_profile, energy, mix_quality, новые модули хранилища/портрета), `miniapp/mix.js`, согласие в miniapp. Не пересекается с crxwov (proxy_guard).
+
+## Done
+- 2026-10-17: выложено на сервер коммитом 5e78b6c (содержит и правку прокси crxwov f09cc0c): документы legal.html, окно согласия, /consent, mixdb.
 
 ## Stages
 1. Дизайн алгоритмов и схемы SQLite — in progress.
