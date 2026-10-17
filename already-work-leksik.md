@@ -3,7 +3,7 @@
 participant: leksik
 agent: Claude
 status: active
-updated_at_utc: 2026-10-17T18:53:48Z
+updated_at_utc: 2026-10-17T19:28:34Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -23,10 +23,9 @@ branch: tg-app
 - 2026-10-17: выложено на сервер коммитом 5e78b6c (содержит и правку прокси crxwov f09cc0c): документы legal.html, окно согласия, /consent, mixdb.
 
 ## Stages
-1. Дизайн алгоритмов и схемы SQLite — in progress.
-2. Хранилище + портрет + скоринг — pending.
-3. Экран согласия — pending.
-4. Замер Essentia на сервере — pending (отдельный venv, без деплоя в рабочий сервис).
+1. SQLite-хранилище, согласие, документы, журнал прослушивания — выложено (42992c1).
+2. Разметка треков (язык, «Без слов», настроение): сигналы — текст песни + lingua, CLAP (PyTorch, отдельное окружение /opt/notka-lab на сервере), ReccoBeats; замер на золотом наборе — in progress.
+3. Профиль вкуса и сборка микса 70/30 за флагом MIX_V2 — pending.
 
 ## Validation / Blockers
 Тесты tests/ и mix_test.js; деплой только по отдельному поручению.
