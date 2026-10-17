@@ -3,7 +3,7 @@
 participant: leksik
 agent: Claude
 status: active
-updated_at_utc: 2026-10-17T19:28:34Z
+updated_at_utc: 2026-10-17T21:23:15Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -24,8 +24,9 @@ branch: tg-app
 
 ## Stages
 1. SQLite-хранилище, согласие, документы, журнал прослушивания — выложено (42992c1).
-2. Разметка треков (язык, «Без слов», настроение): сигналы — текст песни + lingua, CLAP (PyTorch, отдельное окружение /opt/notka-lab на сервере), ReccoBeats; замер на золотом наборе — in progress.
-3. Профиль вкуса и сборка микса 70/30 за флагом MIX_V2 — pending.
+2. Разметка треков (язык, «Без слов», настроение): CLAP + текст песни + lingua + ReccoBeats; проверочный набор golden.json — сделано, пробная база 665 треков; остальные ~1900 размечаются в фоне в /opt/notka-lab (лабораторная база, боевую не трогает).
+3. Профиль вкуса и сборка микса V2 (taste.py, mix_v2.py, /mix/v2, подключение в app.js) за флагом: включается только для NOTKA_MIX_V2_USERS / NOTKA_MIX_V2_PERCENT — закоммичено (269a81e), ждёт выкладки и переноса разметки в боевую базу (worker.py merge).
+4. Метрики и A/B (этап 6), обучение на обратной связи (этап 5) — pending.
 
 ## Validation / Blockers
 Тесты tests/ и mix_test.js; деплой только по отдельному поручению.
