@@ -2,8 +2,8 @@
 
 participant: crxwov
 agent: Codex
-status: active
-updated_at_utc: 2026-10-18T12:18:13Z
+status: completed
+updated_at_utc: 2026-10-18T12:20:25Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -23,7 +23,7 @@ Finish the bot's one-message main menu, profile and Plus-term stub; generate Not
 2. Implement main menu, profile, Plus-term stub, and editable Back navigation — completed.
 3. Run focused checks and review scoped diff — completed (10 tests passed; compile and diff checks passed).
 4. Generate and attach branded menu/profile/Plus banners — completed; three assets are in `bot/assets/`.
-5. Integrate scoped bot changes on fresh `main` — completed as `c639bfb`; deploy to `notka` — in progress under explicit user authorization.
+5. Integrate scoped bot changes on fresh `main` and deploy to `notka` — completed; code commit `c639bfb`, deployed current main commit `433bf93`.
 
 ## Findings / Decisions
 - `bot/main.py` already sets `MenuButtonWebApp` globally; preserve it. Plain `/start` now sends one message; old open-app fallback keyboard and promo/shared-track links remain unchanged.
@@ -31,17 +31,18 @@ Finish the bot's one-message main menu, profile and Plus-term stub; generate Not
 - `sync_store.load(user_id)` exposes the user's per-device listen totals; `plus_store.status(user_id)` is the subscription authority. Profile callbacks are private-chat only.
 - `plat_check` is a non-mutating placeholder. New banner art is limited to in-chat menu pages; keep leksik's paused channel/promo-video work untouched.
 - User corrected the support URL to `https://t.me/notka_support`; the menu and focused assertion now use it.
-- Production currently records `branch=tg-app`, commit `0adb4e1`; switching this requested release to `main` requires the deploy script's explicit `NOTKA_FORCE=1` branch override. The user explicitly authorized deploying `main` after integration.
-- Clean `main` release commit `c639bfb` contains only the scoped bot menu/profile, dependency floor, focused test, and three banner assets.
+- Production was switched from recorded `branch=tg-app` to `main` using the deploy script's explicit branch override, as authorized by the user.
+- Clean `main` code commit `c639bfb` contains only the scoped bot menu/profile, dependency floor, focused test, and three banner assets; published main state commit `433bf93` was deployed.
 - A stale crxwov record from 2026-10-15 described ProxyGuard work: lightweight `generate_204` retry, two-failure debounce, immediate recovery, tests/live probe. Status remains unconfirmed; this task did not touch it.
 
 ## Validation / Blockers
 - `venv\Scripts\python.exe -m pytest tests/test_bot_menu.py -q` — 10 passed; Python compilation and `git diff --check` passed after support correction.
 - Re-ran all 10 focused tests, Python compilation, and diff checks from the clean main integration checkout before commit; push of `c639bfb` succeeded.
-- Read-only production checks: `/health` returned `{"status":"ok"}`; `DEPLOY_INFO` was `branch=tg-app`, `commit=0adb4e1`; `/opt/notka/app/backups` exists.
+- Production verification: `DEPLOY_INFO` records `branch=main`, `commit=433bf93`; service is `active`; `/health` returned `{"status":"ok"}`; SHA-256 for `bot/main.py`, `requirements.txt`, and all three banners matches the release checkout. Latest available backup archive was 2026-10-17 23:14 UTC.
 - Initial test fake signature failure was corrected; no current failure.
 - Graph MCP tools unavailable; targeted search/read used.
 - Production deploy must use the reviewed `main` commit; do not deploy all of `tg-app`. The explicit branch switch is limited to the user's requested release.
+- First deploy invocation failed because `bash` was not on PowerShell PATH; reran via `C:\Program Files\Git\bin\bash.exe`, then deployment and verification succeeded.
 
 ## Next Action / Resume
-Deploy the exact reviewed `main` release with the user-authorized branch switch, then verify DEPLOY_INFO, service status, and `/health`; publish the completed work state.
+No remaining action for this menu release. The separate stale ProxyGuard work remains unconfirmed and untouched.
