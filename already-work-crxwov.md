@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-10-18T12:15:55Z
+updated_at_utc: 2026-10-18T12:16:45Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -39,7 +39,7 @@ Finish the bot's one-message main menu, profile and Plus-term stub; generate Not
 - Read-only production checks: `/health` returned `{"status":"ok"}`; `DEPLOY_INFO` was `branch=tg-app`, `commit=0adb4e1`; `/opt/notka/app/backups` exists.
 - Initial test fake signature failure was corrected; no current failure.
 - Graph MCP tools unavailable; targeted search/read used.
-- Production deploy must use reviewed `main`; do not deploy all of `tg-app` or bypass its branch drift guard.
+- Production deploy must use the reviewed `main` commit; do not deploy all of `tg-app`. The explicit branch switch is limited to the user's requested release.
 
 ## Next Action / Resume
 Publish the verified work state, integrate only scoped files onto fresh `origin/main`, validate the clean release commit, confirm a current backup, and deploy that exact `main` commit under the user-authorized branch switch.
