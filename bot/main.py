@@ -17,6 +17,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     FSInputFile,
+    InputMediaPhoto,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InlineQuery,
@@ -24,35 +25,42 @@ from aiogram.types import (
     InlineQueryResultCachedAudio,
     BufferedInputFile,
     ChatMemberUpdated,
+    CallbackQuery,
     InlineQueryResultsButton,
     MenuButtonWebApp,
     Message,
-    ReplyKeyboardRemove,
     WebAppInfo,
 )
 
 from bot.config import load_config
-from music_resolver.services import metrics, plus_store
+from music_resolver.services import metrics, plus_store, sync_store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("notka.bot")
 
 
-# Welcome banner (Для бота/welcome.jpg): sent with /start. After the first send Telegram
+# Welcome banner: sent with the menu. After the first send Telegram
 # gives a file_id, which is reused so the picture is not uploaded again.
-WELCOME_BANNER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Для бота", "welcome.jpg")
-_banner_file_id: str | None = None
+WELCOME_BANNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "notka-menu-banner.png")
+MENU_BANNERS = {
+    "home": WELCOME_BANNER,
+    "profile": os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "notka-profile-banner.png"),
+    "plus": os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "notka-plus-banner.png"),
+}
+_banner_file_ids: dict[str, str] = {}
+SUPPORT_URL = "https://t.me/notka_support"
+PLUS_MAX_DAYS = 3660
 
 
-async def send_welcome(message: Message, text: str, keyboard: InlineKeyboardMarkup) -> None:
-    global _banner_file_id
-    if os.path.exists(WELCOME_BANNER):
+async def send_welcome(message: Message, text: str, keyboard: InlineKeyboardMarkup, page: str = "home") -> None:
+    banner_path = MENU_BANNERS[page]
+    if os.path.exists(banner_path):
         try:
             sent = await message.answer_photo(
-                _banner_file_id or FSInputFile(WELCOME_BANNER), caption=text, reply_markup=keyboard
+                _banner_file_ids.get(page) or FSInputFile(banner_path), caption=text, reply_markup=keyboard
             )
-            if not _banner_file_id and sent.photo:
-                _banner_file_id = sent.photo[-1].file_id
+            if sent.photo:
+                _banner_file_ids[page] = sent.photo[-1].file_id
             return
         except Exception:
             logger.exception("Could not send the welcome banner, falling back to text")
@@ -61,10 +69,122 @@ async def send_welcome(message: Message, text: str, keyboard: InlineKeyboardMark
 
 def build_open_app_inline_keyboard(miniapp_url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="🔥 Открыть Нотку", web_app=WebAppInfo(url=miniapp_url))]]
+    )
+
+
+def build_main_menu_keyboard(miniapp_url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🔥 Открыть Нотку", web_app=WebAppInfo(url=miniapp_url))]
+            [InlineKeyboardButton(text="🎧 Открыть Нотку", web_app=WebAppInfo(url=miniapp_url), style="primary")],
+            [
+                InlineKeyboardButton(text="Поддержка", url=SUPPORT_URL),
+                InlineKeyboardButton(text="Профиль", callback_data="menu:profile"),
+            ],
         ]
     )
+
+
+def _plural_ru(value: int, one: str, few: str, many: str) -> str:
+    n = abs(value) % 100
+    if 11 <= n <= 14:
+        return many
+    n %= 10
+    return one if n == 1 else few if 2 <= n <= 4 else many
+
+
+def format_duration(seconds: int) -> str:
+    minutes = max(0, int(seconds)) // 60
+    if minutes < 60:
+        return f"{minutes} {_plural_ru(minutes, 'минута', 'минуты', 'минут')}"
+    hours, minutes = divmod(minutes, 60)
+    if hours < 24:
+        result = f"{hours} {_plural_ru(hours, 'час', 'часа', 'часов')}"
+    else:
+        days, hours = divmod(hours, 24)
+        result = f"{days} {_plural_ru(days, 'день', 'дня', 'дней')}"
+        if hours:
+            result += f" {hours} {_plural_ru(hours, 'час', 'часа', 'часов')}"
+    if minutes:
+        result += f" {minutes} {_plural_ru(minutes, 'минута', 'минуты', 'минут')}"
+    return result
+
+
+def listening_seconds(user_id: int) -> int:
+    devices = sync_store.load(user_id).get("devices") or {}
+    if not isinstance(devices, dict):
+        return 0
+    total = 0
+    for device in devices.values():
+        listens = device.get("listens") if isinstance(device, dict) else None
+        if not isinstance(listens, dict):
+            continue
+        try:
+            total += max(0, int(listens.get("seconds") or 0))
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return total
+
+
+def clamp_plus_days(days: int) -> int:
+    return min(PLUS_MAX_DAYS, max(1, int(days)))
+
+
+def build_profile_text(user_id: int) -> tuple[str, bool]:
+    plus = plus_store.status(user_id)
+    if plus["plus"]:
+        remaining = max(60, int(plus["until"] - time.time()))
+        subscription = f"Нотка Плюс: активна ещё {format_duration(remaining)}"
+    else:
+        subscription = "Нотка Плюс: не активна"
+    return f"👤 Профиль\n\n{subscription}\nПрослушано: {format_duration(listening_seconds(user_id))}", plus["plus"]
+
+
+def build_profile_keyboard(plus_active: bool) -> InlineKeyboardMarkup:
+    action = "Продлить Нотку Плюс" if plus_active else "Приобрести Нотку Плюс"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=action, callback_data="menu:plus:config:30")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
+    ])
+
+
+def build_plus_keyboard(days: int, plus_active: bool) -> InlineKeyboardMarkup:
+    action = "Продлить" if plus_active else "Купить"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="− 1 день", callback_data=f"menu:plus:step:{days}:-1"),
+            InlineKeyboardButton(text="+ 1 день", callback_data=f"menu:plus:step:{days}:1"),
+        ],
+        [InlineKeyboardButton(text=f"{action} {days} дн.", callback_data=f"menu:plus:pay:{days}")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:profile")],
+    ])
+
+
+async def edit_menu_message(message: Message, page: str, text: str, keyboard: InlineKeyboardMarkup) -> None:
+    banner_path = MENU_BANNERS[page]
+    if message.photo and os.path.exists(banner_path):
+        try:
+            edited = await message.edit_media(
+                media=InputMediaPhoto(media=_banner_file_ids.get(page) or FSInputFile(banner_path), caption=text),
+                reply_markup=keyboard,
+            )
+            if isinstance(edited, Message) and edited.photo:
+                _banner_file_ids[page] = edited.photo[-1].file_id
+            return
+        except Exception:
+            logger.exception("Could not replace the menu banner, keeping the current image")
+    if message.photo:
+        await message.edit_caption(caption=text, reply_markup=keyboard)
+    else:
+        await message.edit_text(text, reply_markup=keyboard)
+
+
+def build_plus_config_text(days: int) -> str:
+    return f"Нотка Плюс\n\nСрок подписки: {days} {_plural_ru(days, 'день', 'дня', 'дней')}"
+
+
+def build_plus_payment_text(days: int) -> str:
+    return f"plat_check\n\nВыбранный срок: {days} {_plural_ru(days, 'день', 'дня', 'дней')}\n\nОплата пока не подключена."
 
 
 async def main() -> None:
@@ -142,16 +262,82 @@ async def main() -> None:
                 ),
             )
             return
-        await message.answer(
+        await send_welcome(
+            message,
             "Привет! Это Нотка — музыка прямо в Телеграме.\n\n"
             "Жми на кнопку ниже, чтобы найти и включить трек.",
-            reply_markup=build_open_app_inline_keyboard(config.miniapp_url),
+            build_main_menu_keyboard(config.miniapp_url),
         )
-        # also clears the old keyboard button, which may hold a dead address
-        await message.answer(
-            "Кнопка «Нотка» слева от поля ввода тоже всегда под рукой.",
-            reply_markup=ReplyKeyboardRemove(),
-        )
+
+    @dp.callback_query(F.data.startswith("menu:"))
+    async def handle_menu_callback(query: CallbackQuery) -> None:
+        if not isinstance(query.message, Message):
+            await query.answer("Сообщение меню недоступно.", show_alert=True)
+            return
+        if query.message.chat.type != "private":
+            await query.answer("Открой Нотку в личном чате с ботом.", show_alert=True)
+            return
+
+        data = query.data or ""
+        page = "home"
+        if data == "menu:home":
+            text = (
+                "Привет! Это Нотка — музыка прямо в Телеграме.\n\n"
+                "Жми на кнопку ниже, чтобы найти и включить трек."
+            )
+            keyboard = build_main_menu_keyboard(config.miniapp_url)
+        elif data == "menu:profile":
+            page = "profile"
+            text, plus_active = build_profile_text(query.from_user.id)
+            keyboard = build_profile_keyboard(plus_active)
+        else:
+            parts = data.split(":")
+            if len(parts) == 4 and parts[:3] == ["menu", "plus", "config"]:
+                page = "plus"
+                try:
+                    days = clamp_plus_days(int(parts[3]))
+                except ValueError:
+                    await query.answer("Эта кнопка устарела. Отправь /start.", show_alert=True)
+                    return
+                plus_active = plus_store.status(query.from_user.id)["plus"]
+                text = build_plus_config_text(days)
+                keyboard = build_plus_keyboard(days, plus_active)
+            elif len(parts) == 5 and parts[:3] == ["menu", "plus", "step"]:
+                page = "plus"
+                try:
+                    days, change = clamp_plus_days(int(parts[3])), int(parts[4])
+                except ValueError:
+                    await query.answer("Эта кнопка устарела. Отправь /start.", show_alert=True)
+                    return
+                if change not in (-1, 1):
+                    await query.answer("Эта кнопка устарела. Отправь /start.", show_alert=True)
+                    return
+                updated_days = clamp_plus_days(days + change)
+                if updated_days == days:
+                    edge = "минимальный" if change < 0 else "максимальный"
+                    await query.answer(f"Уже выбран {edge} срок.")
+                    return
+                plus_active = plus_store.status(query.from_user.id)["plus"]
+                text = build_plus_config_text(updated_days)
+                keyboard = build_plus_keyboard(updated_days, plus_active)
+            elif len(parts) == 4 and parts[:3] == ["menu", "plus", "pay"]:
+                page = "plus"
+                try:
+                    days = clamp_plus_days(int(parts[3]))
+                except ValueError:
+                    await query.answer("Эта кнопка устарела. Отправь /start.", show_alert=True)
+                    return
+                text = build_plus_payment_text(days)
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⬅️ Назад", callback_data=f"menu:plus:config:{days}")],
+                    [InlineKeyboardButton(text="Главное меню", callback_data="menu:home")],
+                ])
+            else:
+                await query.answer("Эта кнопка устарела. Отправь /start.", show_alert=True)
+                return
+
+        await query.answer()
+        await edit_menu_message(query.message, page, text, keyboard)
 
     # ---- for the owner (ADMIN_IDS in .env): promo codes for «Нотка Плюс» ----
     admin_ids = {int(x) for x in re.findall(r"\d+", os.environ.get("ADMIN_IDS", ""))}

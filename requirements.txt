@@ -9,7 +9,7 @@ ytmusicapi>=1.12,<2.0
 imageio-ffmpeg>=0.5
 
 # Бот
-aiogram>=3.15,<4.0
+aiogram>=3.25,<4.0
 python-dotenv>=1.0,<2.0
 
 # Публичная https-ссылка на этот компьютер (бесплатный туннель Cloudflare)
