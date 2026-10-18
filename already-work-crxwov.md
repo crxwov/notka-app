@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-10-18T13:49:26Z
+updated_at_utc: 2026-10-18T13:52:51Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: main
@@ -32,7 +32,7 @@ Scope: `bot/main.py`, the four `bot/assets/notka-*-banner.png` images, `tests/te
 ## Validation / Blockers
 - Fresh origin/main coordination checked and main integration worktree fast-forwarded to `dc74e4c`.
 - Root tg-app contains unrelated dirty copies of bot code/assets/tests; they are being preserved; edit only clean main integration worktree.
-- Existing images are 2172x724 with centered title-under-logo treatment and distinct glow palettes.
+- Four candidates generated from existing assets and main-menu reference; all visibly use the unchanged Notka N, title below it, and each page's original palette. Source outputs are in `C:/Users/hackov/.codex/generated_images/01a14ee0-1eed-7cf1-834b-2e0ccce5ac87/` (`exec-beebeceb-8715-42fa-8ff8-6b32360dfdbd.png`, `exec-74806dbb-1736-44f7-b32d-48fe8dba8921.png`, `exec-9c6b0617-a494-48ad-93f7-728d60b8406a.png`, `exec-16518b89-d1d7-4c3e-8513-94c75125f590.png`).
 
 ## Next Action / Resume
 Generate reviewable images, update greeting and HTML text formatting, test, commit/push only scoped files, deploy and verify.
