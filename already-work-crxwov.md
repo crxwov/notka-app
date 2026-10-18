@@ -2,8 +2,8 @@
 
 participant: crxwov
 agent: Codex
-status: active
-updated_at_utc: 2026-10-18T13:03:23Z
+status: completed
+updated_at_utc: 2026-10-18T13:05:37Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -22,7 +22,7 @@ Scope: bot menu/profile implementation, `bot/assets/`, relevant bot tests, revie
 1. Refresh coordination, inspect latest feedback, and isolate bot scope — completed. Existing leksik banner/video work remains separate.
 2. Generate and owner-review the four approved wide banners — completed; 2172x724 assets.
 3. Implement Info/legal pages, bannered deep links/fallback, and navigation docs/tests — completed.
-4. Validate, integrate only this change to fresh main, deploy to `ssh notka`, and verify — active.
+4. Validate, integrate only this change to fresh main, deploy to `ssh notka`, and verify — completed.
 
 ## Findings / Decisions
 - Keep selected option 2's living-light look and title-under-mark treatment.
@@ -40,6 +40,7 @@ Scope: bot menu/profile implementation, `bot/assets/`, relevant bot tests, revie
 - `python -m pytest tests/test_bot_menu.py -q`: 13 passed; `py_compile` and `git diff --check` passed.
 - All four banners are 2172x724; privacy and terms captions are 519/531 characters (under Telegram caption limit).
 - Server preflight: `notka.service` active, `/health` returns `{"status":"ok"}`, DEPLOY_INFO branch is main; backup data exists.
+- Commit `727da518b67e682b719f73f76f5c4295755d8c18` is on origin/main and deployed; DEPLOY_INFO matches, service remains active, and `/health` is OK.
 
 ## Next Action / Resume
-Fast-forward main integration worktree to latest origin/main, review and commit only bot code/assets/docs/tests, push without force, deploy from main, and verify DEPLOY_INFO plus service health.
+No further action; production deployment and health verification completed.
