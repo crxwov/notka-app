@@ -3,35 +3,35 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-10-18T12:33:46Z
+updated_at_utc: 2026-10-18T12:36:53Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
 
 ## Objective / Success Criteria
-Create the selected option-2 visual direction as a coordinated set of panoramic Notka bot banners: main menu, profile, Notka Plus, and Info. Each image has a stylish, exact Russian section title and a subtly repositioned living-light orb.
-- Four distinct, readable 3:1 drafts appear in chat for owner review.
-- Preserve the selected palette/light style across the set; shift orb position/scale subtly by screen.
-- No shipped image or runtime changes until the owner reviews the drafts.
+Create a coordinated set of panoramic Notka bot banners for main menu, profile, Notka Plus, and Info. The owner rejected the first titled drafts: left-aligned plain text and near-identical orb placement. Revise with section titles integrated beneath/in the orb's light and visibly varied light placement/glow.
+- Four distinct, readable 3:1 drafts shown in chat for review.
+- Keep the same “Живой свет” identity; title treatment is refined, luminous, exact Russian text, not plain white text floating on dark.
+- Shift orb position, size, and glow character by page while retaining one light source per banner.
+- No shipped image or runtime change until owner approval.
 
 ## Scope / Reservation
-Current work: image generation only for the four bot message/page headers. Do not modify `bot/assets`, bot text, runtime, integration, or production. After banner review, continue the prior user request: format bot copy and add Profile > Info with privacy policy and user agreement. No channel banners or promo video.
+Current work is preview-only image generation for four bot message/page headers. Do not modify `bot/assets`, bot text, runtime, integration, or production. After banner review, continue requested bot copy formatting and Profile > Info with privacy policy and user agreement. No channel banners or promo video.
 
 ## Stages
-1. Fresh coordination and inspect selected visual direction — completed. The owner chose draft 2 and requested four section-specific variants. leksik's general banner/channel/video work remains paused until 2026-10-19; this assignment is confined to the bot's in-chat pages.
-2. Generate and inspect the four titled, wide banner drafts — active.
-3. Owner visual review — pending; no code or asset replacement before review.
-4. Format bot text and implement Profile > Info legal content — pending review; read the existing approved legal source before editing.
+1. Fresh coordination, read private Roadmap, and inspect feedback/base direction — completed. User chose option 2, then rejected left-aligned titles and insufficient orb variation. leksik's broad banner/channel/video work remains paused until 2026-10-19; current scope is only the bot's in-chat pages.
+2. Generate and inspect four revised 3:1 banners with integrated luminous headings and moved light — active.
+3. Owner visual review — pending; no code or image replacement before review.
+4. Format bot text and implement Profile > Info legal content — pending review; locate the existing approved legal source before edits.
 
 ## Findings / Decisions
-- Base visual: selected option 2, a warm-to-magenta-to-violet living-light orb on a near-black violet ground, based on the supplied Notka design system.
-- Section titles: `Главное меню`, `Профиль`, `Нотка Плюс`, `Информация`; use Onest-like neutral white typography in the dark negative space.
-- Vary the orb placement and scale slightly across screens; keep one coherent, calm light source per banner.
-- References: owner-selected image, splash/logo, Mini App screenshot, and Telegram message crop.
+- Visual base: selected option 2, warm-to-magenta-to-violet living-light orb on near-black violet, from the supplied Notka design system.
+- Titles: `Главное меню`, `Профиль`, `Нотка Плюс`, `Информация`; neutral white Onest-like letters should be subtly backlit/reflected by the orb and placed below its mark, integrated into the glow.
+- Make motion apparent across static pages by changing orb position, size, and intensity/tone between banners; no video or extra colored elements.
 
 ## Validation / Blockers
-- Confirmed fresh origin coordination; `todo.md` has no banner/Info task. No source code or deployed files were changed.
-- No blocker; waiting only on visual review after draft generation.
+- Fresh remote work records and todo checked; no conflicting current code task. Existing dirty menu code/assets remain untouched.
+- No blocker before generation; owner review is required after.
 
 ## Next Action / Resume
-Generate four individual 3:1 banner drafts with exact Russian titles. Show all for owner review and stop before modifying the bot.
+Generate four individual revised banners, check title spelling/readability and distinct light placements, show the set, and stop for review.
