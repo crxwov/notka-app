@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-10-18T12:55:38Z
+updated_at_utc: 2026-10-18T13:03:23Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -19,11 +19,10 @@ Finish the authorized Notka Telegram bot menu/profile flow, place the approved b
 Scope: bot menu/profile implementation, `bot/assets/`, relevant bot tests, reviewed integration to main, and deployment to `ssh notka`. Preserve unrelated existing dirty changes. No channel banners, Android client work, or promo video.
 
 ## Stages
-1. Refresh coordination, read Roadmap, inspect previous drafts and latest feedback — completed. Existing leksik reservation remains paused; this direct scope is only the bot in-chat pages.
-2. Main-menu visual reference review — completed; owner selected the logo/style from `exec-2f7309a2-1725-4150-826b-37f3a1b0b426.png`.
-3. Generate remaining three banners — completed; user approved the selected logo/style and requested the remaining work.
-4. Inspect existing bot work and legal text; implement menu/profile/info flows — active.
-5. Validate, integrate to main, deploy to `ssh notka`, and verify health — pending.
+1. Refresh coordination, inspect latest feedback, and isolate bot scope — completed. Existing leksik banner/video work remains separate.
+2. Generate and owner-review the four approved wide banners — completed; 2172x724 assets.
+3. Implement Info/legal pages, bannered deep links/fallback, and navigation docs/tests — completed.
+4. Validate, integrate only this change to fresh main, deploy to `ssh notka`, and verify — active.
 
 ## Findings / Decisions
 - Keep selected option 2's living-light look and title-under-mark treatment.
@@ -37,9 +36,10 @@ Scope: bot menu/profile implementation, `bot/assets/`, relevant bot tests, revie
 - Payment purchase/renewal must remain a stub that displays `plat_check` at the payment step.
 
 ## Validation / Blockers
-- Fresh origin coordination and private Roadmap checked; no competing runtime task. Existing dirty menu code/assets preserved.
-- Three remaining 3:1 drafts generated at 2172x724 and displayed inline; user approved their style and authorized bot integration/deployment.
-- Prior dirty app changes and assets must be reviewed and preserved; do not assume they are disposable.
+- Fresh origin/main and both coordination records checked; unrelated dirty tg-app changes remain untouched.
+- `python -m pytest tests/test_bot_menu.py -q`: 13 passed; `py_compile` and `git diff --check` passed.
+- All four banners are 2172x724; privacy and terms captions are 519/531 characters (under Telegram caption limit).
+- Server preflight: `notka.service` active, `/health` returns `{"status":"ok"}`, DEPLOY_INFO branch is main; backup data exists.
 
 ## Next Action / Resume
-Inspect source graph (or targeted fallback), dirty diffs, legal text, and deployment procedure. Implement smallest complete bot flow, validate it, integrate reviewed runtime changes to main, and deploy/verify the server.
+Fast-forward main integration worktree to latest origin/main, review and commit only bot code/assets/docs/tests, push without force, deploy from main, and verify DEPLOY_INFO plus service health.
