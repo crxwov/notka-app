@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-10-18T12:13:03Z
+updated_at_utc: 2026-10-18T12:15:55Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -21,9 +21,9 @@ Finish the bot's one-message main menu, profile and Plus-term stub; generate Not
 ## Stages
 1. Refresh coordination, inspect bot call sites, and verify Telegram API — completed.
 2. Implement main menu, profile, Plus-term stub, and editable Back navigation — completed.
-3. Run focused checks and review scoped diff — rerun after support-link correction pending.
+3. Run focused checks and review scoped diff — completed (10 tests passed; compile and diff checks passed).
 4. Generate and attach branded menu/profile/Plus banners — completed; three assets are in `bot/assets/`.
-5. Reconcile the scoped bot changes to fresh `main`, then deploy to `notka` under the drift guard — authorized by user, pending.
+5. Reconcile the scoped bot changes to fresh `main`, then deploy to `notka` — authorized by user, pending.
 
 ## Findings / Decisions
 - `bot/main.py` already sets `MenuButtonWebApp` globally; preserve it. Plain `/start` now sends one message; old open-app fallback keyboard and promo/shared-track links remain unchanged.
@@ -31,14 +31,15 @@ Finish the bot's one-message main menu, profile and Plus-term stub; generate Not
 - `sync_store.load(user_id)` exposes the user's per-device listen totals; `plus_store.status(user_id)` is the subscription authority. Profile callbacks are private-chat only.
 - `plat_check` is a non-mutating placeholder. New banner art is limited to in-chat menu pages; keep leksik's paused channel/promo-video work untouched.
 - User corrected the support URL to `https://t.me/notka_support`; the menu and focused assertion now use it.
+- Production currently records `branch=tg-app`, commit `0adb4e1`; switching this requested release to `main` requires the deploy script's explicit `NOTKA_FORCE=1` branch override. The user explicitly authorized deploying `main` after integration.
 - A stale crxwov record from 2026-10-15 described ProxyGuard work: lightweight `generate_204` retry, two-failure debounce, immediate recovery, tests/live probe. Status remains unconfirmed; this task did not touch it.
 
 ## Validation / Blockers
-- Before latest support correction: `venv\Scripts\python.exe -m pytest tests/test_bot_menu.py -q` — 9 passed; rerun before integration.
-- `venv\Scripts\python.exe -m py_compile bot/main.py tests/test_bot_menu.py` and `git diff --check` — passed.
+- `venv\Scripts\python.exe -m pytest tests/test_bot_menu.py -q` — 10 passed; Python compilation and `git diff --check` passed after support correction.
+- Read-only production checks: `/health` returned `{"status":"ok"}`; `DEPLOY_INFO` was `branch=tg-app`, `commit=0adb4e1`; `/opt/notka/app/backups` exists.
 - Initial test fake signature failure was corrected; no current failure.
 - Graph MCP tools unavailable; targeted search/read used.
 - Production deploy must use reviewed `main`; do not deploy all of `tg-app` or bypass its branch drift guard.
 
 ## Next Action / Resume
-Rerun focused checks, publish the updated work state, inspect fresh deployment state, and integrate only the scoped files onto `origin/main` before the authorized deploy.
+Publish the verified work state, integrate only scoped files onto fresh `origin/main`, validate the clean release commit, confirm a current backup, and deploy that exact `main` commit under the user-authorized branch switch.
