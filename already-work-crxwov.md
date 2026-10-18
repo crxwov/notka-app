@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-10-18T12:28:06Z
+updated_at_utc: 2026-10-18T12:28:22Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -24,7 +24,7 @@ Current stage: visual draft generation and review only; no runtime changes, asse
 
 ## Findings / Decisions
 - Brand references: `DESIGN.md`, `miniapp/index.html`, Mini App screenshot, splash/logo screenshot, and bot profile screenshot.
-- Brand tokens: ground `#0C0A12`, warm/core light, rose `#E23C8C`, deep violet `#6D34E0`, translucent glass, Onest.
+- Brand guide now supplied by the owner: Creative North Star is “Живой свет” — one soft orb with cream, orange, magenta and violet layers on a near-black violet ground. Color belongs to emitted light; surrounding chrome stays neutral. Onest throughout. The attached Blender-only 3D icon rules do not apply to this banner asset.
 - Existing Telegram profile screenshot shows the previous generic record/landscape banner that the owner rejected; new images must be wider and use Notka's actual abstract logo/light identity.
 - The user's explicit assignment separates bot in-chat drafts from leksik's paused channel and promo-video work.
 
