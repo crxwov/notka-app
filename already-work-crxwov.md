@@ -2,39 +2,36 @@
 
 participant: crxwov
 agent: Codex
-status: paused
-updated_at_utc: 2026-10-18T12:30:03Z
+status: active
+updated_at_utc: 2026-10-18T12:33:46Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
 
 ## Objective / Success Criteria
-Prepare wider, on-brand Telegram bot banner drafts for owner review before replacing the current art. After the owner chooses a direction, continue the requested bot copy formatting and Profile > Info pages for privacy policy and user agreement.
-- Three independent 3:1 banner images shown in chat, grounded in the Notka “Живой свет” design system.
-- Existing shipped images and runtime stay unchanged until owner review.
+Create the selected option-2 visual direction as a coordinated set of panoramic Notka bot banners: main menu, profile, Notka Plus, and Info. Each image has a stylish, exact Russian section title and a subtly repositioned living-light orb.
+- Four distinct, readable 3:1 drafts appear in chat for owner review.
+- Preserve the selected palette/light style across the set; shift orb position/scale subtly by screen.
+- No shipped image or runtime changes until the owner reviews the drafts.
 
 ## Scope / Reservation
-Current stage completed: preview-only image drafts. No runtime changes, asset replacement, commit, integration, or deployment. Waiting for owner choice. Follow-up after review: format bot message copy and add Profile > Info with existing approved legal content; then validate and use the previously authorized release path. No channel banners or promo video.
+Current work: image generation only for the four bot message/page headers. Do not modify `bot/assets`, bot text, runtime, integration, or production. After banner review, continue the prior user request: format bot copy and add Profile > Info with privacy policy and user agreement. No channel banners or promo video.
 
 ## Stages
-1. Refresh `origin/main` coordination and inspect Notka references/current art — completed. leksik's broader bot/channel banner and promo-video work is paused until 2026-10-19; this direct request is limited to the owner's bot in-chat assets.
-2. Generate and inspect three wide banner drafts; show in chat — completed.
-3. Owner visual review — paused/waiting for the owner to choose or request changes.
-4. Bot message formatting and Profile > Info legal content — pending visual review.
+1. Fresh coordination and inspect selected visual direction — completed. The owner chose draft 2 and requested four section-specific variants. leksik's general banner/channel/video work remains paused until 2026-10-19; this assignment is confined to the bot's in-chat pages.
+2. Generate and inspect the four titled, wide banner drafts — active.
+3. Owner visual review — pending; no code or asset replacement before review.
+4. Format bot text and implement Profile > Info legal content — pending review; read the existing approved legal source before editing.
 
 ## Findings / Decisions
-- The owner supplied the actual brand guide: “Живой свет”, one soft orb with cream, orange, magenta and violet layers on near-black violet; color belongs to emitted light, chrome stays neutral; Onest throughout. Blender-only icon rules are not in scope for banner images.
-- The supplied splash/logo, Mini App screenshot, Telegram profile crop and existing banners were attached/reviewed as references.
-- Three wide candidates are at:
-  - `C:\Users\hackov\.codex\generated_images\01a14ee0-1eed-7cf1-834b-2e0ccce5ac87\exec-7ba462d6-4a41-439a-8cfc-5ddd1152e6fa.png`
-  - `C:\Users\hackov\.codex\generated_images\01a14ee0-1eed-7cf1-834b-2e0ccce5ac87\exec-b11561ae-811c-4ac9-ad4e-2bf4ff7f72d0.png`
-  - `C:\Users\hackov\.codex\generated_images\01a14ee0-1eed-7cf1-834b-2e0ccce5ac87\exec-f0705b59-1593-45ed-a9a8-54ab88d4f2cb.png`
+- Base visual: selected option 2, a warm-to-magenta-to-violet living-light orb on a near-black violet ground, based on the supplied Notka design system.
+- Section titles: `Главное меню`, `Профиль`, `Нотка Плюс`, `Информация`; use Onest-like neutral white typography in the dark negative space.
+- Vary the orb placement and scale slightly across screens; keep one coherent, calm light source per banner.
+- References: owner-selected image, splash/logo, Mini App screenshot, and Telegram message crop.
 
 ## Validation / Blockers
-- Product Design user-context preflight ran; no saved context exists, so current screenshots and the attached brand guide were used.
-- Visually checked all three outputs: panoramic 3:1; no generated copy, vinyl, landscape, or mascot; palette/light follows the provided Mini App style.
-- No bot code or shipped image was changed. Existing dirty code files in the shared `tg-app` checkout are from the prior completed menu task and were preserved.
-- No blocker; next step depends on owner review.
+- Confirmed fresh origin coordination; `todo.md` has no banner/Info task. No source code or deployed files were changed.
+- No blocker; waiting only on visual review after draft generation.
 
 ## Next Action / Resume
-Wait for the owner's banner selection or visual corrections. Then implement the approved art, requested text formatting and Profile > Info.
+Generate four individual 3:1 banner drafts with exact Russian titles. Show all for owner review and stop before modifying the bot.
