@@ -3,40 +3,41 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-10-18T12:06:10Z
+updated_at_utc: 2026-10-18T12:06:53Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
 
 ## Objective / Success Criteria
-Complete the Notka bot's one-message main menu, user profile, Plus-term configurator stub and Back navigation, then generate and attach Notka-style menu banners as the final implementation stage.
-- Plain `/start`: one editable message; blue `Открыть Нотку` button first; support and profile share the next row.
-- Keep the persistent `Нотка` chat menu button.
-- Profile shows current Plus status and aggregate listening time from the user's synchronized devices.
-- Plus term can increase/decrease; the payment step shows `plat_check` and never grants Plus.
+Finish the bot's one-message main menu, profile and Plus-term stub, then generate Notka-style in-chat menu art as the final stage.
+- Plain `/start`: one editable message; blue `Открыть Нотку` first; support and profile on the same next row.
+- Keep the persistent `Нотка` chat-menu button.
+- Profile shows the user's current Plus state and aggregate listening time from synchronized devices.
+- Plus term can increase/decrease; payment stage displays `plat_check` and never grants Plus.
 
 ## Scope / Reservation
-`bot/main.py`, `requirements.txt`, focused `tests/test_bot_menu.py`, and new menu banner files under `bot/assets/`. In-chat menu and profile routes only. No channel/promo-video artwork and no changes to `music_resolver/services/proxy_guard.py`.
+`bot/main.py`, `requirements.txt`, `tests/test_bot_menu.py`, and new `bot/assets/notka-menu-banner.png`. Interactive menu/profile/Plus routes only. No channel/promo-video art and no edits to `music_resolver/services/proxy_guard.py`.
 
 ## Stages
-1. Refresh coordination, inspect current bot paths, and verify Telegram button/menu API — completed.
-2. Implement main menu, profile, Plus-term stub, and editable Back navigation — in progress.
-3. Run focused checks and review the scoped diff — pending.
-4. Generate and attach the new in-chat menu banners — pending; deliberately last.
-5. Reconcile to reviewed `main` and deploy to `notka` only after drift/health checks permit it — pending.
+1. Refresh coordination, inspect bot call sites, and verify Telegram API — completed.
+2. Implement main menu, profile, Plus-term stub, and editable Back navigation — completed.
+3. Run focused checks and review scoped diff — completed (9 tests passed; compile and diff checks passed).
+4. Generate and attach the new in-chat menu banner — in progress; deliberately last.
+5. Reconcile to reviewed `main` and deploy to `notka` only if authorized and drift/health checks permit — pending.
 
 ## Findings / Decisions
-- `bot/main.py` already calls `set_chat_menu_button(MenuButtonWebApp(...))` globally; preserve it.
-- Plain `/start` currently sends a second explanatory message; remove it. Keep promo and shared-track deep-link behavior.
-- Telegram Bot API supports inline-button style `primary` (blue) and MenuButtonWebApp. aiogram added the style field in 3.25.0; current local runtime is 3.31.0, so align the minimum dependency version.
-- `sync_store.load(user_id)` stores per-device listen totals; `plus_store.status(user_id)` is the Plus authority.
-- User explicitly assigned new in-chat Notka menu banners as the last stage. Fresh `origin/main` says leksik paused separate bot/channel banner and promo-video work until 2026-10-19; do not edit those assets or scope.
-- Fresh `origin/main` also had an active ProxyGuard task record from 2026-10-15, older than the 180-second heartbeat. This is a separate source area; leave it unmodified and carry its unverified status forward.
+- `bot/main.py` already sets `MenuButtonWebApp` globally; preserve it. Plain `/start` now sends one message; old open-app fallback keyboard and promo/shared-track links remain unchanged.
+- Telegram Bot API uses `style="primary"` for blue inline buttons. aiogram added `style` in 3.25.0, so the minimum dependency is now 3.25.
+- `sync_store.load(user_id)` exposes the user's per-device listen totals; `plus_store.status(user_id)` is the subscription authority. Profile callbacks are private-chat only.
+- `plat_check` is a non-mutating placeholder. New banner art is limited to in-chat menu pages; keep leksik's paused channel/promo-video work untouched.
+- A stale crxwov record from 2026-10-15 described ProxyGuard work: lightweight `generate_204` retry, two-failure debounce, immediate recovery, tests/live probe. Status remains unconfirmed; this task did not touch it.
 
 ## Validation / Blockers
-- No implementation checks run yet.
-- Graph discovery tools unavailable; targeted source search/read used instead.
-- Deployment must follow `deploy/push.sh` from reviewed `main`; do not deploy the whole `tg-app` branch or bypass its drift guard.
+- `venv\Scripts\python.exe -m pytest tests/test_bot_menu.py -q` — 9 passed.
+- `venv\Scripts\python.exe -m py_compile bot/main.py tests/test_bot_menu.py` and `git diff --check` — passed.
+- Initial test fake signature failure was corrected; no current failure.
+- Graph MCP tools unavailable; targeted search/read used.
+- Production deploy must use reviewed `main`; do not deploy all of `tg-app` or bypass its branch drift guard.
 
 ## Next Action / Resume
-Publish this reservation using `deploy/publish-work-state.ps1 -Participant crxwov`; implement the callback-driven menu in `bot/main.py`.
+Generate `bot/assets/notka-menu-banner.png`, rerun focused checks, then inspect release readiness.
