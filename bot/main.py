@@ -46,6 +46,7 @@ MENU_BANNERS = {
     "home": WELCOME_BANNER,
     "profile": os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "notka-profile-banner.png"),
     "plus": os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "notka-plus-banner.png"),
+    "info": os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "notka-info-banner.png"),
 }
 _banner_file_ids: dict[str, str] = {}
 SUPPORT_URL = "https://t.me/notka_support"
@@ -144,8 +145,44 @@ def build_profile_keyboard(plus_active: bool) -> InlineKeyboardMarkup:
     action = "Продлить Нотку Плюс" if plus_active else "Приобрести Нотку Плюс"
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=action, callback_data="menu:plus:config:30")],
+        [InlineKeyboardButton(text="Информация", callback_data="menu:info")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
     ])
+
+
+def build_info_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Политика конфиденциальности", callback_data="menu:legal:privacy")],
+        [InlineKeyboardButton(text="Пользовательское соглашение", callback_data="menu:legal:terms")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:profile")],
+    ])
+
+
+def build_legal_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:info")],
+    ])
+
+
+INFO_TEXT = "Выбери, что открыть."
+PRIVACY_TEXT = (
+    "🔒 Политика конфиденциальности\n\n"
+    "Для работы Нотки используются Telegram ID, имя, username, язык и статус Premium из профиля. "
+    "Для синхронизации сохраняются избранное, плейлисты, настройки, история поиска и статистика прослушивания; "
+    "статус Нотки Плюс связан с Telegram ID.\n\n"
+    "Поисковые запросы и выбранные треки могут передаваться музыкальным каталогам и источникам воспроизведения. "
+    "Данные аккаунта хранятся на сервере Нотки; дневные счётчики событий — до 120 дней.\n\n"
+    "Вопросы о данных и запросы на их удаление: @notka_support."
+)
+TERMS_TEXT = (
+    "📜 Пользовательское соглашение\n\n"
+    "Нотка помогает искать музыку и воспроизводить её из доступных источников. Пользуясь сервисом, "
+    "соблюдай правила Telegram и права владельцев музыки; не нарушай работу сервиса и не обходи ограничения.\n\n"
+    "Каталог и воспроизведение зависят от внешних источников, поэтому доступность и сведения о треках могут меняться. "
+    "Права на музыку принадлежат соответствующим правообладателям.\n\n"
+    "Покупка Нотки Плюс в боте пока не подключена: экран plat_check — заглушка, оплату он не принимает. "
+    "Поддержка: @notka_support."
+)
 
 
 def build_plus_keyboard(days: int, plus_active: bool) -> InlineKeyboardMarkup:
@@ -238,28 +275,32 @@ async def main() -> None:
         promo = re.fullmatch(r"promo_([A-Za-zА-Яа-яЁё0-9_-]{3,24})", payload)
         if promo:
             sep = "&" if "?" in config.miniapp_url else "?"
-            await message.answer(
+            await send_welcome(
+                message,
                 "У тебя промокод на Нотку Плюс 🎁\nЖми на кнопку — он активируется сам.",
-                reply_markup=InlineKeyboardMarkup(
+                InlineKeyboardMarkup(
                     inline_keyboard=[[InlineKeyboardButton(
                         text="🎁 Активировать Плюс",
                         web_app=WebAppInfo(url=f"{config.miniapp_url}{sep}promo={plus_store.normalize_code(promo.group(1))}"),
                     )]]
                 ),
+                page="plus",
             )
             return
         if re.fullmatch(r"[tp]_[A-Za-z0-9_-]{2,60}", payload):
             is_track = payload.startswith("t_")
             sep = "&" if "?" in config.miniapp_url else "?"
             url = f"{config.miniapp_url}{sep}{'t' if is_track else 'p'}={payload[2:]}"
-            await message.answer(
+            await send_welcome(
+                message,
                 "С тобой поделились треком в Нотке 🎧" if is_track else "С тобой поделились плейлистом в Нотке 🎧",
-                reply_markup=InlineKeyboardMarkup(
+                InlineKeyboardMarkup(
                     inline_keyboard=[[InlineKeyboardButton(
                         text="▶ Слушать" if is_track else "▶ Открыть плейлист",
                         web_app=WebAppInfo(url=url),
                     )]]
                 ),
+                page="home",
             )
             return
         await send_welcome(
@@ -281,15 +322,24 @@ async def main() -> None:
         data = query.data or ""
         page = "home"
         if data == "menu:home":
-            text = (
-                "Привет! Это Нотка — музыка прямо в Телеграме.\n\n"
-                "Жми на кнопку ниже, чтобы найти и включить трек."
-            )
+            text = "Музыка прямо в Telegram 🎧\n\nНайди трек, исполнителя или альбом и включай его в Нотке."
             keyboard = build_main_menu_keyboard(config.miniapp_url)
         elif data == "menu:profile":
             page = "profile"
             text, plus_active = build_profile_text(query.from_user.id)
             keyboard = build_profile_keyboard(plus_active)
+        elif data == "menu:info":
+            page = "info"
+            text = INFO_TEXT
+            keyboard = build_info_keyboard()
+        elif data == "menu:legal:privacy":
+            page = "info"
+            text = PRIVACY_TEXT
+            keyboard = build_legal_keyboard()
+        elif data == "menu:legal:terms":
+            page = "info"
+            text = TERMS_TEXT
+            keyboard = build_legal_keyboard()
         else:
             parts = data.split(":")
             if len(parts) == 4 and parts[:3] == ["menu", "plus", "config"]:
@@ -626,10 +676,11 @@ async def main() -> None:
     @dp.message()
     async def handle_other(message: Message) -> None:
         _touch_message_user(message.from_user)
-        await message.answer(
-            "Привет! Это Нотка — музыка прямо в Телеграме. 🎧\n\n"
-            "Жми кнопку ниже или отправь /start, чтобы открыть плеер в Telegram.",
-            reply_markup=build_open_app_inline_keyboard(config.miniapp_url),
+        await send_welcome(
+            message,
+            "Музыка прямо в Telegram 🎧\n\n"
+            "Найди трек, исполнителя или альбом — или нажми кнопку ниже, чтобы открыть Нотку.",
+            build_main_menu_keyboard(config.miniapp_url),
         )
 
     logger.info("Starting Notka bot polling...")

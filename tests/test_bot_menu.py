@@ -65,6 +65,30 @@ def test_profile_shows_current_plus_and_listening_time(monkeypatch):
     assert "Прослушано: 1 день 2 часа" in text
 
 
+def test_profile_keyboard_links_to_info_and_back_home():
+    keyboard = bot_main.build_profile_keyboard(plus_active=False)
+
+    assert keyboard.inline_keyboard[1][0].callback_data == "menu:info"
+    assert keyboard.inline_keyboard[2][0].callback_data == "menu:home"
+
+
+def test_info_and_legal_pages_have_back_navigation():
+    info = bot_main.build_info_keyboard()
+    legal = bot_main.build_legal_keyboard()
+
+    assert info.inline_keyboard[0][0].callback_data == "menu:legal:privacy"
+    assert info.inline_keyboard[1][0].callback_data == "menu:legal:terms"
+    assert info.inline_keyboard[2][0].callback_data == "menu:profile"
+    assert legal.inline_keyboard[0][0].callback_data == "menu:info"
+
+
+def test_legal_copy_describes_actual_storage_and_non_payment_stub():
+    assert "Telegram ID" in bot_main.PRIVACY_TEXT
+    assert "120 дней" in bot_main.PRIVACY_TEXT
+    assert "plat_check" in bot_main.TERMS_TEXT
+    assert "оплату он не принимает" in bot_main.TERMS_TEXT
+
+
 def test_payment_step_is_an_explicit_non_mutating_placeholder():
     text = bot_main.build_plus_payment_text(30)
 
@@ -100,5 +124,5 @@ def test_menu_navigation_edits_text_or_caption_in_place():
 def test_every_menu_page_has_its_generated_banner():
     from pathlib import Path
 
-    assert set(bot_main.MENU_BANNERS) == {"home", "profile", "plus"}
+    assert set(bot_main.MENU_BANNERS) == {"home", "profile", "plus", "info"}
     assert all(Path(path).is_file() for path in bot_main.MENU_BANNERS.values())
