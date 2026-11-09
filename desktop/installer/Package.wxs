@@ -1,0 +1,72 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="Notka"
+           Manufacturer="Notka"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="5CA0235C-62E1-4965-A67C-12A5C94B3C7B"
+           Scope="perMachine"
+           Language="1049"
+           Codepage="1251">
+
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="На компьютере уже установлена более новая версия Notka." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="NotkaProductIcon" SourceFile="$(var.AssetsDir)/notka.ico" />
+    <Property Id="ARPPRODUCTICON" Value="NotkaProductIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://notka.duckdns.org" />
+
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Запустить Notka после закрытия установщика" />
+    <Property Id="CREATE_DESKTOP_SHORTCUT" Value="1" />
+    <Property Id="WIXUI_DESKTOPSHORTCUTTEXT" Value="Закрепить ярлык на рабочем столе" />
+    <SetProperty Id="WixShellExecTarget" Value="[INSTALLFOLDER]Notka.exe" After="CostFinalize" />
+    <CustomAction Id="LaunchApplication" BinaryRef="Wix4UtilCA_X64" DllEntry="WixShellExec" Impersonate="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Notka" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcutComponent" Guid="7A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5D">
+        <Shortcut Id="AppStartMenuShortcut"
+                  Name="Notka"
+                  Description="Notka Music Player"
+                  Target="[INSTALLFOLDER]Notka.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="NotkaProductIcon" />
+        <RemoveFolder Id="CleanStartMenu" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Notka" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcutComponent" Guid="9F8E7D6C-5B4A-3F2E-1D0C-9B8A7F6E5D4C">
+        <Shortcut Id="AppDesktopShortcut"
+                  Name="Notka"
+                  Description="Notka Music Player"
+                  Target="[INSTALLFOLDER]Notka.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="NotkaProductIcon" />
+        <RegistryValue Root="HKCU" Key="Software\Notka" Name="Desktop" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <ComponentGroup Id="ProductFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PublishDir)\**" />
+    </ComponentGroup>
+
+    <Feature Id="MainFeature" Title="Notka" Level="1">
+      <ComponentGroupRef Id="ProductFiles" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </Feature>
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT REMOVE" />
+    </UI>
+
+  </Package>
+</Wix>

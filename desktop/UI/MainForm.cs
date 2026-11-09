@@ -1,0 +1,605 @@
+using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Windows.Forms;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
+using Notka.Desktop.Discord;
+using Notka.Desktop.Smtc;
+using Notka.Desktop.Tray;
+
+namespace Notka.Desktop.UI;
+
+public sealed class MainForm : Form
+{
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    [DllImport("kernel32.dll", EntryPoint = "SetProcessWorkingSetSize", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
+    private static extern int SetProcessWorkingSetSize(IntPtr process, int minimumWorkingSetSize, int maximumWorkingSetSize);
+
+    private readonly WebView2 _webView;
+    private readonly SmtcManager _smtc;
+    private readonly TrayIconManager _tray;
+    private readonly DiscordRpcManager _discordRpc;
+    private readonly string _startUrl;
+    private readonly string _settingsFilePath;
+    private readonly string _authFilePath;
+    private readonly string _sessionFilePath;
+    private readonly string _appDataDir;
+
+    private bool _isExiting;
+    private bool _balloonShown;
+    private string _currentTitle = "Notka";
+    private string _currentArtist = "";
+    private string _currentAlbum = "";
+    private string _currentArtwork = "";
+    private double _currentDuration;
+    private double _currentPosition;
+    private bool _isPlaying;
+
+    public MainForm(string? startUrl = null)
+    {
+        // Window appearance
+        Text = "Notka";
+        Icon = LoadApplicationIcon();
+        BackColor = Color.FromArgb(13, 13, 15);
+        ForeColor = Color.White;
+        StartPosition = FormStartPosition.CenterScreen;
+        Size = new Size(1060, 740);
+        MinimumSize = new Size(420, 580);
+        DoubleBuffered = true;
+
+        EnableDarkTitleBar();
+
+        _startUrl = !string.IsNullOrWhiteSpace(startUrl)
+            ? startUrl
+            : "https://notka.duckdns.org/app/?source=desktop";
+
+        _appDataDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Notka"
+        );
+        Directory.CreateDirectory(_appDataDir);
+        _settingsFilePath = Path.Combine(_appDataDir, "window-settings.json");
+        _authFilePath = Path.Combine(_appDataDir, "auth.json");
+        _sessionFilePath = Path.Combine(_appDataDir, "session.json");
+
+        Log($"=== Notka Desktop v{Application.ProductVersion} (PID {Process.GetCurrentProcess().Id}) Started ===");
+        Log($"AppDataDir: {_appDataDir}");
+
+        RestoreWindowSettings();
+
+        // SMTC manager
+        _smtc = new SmtcManager(Handle);
+        _smtc.MediaCommandReceived += OnMediaCommand;
+
+        // Discord RPC manager
+        _discordRpc = new DiscordRpcManager(_appDataDir);
+
+        // Tray icon manager
+        _tray = new TrayIconManager(Icon);
+        _tray.SetDiscordState(_discordRpc.IsEnabled);
+        _tray.MediaCommandRequested += OnMediaCommand;
+        _tray.RestoreWindowRequested += RestoreWindow;
+        _tray.ToggleDiscordRequested += () =>
+        {
+            _discordRpc.IsEnabled = !_discordRpc.IsEnabled;
+            _tray.SetDiscordState(_discordRpc.IsEnabled);
+        };
+        _tray.ExitRequested += ExitApplication;
+
+        // WebView2 control
+        _webView = new WebView2
+        {
+            Dock = DockStyle.Fill,
+            DefaultBackgroundColor = Color.FromArgb(13, 13, 15)
+        };
+        Controls.Add(_webView);
+
+        InitializeWebViewAsync(_appDataDir);
+    }
+
+    private Icon LoadApplicationIcon()
+    {
+        try
+        {
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "notka.ico");
+            if (File.Exists(iconPath))
+            {
+                return new Icon(iconPath);
+            }
+        }
+        catch { /* fallback */ }
+
+        try
+        {
+            var exeIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (exeIcon != null) return exeIcon;
+        }
+        catch { /* fallback */ }
+
+        return SystemIcons.Application;
+    }
+
+    private void EnableDarkTitleBar()
+    {
+        try
+        {
+            int useDarkMode = 1;
+            DwmSetWindowAttribute(Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDarkMode, sizeof(int));
+        }
+        catch { /* ignored on older OS builds */ }
+    }
+
+    private async void InitializeWebViewAsync(string appDataDir)
+    {
+        try
+        {
+            Log("[WebView2] Initializing environment...");
+            string userDataFolder = Path.Combine(appDataDir, "WebViewData");
+            var envOptions = new CoreWebView2EnvironmentOptions(
+                additionalBrowserArguments: "--disable-features=Translate,OptimizationHints,MediaRouter " +
+                                            "--enable-features=HardwareMediaKeyHandling " +
+                                            "--autoplay-policy=no-user-gesture-required " +
+                                            "--disable-background-timer-throttling " +
+                                            "--disable-renderer-backgrounding"
+            );
+
+            var env = await CoreWebView2Environment.CreateAsync(
+                browserExecutableFolder: null,
+                userDataFolder: userDataFolder,
+                options: envOptions
+            );
+
+            await _webView.EnsureCoreWebView2Async(env);
+            Log("[WebView2] CoreWebView2 initialized successfully");
+
+            // Configure settings
+            _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            _webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
+            _webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
+
+            // Inject saved session before any script runs
+            if (File.Exists(_sessionFilePath) || File.Exists(_authFilePath))
+            {
+                try
+                {
+                    string targetFile = File.Exists(_sessionFilePath) ? _sessionFilePath : _authFilePath;
+                    string rawJson = File.ReadAllText(targetFile);
+                    if (!string.IsNullOrWhiteSpace(rawJson))
+                    {
+                        Log("[WebView2] Injecting saved session on document created");
+                        await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                            $"try {{ " +
+                            $"window.__NOTKA_SAVED_SESSION__ = {rawJson}; " +
+                            $"var _sess = {rawJson}; " +
+                            $"if (!localStorage.getItem('notka_session_v1')) localStorage.setItem('notka_session_v1', JSON.stringify(_sess)); " +
+                            $"if (_sess && _sess.token) {{ " +
+                            $"localStorage.setItem('notka_auth_token', _sess.token); " +
+                            $"if (_sess.user) localStorage.setItem('notka_auth_user', JSON.stringify(_sess.user)); " +
+                            $"window.Telegram = window.Telegram || {{}}; " +
+                            $"window.Telegram.WebApp = window.Telegram.WebApp || {{}}; " +
+                            $"window.Telegram.WebApp.initData = 'notka-session:' + _sess.token; " +
+                            $"window.Telegram.WebApp.initDataUnsafe = {{ user: _sess.user || _sess }}; " +
+                            $"}} " +
+                            $"}} catch (e) {{}}"
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[MainForm] Session load error: {ex.Message}");
+                }
+            }
+
+            // Load bridge script
+            string bridgeScript = GetEmbeddedBridgeScript();
+            if (!string.IsNullOrEmpty(bridgeScript))
+            {
+                Log($"[WebView2] Injected bridge script ({bridgeScript.Length} bytes)");
+                await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(bridgeScript);
+            }
+            else
+            {
+                Log("[WebView2] WARNING: Bridge script was empty or missing!");
+            }
+
+            // Web message handler
+            _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            _webView.CoreWebView2.NavigationCompleted += (_, e) =>
+            {
+                Log($"[WebView2] NavigationCompleted: success={e.IsSuccess}, httpStatus={e.HttpStatusCode}");
+            };
+
+            // Open external links in default browser
+            _webView.CoreWebView2.NewWindowRequested += (_, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(e.Uri) &&
+                    (e.Uri.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                     e.Uri.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+                {
+                    e.Handled = true;
+                    OpenExternalUrl(e.Uri);
+                }
+            };
+
+            // Navigate
+            Log($"[WebView2] Navigating to {_startUrl}");
+            _webView.CoreWebView2.Navigate(_startUrl);
+        }
+        catch (Exception ex)
+        {
+            Log($"[WebView2] Initialization error: {ex.Message}");
+            MessageBox.Show(
+                $"Ошибка инициализации компонента WebView2:\n{ex.Message}\n\nУбедитесь, что установлен Microsoft Edge WebView2 Runtime.",
+                "Notka Desktop",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+        }
+    }
+
+    private static string GetEmbeddedBridgeScript()
+    {
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            const string resourceName = "Notka.Desktop.Bridge.notka-bridge.js";
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream != null)
+            {
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            }
+
+            // Fallback: check file system if debugging
+            string diskPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Bridge", "notka-bridge.js");
+            if (File.Exists(diskPath))
+            {
+                return File.ReadAllText(diskPath);
+            }
+        }
+        catch { /* ignore */ }
+
+        return string.Empty;
+    }
+
+    public static void Log(string message)
+    {
+        try
+        {
+            string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Notka", "desktop.log");
+            File.AppendAllText(logPath, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
+        }
+        catch { }
+    }
+
+    private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(e.WebMessageAsJson);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("type", out var typeProp)) return;
+            string? type = typeProp.GetString();
+
+            if (type == "metadata")
+            {
+                string title = root.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
+                string artist = root.TryGetProperty("artist", out var a) ? a.GetString() ?? "" : "";
+                string album = root.TryGetProperty("album", out var al) ? al.GetString() ?? "" : "";
+                string artwork = root.TryGetProperty("artwork", out var art) ? art.GetString() ?? "" : "";
+
+                _currentTitle = string.IsNullOrWhiteSpace(title) ? "Notka" : title;
+                _currentArtist = artist;
+                _currentAlbum = album;
+                _currentArtwork = artwork;
+
+                BeginInvoke(() =>
+                {
+                    Text = string.IsNullOrWhiteSpace(_currentArtist)
+                        ? $"Notka — {_currentTitle}"
+                        : $"Notka — {_currentArtist} — {_currentTitle}";
+
+                    _smtc.UpdateMetadata(_currentTitle, _currentArtist, album, artwork);
+                    _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
+                    _discordRpc.UpdateTrack(_currentTitle, _currentArtist, _currentAlbum, _currentArtwork, _isPlaying, _currentDuration, _currentPosition);
+                });
+            }
+            else if (type == "playback_state")
+            {
+                bool isPlaying = root.TryGetProperty("isPlaying", out var p) && p.GetBoolean();
+                _isPlaying = isPlaying;
+
+                if (root.TryGetProperty("title", out var pt) && !string.IsNullOrWhiteSpace(pt.GetString()) && pt.GetString() != "Notka")
+                {
+                    _currentTitle = pt.GetString()!;
+                }
+                if (root.TryGetProperty("artist", out var pa) && !string.IsNullOrWhiteSpace(pa.GetString()))
+                {
+                    _currentArtist = pa.GetString()!;
+                }
+                if (root.TryGetProperty("album", out var pal) && !string.IsNullOrWhiteSpace(pal.GetString()))
+                {
+                    _currentAlbum = pal.GetString()!;
+                }
+                if (root.TryGetProperty("artwork", out var part) && !string.IsNullOrWhiteSpace(part.GetString()))
+                {
+                    _currentArtwork = part.GetString()!;
+                }
+
+                BeginInvoke(() =>
+                {
+                    Text = string.IsNullOrWhiteSpace(_currentArtist)
+                        ? $"Notka — {_currentTitle}"
+                        : $"Notka — {_currentArtist} — {_currentTitle}";
+
+                    _smtc.UpdatePlaybackStatus(_isPlaying);
+                    _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
+                    _discordRpc.UpdateTrack(_currentTitle, _currentArtist, _currentAlbum, _currentArtwork, _isPlaying, _currentDuration, _currentPosition);
+                });
+            }
+            else if (type == "timeline")
+            {
+                double duration = root.TryGetProperty("duration", out var d) ? d.GetDouble() : 0;
+                double position = root.TryGetProperty("position", out var pos) ? pos.GetDouble() : 0;
+                _currentDuration = duration;
+                _currentPosition = position;
+
+                BeginInvoke(() =>
+                {
+                    _smtc.UpdateTimeline(duration, position);
+                    _discordRpc.UpdateTimeline(duration, position);
+                });
+            }
+            else if (type == "session_save")
+            {
+                try
+                {
+                    if (root.TryGetProperty("session", out var sessProp))
+                    {
+                        string json = sessProp.GetRawText();
+                        File.WriteAllText(_sessionFilePath, json);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Session save error: {ex.Message}");
+                }
+            }
+            else if (type == "session_clear")
+            {
+                try
+                {
+                    if (File.Exists(_sessionFilePath)) File.Delete(_sessionFilePath);
+                    if (File.Exists(_authFilePath)) File.Delete(_authFilePath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Session clear error: {ex.Message}");
+                }
+            }
+            else if (type == "auth_save")
+            {
+                try
+                {
+                    string token = root.TryGetProperty("token", out var tProp) ? tProp.GetString() ?? "" : "";
+                    if (root.TryGetProperty("user", out var uProp))
+                    {
+                        using var stream = new MemoryStream();
+                        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+                        {
+                            writer.WriteStartObject();
+                            writer.WriteString("token", token);
+                            writer.WritePropertyName("user");
+                            uProp.WriteTo(writer);
+                            writer.WriteEndObject();
+                        }
+                        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+                        File.WriteAllText(_authFilePath, json);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Auth save error: {ex.Message}");
+                }
+            }
+            else if (type == "auth_logout")
+            {
+                try
+                {
+                    if (File.Exists(_authFilePath))
+                    {
+                        File.Delete(_authFilePath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Auth delete error: {ex.Message}");
+                }
+            }
+            else if (type == "open_external")
+            {
+                string url = root.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    OpenExternalUrl(url);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MainForm] WebMessage parse error: {ex.Message}");
+        }
+    }
+
+    private void OnMediaCommand(string action)
+    {
+        if (IsDisposed || !IsHandleCreated) return;
+
+        BeginInvoke(async () =>
+        {
+            try
+            {
+                if (_webView.CoreWebView2 != null)
+                {
+                    await _webView.CoreWebView2.ExecuteScriptAsync($"window.notkaMedia && window.notkaMedia('{action}');");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainForm] Media command execute error: {ex.Message}");
+            }
+        });
+    }
+
+    private void RestoreWindow()
+    {
+        if (WindowState == FormWindowState.Minimized)
+        {
+            WindowState = FormWindowState.Normal;
+        }
+
+        Show();
+        Activate();
+        BringToFront();
+    }
+
+    private void ExitApplication()
+    {
+        _isExiting = true;
+        SaveWindowSettings();
+        Application.Exit();
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (!_isExiting && e.CloseReason == CloseReason.UserClosing)
+        {
+            // Minimize to tray instead of quitting so playback continues uninterrupted
+            e.Cancel = true;
+            Hide();
+
+            // Trim working set to reduce memory footprint while minimized
+            TrimMemory();
+
+            if (!_balloonShown)
+            {
+                _balloonShown = true;
+                _tray.ShowBalloon(
+                    "Notka",
+                    "Приложение свёрнуто в трей и продолжает играть. Для выхода нажмите «Выход» в меню трея.",
+                    ToolTipIcon.Info
+                );
+            }
+            return;
+        }
+
+        SaveWindowSettings();
+        _discordRpc.Dispose();
+        _smtc.Dispose();
+        _tray.Dispose();
+        base.OnFormClosing(e);
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        if (WindowState == FormWindowState.Minimized)
+        {
+            TrimMemory();
+        }
+    }
+
+    private static void TrimMemory()
+    {
+        try
+        {
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+            SetProcessWorkingSetSize(Process.GetCurrentProcess().Handle, -1, -1);
+        }
+        catch { /* ignore */ }
+    }
+
+    private static void OpenExternalUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch { /* ignore */ }
+    }
+
+    private void SaveWindowSettings()
+    {
+        try
+        {
+            var settings = new WindowSettings
+            {
+                X = Location.X,
+                Y = Location.Y,
+                Width = Width,
+                Height = Height,
+                IsMaximized = WindowState == FormWindowState.Maximized
+            };
+            string json = JsonSerializer.Serialize(settings);
+            File.WriteAllText(_settingsFilePath, json);
+        }
+        catch { /* ignore */ }
+    }
+
+    private void RestoreWindowSettings()
+    {
+        try
+        {
+            if (File.Exists(_settingsFilePath))
+            {
+                string json = File.ReadAllText(_settingsFilePath);
+                var settings = JsonSerializer.Deserialize<WindowSettings>(json);
+                if (settings != null)
+                {
+                    if (settings.Width >= MinimumSize.Width && settings.Height >= MinimumSize.Height)
+                    {
+                        Size = new Size(settings.Width, settings.Height);
+                    }
+
+                    // Check if coordinates are within visible screen bounds
+                    var rect = new Rectangle(settings.X, settings.Y, Width, Height);
+                    if (Screen.FromRectangle(rect).WorkingArea.IntersectsWith(rect))
+                    {
+                        StartPosition = FormStartPosition.Manual;
+                        Location = new Point(settings.X, settings.Y);
+                    }
+
+                    if (settings.IsMaximized)
+                    {
+                        WindowState = FormWindowState.Maximized;
+                    }
+                }
+            }
+        }
+        catch { /* fallback to defaults */ }
+    }
+
+    private sealed class WindowSettings
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public bool IsMaximized { get; set; }
+    }
+}

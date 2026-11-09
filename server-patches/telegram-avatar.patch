@@ -1,0 +1,102 @@
+diff --git a/miniapp/app.js b/miniapp/app.js
+index 640d5a3..7bbdc3e 100644
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -121,7 +121,7 @@
+   // who is listening: Telegram's own object, and when a client leaves it empty, the same
+   // thing read from the launch parameters in the address (initData carries the user too)
+   const tgUser = (() => {
+-    const direct = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
++    const direct = window.NotkaDesktop?.user || tg?.initDataUnsafe?.user;
+     if (direct) return direct;
+     try {
+       const fromData = (raw) => { const u = new URLSearchParams(raw || "").get("user"); return u ? JSON.parse(u) : null; };
+@@ -5257,6 +5257,12 @@
+       el.appendChild(span);
+     }
+   }
++  if (window.notkaDesktop) window.addEventListener("notka:telegram-avatar", () => {
++    renderAvatarInto("side-avatar", "side-initial");
++    renderAvatarInto("home-avatar", "home-initial");
++    renderAvatarInto("profile-avatar-btn", "profile-initial");
++    if (currentScreen === "account") renderAccountScreen();
++  });
+   async function changeAccountAvatar() {
+     const dataUrl = await pickAvatarImage();
+     if (!dataUrl) return;
+diff --git a/miniapp/index.html b/miniapp/index.html
+index fd2f6ff..04ef407 100644
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -1579,7 +1579,7 @@ try {
+ <script src="mix.js?v=8"></script>
+ <script src="splash.js?v=8"></script>
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=419-bgnext"></script>
++<script src="app.js?v=421-desktop-avatar"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+diff --git a/music_resolver/api/routes.py b/music_resolver/api/routes.py
+index 67d7c68..178474b 100644
+--- a/music_resolver/api/routes.py
++++ b/music_resolver/api/routes.py
+@@ -9,6 +9,7 @@ import secrets
+ import threading
+ import time
+ import uuid
++from html import unescape
+ from concurrent.futures import ThreadPoolExecutor
+ from pathlib import Path
+ from urllib.parse import quote
+@@ -1519,6 +1520,50 @@ def create_router(service: MusicService, settings: Settings) -> APIRouter:
+             "plus": plus_store.status(user_id),
+         }
+
++    @router.get("/auth/avatar")
++    async def auth_avatar(request: Request, authorization: str = Header(default="")):
++        user_id = auth_store.resolve_user_id(authorization=authorization)
++        if not user_id:
++            return Response(status_code=401)
++        if _too_many(request, f"auth-avatar:{user_id}", 6, 300):
++            return Response(status_code=429)
++
++        token = os.environ.get("BOT_TOKEN", "").strip()
++        if not token:
++            return Response(status_code=503)
++        api = f"https://api.telegram.org/bot{token}"
++        try:
++            async with httpx.AsyncClient(timeout=5) as client:
++                photos = await client.get(f"{api}/getUserProfilePhotos", params={"user_id": user_id, "limit": 1})
++                photos.raise_for_status()
++                sizes = photos.json()["result"]["photos"]
++                if sizes:
++                    file_id = min(sizes[0], key=lambda photo: photo["width"] * photo["height"])["file_id"]
++                    file_info = await client.get(f"{api}/getFile", params={"file_id": file_id})
++                    file_info.raise_for_status()
++                    path = file_info.json()["result"]["file_path"]
++                    if not re.fullmatch(r"photos/[A-Za-z0-9_.-]+\.jpg", path):
++                        return Response(status_code=502)
++                    image_url = f"https://api.telegram.org/file/bot{token}/{path}"
++                else:
++                    user = metrics.users().get(str(user_id), {})
++                    username = user.get("username") or ""
++                    if not re.fullmatch(r"[A-Za-z0-9_]{1,32}", username):
++                        return Response(status_code=204, headers={"Cache-Control": "no-store"})
++                    profile = await client.get(f"https://t.me/{username}")
++                    profile.raise_for_status()
++                    photo = re.search(r'<meta property="og:image" content="([^"]+)"', profile.text)
++                    image_url = unescape(photo[1]) if photo else ""
++                    if not re.fullmatch(r"https://cdn[0-9]+\.telesco\.pe/file/[^\s?#]+", image_url):
++                        return Response(status_code=204, headers={"Cache-Control": "no-store"})
++                image = await client.get(image_url)
++                image.raise_for_status()
++                if not image.content.startswith(b"\xff\xd8") or len(image.content) > 128 * 1024:
++                    return Response(status_code=502)
++                return Response(image.content, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
++        except (httpx.HTTPError, KeyError, ValueError, TypeError):
++            return Response(status_code=502)
++
+     @router.post("/sync")
+     async def sync_account(
+         request: Request,
