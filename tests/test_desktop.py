@@ -54,9 +54,16 @@ def test_build():
     assert os.path.getsize(exe_path) > 50000, "Notka.exe is unexpectedly small"
     print("[OK] Build and publish test passed (Notka.exe built successfully)")
 
+def test_msi_build():
+    msi_path = os.path.join("desktop", "bin", "msi", "Notka-Setup.msi")
+    assert os.path.exists(msi_path), f"Missing {msi_path}"
+    assert os.path.getsize(msi_path) > 10_000_000, f"MSI file is too small: {os.path.getsize(msi_path)} bytes"
+    print("[OK] MSI package test passed (Notka-Setup.msi verified)")
+
 if __name__ == "__main__":
     test_assets()
     test_bridge_script()
     test_source_files()
     test_build()
+    test_msi_build()
     print("All desktop tests passed successfully!")

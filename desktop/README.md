@@ -37,7 +37,17 @@
 - .NET 10 SDK (установлен в системе или в `D:\DeyttConnectBuild\dotnet`).
 - Microsoft Edge WebView2 Runtime (входит в состав Windows 10/11 по умолчанию).
 
-### Быстрая сборка через PowerShell:
+### Сборка установщика Windows (MSI):
+```powershell
+powershell -ExecutionPolicy Bypass -File desktop/build-msi.ps1
+```
+Готовый установщик сохраняется в `desktop/bin/msi/Notka-Setup.msi`. Установщик:
+- Разворачивает приложение в `Program Files\Notka\`;
+- Создаёт ярлыки в меню «Пуск» и на Рабочем столе с официальной иконкой Notka;
+- Содержит self-contained сжатую сборку, не требующую отдельной установки .NET SDK у пользователя;
+- Поддерживает тихую установку через `msiexec /i Notka-Setup.msi /qn` и корректное удаление.
+
+### Быстрая сборка portable-версии:
 ```powershell
 powershell -ExecutionPolicy Bypass -File desktop/build.ps1
 ```
