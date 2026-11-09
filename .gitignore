@@ -1,0 +1,22 @@
+# Build outputs
+/android/build/
+/desktop/bin/
+/desktop/obj/
+*.apk
+*.aab
+*.dex
+*.class
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.iml
+.gradle/
+local.properties
+
+# OS & Temp
+Thumbs.db
+Desktop.ini
+*.tmp
+*.log
+.DS_Store
