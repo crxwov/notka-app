@@ -1,12 +1,10 @@
 # Notka App — Agent Guidelines
 
-This is the official open-source repository for **Notka** client applications (Android mobile and Windows Desktop).
+All Notka work must be carried out exclusively in https://github.com/crxwov/notka-app. This covers client, backend, web, bot, infrastructure, documentation, commits, pull requests and releases. Do not make or publish Notka changes in any other repository.
 
 ## Core Principles
 
-1. **Dedicated Client App Repository**:
-   - All client application development (Android, Windows Desktop, cross-platform) happens exclusively in this repository.
-   - The main backend and web repository handles the core server, bot, API, and Mini App.
+1. **Client Integration**:
    - Client applications serve as native lightweight containers and system integrations for the Notka web experience.
 
 2. **Open-Source Hygiene & Security**:
