@@ -1,5 +1,8 @@
 package space.notka.app;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
@@ -14,6 +17,7 @@ import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
@@ -106,10 +110,60 @@ public class MainActivity extends Activity {
         }
     }
 
+    private ValueAnimator marginAnimator = null;
+    private int currentBottomMargin = 0;
+
+    private void animateBottomMargin(int targetMargin) {
+        if (webView == null || currentBottomMargin == targetMargin) return;
+        if (marginAnimator != null && marginAnimator.isRunning()) {
+            marginAnimator.cancel();
+        }
+
+        final boolean isOpen = targetMargin > 0;
+        if (isOpen) {
+            webView.evaluateJavascript("document.body.classList.add('keyboard-open');", null);
+        }
+
+        int startMargin = currentBottomMargin;
+        marginAnimator = ValueAnimator.ofInt(startMargin, targetMargin);
+        marginAnimator.setDuration(300);
+        marginAnimator.setInterpolator(new DecelerateInterpolator(1.8f));
+        marginAnimator.addUpdateListener(animation -> {
+            int val = (int) animation.getAnimatedValue();
+            currentBottomMargin = val;
+            ViewGroup.LayoutParams rawLp = webView.getLayoutParams();
+            if (rawLp instanceof FrameLayout.LayoutParams) {
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) rawLp;
+                lp.bottomMargin = val;
+                webView.setLayoutParams(lp);
+            }
+        });
+        marginAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                currentBottomMargin = targetMargin;
+                if (isOpen) {
+                    webView.evaluateJavascript(
+                        "(function(){ " +
+                        "  var el = document.activeElement; " +
+                        "  if (el && typeof el.scrollIntoView === 'function') { " +
+                        "    el.scrollIntoView({ block: 'center', behavior: 'smooth' }); " +
+                        "  } " +
+                        "})();",
+                        null
+                    );
+                } else {
+                    webView.evaluateJavascript("document.body.classList.remove('keyboard-open');", null);
+                }
+            }
+        });
+        marginAnimator.start();
+    }
+
     private void setupKeyboardListener() {
         final View decorView = getWindow().getDecorView();
         decorView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-            private int previousBottomMargin = -1;
+            private int previousTargetMargin = -1;
 
             @Override
             public void onGlobalLayout() {
@@ -122,36 +176,9 @@ public class MainActivity extends Activity {
                 boolean isOpen = keypadHeight > screenHeight * 0.15;
                 int targetMargin = isOpen ? keypadHeight : 0;
 
-                if (targetMargin != previousBottomMargin) {
-                    previousBottomMargin = targetMargin;
-                    if (webView != null) {
-                        ViewGroup.LayoutParams rawLp = webView.getLayoutParams();
-                        if (rawLp instanceof FrameLayout.LayoutParams) {
-                            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) rawLp;
-                            lp.bottomMargin = targetMargin;
-                            webView.setLayoutParams(lp);
-                        }
-
-                        if (isOpen) {
-                            webView.evaluateJavascript(
-                                "(function(){ " +
-                                "  document.body.classList.add('keyboard-open'); " +
-                                "  var el = document.activeElement; " +
-                                "  if (el && typeof el.scrollIntoView === 'function') { " +
-                                "    setTimeout(function() { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 80); " +
-                                "  } " +
-                                "})();",
-                                null
-                            );
-                        } else {
-                            webView.evaluateJavascript(
-                                "(function(){ " +
-                                "  document.body.classList.remove('keyboard-open'); " +
-                                "})();",
-                                null
-                            );
-                        }
-                    }
+                if (targetMargin != previousTargetMargin) {
+                    previousTargetMargin = targetMargin;
+                    animateBottomMargin(targetMargin);
                 }
             }
         });
@@ -384,9 +411,13 @@ public class MainActivity extends Activity {
             "    style = document.createElement('style');" +
             "    style.id = 'notka-keyboard-style';" +
             "    style.textContent = '" +
-            "      body.keyboard-open #login-modal.gate .login-hero { display: none !important; }" +
-            "      body.keyboard-open #login-modal.gate .modal { justify-content: center !important; height: 100% !important; padding: 12px 18px !important; }" +
+            "      #login-modal.gate .modal { transition: padding 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important; }" +
+            "      #login-modal.gate .login-hero { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease, max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), margin 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important; will-change: transform, opacity, max-height; max-height: 480px; }" +
+            "      body.keyboard-open #login-modal.gate .login-hero { opacity: 0 !important; transform: translateY(-26px) scale(0.92) !important; max-height: 0 !important; margin: 0 !important; overflow: hidden !important; pointer-events: none !important; }" +
+            "      #login-modal.gate .login-card { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease !important; will-change: transform; }" +
+            "      body.keyboard-open #login-modal.gate .modal { justify-content: center !important; height: 100% !important; padding-top: 14px !important; padding-bottom: 14px !important; }" +
             "      body.keyboard-open #login-modal.gate { overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }" +
+            "      .modal-anim .modal { transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important; will-change: transform; }" +
             "      body.keyboard-open .modal-anim { overflow-y: auto !important; align-items: center !important; justify-content: center !important; }" +
             "      body.keyboard-open .modal { margin: auto !important; max-height: calc(100vh - 20px) !important; }" +
             "      body.keyboard-open .sheet { max-height: calc(100vh - 20px) !important; }';" +
