@@ -9,11 +9,16 @@
     <ApplicationIcon>Assets\notka.ico</ApplicationIcon>
     <AssemblyName>Notka</AssemblyName>
     <RootNamespace>Notka.Desktop</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>crxwov, leksik</Authors>
     <Company>Notka</Company>
     <Product>Notka Music Player</Product>
     <Description>Lightweight desktop player for Notka on .NET 10 and WebView2 with native Windows SMTC and tray.</Description>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
   </PropertyGroup>
 

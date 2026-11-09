@@ -163,6 +163,8 @@ public sealed class DiscordRpcManager : IDisposable
     {
         if (!_isEnabled || _isDisposed) return;
 
+        UI.MainForm.Log($"[DiscordRpc] UpdateActivityInternal: isPlaying={_lastIsPlaying}, title='{_lastTitle}', artist='{_lastArtist}'");
+
         if (!_lastIsPlaying || string.IsNullOrWhiteSpace(_lastTitle) || _lastTitle == "Notka")
         {
             await ClearActivityAsync();
@@ -300,24 +302,28 @@ public sealed class DiscordRpcManager : IDisposable
 
                 // Read Handshake response
                 var (op, json) = await ReadPayloadAsync();
+                UI.MainForm.Log($"[DiscordRpc] discord-ipc-{i} handshake op={op} json={json}");
                 if (op == 1) // DISPATCH READY
                 {
                     _isConnected = true;
-                    Debug.WriteLine($"[DiscordRpc] Connected to pipe discord-ipc-{i}");
+                    UI.MainForm.Log($"[DiscordRpc] Connected to pipe discord-ipc-{i} successfully");
                     return true;
                 }
                 else
                 {
-                    Debug.WriteLine($"[DiscordRpc] Handshake rejected: {json}");
+                    UI.MainForm.Log($"[DiscordRpc] Handshake rejected: {json}");
                     Disconnect();
                     return false;
                 }
             }
-            catch
+            catch (Exception)
             {
+                // Pipe not open or failed
                 Disconnect();
             }
         }
+
+        UI.MainForm.Log("[DiscordRpc] Could not connect to any discord-ipc-0..9 pipe");
 
         return false;
     }

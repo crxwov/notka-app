@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$ProductVersion = '1.1.0',
+    [string]$ProductVersion = '1.2.0',
     [string]$OutputDir = ''
 )
 
@@ -90,6 +90,27 @@ if (-not (Test-Path $msiFile)) {
         throw "MSI output file not found in $OutputDir"
     }
 }
+
+Write-Host "`n=== 3. Tuning MSI tables for Upgrade & Exit Checkboxes ===" -ForegroundColor Cyan
+$tuneScript = Join-Path $desktopDir "installer\tune-msi.ps1"
+if (Test-Path $tuneScript) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $tuneScript -MsiPath $msiFile
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Tuning script returned exit code $LASTEXITCODE"
+    }
+}
+
+# Update local user binary for immediate testing
+try {
+    $localAppBinDir = Join-Path $env:LOCALAPPDATA "Programs\Notka"
+    if (Test-Path $localAppBinDir) {
+        $pubExe = Join-Path $publishDir "Notka.exe"
+        if (Test-Path $pubExe) {
+            Copy-Item -Path $pubExe -Destination (Join-Path $localAppBinDir "Notka.exe") -Force
+            Write-Host "Updated local test binary at $localAppBinDir\Notka.exe" -ForegroundColor Green
+        }
+    }
+} catch { }
 
 $hash = (Get-FileHash -Path $msiFile -Algorithm SHA256).Hash
 $sizeMb = [Math]::Round((Get-Item $msiFile).Length / 1MB, 2)

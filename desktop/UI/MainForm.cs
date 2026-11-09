@@ -71,6 +71,9 @@ public sealed class MainForm : Form
         _authFilePath = Path.Combine(_appDataDir, "auth.json");
         _sessionFilePath = Path.Combine(_appDataDir, "session.json");
 
+        Log($"=== Notka Desktop v1.2.0 (PID {Process.GetCurrentProcess().Id}) Started ===");
+        Log($"AppDataDir: {_appDataDir}");
+
         RestoreWindowSettings();
 
         // SMTC manager
@@ -139,6 +142,7 @@ public sealed class MainForm : Form
     {
         try
         {
+            Log("[WebView2] Initializing environment...");
             string userDataFolder = Path.Combine(appDataDir, "WebViewData");
             var envOptions = new CoreWebView2EnvironmentOptions(
                 additionalBrowserArguments: "--disable-features=Translate,OptimizationHints,MediaRouter " +
@@ -155,6 +159,7 @@ public sealed class MainForm : Form
             );
 
             await _webView.EnsureCoreWebView2Async(env);
+            Log("[WebView2] CoreWebView2 initialized successfully");
 
             // Configure settings
             _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
@@ -170,6 +175,7 @@ public sealed class MainForm : Form
                     string rawJson = File.ReadAllText(targetFile);
                     if (!string.IsNullOrWhiteSpace(rawJson))
                     {
+                        Log("[WebView2] Injecting saved session on document created");
                         await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
                             $"try {{ " +
                             $"window.__NOTKA_SAVED_SESSION__ = {rawJson}; " +
@@ -189,7 +195,7 @@ public sealed class MainForm : Form
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[MainForm] Session load error: {ex.Message}");
+                    Log($"[MainForm] Session load error: {ex.Message}");
                 }
             }
 
@@ -197,11 +203,20 @@ public sealed class MainForm : Form
             string bridgeScript = GetEmbeddedBridgeScript();
             if (!string.IsNullOrEmpty(bridgeScript))
             {
+                Log($"[WebView2] Injected bridge script ({bridgeScript.Length} bytes)");
                 await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(bridgeScript);
+            }
+            else
+            {
+                Log("[WebView2] WARNING: Bridge script was empty or missing!");
             }
 
             // Web message handler
             _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            _webView.CoreWebView2.NavigationCompleted += (_, e) =>
+            {
+                Log($"[WebView2] NavigationCompleted: success={e.IsSuccess}, httpStatus={e.HttpStatusCode}");
+            };
 
             // Open external links in default browser
             _webView.CoreWebView2.NewWindowRequested += (_, e) =>
@@ -216,10 +231,12 @@ public sealed class MainForm : Form
             };
 
             // Navigate
+            Log($"[WebView2] Navigating to {_startUrl}");
             _webView.CoreWebView2.Navigate(_startUrl);
         }
         catch (Exception ex)
         {
+            Log($"[WebView2] Initialization error: {ex.Message}");
             MessageBox.Show(
                 $"Ошибка инициализации компонента WebView2:\n{ex.Message}\n\nУбедитесь, что установлен Microsoft Edge WebView2 Runtime.",
                 "Notka Desktop",
@@ -254,6 +271,16 @@ public sealed class MainForm : Form
         return string.Empty;
     }
 
+    public static void Log(string message)
+    {
+        try
+        {
+            string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Notka", "desktop.log");
+            File.AppendAllText(logPath, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
+        }
+        catch { }
+    }
+
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         try
@@ -263,6 +290,8 @@ public sealed class MainForm : Form
             {
                 raw = e.WebMessageAsJson;
             }
+
+            Log($"[WebMessage] {raw}");
 
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
@@ -298,11 +327,32 @@ public sealed class MainForm : Form
                 bool isPlaying = root.TryGetProperty("isPlaying", out var p) && p.GetBoolean();
                 _isPlaying = isPlaying;
 
+                if (root.TryGetProperty("title", out var pt) && !string.IsNullOrWhiteSpace(pt.GetString()) && pt.GetString() != "Notka")
+                {
+                    _currentTitle = pt.GetString()!;
+                }
+                if (root.TryGetProperty("artist", out var pa) && !string.IsNullOrWhiteSpace(pa.GetString()))
+                {
+                    _currentArtist = pa.GetString()!;
+                }
+                if (root.TryGetProperty("album", out var pal) && !string.IsNullOrWhiteSpace(pal.GetString()))
+                {
+                    _currentAlbum = pal.GetString()!;
+                }
+                if (root.TryGetProperty("artwork", out var part) && !string.IsNullOrWhiteSpace(part.GetString()))
+                {
+                    _currentArtwork = part.GetString()!;
+                }
+
                 BeginInvoke(() =>
                 {
+                    Text = string.IsNullOrWhiteSpace(_currentArtist)
+                        ? $"Notka — {_currentTitle}"
+                        : $"Notka — {_currentArtist} — {_currentTitle}";
+
                     _smtc.UpdatePlaybackStatus(_isPlaying);
                     _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
-                    _discordRpc.UpdatePlaybackState(_isPlaying);
+                    _discordRpc.UpdateTrack(_currentTitle, _currentArtist, _currentAlbum, _currentArtwork, _isPlaying, _currentDuration, _currentPosition);
                 });
             }
             else if (type == "timeline")

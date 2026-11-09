@@ -19,6 +19,8 @@
     }
   };
 
+  postToHost({ type: 'bridge_init', url: window.location.href });
+
   // Restore saved session from native host or localStorage
   let activeSession = null;
   try {
@@ -743,10 +745,27 @@
 
     audio.addEventListener('play', () => {
       state.isPlaying = true;
+
+      // Extract current DOM track info if available
+      const titleEl = document.getElementById('player-title') || document.getElementById('mp-title');
+      const artistEl = document.getElementById('player-artist') || document.getElementById('mp-artist');
+      let domTitle = (titleEl && (titleEl.textContent || '').trim()) || '';
+      let domArtist = (artistEl && (artistEl.textContent || '').trim()) || '';
+      if (domTitle && domTitle !== 'Без названия' && domTitle !== 'Notka') {
+        state.title = domTitle;
+      }
+      if (domArtist && domArtist !== 'Неизвестный исполнитель') {
+        state.artist = domArtist;
+      }
+
       postToHost({
         type: 'playback_state',
         isPlaying: true,
         state: 'playing',
+        title: state.title,
+        artist: state.artist,
+        album: state.album,
+        artwork: state.artwork,
         duration: audio.duration || 0,
         position: audio.currentTime || 0
       });
@@ -798,9 +817,36 @@
   });
   audioObserver.observe(document.documentElement, { childList: true, subtree: true });
 
-  // Fallback poll to ensure playback state never gets out of sync
+  // Fallback poll to ensure playback state and track metadata never get out of sync
   setInterval(() => {
     const audio = document.querySelector('audio');
+    const titleEl = document.getElementById('player-title') || document.getElementById('mp-title');
+    const artistEl = document.getElementById('player-artist') || document.getElementById('mp-artist');
+    const artEl = document.getElementById('player-art') || document.getElementById('mp-art');
+
+    let domTitle = (titleEl && (titleEl.textContent || '').trim()) || '';
+    let domArtist = (artistEl && (artistEl.textContent || '').trim()) || '';
+    if (domTitle === 'Без названия' || domTitle === 'Notka') domTitle = '';
+    if (domArtist === 'Неизвестный исполнитель') domArtist = '';
+
+    if (domTitle && (domTitle !== state.title || (domArtist && domArtist !== state.artist))) {
+      state.title = domTitle;
+      if (domArtist) state.artist = domArtist;
+      let artwork = state.artwork;
+      if (!artwork && artEl) {
+        const bg = artEl.style.backgroundImage || '';
+        const m = bg.match(/url\(["']?([^"']+)["']?\)/);
+        if (m) artwork = m[1];
+      }
+      postToHost({
+        type: 'metadata',
+        title: state.title,
+        artist: state.artist,
+        album: state.album || 'Нотка',
+        artwork: artwork || state.artwork || ''
+      });
+    }
+
     if (audio) {
       const isPlaying = !audio.paused && !audio.ended && audio.currentTime > 0;
       if (isPlaying !== state.isPlaying) {
@@ -809,6 +855,10 @@
           type: 'playback_state',
           isPlaying: isPlaying,
           state: isPlaying ? 'playing' : 'paused',
+          title: state.title,
+          artist: state.artist,
+          album: state.album,
+          artwork: state.artwork,
           duration: audio.duration || 0,
           position: audio.currentTime || 0
         });
