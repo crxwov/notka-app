@@ -250,6 +250,7 @@ public class MediaPlaybackService extends Service implements AudioManager.OnAudi
 
                 if (newArtwork != null && !newArtwork.equals(currentArtworkUrl)) {
                     currentArtworkUrl = newArtwork;
+                    currentArtworkBitmap = null;
                     fetchArtworkAsync(newArtwork);
                 }
                 updateNotificationAndSession();

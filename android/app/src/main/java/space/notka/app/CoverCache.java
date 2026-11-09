@@ -102,7 +102,9 @@ public class CoverCache {
 
     public WebResourceResponse getInterceptedResponse(String url) {
         try {
-            byte[] cached = getCoverBytes(url, true);
+            // Fast non-blocking lookup: only return if already in RAM or on disk (0 ms).
+            // Never block WebView worker threads with synchronous network downloads!
+            byte[] cached = getCoverBytes(url, false);
             if (cached != null && cached.length > 0) {
                 return new WebResourceResponse(
                         getMimeType(url),
@@ -114,8 +116,11 @@ public class CoverCache {
                 );
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to intercept cover for: " + url, e);
+            Log.w(TAG, "Cache read failed: " + url, e);
         }
+
+        // Return null so Chromium's native network engine downloads the resource via HTTP/2
+        // with full connection pooling, hardware acceleration, and zero thread contention.
         return null;
     }
 
@@ -160,14 +165,17 @@ public class CoverCache {
     private byte[] downloadAndCache(String urlStr, String key) {
         HttpURLConnection conn = null;
         try {
+            System.setProperty("java.net.preferIPv4Stack", "true");
+            System.setProperty("java.net.preferIPv6Addresses", "false");
+
             URL url = new URL(urlStr);
             conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(4500);
-            conn.setReadTimeout(6000);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3500);
             conn.setInstanceFollowRedirects(true);
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36 NotkaApp/2.5");
-            conn.setRequestProperty("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
-            conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
+            conn.setRequestProperty("Accept", "image/webp,image/png,image/jpeg,image/*;q=0.9");
+            conn.setRequestProperty("Accept-Encoding", "identity");
             conn.connect();
 
             int status = conn.getResponseCode();

@@ -228,7 +228,11 @@ public class MainActivity extends Activity {
 
         // Hardware acceleration and styling
         webView.setBackgroundColor(Color.parseColor("#0C0A12"));
-        webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
 
         webAppInterface = new WebAppInterface(this, webView);
         webView.addJavascriptInterface(webAppInterface, "NotkaAndroid");
@@ -411,6 +415,14 @@ public class MainActivity extends Activity {
             "    style = document.createElement('style');" +
             "    style.id = 'notka-keyboard-style';" +
             "    style.textContent = '" +
+            "      * { -webkit-tap-highlight-color: transparent !important; }" +
+            "      body { -webkit-user-select: none !important; user-select: none !important; }" +
+            "      input, textarea { -webkit-user-select: auto !important; user-select: auto !important; }" +
+            "      img, svg { -webkit-touch-callout: none !important; }" +
+            "      .cover img { transition: opacity 0.28s ease !important; will-change: opacity; }" +
+            "      #login-modal.gate .modal-actions { display: grid !important; grid-template-columns: 1fr 1.35fr !important; gap: 10px !important; margin-top: 10px !important; }" +
+            "      #login-modal.gate #login-cancel { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; }" +
+            "      #login-modal.gate #login-next { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; width: 100% !important; }" +
             "      #login-modal.gate .modal { transition: padding 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important; }" +
             "      #login-modal.gate .login-hero { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease, max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), margin 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important; will-change: transform, opacity, max-height; max-height: 480px; }" +
             "      body.keyboard-open #login-modal.gate .login-hero { opacity: 0 !important; transform: translateY(-26px) scale(0.92) !important; max-height: 0 !important; margin: 0 !important; overflow: hidden !important; pointer-events: none !important; }" +
@@ -420,8 +432,33 @@ public class MainActivity extends Activity {
             "      .modal-anim .modal { transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important; will-change: transform; }" +
             "      body.keyboard-open .modal-anim { overflow-y: auto !important; align-items: center !important; justify-content: center !important; }" +
             "      body.keyboard-open .modal { margin: auto !important; max-height: calc(100vh - 20px) !important; }" +
-            "      body.keyboard-open .sheet { max-height: calc(100vh - 20px) !important; }';" +
+            "      body.keyboard-open .sheet { max-height: calc(100vh - 20px) !important; }" +
+            "      body.keyboard-open .tabbar, body.keyboard-open #bottom-nav, body.keyboard-open .mini-player { opacity: 0 !important; pointer-events: none !important; transform: translateY(120px) !important; transition: opacity 0.22s ease, transform 0.22s ease !important; }" +
+            "      .tabbar, #bottom-nav, .mini-player { transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important; }" +
+            "      body.keyboard-open .screen { padding-bottom: 24px !important; }';" +
             "    (document.head || document.documentElement).appendChild(style);" +
+            "  }" +
+            "  document.addEventListener('click', function(e) {" +
+            "    if (e.target && e.target.id === 'login-cancel') {" +
+            "      var m = document.getElementById('login-modal');" +
+            "      if (m) {" +
+            "        m.classList.remove('open', 'gate');" +
+            "        m.style.display = 'none';" +
+            "      }" +
+            "    }" +
+            "  }, true);" +
+            "  if (window.visualViewport && !window.__notka_viewport_listener_added) {" +
+            "    window.__notka_viewport_listener_added = true;" +
+            "    window.visualViewport.addEventListener('resize', function() {" +
+            "      var isKb = (window.innerHeight - window.visualViewport.height) > 150;" +
+            "      if (isKb) document.body.classList.add('keyboard-open');" +
+            "      else {" +
+            "        var a = document.activeElement;" +
+            "        if (!a || (a.tagName !== 'INPUT' && a.tagName !== 'TEXTAREA')) {" +
+            "          document.body.classList.remove('keyboard-open');" +
+            "        }" +
+            "      }" +
+            "    });" +
             "  }" +
             "  if (!window.__notka_focus_listener_added) {" +
             "    window.__notka_focus_listener_added = true;" +
@@ -457,12 +494,22 @@ public class MainActivity extends Activity {
             "  window.__notka_bridge_injected = true;" +
             "  window.NotkaAndroidBridge = {" +
             "    play: function() {" +
-            "      var a = document.querySelector('audio');" +
-            "      if (a) a.play().catch(function(e){ console.error(e); });" +
+            "      if (navigator.mediaSession && navigator.mediaSession._actions && navigator.mediaSession._actions.play) {" +
+            "        navigator.mediaSession._actions.play();" +
+            "      } else {" +
+            "        var btn = document.getElementById('player-play-btn') || document.getElementById('mp-play-btn');" +
+            "        if (btn) btn.click();" +
+            "        else { var a = document.querySelector('audio'); if (a) a.play().catch(function(e){}); }" +
+            "      }" +
             "    }," +
             "    pause: function() {" +
-            "      var a = document.querySelector('audio');" +
-            "      if (a) a.pause();" +
+            "      if (navigator.mediaSession && navigator.mediaSession._actions && navigator.mediaSession._actions.pause) {" +
+            "        navigator.mediaSession._actions.pause();" +
+            "      } else {" +
+            "        var btn = document.getElementById('player-play-btn') || document.getElementById('mp-play-btn');" +
+            "        if (btn) btn.click();" +
+            "        else { var a = document.querySelector('audio'); if (a) a.pause(); }" +
+            "      }" +
             "    }," +
             "    next: function() {" +
             "      if (window.notkaMedia && typeof window.notkaMedia.next === 'function') {" +
@@ -470,7 +517,7 @@ public class MainActivity extends Activity {
             "      } else if (navigator.mediaSession && navigator.mediaSession._actions && navigator.mediaSession._actions.nexttrack) {" +
             "        navigator.mediaSession._actions.nexttrack();" +
             "      } else {" +
-            "        var btn = document.getElementById('player-next') || document.getElementById('dock-next-btn');" +
+            "        var btn = document.getElementById('player-next-btn') || document.getElementById('mp-next-btn');" +
             "        if (btn) btn.click();" +
             "      }" +
             "    }," +
@@ -480,7 +527,7 @@ public class MainActivity extends Activity {
             "      } else if (navigator.mediaSession && navigator.mediaSession._actions && navigator.mediaSession._actions.previoustrack) {" +
             "        navigator.mediaSession._actions.previoustrack();" +
             "      } else {" +
-            "        var btn = document.getElementById('player-prev');" +
+            "        var btn = document.getElementById('player-prev-btn') || document.getElementById('mp-prev-btn');" +
             "        if (btn) btn.click();" +
             "      }" +
             "    }" +
@@ -504,6 +551,22 @@ public class MainActivity extends Activity {
             "          if (meta && window.NotkaAndroid) {" +
             "            var art = (meta.artwork && meta.artwork.length) ? meta.artwork[0].src : '';" +
             "            window.NotkaAndroid.updateTrack(meta.title || 'Нотка', meta.artist || '', meta.album || '', art, true);" +
+            "            try {" +
+            "              var pArt = document.getElementById('player-art');" +
+            "              if (pArt) {" +
+            "                var pImg = pArt.querySelector('img');" +
+            "                if (pImg && art && pImg.getAttribute('src') !== art) {" +
+            "                  pImg.style.opacity = '0.15';" +
+            "                }" +
+            "              }" +
+            "              var mArt = document.getElementById('mp-art');" +
+            "              if (mArt) {" +
+            "                var mImg = mArt.querySelector('img');" +
+            "                if (mImg && art && mImg.getAttribute('src') !== art) {" +
+            "                  mImg.style.opacity = '0.15';" +
+            "                }" +
+            "              }" +
+            "            } catch(_){}" +
             "          }" +
             "        }" +
             "      });" +
@@ -546,20 +609,45 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (webView != null) {
-            // Check if Telegram BackButton or Notka Back handler is active (e.g. open sheet/screen)
             webView.evaluateJavascript(
                 "(function(){ " +
-                "  if (typeof window.notkaBack === 'function') { " +
-                "    return window.notkaBack() ? 'handled' : 'unhandled'; " +
-                "  } " +
-                "  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.BackButton && window.Telegram.WebApp.BackButton._trigger) { " +
-                "    return window.Telegram.WebApp.BackButton._trigger() ? 'handled' : 'unhandled'; " +
-                "  } " +
+                "  try { " +
+                "    var openModal = document.querySelector('.sheet-anim.open, .modal-anim.open, .sheet.open, .modal-wrap.open, #login-modal.open'); " +
+                "    if (openModal) { " +
+                "      var closeBtn = openModal.querySelector('#login-cancel, .sheet-close, .modal-close, .btn-close, [data-close]'); " +
+                "      if (closeBtn) { closeBtn.click(); return 'handled'; } " +
+                "      openModal.click(); " +
+                "      return 'handled'; " +
+                "    } " +
+                "    var screen = (document.body && document.body.dataset) ? document.body.dataset.screen : ''; " +
+                "    var p = document.getElementById('screen-player'); " +
+                "    if (screen === 'player' || (p && !p.hidden)) { " +
+                "      var b = document.getElementById('player-back-btn'); " +
+                "      if (b) { b.click(); return 'handled'; } " +
+                "    } " +
+                "    var tabs = ['home', 'search', 'library']; " +
+                "    if (screen && tabs.indexOf(screen) === -1 && screen !== 'splash' && screen !== 'onboarding') { " +
+                "      var activeScreen = document.getElementById('screen-' + screen) || document.querySelector('.screen:not([hidden])'); " +
+                "      if (activeScreen) { " +
+                "        var backBtn = activeScreen.querySelector('.back-btn, #player-back-btn, [data-back]'); " +
+                "        if (backBtn) { backBtn.click(); return 'handled'; } " +
+                "      } " +
+                "      var anyBack = document.querySelector('.back-btn:not([hidden])'); " +
+                "      if (anyBack) { anyBack.click(); return 'handled'; } " +
+                "    } " +
+                "    if (typeof window.notkaBack === 'function') { " +
+                "      var res = window.notkaBack(); " +
+                "      if (res === 'handled' || res === true) return 'handled'; " +
+                "    } " +
+                "    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.BackButton && window.Telegram.WebApp.BackButton._trigger) { " +
+                "      var res = window.Telegram.WebApp.BackButton._trigger(); " +
+                "      if (res === 'handled' || res === true) return 'handled'; " +
+                "    } " +
+                "  } catch (e) { console.error('onBackPressed error', e); } " +
                 "  return 'unhandled'; " +
                 "})();",
                 val -> {
                     if ("\"handled\"".equals(val)) {
-                        // Consumed by sheet/screen close
                         return;
                     }
                     if (webView.canGoBack()) {
