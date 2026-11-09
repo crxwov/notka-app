@@ -140,21 +140,26 @@ if (Test-Path "$app\assets") {
 
 $zip.Dispose()
 
-# Step 6: Sign and zipalign APK
-Write-Host "[6/6] Signing APK with uber-apk-signer (v1, v2, v3)..." -ForegroundColor Yellow
+# Step 6: Sign and zipalign APK with canonical Notka release keystore
+Write-Host "[6/6] Signing APK with canonical Notka release keystore..." -ForegroundColor Yellow
+$keystorePath = "$root\keystore\notka-release.keystore"
 $signerArgs = @(
     "-jar", $signer,
     "--apks", "$build\unaligned.apk",
-    "--out", "$build\dist"
+    "--out", "$build\dist",
+    "--ks", $keystorePath,
+    "--ksAlias", "notka",
+    "--ksPass", "notka2026",
+    "--ksKeyPass", "notka2026"
 )
 & $java @signerArgs
-if ($LASTEXITCODE -ne 0) { throw "APK signing failed with code $LASTEXITCODE" }
+$signedCandidate = Get-ChildItem -Path "$build\dist" -Filter "*.apk" | Where-Object { $_.Name -like "*signed*" } | Select-Object -First 1
+if (-not $signedCandidate) {
+    throw "APK signing failed: no signed APK generated."
+}
 
 $outputApk = "$build\dist\notka.apk"
-$signedCandidate = Get-ChildItem -Path "$build\dist" -Filter "*.apk" | Where-Object { $_.Name -like "*signed*" } | Select-Object -First 1
-if ($signedCandidate) {
-    Copy-Item $signedCandidate.FullName $outputApk -Force
-}
+Copy-Item $signedCandidate.FullName $outputApk -Force
 
 $apkSizeMB = [math]::Round((Get-Item $outputApk).Length / 1MB, 2)
 Write-Host "BUILD SUCCESSFUL! APK generated: $outputApk ($apkSizeMB MB)" -ForegroundColor Green

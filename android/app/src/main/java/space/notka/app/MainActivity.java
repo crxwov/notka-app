@@ -10,17 +10,25 @@ import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
+import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import java.io.File;
+
 public class MainActivity extends Activity {
     private static final String TAG = "NotkaMainActivity";
+    private static final String CHROME_USER_AGENT = 
+        "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36 NotkaApp/2.5";
+
     private static MainActivity sInstance;
 
     private WebView webView;
@@ -36,14 +44,20 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         sInstance = this;
 
-        // Apply dark living-light theme to status bar and nav bar
-        setupSystemBars("#0C0A12", "#0C0A12");
+        // Initialize high-performance native cover image cache
+        CoverCache.init(this);
+
+        // Configure edge-to-edge full bleed window
+        setupEdgeToEdge();
 
         webView = new WebView(this);
         setContentView(webView);
 
         configureWebView();
         loadAppUrl();
+
+        // Check for app updates in the background
+        AppUpdater.checkForUpdatesAsync(this);
     }
 
     public void loadAppUrl() {
@@ -53,31 +67,34 @@ public class MainActivity extends Activity {
         webView.loadUrl(appUrl);
     }
 
-    private void setupSystemBars(String statusBarHex, String navBarHex) {
+    private void setupEdgeToEdge() {
         Window window = getWindow();
         try {
-            int statusColor = Color.parseColor(statusBarHex);
-            int navColor = Color.parseColor(navBarHex);
-            window.setStatusBarColor(statusColor);
-            window.setNavigationBarColor(navColor);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS | WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.setDecorFitsSystemWindows(false);
+            } else {
                 View decor = window.getDecorView();
-                int flags = decor.getSystemUiVisibility();
-                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+                            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+                            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
                 decor.setSystemUiVisibility(flags);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error applying system bar colors", e);
+            Log.e(TAG, "Error applying edge-to-edge window", e);
         }
     }
 
     public void setHeaderColor(String hexColor) {
-        runOnUiThread(() -> setupSystemBars(hexColor, "#0C0A12"));
+        // Transparent edge-to-edge keeps living-light flow intact
     }
 
     public void setBackgroundColor(String hexColor) {
-        runOnUiThread(() -> setupSystemBars("#0C0A12", hexColor));
+        // Transparent edge-to-edge keeps living-light flow intact
     }
 
     public void setBackButtonState(boolean visible) {
@@ -89,28 +106,54 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
+
+        // Security: restrict local file access to bundled assets only
         settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
+        settings.setAllowContentAccess(false);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
+
+        // Smooth media playback
         settings.setMediaPlaybackRequiresUserGesture(false);
+
+        // High performance image loading & caching
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkImage(false);
+        settings.setBlockNetworkLoads(false);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setBuiltInZoomControls(false);
-        settings.setDisplayZoomControls(false);
-        settings.setSupportZoom(false);
+        settings.setUserAgentString(CHROME_USER_AGENT);
 
+        // Cookie management for cross-origin assets
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            WebView.setWebContentsDebuggingEnabled(true);
-        }
-
+        // Hardware acceleration and styling
         webView.setBackgroundColor(Color.parseColor("#0C0A12"));
+        webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
 
         webAppInterface = new WebAppInterface(this, webView);
         webView.addJavascriptInterface(webAppInterface, "NotkaAndroid");
 
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (request != null && request.getUrl() != null) {
+                    String url = request.getUrl().toString();
+                    CoverCache cache = CoverCache.getInstance();
+                    if (cache != null && cache.isCoverUrl(url)) {
+                        WebResourceResponse resp = cache.getInterceptedResponse(url);
+                        if (resp != null) {
+                            return resp;
+                        }
+                    }
+                }
+                return super.shouldInterceptRequest(view, request);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (request == null || request.getUrl() == null) return false;
@@ -127,11 +170,12 @@ public class MainActivity extends Activity {
                 String scheme = uri.getScheme();
                 if (scheme == null) return false;
 
-                // Handle intent:, tg:, mailto:, tel:
+                // Handle intent:, tg:, mailto:, tel: safely
                 if ("tg".equalsIgnoreCase(scheme) || "mailto".equalsIgnoreCase(scheme) ||
-                    "tel".equalsIgnoreCase(scheme) || "intent".equalsIgnoreCase(scheme)) {
+                    "tel".equalsIgnoreCase(scheme)) {
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                        intent.addCategory(Intent.CATEGORY_BROWSABLE);
                         startActivity(intent);
                         return true;
                     } catch (Exception e) {
@@ -140,12 +184,27 @@ public class MainActivity extends Activity {
                     }
                 }
 
-                // External domains (like t.me, github, etc.) open in browser
+                if ("intent".equalsIgnoreCase(scheme)) {
+                    try {
+                        Intent intent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME);
+                        intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                        intent.setComponent(null);
+                        intent.setSelector(null);
+                        startActivity(intent);
+                        return true;
+                    } catch (Exception e) {
+                        Log.w(TAG, "Cannot launch intent URI", e);
+                        return true;
+                    }
+                }
+
+                // External domains (t.me, telegram, github, etc.) open in external apps/browser
                 String host = uri.getHost();
                 if (host != null && (host.contains("t.me") || host.contains("telegram.me") ||
                     host.contains("github.com") || host.contains("google.com"))) {
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                        intent.addCategory(Intent.CATEGORY_BROWSABLE);
                         startActivity(intent);
                         return true;
                     } catch (Exception e) {
@@ -191,7 +250,16 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                request.grant(request.getResources());
+                // Security check: only allow media permissions from the verified Notka origin
+                Uri origin = request.getOrigin();
+                if (origin != null && ("notka.duckdns.org".equalsIgnoreCase(origin.getHost()) ||
+                                       "127.0.0.1".equals(origin.getHost()) ||
+                                       "localhost".equals(origin.getHost()))) {
+                    request.grant(request.getResources());
+                } else {
+                    Log.w(TAG, "Denied untrusted permission request from: " + origin);
+                    request.deny();
+                }
             }
         });
 
@@ -214,10 +282,24 @@ public class MainActivity extends Activity {
                 int topDp = Math.round(topPx / density);
                 int bottomDp = Math.round(bottomPx / density);
 
+                // Ensure bottom inset accounts for gesture navigation pill (minimum 24dp)
+                if (bottomDp < 16) {
+                    bottomDp = 24;
+                }
+
                 String js = String.format(
-                    "document.documentElement.style.setProperty('--tg-safe-area-inset-top', '%dpx');" +
-                    "document.documentElement.style.setProperty('--tg-safe-area-inset-bottom', '%dpx');",
-                    topDp, bottomDp
+                    "(function() {" +
+                    "  var r = document.documentElement.style;" +
+                    "  r.setProperty('--sat', '%dpx');" +
+                    "  r.setProperty('--sab', '%dpx');" +
+                    "  r.setProperty('--tg-safe-area-inset-top', '%dpx');" +
+                    "  r.setProperty('--tg-safe-area-inset-bottom', '%dpx');" +
+                    "  if (window.Telegram && window.Telegram.WebApp) {" +
+                    "    window.Telegram.WebApp.safeAreaInset = { top: %d, bottom: %d, left: 0, right: 0 };" +
+                    "    window.Telegram.WebApp.contentSafeAreaInset = { top: %d, bottom: %d, left: 0, right: 0 };" +
+                    "  }" +
+                    "})();",
+                    topDp, bottomDp, topDp, bottomDp, topDp, bottomDp, topDp, bottomDp
                 );
                 webView.evaluateJavascript(js, null);
             }

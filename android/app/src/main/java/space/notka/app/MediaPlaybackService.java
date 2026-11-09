@@ -13,18 +13,19 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.util.Log;
 
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-
-public class MediaPlaybackService extends Service {
+public class MediaPlaybackService extends Service implements AudioManager.OnAudioFocusChangeListener {
     private static final String TAG = "NotkaPlaybackService";
     private static final String CHANNEL_ID = "notka_playback_channel";
     private static final int NOTIFICATION_ID = 4242;
@@ -44,12 +45,18 @@ public class MediaPlaybackService extends Service {
     public static final String EXTRA_IS_PLAYING = "extra_is_playing";
 
     private MediaSession mediaSession;
+    private AudioManager audioManager;
+    private AudioFocusRequest audioFocusRequest;
+    private PowerManager.WakeLock wakeLock;
+    private WifiManager.WifiLock wifiLock;
+
     private String currentTitle = "Нотка";
     private String currentArtist = "Музыка";
     private String currentAlbum = "";
     private String currentArtworkUrl = "";
     private Bitmap currentArtworkBitmap = null;
     private boolean isPlaying = false;
+    private boolean pausedByTransientLoss = false;
 
     public static void updateMetadata(Context context, String title, String artist, String album, String artworkUrl, boolean isPlaying) {
         Intent intent = new Intent(context, MediaPlaybackService.class);
@@ -90,6 +97,39 @@ public class MediaPlaybackService extends Service {
         super.onCreate();
         createNotificationChannel();
         initMediaSession();
+        initPowerLocks();
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+    }
+
+    private void initPowerLocks() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Notka:PlaybackWakeLock");
+                wakeLock.setReferenceCounted(false);
+            }
+            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wm != null) {
+                wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Notka:PlaybackWifiLock");
+                wifiLock.setReferenceCounted(false);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to initialize wake locks", e);
+        }
+    }
+
+    private void updateLocks(boolean active) {
+        try {
+            if (active) {
+                if (wakeLock != null && !wakeLock.isHeld()) wakeLock.acquire(12 * 60 * 60 * 1000L); // 12h max
+                if (wifiLock != null && !wifiLock.isHeld()) wifiLock.acquire();
+            } else {
+                if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+                if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error updating wake locks", e);
+        }
     }
 
     private void createNotificationChannel() {
@@ -115,6 +155,7 @@ public class MediaPlaybackService extends Service {
         mediaSession.setCallback(new MediaSession.Callback() {
             @Override
             public void onPlay() {
+                requestAudioFocus();
                 handleMediaAction(ACTION_PLAY);
             }
 
@@ -141,6 +182,50 @@ public class MediaPlaybackService extends Service {
         mediaSession.setActive(true);
     }
 
+    private void requestAudioFocus() {
+        if (audioManager == null) return;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build();
+                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(attrs)
+                        .setOnAudioFocusChangeListener(this)
+                        .build();
+                audioManager.requestAudioFocus(audioFocusRequest);
+            } else {
+                audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to request audio focus", e);
+        }
+    }
+
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+        switch (focusChange) {
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                if (isPlaying) {
+                    pausedByTransientLoss = true;
+                    handleMediaAction(ACTION_PAUSE);
+                }
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS:
+                pausedByTransientLoss = false;
+                handleMediaAction(ACTION_PAUSE);
+                break;
+            case AudioManager.AUDIOFOCUS_GAIN:
+                if (pausedByTransientLoss) {
+                    pausedByTransientLoss = false;
+                    handleMediaAction(ACTION_PLAY);
+                }
+                break;
+        }
+    }
+
     private void handleMediaAction(String action) {
         if (MainActivity.getInstance() != null) {
             MainActivity.getInstance().dispatchMediaCommand(action);
@@ -161,6 +246,8 @@ public class MediaPlaybackService extends Service {
                 String newArtwork = intent.getStringExtra(EXTRA_ARTWORK);
                 isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true);
 
+                updateLocks(isPlaying);
+
                 if (newArtwork != null && !newArtwork.equals(currentArtworkUrl)) {
                     currentArtworkUrl = newArtwork;
                     fetchArtworkAsync(newArtwork);
@@ -168,6 +255,10 @@ public class MediaPlaybackService extends Service {
                 updateNotificationAndSession();
             } else if (ACTION_UPDATE_STATE.equals(action)) {
                 isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false);
+                updateLocks(isPlaying);
+                if (isPlaying) {
+                    requestAudioFocus();
+                }
                 updateNotificationAndSession();
             } else if (ACTION_PLAY.equals(action) || ACTION_PAUSE.equals(action) ||
                        ACTION_NEXT.equals(action) || ACTION_PREV.equals(action) ||
@@ -183,20 +274,17 @@ public class MediaPlaybackService extends Service {
             currentArtworkBitmap = null;
             return;
         }
+
         new Thread(() -> {
             try {
-                URL url = new URL(urlStr);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(4000);
-                conn.setReadTimeout(4000);
-                conn.setInstanceFollowRedirects(true);
-                conn.connect();
-                try (InputStream is = conn.getInputStream()) {
-                    currentArtworkBitmap = BitmapFactory.decodeStream(is);
+                CoverCache cache = CoverCache.getInstance();
+                byte[] bytes = cache != null ? cache.getCoverBytes(urlStr, true) : null;
+                if (bytes != null && bytes.length > 0) {
+                    currentArtworkBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                     updateNotificationAndSession();
                 }
             } catch (Exception e) {
-                Log.d(TAG, "Failed to load album artwork: " + e.getMessage());
+                Log.d(TAG, "Failed to load album artwork via CoverCache: " + e.getMessage());
             }
         }).start();
     }
@@ -207,7 +295,7 @@ public class MediaPlaybackService extends Service {
         Bitmap b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(Color.rgb(139, 92, 246));
+        p.setColor(Color.rgb(255, 45, 85)); // Brand pink/magenta
         c.drawCircle(size / 2f, size / 2f, size / 2f, p);
         return b;
     }
@@ -302,6 +390,7 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public void onDestroy() {
+        updateLocks(false);
         if (mediaSession != null) {
             mediaSession.setActive(false);
             mediaSession.release();
