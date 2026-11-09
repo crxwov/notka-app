@@ -2,8 +2,8 @@
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
-    [switch]$SingleFile,
-    [switch]$SelfContained
+    [bool]$SingleFile = $true,
+    [bool]$SelfContained = $true
 )
 
 $ErrorActionPreference = 'Stop'

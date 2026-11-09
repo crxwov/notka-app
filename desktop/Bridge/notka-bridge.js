@@ -641,12 +641,64 @@
 
   const actionHandlers = {};
 
+  // Intercept MediaMetadata constructor
+  const OrigMediaMetadata = window.MediaMetadata;
+  if (OrigMediaMetadata) {
+    window.MediaMetadata = function (init) {
+      const inst = new OrigMediaMetadata(init);
+      if (init) {
+        state.title = init.title || '';
+        state.artist = init.artist || '';
+        state.album = init.album || '';
+        let artUrl = '';
+        if (init.artwork && init.artwork.length > 0) {
+          const bestArt = init.artwork[init.artwork.length - 1];
+          artUrl = (bestArt && (bestArt.src || bestArt)) || '';
+        }
+        state.artwork = artUrl;
+        postToHost({
+          type: 'metadata',
+          title: state.title,
+          artist: state.artist,
+          album: state.album,
+          artwork: state.artwork
+        });
+      }
+      return inst;
+    };
+    window.MediaMetadata.prototype = OrigMediaMetadata.prototype;
+  }
+
   if ('mediaSession' in navigator) {
     const origSetActionHandler = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
     navigator.mediaSession.setActionHandler = function (action, handler) {
       actionHandlers[action] = handler;
       return origSetActionHandler(action, handler);
     };
+
+    try {
+      const proto = Object.getPrototypeOf(navigator.mediaSession);
+      const origPlaybackDesc = Object.getOwnPropertyDescriptor(proto, 'playbackState');
+      if (origPlaybackDesc && origPlaybackDesc.set) {
+        const origSet = origPlaybackDesc.set;
+        Object.defineProperty(navigator.mediaSession, 'playbackState', {
+          get() {
+            return origPlaybackDesc.get ? origPlaybackDesc.get.call(navigator.mediaSession) : (state.isPlaying ? 'playing' : 'paused');
+          },
+          set(val) {
+            state.isPlaying = (val === 'playing');
+            postToHost({
+              type: 'playback_state',
+              isPlaying: state.isPlaying,
+              state: val
+            });
+            return origSet.call(navigator.mediaSession, val);
+          },
+          configurable: true,
+          enumerable: true
+        });
+      }
+    } catch (e) {}
 
     try {
       let currentMetadata = navigator.mediaSession.metadata;
@@ -682,28 +734,6 @@
       });
     } catch (e) {
       console.warn('[NotkaDesktop] Unable to redefine navigator.mediaSession.metadata:', e);
-    }
-
-    try {
-      let currentPlaybackState = navigator.mediaSession.playbackState || 'none';
-      Object.defineProperty(navigator.mediaSession, 'playbackState', {
-        get() {
-          return currentPlaybackState;
-        },
-        set(val) {
-          currentPlaybackState = val;
-          state.isPlaying = (val === 'playing');
-          postToHost({
-            type: 'playback_state',
-            isPlaying: state.isPlaying,
-            state: val
-          });
-        },
-        configurable: true,
-        enumerable: true
-      });
-    } catch (e) {
-      console.warn('[NotkaDesktop] Unable to redefine navigator.mediaSession.playbackState:', e);
     }
   }
 
@@ -767,6 +797,24 @@
     }
   });
   audioObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+  // Fallback poll to ensure playback state never gets out of sync
+  setInterval(() => {
+    const audio = document.querySelector('audio');
+    if (audio) {
+      const isPlaying = !audio.paused && !audio.ended && audio.currentTime > 0;
+      if (isPlaying !== state.isPlaying) {
+        state.isPlaying = isPlaying;
+        postToHost({
+          type: 'playback_state',
+          isPlaying: isPlaying,
+          state: isPlaying ? 'playing' : 'paused',
+          duration: audio.duration || 0,
+          position: audio.currentTime || 0
+        });
+      }
+    }
+  }, 1000);
 
   // Native media controls handler
   window.notkaMedia = function (action) {

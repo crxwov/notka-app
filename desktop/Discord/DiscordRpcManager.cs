@@ -229,6 +229,7 @@ public sealed class DiscordRpcManager : IDisposable
                 };
 
                 await SendPayloadAsync(1, activity);
+                try { await ReadPayloadAsync(); } catch { }
             }
             finally
             {
@@ -265,6 +266,7 @@ public sealed class DiscordRpcManager : IDisposable
                 };
 
                 await SendPayloadAsync(1, payload);
+                try { await ReadPayloadAsync(); } catch { }
             }
             finally
             {
@@ -334,12 +336,15 @@ public sealed class DiscordRpcManager : IDisposable
         await _pipe.FlushAsync();
     }
 
-    private async Task<(int Opcode, string Json)> ReadPayloadAsync()
+    private async Task<(int Opcode, string Json)> ReadPayloadAsync(CancellationToken cancellationToken = default)
     {
         if (_pipe == null || !_pipe.IsConnected) throw new IOException("Pipe not connected");
 
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(3000);
+
         byte[] header = new byte[8];
-        int read = await _pipe.ReadAsync(header.AsMemory(0, 8));
+        int read = await _pipe.ReadAsync(header.AsMemory(0, 8), cts.Token);
         if (read < 8) throw new EndOfStreamException();
 
         int op = BitConverter.ToInt32(header, 0);
@@ -349,7 +354,7 @@ public sealed class DiscordRpcManager : IDisposable
         int totalRead = 0;
         while (totalRead < length)
         {
-            int chunk = await _pipe.ReadAsync(body.AsMemory(totalRead, length - totalRead));
+            int chunk = await _pipe.ReadAsync(body.AsMemory(totalRead, length - totalRead), cts.Token);
             if (chunk == 0) throw new EndOfStreamException();
             totalRead += chunk;
         }
