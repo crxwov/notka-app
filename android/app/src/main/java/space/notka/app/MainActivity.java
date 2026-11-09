@@ -3,14 +3,18 @@ package space.notka.app;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
@@ -50,11 +54,24 @@ public class MainActivity extends Activity {
         // Configure edge-to-edge full bleed window
         setupEdgeToEdge();
 
+        FrameLayout rootLayout = new FrameLayout(this);
+        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+
         webView = new WebView(this);
-        setContentView(webView);
+        rootLayout.addView(webView, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+        setContentView(rootLayout);
 
         configureWebView();
         loadAppUrl();
+
+        // Ensure soft keyboard never covers input fields
+        setupKeyboardListener();
 
         // Check for app updates in the background
         AppUpdater.checkForUpdatesAsync(this);
@@ -87,6 +104,57 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Log.e(TAG, "Error applying edge-to-edge window", e);
         }
+    }
+
+    private void setupKeyboardListener() {
+        final View decorView = getWindow().getDecorView();
+        decorView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            private int previousBottomMargin = -1;
+
+            @Override
+            public void onGlobalLayout() {
+                Rect r = new Rect();
+                decorView.getWindowVisibleDisplayFrame(r);
+                int screenHeight = decorView.getRootView().getHeight();
+                int keypadHeight = screenHeight - r.bottom;
+
+                // Detect if keyboard is open (> 15% of screen height)
+                boolean isOpen = keypadHeight > screenHeight * 0.15;
+                int targetMargin = isOpen ? keypadHeight : 0;
+
+                if (targetMargin != previousBottomMargin) {
+                    previousBottomMargin = targetMargin;
+                    if (webView != null) {
+                        ViewGroup.LayoutParams rawLp = webView.getLayoutParams();
+                        if (rawLp instanceof FrameLayout.LayoutParams) {
+                            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) rawLp;
+                            lp.bottomMargin = targetMargin;
+                            webView.setLayoutParams(lp);
+                        }
+
+                        if (isOpen) {
+                            webView.evaluateJavascript(
+                                "(function(){ " +
+                                "  document.body.classList.add('keyboard-open'); " +
+                                "  var el = document.activeElement; " +
+                                "  if (el && typeof el.scrollIntoView === 'function') { " +
+                                "    setTimeout(function() { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 80); " +
+                                "  } " +
+                                "})();",
+                                null
+                            );
+                        } else {
+                            webView.evaluateJavascript(
+                                "(function(){ " +
+                                "  document.body.classList.remove('keyboard-open'); " +
+                                "})();",
+                                null
+                            );
+                        }
+                    }
+                }
+            }
+        });
     }
 
     public void setHeaderColor(String hexColor) {
@@ -220,6 +288,7 @@ public class MainActivity extends Activity {
                 super.onPageFinished(view, url);
                 injectMediaBridge();
                 injectInsets();
+                injectKeyboardStyles();
             }
 
             @Override
@@ -304,6 +373,50 @@ public class MainActivity extends Activity {
                 webView.evaluateJavascript(js, null);
             }
         }
+    }
+
+    private void injectKeyboardStyles() {
+        if (webView == null) return;
+        String script = 
+            "(function() {" +
+            "  var style = document.getElementById('notka-keyboard-style');" +
+            "  if (!style) {" +
+            "    style = document.createElement('style');" +
+            "    style.id = 'notka-keyboard-style';" +
+            "    style.textContent = '" +
+            "      body.keyboard-open #login-modal.gate .login-hero { display: none !important; }" +
+            "      body.keyboard-open #login-modal.gate .modal { justify-content: center !important; height: 100% !important; padding: 12px 18px !important; }" +
+            "      body.keyboard-open #login-modal.gate { overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }" +
+            "      body.keyboard-open .modal-anim { overflow-y: auto !important; align-items: center !important; justify-content: center !important; }" +
+            "      body.keyboard-open .modal { margin: auto !important; max-height: calc(100vh - 20px) !important; }" +
+            "      body.keyboard-open .sheet { max-height: calc(100vh - 20px) !important; }';" +
+            "    (document.head || document.documentElement).appendChild(style);" +
+            "  }" +
+            "  if (!window.__notka_focus_listener_added) {" +
+            "    window.__notka_focus_listener_added = true;" +
+            "    window.addEventListener('focusin', function(e) {" +
+            "      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {" +
+            "        document.body.classList.add('keyboard-open');" +
+            "        setTimeout(function() {" +
+            "          if (typeof e.target.scrollIntoView === 'function') {" +
+            "            e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });" +
+            "          }" +
+            "        }, 100);" +
+            "      }" +
+            "    });" +
+            "    window.addEventListener('focusout', function(e) {" +
+            "      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {" +
+            "        setTimeout(function() {" +
+            "          var a = document.activeElement;" +
+            "          if (!a || (a.tagName !== 'INPUT' && a.tagName !== 'TEXTAREA')) {" +
+            "            document.body.classList.remove('keyboard-open');" +
+            "          }" +
+            "        }, 200);" +
+            "      }" +
+            "    });" +
+            "  }" +
+            "})();";
+        webView.evaluateJavascript(script, null);
     }
 
     private void injectMediaBridge() {
