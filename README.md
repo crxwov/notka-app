@@ -3,7 +3,7 @@
 Официальный репозиторий клиентских приложений для музыкального сервиса **Нотка** ([Notka](https://notka.duckdns.org)).
 
 <p align="center">
-  <img src="android/app/src/main/res/drawable/ic_launcher.png" width="96" height="96" alt="Notka Logo" />
+  <img src="assets/logo.png" width="112" height="112" style="border-radius: 24px;" alt="Notka Logo" />
 </p>
 
 ## Архитектура: Dynamic Hybrid Shell
