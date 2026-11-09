@@ -38,6 +38,7 @@ def test_source_files():
         os.path.join("desktop", "Program.cs"),
         os.path.join("desktop", "Smtc", "SmtcInterop.cs"),
         os.path.join("desktop", "Smtc", "SmtcManager.cs"),
+        os.path.join("desktop", "Discord", "DiscordRpcManager.cs"),
         os.path.join("desktop", "Tray", "TrayIconManager.cs"),
         os.path.join("desktop", "UI", "MainForm.cs"),
         os.path.join("desktop", "build.ps1"),

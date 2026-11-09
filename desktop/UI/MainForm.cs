@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Notka.Desktop.Discord;
 using Notka.Desktop.Smtc;
 using Notka.Desktop.Tray;
 
@@ -26,6 +27,7 @@ public sealed class MainForm : Form
     private readonly WebView2 _webView;
     private readonly SmtcManager _smtc;
     private readonly TrayIconManager _tray;
+    private readonly DiscordRpcManager _discordRpc;
     private readonly string _startUrl;
     private readonly string _settingsFilePath;
     private readonly string _authFilePath;
@@ -36,6 +38,10 @@ public sealed class MainForm : Form
     private bool _balloonShown;
     private string _currentTitle = "Notka";
     private string _currentArtist = "";
+    private string _currentAlbum = "";
+    private string _currentArtwork = "";
+    private double _currentDuration;
+    private double _currentPosition;
     private bool _isPlaying;
 
     public MainForm(string? startUrl = null)
@@ -71,10 +77,19 @@ public sealed class MainForm : Form
         _smtc = new SmtcManager(Handle);
         _smtc.MediaCommandReceived += OnMediaCommand;
 
+        // Discord RPC manager
+        _discordRpc = new DiscordRpcManager(_appDataDir);
+
         // Tray icon manager
         _tray = new TrayIconManager(Icon);
+        _tray.SetDiscordState(_discordRpc.IsEnabled);
         _tray.MediaCommandRequested += OnMediaCommand;
         _tray.RestoreWindowRequested += RestoreWindow;
+        _tray.ToggleDiscordRequested += () =>
+        {
+            _discordRpc.IsEnabled = !_discordRpc.IsEnabled;
+            _tray.SetDiscordState(_discordRpc.IsEnabled);
+        };
         _tray.ExitRequested += ExitApplication;
 
         // WebView2 control
@@ -252,6 +267,8 @@ public sealed class MainForm : Form
 
                 _currentTitle = string.IsNullOrWhiteSpace(title) ? "Notka" : title;
                 _currentArtist = artist;
+                _currentAlbum = album;
+                _currentArtwork = artwork;
 
                 BeginInvoke(() =>
                 {
@@ -261,6 +278,7 @@ public sealed class MainForm : Form
 
                     _smtc.UpdateMetadata(_currentTitle, _currentArtist, album, artwork);
                     _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
+                    _discordRpc.UpdateTrack(_currentTitle, _currentArtist, _currentAlbum, _currentArtwork, _isPlaying, _currentDuration, _currentPosition);
                 });
             }
             else if (type == "playback_state")
@@ -272,16 +290,20 @@ public sealed class MainForm : Form
                 {
                     _smtc.UpdatePlaybackStatus(_isPlaying);
                     _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
+                    _discordRpc.UpdatePlaybackState(_isPlaying);
                 });
             }
             else if (type == "timeline")
             {
                 double duration = root.TryGetProperty("duration", out var d) ? d.GetDouble() : 0;
                 double position = root.TryGetProperty("position", out var pos) ? pos.GetDouble() : 0;
+                _currentDuration = duration;
+                _currentPosition = position;
 
                 BeginInvoke(() =>
                 {
                     _smtc.UpdateTimeline(duration, position);
+                    _discordRpc.UpdateTimeline(duration, position);
                 });
             }
             else if (type == "session_save")
@@ -428,6 +450,7 @@ public sealed class MainForm : Form
         }
 
         SaveWindowSettings();
+        _discordRpc.Dispose();
         _smtc.Dispose();
         _tray.Dispose();
         base.OnFormClosing(e);

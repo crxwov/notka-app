@@ -13,6 +13,7 @@ public sealed class TrayIconManager : IDisposable
     private readonly ToolStripMenuItem _itemNext;
     private readonly ToolStripMenuItem _itemPrev;
     private readonly ToolStripMenuItem _itemShow;
+    private readonly ToolStripMenuItem _itemDiscord;
     private readonly ToolStripMenuItem _itemExit;
 
     private bool _isPlaying;
@@ -20,6 +21,7 @@ public sealed class TrayIconManager : IDisposable
 
     public event Action<string>? MediaCommandRequested;
     public event Action? RestoreWindowRequested;
+    public event Action? ToggleDiscordRequested;
     public event Action? ExitRequested;
 
     public TrayIconManager(Icon appIcon)
@@ -40,6 +42,8 @@ public sealed class TrayIconManager : IDisposable
         _itemNext = new ToolStripMenuItem("⏭  Следующий трек", null, (_, _) => MediaCommandRequested?.Invoke("next"));
         _itemPrev = new ToolStripMenuItem("⏮  Предыдущий трек", null, (_, _) => MediaCommandRequested?.Invoke("prev"));
 
+        _itemDiscord = new ToolStripMenuItem("✓  Активность в Discord", null, (_, _) => ToggleDiscordRequested?.Invoke());
+
         _itemShow = new ToolStripMenuItem("Развернуть Notka", null, (_, _) => RestoreWindowRequested?.Invoke())
         {
             Font = new Font(_contextMenu.Font, FontStyle.Bold)
@@ -52,6 +56,8 @@ public sealed class TrayIconManager : IDisposable
         _contextMenu.Items.Add(_itemPlayPause);
         _contextMenu.Items.Add(_itemNext);
         _contextMenu.Items.Add(_itemPrev);
+        _contextMenu.Items.Add(new ToolStripSeparator());
+        _contextMenu.Items.Add(_itemDiscord);
         _contextMenu.Items.Add(new ToolStripSeparator());
         _contextMenu.Items.Add(_itemShow);
         _contextMenu.Items.Add(new ToolStripSeparator());
@@ -73,6 +79,11 @@ public sealed class TrayIconManager : IDisposable
                 RestoreWindowRequested?.Invoke();
             }
         };
+    }
+
+    public void SetDiscordState(bool enabled)
+    {
+        _itemDiscord.Text = enabled ? "✓  Активность в Discord" : "    Активность в Discord";
     }
 
     public void UpdateTrack(string title, string artist, bool isPlaying)
