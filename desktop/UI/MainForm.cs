@@ -171,7 +171,19 @@ public sealed class MainForm : Form
                     if (!string.IsNullOrWhiteSpace(rawJson))
                     {
                         await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
-                            $"try {{ window.__NOTKA_SAVED_SESSION__ = {rawJson}; if (!localStorage.getItem('notka_session_v1')) localStorage.setItem('notka_session_v1', JSON.stringify({rawJson})); }} catch (e) {{}}"
+                            $"try {{ " +
+                            $"window.__NOTKA_SAVED_SESSION__ = {rawJson}; " +
+                            $"var _sess = {rawJson}; " +
+                            $"if (!localStorage.getItem('notka_session_v1')) localStorage.setItem('notka_session_v1', JSON.stringify(_sess)); " +
+                            $"if (_sess && _sess.token) {{ " +
+                            $"localStorage.setItem('notka_auth_token', _sess.token); " +
+                            $"if (_sess.user) localStorage.setItem('notka_auth_user', JSON.stringify(_sess.user)); " +
+                            $"window.Telegram = window.Telegram || {{}}; " +
+                            $"window.Telegram.WebApp = window.Telegram.WebApp || {{}}; " +
+                            $"window.Telegram.WebApp.initData = 'notka-session:' + _sess.token; " +
+                            $"window.Telegram.WebApp.initDataUnsafe = {{ user: _sess.user || _sess }}; " +
+                            $"}} " +
+                            $"}} catch (e) {{}}"
                         );
                     }
                 }

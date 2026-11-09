@@ -12,7 +12,7 @@ namespace Notka.Desktop.Discord;
 public sealed class DiscordRpcManager : IDisposable
 {
     // Default Discord Application ID for Notka Rich Presence
-    public const string DefaultClientId = "1348325497240326194";
+    public const string DefaultClientId = "463097721130188830";
 
     private readonly string _configFilePath;
     private readonly SemaphoreSlim _lock = new(1, 1);
@@ -94,7 +94,15 @@ public sealed class DiscordRpcManager : IDisposable
                 }
                 if (root.TryGetProperty("clientId", out var idProp) && !string.IsNullOrWhiteSpace(idProp.GetString()))
                 {
-                    _clientId = idProp.GetString()!.Trim();
+                    string loadedId = idProp.GetString()!.Trim();
+                    if (loadedId != "1348325497240326194")
+                    {
+                        _clientId = loadedId;
+                    }
+                    else
+                    {
+                        _clientId = DefaultClientId;
+                    }
                 }
             }
         }
@@ -280,7 +288,7 @@ public sealed class DiscordRpcManager : IDisposable
             try
             {
                 var pipe = new NamedPipeClientStream(".", $"discord-ipc-{i}", PipeDirection.InOut, PipeOptions.Asynchronous);
-                await pipe.ConnectAsync(80);
+                await pipe.ConnectAsync(250);
 
                 _pipe = pipe;
 
