@@ -71,7 +71,7 @@ public sealed class MainForm : Form
         _authFilePath = Path.Combine(_appDataDir, "auth.json");
         _sessionFilePath = Path.Combine(_appDataDir, "session.json");
 
-        Log($"=== Notka Desktop v1.2.0 (PID {Process.GetCurrentProcess().Id}) Started ===");
+        Log($"=== Notka Desktop v1.2.7 (PID {Process.GetCurrentProcess().Id}) Started ===");
         Log($"AppDataDir: {_appDataDir}");
 
         RestoreWindowSettings();
@@ -281,6 +281,20 @@ public sealed class MainForm : Form
         catch { }
     }
 
+    private void UpdateWindowTitle()
+    {
+        if (string.IsNullOrWhiteSpace(_currentTitle) || _currentTitle == "Notka")
+        {
+            Text = "Notka";
+        }
+        else
+        {
+            Text = string.IsNullOrWhiteSpace(_currentArtist)
+                ? _currentTitle
+                : $"{_currentArtist} — {_currentTitle}";
+        }
+    }
+
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         try
@@ -313,9 +327,7 @@ public sealed class MainForm : Form
 
                 BeginInvoke(() =>
                 {
-                    Text = string.IsNullOrWhiteSpace(_currentArtist)
-                        ? $"Notka — {_currentTitle}"
-                        : $"Notka — {_currentArtist} — {_currentTitle}";
+                    UpdateWindowTitle();
 
                     _smtc.UpdateMetadata(_currentTitle, _currentArtist, album, artwork);
                     _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
@@ -346,9 +358,7 @@ public sealed class MainForm : Form
 
                 BeginInvoke(() =>
                 {
-                    Text = string.IsNullOrWhiteSpace(_currentArtist)
-                        ? $"Notka — {_currentTitle}"
-                        : $"Notka — {_currentArtist} — {_currentTitle}";
+                    UpdateWindowTitle();
 
                     _smtc.UpdatePlaybackStatus(_isPlaying);
                     _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);

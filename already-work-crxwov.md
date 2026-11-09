@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Antigravity
 status: idle
-updated_at_utc: 2026-11-09T14:23:00Z
+updated_at_utc: 2026-11-09T15:31:00Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: webview2_desktop_app
@@ -19,7 +19,7 @@ branch: webview2_desktop_app
    - Сессия сохраняется в `notka_auth_token`, `notka_auth_user`, `notka_session_v1`, в `%LOCALAPPDATA%\Notka\session.json` и `%LOCALAPPDATA%\Notka\auth.json`.
    - Подтягивание и синхронизация медиатеки с сервера (`data.sync` в `notka_state_v2`), автоматическая инициализация `window.Telegram.WebApp.initData = 'notka-session:<token>'` и `initDataUnsafe`.
    - Клик по аватару «Гость» в сайдбаре, профиле или шапке открывает окно авторизации.
-3. Доработан установщик MSI (версия 1.2.0):
+3. Доработан установщик MSI (версия 1.2.7):
    - Поддержка обновления поверх существующей версии: `MajorUpgrade AllowSameVersionUpgrades="yes"`, на экране приветствия при обнаружении установленной версии показывается текст обновления, а на экране подтверждения кнопка «Обновить».
    - На финальном экране мастера (ExitDialog) добавлены две галочки:
      - `[X] Закрепить ярлык на рабочем столе` (по умолчанию включена, при снятии удаляет ярлык).
@@ -29,7 +29,12 @@ branch: webview2_desktop_app
    - В `notka-bridge.js` добавлен автоматический сбор метаданных (название, артист, обложка) напрямую из DOM-элементов плеера при старте воспроизведения и по таймеру (в дополнение к `MediaMetadata`).
    - `playback_state` передает актуальные метаданные в нативный хост `MainForm.cs`, который мгновенно транслирует их в `DiscordRpcManager.cs`.
    - Добавлено подробное логирование в `%LOCALAPPDATA%\Notka\desktop.log` для аудита работы WebView2 и Discord RPC.
-5. Собран актуальный MSI-пакет: `desktop/bin/msi/Notka-Setup.msi` (49.81 MB, v1.2.0), обновлен бинарник `%LOCALAPPDATA%\Programs\Notka\Notka.exe`.
+5. Заголовок окна приложения во время воспроизведения:
+   - Убран префикс «Notka — », теперь во время воспроизведения отображается строго `{Artist} — {Title}` (например, `Kanye West — Everything I Am (feat. DJ Premier)`), а в отсутствие трека — `Notka`.
+6. Собран релиз 1.2.7 и обновлен на GitHub:
+   - `Notka-Setup-1.2.7.msi` (49.81 MB) загружен в релиз https://github.com/crxwov/notka-app/releases/tag/desktop-v1.2.7 с обновленным SHA-256 (`b827255a2c769b997eed66a6b92a533ba4ce4541ed13a4e2184d6e3d2c50bb5a`).
+   - Копия установщика сохранена на Рабочем столе: `Notka-Setup.msi` и `Notka-Setup-1.2.7.msi`.
+   - Обновлен исполняемый файл в `%LOCALAPPDATA%\Programs\Notka\Notka.exe`.
 
 ## Scope / Reservation
 Нет активного резервирования (idle).

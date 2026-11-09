@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$ProductVersion = '1.2.0',
+    [string]$ProductVersion = '1.2.7',
     [string]$OutputDir = ''
 )
 
@@ -114,6 +114,19 @@ try {
 
 $hash = (Get-FileHash -Path $msiFile -Algorithm SHA256).Hash
 $sizeMb = [Math]::Round((Get-Item $msiFile).Length / 1MB, 2)
+
+# Also create versioned installer file Notka-Setup-<version>.msi
+$versionedMsiFile = Join-Path $OutputDir "Notka-Setup-$ProductVersion.msi"
+Copy-Item -Path $msiFile -Destination $versionedMsiFile -Force
+
+try {
+    $desktopDir = [Environment]::GetFolderPath('Desktop')
+    if (Test-Path $desktopDir) {
+        Copy-Item -Path $msiFile -Destination (Join-Path $desktopDir "Notka-Setup.msi") -Force
+        Copy-Item -Path $msiFile -Destination (Join-Path $desktopDir "Notka-Setup-$ProductVersion.msi") -Force
+        Write-Host "Copied latest installer to Desktop: Notka-Setup-$ProductVersion.msi" -ForegroundColor Green
+    }
+} catch { }
 
 Write-Host "`n==================================================" -ForegroundColor Green
 Write-Host " MSI INSTALLER CREATED SUCCESSFULLY!" -ForegroundColor Green
