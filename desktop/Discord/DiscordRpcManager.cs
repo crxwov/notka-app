@@ -172,7 +172,7 @@ public sealed class DiscordRpcManager : IDisposable
                 long start = (long)Math.Max(0, now - _lastPosition);
                 long end = _lastDuration > 0 ? (long)(start + _lastDuration) : 0;
 
-                string displayArtist = string.IsNullOrWhiteSpace(_lastArtist) ? "Неизвестный исполнитель" : _lastArtist;
+                string displayArtist = string.IsNullOrWhiteSpace(_lastArtist) ? "Нотка" : _lastArtist;
                 string displayTitle = _lastTitle;
 
                 string artworkUrl = !string.IsNullOrWhiteSpace(_lastArtwork) && _lastArtwork.StartsWith("http", StringComparison.OrdinalIgnoreCase)
@@ -183,6 +183,10 @@ public sealed class DiscordRpcManager : IDisposable
                     ? (object)new { start = start, end = end }
                     : (object)new { start = start };
 
+                string stateText = !string.IsNullOrWhiteSpace(_lastAlbum)
+                    ? $"{_lastAlbum} • в Нотке"
+                    : "в приложении Нотка";
+
                 var activity = new
                 {
                     cmd = "SET_ACTIVITY",
@@ -191,16 +195,17 @@ public sealed class DiscordRpcManager : IDisposable
                         pid = Process.GetCurrentProcess().Id,
                         activity = new
                         {
-                            type = 2, // 2 = Listening to
+                            name = displayArtist,
+                            type = 2, // 2 = Listening to: renders as "Слушает <displayArtist>"
                             details = displayTitle,
-                            state = displayArtist,
+                            state = stateText,
                             timestamps = timestampsObj,
                             assets = new
                             {
                                 large_image = artworkUrl,
                                 large_text = $"{displayTitle} — {displayArtist}",
                                 small_image = "https://notka.duckdns.org/app/icons/icon-512.png",
-                                small_text = "Слушает в Notka"
+                                small_text = "Нотка — Музыка для души"
                             },
                             buttons = new[]
                             {

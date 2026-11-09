@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Antigravity
 status: idle
-updated_at_utc: 2026-11-09T12:55:24Z
+updated_at_utc: 2026-11-09T13:00:18Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: webview2_desktop_app
@@ -20,7 +20,14 @@ branch: webview2_desktop_app
    - В `music_resolver/services/auth_store.py` добавлена поддержка распознавания `notka-session:<token>` в `resolve_user_id`.
 3. Реализована автоматическая интеграция Discord Rich Presence (`desktop/Discord/DiscordRpcManager.cs`):
    - Прямое общение через локальный IPC-пайп `\\.\pipe\discord-ipc-0..9` без сторонних зависимостей.
-   - Отображение статуса активности в профиле Discord: название трека (`details`), исполнитель (`state`), живой прогресс проигрывания (`timestamps.start` / `end`), обложка альбома (`assets.large_image`) и кликабельная кнопка «Слушать в Нотке».
+   - В статусе пользователя в списке друзей отображается «Слушает <Имя артиста>» (например, «Слушает Yeat», «Слушает Miyagi & Эндшпиль»).
+   - В развёрнутой карточке профиля:
+     - Заголовок активности: Имя артиста
+     - Первая строка: Название трека
+     - Вторая строка: «в приложении Нотка» (или «Альбом • в Нотке»)
+     - Живой прогресс-бар трека с таймером
+     - Большая обложка альбома/трека + маленький круглый бейдж Нотки
+     - Кликабельная кнопка «Слушать в Нотке».
    - Переключатель «Активность в Discord» в контекстном меню системного трея, сохранение настроек в `%LOCALAPPDATA%\Notka\discord.json`.
 4. Установлен официальный круглый логотип Notka (`Assets/notka.ico`, `notka-512.png`).
 5. Создан и проверен Windows MSI установщик `Notka-Setup.msi` (WiX v6, 49.39 МБ, self-contained single-file).
@@ -31,4 +38,4 @@ branch: webview2_desktop_app
 
 ## Findings / Decisions
 - Встроенный в веб-клиент `setupLogin` в `app.js` проверяет `isApp = !!(androidApp || window.notkaDesktop)`. При выставлении `window.notkaDesktop = true` и отсутствии `notka_session_v1` он автоматически открывает `#login-modal` после сплеша.
-- `DiscordRpcManager` реализован нативно через `NamedPipeClientStream` с обработкой opcode 0 (Handshake) и opcode 1 (SET_ACTIVITY) по стандарту Discord IPC. При паузе активность безопасно очищается или обновляется без блокировок потока.
+- `DiscordRpcManager` передаёт `name = displayArtist` при `type = 2`, что заставляет Discord рендерить заголовок «Слушает <Артист>», а детали трека и метку «в Нотке» выводить в раскрытой карточке.
