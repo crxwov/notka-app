@@ -27,6 +27,10 @@ def test_bridge_script():
     assert "mediaSession" in content, "Missing mediaSession hooks"
     assert "playback_state" in content, "Missing playback_state event"
     assert "metadata" in content, "Missing metadata event"
+    assert "auth/request-code" in content, "Missing Telegram auth request-code endpoint"
+    assert "auth/verify-code" in content, "Missing Telegram auth verify-code endpoint"
+    assert "auth/me" in content, "Missing profile sync endpoint"
+    assert "initDataUnsafe" in content, "Missing Telegram WebApp initData shim"
     print("[OK] Bridge script test passed")
 
 def test_source_files():

@@ -28,6 +28,7 @@ public sealed class MainForm : Form
     private readonly TrayIconManager _tray;
     private readonly string _startUrl;
     private readonly string _settingsFilePath;
+    private readonly string _authFilePath;
 
     private bool _isExiting;
     private bool _balloonShown;
@@ -59,6 +60,7 @@ public sealed class MainForm : Form
         );
         Directory.CreateDirectory(appDataDir);
         _settingsFilePath = Path.Combine(appDataDir, "window-settings.json");
+        _authFilePath = Path.Combine(appDataDir, "auth.json");
 
         RestoreWindowSettings();
 
@@ -92,6 +94,13 @@ public sealed class MainForm : Form
             {
                 return new Icon(iconPath);
             }
+        }
+        catch { /* fallback */ }
+
+        try
+        {
+            var exeIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (exeIcon != null) return exeIcon;
         }
         catch { /* fallback */ }
 
@@ -133,6 +142,25 @@ public sealed class MainForm : Form
             _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
             _webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             _webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
+
+            // Inject saved auth token and user before any script runs
+            if (File.Exists(_authFilePath))
+            {
+                try
+                {
+                    string authJson = File.ReadAllText(_authFilePath);
+                    if (!string.IsNullOrWhiteSpace(authJson))
+                    {
+                        await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                            $"window.__NOTKA_SAVED_AUTH__ = {authJson};"
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Auth load error: {ex.Message}");
+                }
+            }
 
             // Load bridge script
             string bridgeScript = GetEmbeddedBridgeScript();
@@ -251,6 +279,53 @@ public sealed class MainForm : Form
                 {
                     _smtc.UpdateTimeline(duration, position);
                 });
+            }
+            else if (type == "auth_save")
+            {
+                try
+                {
+                    string token = root.TryGetProperty("token", out var tProp) ? tProp.GetString() ?? "" : "";
+                    if (root.TryGetProperty("user", out var uProp))
+                    {
+                        using var stream = new MemoryStream();
+                        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+                        {
+                            writer.WriteStartObject();
+                            writer.WriteString("token", token);
+                            writer.WritePropertyName("user");
+                            uProp.WriteTo(writer);
+                            writer.WriteEndObject();
+                        }
+                        string json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+                        File.WriteAllText(_authFilePath, json);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Auth save error: {ex.Message}");
+                }
+            }
+            else if (type == "auth_logout")
+            {
+                try
+                {
+                    if (File.Exists(_authFilePath))
+                    {
+                        File.Delete(_authFilePath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Auth delete error: {ex.Message}");
+                }
+            }
+            else if (type == "open_external")
+            {
+                string url = root.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    OpenExternalUrl(url);
+                }
             }
         }
         catch (Exception ex)
