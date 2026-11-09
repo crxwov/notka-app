@@ -29,6 +29,8 @@ public sealed class MainForm : Form
     private readonly string _startUrl;
     private readonly string _settingsFilePath;
     private readonly string _authFilePath;
+    private readonly string _sessionFilePath;
+    private readonly string _appDataDir;
 
     private bool _isExiting;
     private bool _balloonShown;
@@ -54,13 +56,14 @@ public sealed class MainForm : Form
             ? startUrl
             : "https://notka.duckdns.org/app/?source=desktop";
 
-        string appDataDir = Path.Combine(
+        _appDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Notka"
         );
-        Directory.CreateDirectory(appDataDir);
-        _settingsFilePath = Path.Combine(appDataDir, "window-settings.json");
-        _authFilePath = Path.Combine(appDataDir, "auth.json");
+        Directory.CreateDirectory(_appDataDir);
+        _settingsFilePath = Path.Combine(_appDataDir, "window-settings.json");
+        _authFilePath = Path.Combine(_appDataDir, "auth.json");
+        _sessionFilePath = Path.Combine(_appDataDir, "session.json");
 
         RestoreWindowSettings();
 
@@ -82,7 +85,7 @@ public sealed class MainForm : Form
         };
         Controls.Add(_webView);
 
-        InitializeWebViewAsync(appDataDir);
+        InitializeWebViewAsync(_appDataDir);
     }
 
     private Icon LoadApplicationIcon()
@@ -143,22 +146,23 @@ public sealed class MainForm : Form
             _webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             _webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
 
-            // Inject saved auth token and user before any script runs
-            if (File.Exists(_authFilePath))
+            // Inject saved session before any script runs
+            if (File.Exists(_sessionFilePath) || File.Exists(_authFilePath))
             {
                 try
                 {
-                    string authJson = File.ReadAllText(_authFilePath);
-                    if (!string.IsNullOrWhiteSpace(authJson))
+                    string targetFile = File.Exists(_sessionFilePath) ? _sessionFilePath : _authFilePath;
+                    string rawJson = File.ReadAllText(targetFile);
+                    if (!string.IsNullOrWhiteSpace(rawJson))
                     {
                         await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
-                            $"window.__NOTKA_SAVED_AUTH__ = {authJson};"
+                            $"try {{ window.__NOTKA_SAVED_SESSION__ = {rawJson}; if (!localStorage.getItem('notka_session_v1')) localStorage.setItem('notka_session_v1', JSON.stringify({rawJson})); }} catch (e) {{}}"
                         );
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[MainForm] Auth load error: {ex.Message}");
+                    Debug.WriteLine($"[MainForm] Session load error: {ex.Message}");
                 }
             }
 
@@ -279,6 +283,33 @@ public sealed class MainForm : Form
                 {
                     _smtc.UpdateTimeline(duration, position);
                 });
+            }
+            else if (type == "session_save")
+            {
+                try
+                {
+                    if (root.TryGetProperty("session", out var sessProp))
+                    {
+                        string json = sessProp.GetRawText();
+                        File.WriteAllText(_sessionFilePath, json);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Session save error: {ex.Message}");
+                }
+            }
+            else if (type == "session_clear")
+            {
+                try
+                {
+                    if (File.Exists(_sessionFilePath)) File.Delete(_sessionFilePath);
+                    if (File.Exists(_authFilePath)) File.Delete(_authFilePath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Session clear error: {ex.Message}");
+                }
             }
             else if (type == "auth_save")
             {

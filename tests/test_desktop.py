@@ -24,13 +24,12 @@ def test_bridge_script():
         content = f.read()
     assert "window.notkaMedia" in content, "Missing window.notkaMedia"
     assert "window.NotkaDesktop" in content, "Missing window.NotkaDesktop"
+    assert "window.notkaDesktop" in content, "Missing window.notkaDesktop"
     assert "mediaSession" in content, "Missing mediaSession hooks"
     assert "playback_state" in content, "Missing playback_state event"
     assert "metadata" in content, "Missing metadata event"
-    assert "auth/request-code" in content, "Missing Telegram auth request-code endpoint"
-    assert "auth/verify-code" in content, "Missing Telegram auth verify-code endpoint"
-    assert "auth/me" in content, "Missing profile sync endpoint"
-    assert "initDataUnsafe" in content, "Missing Telegram WebApp initData shim"
+    assert "notka_session_v1" in content, "Missing notka_session_v1 integration"
+    assert "menu-login" in content, "Missing menu-login integration"
     print("[OK] Bridge script test passed")
 
 def test_source_files():

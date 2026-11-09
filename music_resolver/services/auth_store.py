@@ -407,8 +407,13 @@ def resolve_user_id(
         if uid:
             return uid
 
-    # 3. Telegram WebApp initData
+    # 3. Telegram WebApp initData (or mobile/desktop notka-session:<token>)
     if x_telegram_init_data:
+        if x_telegram_init_data.startswith('notka-session:'):
+            sess_token = x_telegram_init_data[len('notka-session:'):].strip()
+            uid = get_user_id_by_token(sess_token)
+            if uid:
+                return uid
         return plus_store.verify_init_data(x_telegram_init_data)
 
     return None
