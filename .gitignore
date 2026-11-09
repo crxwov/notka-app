@@ -51,3 +51,10 @@ android/build/
 /_tmp/
 *.lnk
 *.blend1
+
+# .NET / Desktop build outputs
+desktop/bin/
+desktop/obj/
+bin/
+obj/
+*.user

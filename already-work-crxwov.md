@@ -1,38 +1,48 @@
 # Current work — crxwov
 
 participant: crxwov
-agent: Codex
+agent: Antigravity
 status: active
-updated_at_utc: 2026-10-18T13:52:51Z
+updated_at_utc: 2026-11-09T11:37:01Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
-branch: main
+branch: webview2_desktop_app
 
 ## Objective / Success Criteria
-Refine the deployed Notka bot menus: minimal personalized greeting, readable Telegram formatting, and less panoramic matching banners; validate and redeploy to `ssh notka`.
-- Every return to the home page greets the user by username (fallback to first name) and asks them to open Notka.
-- Product menu copy uses safe Telegram HTML formatting; profile/Plus/info/legal pages remain navigable by editing one message.
-- Replace all four banners with a compact 16:9 composition in the existing palette, with the title centered under the unchanged Notka mark.
-- Validate tests and image dimensions, integrate only task files into fresh main, deploy and verify health.
+Develop modern, lightweight Windows Desktop client for Notka in `desktop/` based on .NET 10 + WebView2:
+- Minimal memory consumption and near-instant startup (no Electron, ~30-50MB RAM footprint).
+- Native Windows System Media Transport Controls (SMTC) integration: volume flyout / lock screen with track metadata (title, artist, album, cover art) and hardware media keys (Play/Pause, Next, Previous, Stop).
+- System tray integration with context menu (Play/Pause, Next, Previous, Open, Exit) and minimize-to-tray.
+- Seamless two-way bridge with Notka web application: automatically intercepts `navigator.mediaSession` and audio events, reflects state in SMTC, dispatches media key commands back to the web client.
+- Fast, clean single-file or portable Windows build script and tests.
 
 ## Scope / Reservation
-Scope: `bot/main.py`, the four `bot/assets/notka-*-banner.png` images, `tests/test_bot_menu.py`, bot documentation, reviewed main integration, and deployment to `ssh notka`. Preserve the unrelated dirty tg-app checkout. No channel, Android, or promo-video work.
+- Directory `desktop/`
+- Build and test scripts for Windows desktop client (`desktop/build.ps1`, `tests/test_desktop.py`)
+- Documentation in `desktop/README.md` and `PROJECT_INDEX.md`
 
 ## Stages
-1. Refresh coordination and inspect current bot flow/assets — completed; no competing active task.
-2. Generate and inspect compact same-palette banners; update minimal formatted bot copy — active.
-3. Test, integrate only this task onto fresh main, deploy to `ssh notka`, and verify — pending.
+1. Coordinate task and publish active work state — completed.
+2. Design and create .NET 10 WinForms/WinRT project structure in `desktop/` with WebView2 and SMTC — completed.
+3. Implement native SMTC manager with `ISystemMediaTransportControlsInterop` and two-way JS bridge — completed.
+4. Implement System Tray (`NotifyIcon`) with controls and minimize/restore behavior — completed.
+5. Verify build, memory footprint, SMTC media keys, and tray functionality — completed (`tests/test_desktop.py` all green).
+6. Commit changes and validate — active.
 
 ## Findings / Decisions
-- Latest origin/main is `dc74e4c`; leksik is paused, crxwov's prior task is completed, todo has no bot-menu task.
-- Reuse the four existing banners as edit targets and the attached main banner as the composition reference. Preserve each target's color palette and mark; compact to 16:9 with the title below the mark.
-- Use Telegram HTML only in product menu text; HTML-escape user-controlled greeting names. Unknown usernames fall back to the first name.
-- Keep prior support, Plus placeholder, legal, and navigation behavior intact.
+- .NET 10 SDK (version 10.0.401, host 10.0.12, WindowsDesktop runtime) located in `D:\DeyttConnectBuild\dotnet`.
+- Electron was rejected due to excessive memory overhead (~200MB+ vs ~35MB with WebView2 Evergreen).
+- Web application in `miniapp/app.js` already integrates with `navigator.mediaSession` and MediaMetadata. The desktop client injects a thin bridge script (`desktop/Bridge/notka-bridge.js`) to listen to `mediaSession` metadata/playbackState and relay it directly to native SMTC, as well as handling SMTC button presses (`Play`, `Pause`, `Next`, `Previous`) by calling `navigator.mediaSession` handlers or DOM fallback buttons.
+- Windows SMTC acquired via `ISystemMediaTransportControlsInterop.GetForWindow(HWND)` with `IInspectable` GUID (`af86e2e0-b12d-4c6a-9c5a-d7aa65101e90`).
+- System tray context menu styled with modern dark theme palette matching Notka dark `#0d0d0f` aesthetic.
+- Single-instance mutex and event wait handle prevent duplicate processes and focus existing window on duplicate launch.
 
 ## Validation / Blockers
-- Fresh origin/main coordination checked and main integration worktree fast-forwarded to `dc74e4c`.
-- Root tg-app contains unrelated dirty copies of bot code/assets/tests; they are being preserved; edit only clean main integration worktree.
-- Four candidates generated from existing assets and main-menu reference; all visibly use the unchanged Notka N, title below it, and each page's original palette. Source outputs are in `C:/Users/hackov/.codex/generated_images/01a14ee0-1eed-7cf1-834b-2e0ccce5ac87/` (`exec-beebeceb-8715-42fa-8ff8-6b32360dfdbd.png`, `exec-74806dbb-1736-44f7-b32d-48fe8dba8921.png`, `exec-9c6b0617-a494-48ad-93f7-728d60b8406a.png`, `exec-16518b89-d1d7-4c3e-8513-94c75125f590.png`).
+- Automated validation suite `tests/test_desktop.py` executed:
+  - Assets check: `notka.ico` and `notka-512.png` valid icon formats.
+  - Bridge check: `window.notkaMedia`, `window.NotkaDesktop`, `playback_state`, `metadata` hooks verified.
+  - Source files check: all C# sources and build script present.
+  - Build & publish check: `build.ps1` produces standalone runnable `Notka.exe` (187 KB) with exit code 0 and 0 warnings / 0 errors.
 
 ## Next Action / Resume
-Generate reviewable images, update greeting and HTML text formatting, test, commit/push only scoped files, deploy and verify.
+Commit implementation to branch and present results to user.

@@ -40,6 +40,7 @@ Two developers maintain Notka: **leksik**, original creator of the product/desig
 - `miniapp/mix.js`, `prism.js`, `atmosphere.js`, `shredder.js`, `pumpkin.js`: mix and visual effects.
 - `android/app/src/main/java/space/notka/app/`: Java WebView, JavaScript bridge, playback service/MediaSession.
 - `android/app/src/main/assets/miniapp/`: separately bundled Android frontend, with modular src and styles. Web deployment does not replace installed APK assets.
+- `desktop/`: Windows desktop client on .NET 10 + WebView2; native Windows SMTC (System Media Transport Controls) media keys and system tray integration.
 - `admin/index.html`: owner dashboard, protected by reverse proxy Basic Auth rather than independent handler login.
 
 ## Data and operations
