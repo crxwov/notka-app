@@ -2,10 +2,24 @@
 /android/build/
 /desktop/bin/
 /desktop/obj/
+/desktop/installer/obj/
 *.apk
 *.aab
 *.dex
 *.class
+
+# AI / Agent & Planning files (local only, never published)
+AGENTS.md
+AGENTS.MD
+CLAUDE.md
+.agents/
+.claude/
+.codex/
+.notka-local/
+already-work*
+todo.md
+*.patch
+server-patches/
 
 # IDE & Editor files
 .idea/

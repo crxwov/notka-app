@@ -44,6 +44,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File android/build.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build-msi.ps1
 ```
 
-Исходники клиентов находятся в [android/](android/) и [desktop/](desktop/). Серверные изменения для загрузки аватаров Telegram хранятся в [server-patches/](server-patches/).
+Исходники клиентов находятся в [android/](android/) и [desktop/](desktop/).
 
 [Лицензия GPL-3.0](LICENSE)

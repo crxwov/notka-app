@@ -16,6 +16,7 @@ public sealed class DiscordRpcManager : IDisposable
 
     private readonly string _configFilePath;
     private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly System.Threading.Timer _retryTimer;
 
     private NamedPipeClientStream? _pipe;
     private bool _isEnabled = true;
@@ -71,6 +72,24 @@ public sealed class DiscordRpcManager : IDisposable
     {
         _configFilePath = Path.Combine(appDataDir, "discord.json");
         LoadConfig();
+        _retryTimer = new System.Threading.Timer(OnRetryTick, null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+    }
+
+    private void OnRetryTick(object? state)
+    {
+        if (_isDisposed || !_isEnabled) return;
+
+        // Detect if pipe broke or Discord was closed
+        if (_isConnected && (_pipe == null || !_pipe.IsConnected))
+        {
+            Disconnect();
+        }
+
+        // When track is playing but Discord wasn't connected yet (e.g. launched after Notka), connect and set activity
+        if (_lastIsPlaying && !_isConnected && !string.IsNullOrWhiteSpace(_lastTitle) && _lastTitle != "Notka")
+        {
+            _ = UpdateActivityInternalAsync();
+        }
     }
 
     private void LoadConfig()
@@ -383,6 +402,7 @@ public sealed class DiscordRpcManager : IDisposable
     {
         if (_isDisposed) return;
         _isDisposed = true;
+        _retryTimer.Dispose();
         _ = ClearActivityAsync();
         Disconnect();
         _lock.Dispose();

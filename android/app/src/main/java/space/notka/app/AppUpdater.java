@@ -16,14 +16,11 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.json.JSONObject;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -176,19 +173,6 @@ public class AppUpdater {
         scroll.addView(body);
         root.addView(scroll);
 
-        ProgressBar progress = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setIndeterminate(false);
-        progress.setVisibility(View.GONE);
-        progress.setPadding(0, dp(activity, 12), 0, dp(activity, 12));
-        root.addView(progress);
-
-        TextView status = new TextView(activity);
-        status.setTextColor(Color.parseColor("#8E8B9E"));
-        status.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        status.setVisibility(View.GONE);
-        status.setGravity(Gravity.CENTER);
-        root.addView(status);
-
         LinearLayout buttons = new LinearLayout(activity);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
         buttons.setGravity(Gravity.END);
@@ -219,73 +203,18 @@ public class AppUpdater {
 
         laterBtn.setOnClickListener(v -> dialog.dismiss());
         updateBtn.setOnClickListener(v -> {
-            updateBtn.setEnabled(false);
-            laterBtn.setVisibility(View.GONE);
-            progress.setVisibility(View.VISIBLE);
-            status.setVisibility(View.VISIBLE);
-            status.setText("Загрузка обновления...");
-
-            startDownload(activity, downloadUrl, progress, status, dialog);
+            dialog.dismiss();
+            try {
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
+                browserIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+                browserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                activity.startActivity(browserIntent);
+            } catch (Exception e) {
+                Log.e(TAG, "Cannot launch browser for update URL", e);
+            }
         });
 
         dialog.show();
-    }
-
-    private static void startDownload(Activity activity, String downloadUrl, ProgressBar progress, TextView status, AlertDialog dialog) {
-        new Thread(() -> {
-            try {
-                URL url = new URL(downloadUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(6000);
-                conn.setReadTimeout(15000);
-                conn.setRequestProperty("User-Agent", "NotkaAppUpdater");
-                conn.connect();
-
-                int length = conn.getContentLength();
-                File updateFile = new File(activity.getCacheDir(), "notka_update.apk");
-
-                try (InputStream is = conn.getInputStream();
-                     FileOutputStream fos = new FileOutputStream(updateFile)) {
-                    byte[] buf = new byte[8192];
-                    int read;
-                    long total = 0;
-                    while ((read = is.read(buf)) != -1) {
-                        fos.write(buf, 0, read);
-                        total += read;
-                        if (length > 0) {
-                            final int p = (int) ((total * 100) / length);
-                            activity.runOnUiThread(() -> {
-                                progress.setProgress(p);
-                                status.setText("Загрузка: " + p + "%");
-                            });
-                        }
-                    }
-                }
-
-                activity.runOnUiThread(() -> {
-                    status.setText("Готово! Запуск установки...");
-                    dialog.dismiss();
-                    installApk(activity, updateFile);
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to download update APK", e);
-                activity.runOnUiThread(() -> {
-                    status.setText("Ошибка загрузки. Попробуйте позже.");
-                });
-            }
-        }).start();
-    }
-
-    private static void installApk(Activity activity, File apkFile) {
-        try {
-            Uri apkUri = NotkaFileProvider.getUriForFile(activity, apkFile);
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            activity.startActivity(intent);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to launch package installer", e);
-        }
     }
 
     private static int dp(Context context, int dp) {

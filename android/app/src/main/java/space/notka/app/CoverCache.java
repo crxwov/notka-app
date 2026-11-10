@@ -62,6 +62,11 @@ public class CoverCache {
         if (url == null) return false;
         String lower = url.toLowerCase();
 
+        // Artwork proxy endpoint
+        if (lower.contains("/artwork?url=") || lower.contains("/artwork")) {
+            return true;
+        }
+
         // Must not be web app code or API endpoints
         if (lower.contains("/app/") || lower.contains("/api/") || lower.contains("/auth/") ||
             lower.contains("/stream") || lower.contains(".js") || lower.contains(".css") || lower.contains(".html")) {
@@ -102,9 +107,8 @@ public class CoverCache {
 
     public WebResourceResponse getInterceptedResponse(String url) {
         try {
-            // Fast non-blocking lookup: only return if already in RAM or on disk (0 ms).
-            // Never block WebView worker threads with synchronous network downloads!
-            byte[] cached = getCoverBytes(url, false);
+            // Check memory -> flash disk -> fast proxy fetch
+            byte[] cached = getCoverBytes(url, true);
             if (cached != null && cached.length > 0) {
                 return new WebResourceResponse(
                         getMimeType(url),
@@ -119,8 +123,6 @@ public class CoverCache {
             Log.w(TAG, "Cache read failed: " + url, e);
         }
 
-        // Return null so Chromium's native network engine downloads the resource via HTTP/2
-        // with full connection pooling, hardware acceleration, and zero thread contention.
         return null;
     }
 
@@ -168,10 +170,19 @@ public class CoverCache {
             System.setProperty("java.net.preferIPv4Stack", "true");
             System.setProperty("java.net.preferIPv6Addresses", "false");
 
-            URL url = new URL(urlStr);
+            String effectiveUrl = urlStr;
+            if (effectiveUrl != null && (effectiveUrl.contains("ytimg.com") || effectiveUrl.contains("googleusercontent.com") || effectiveUrl.contains("ggpht.com")) && !effectiveUrl.contains("/artwork?url=")) {
+                try {
+                    effectiveUrl = "https://notka.duckdns.org/artwork?url=" + java.net.URLEncoder.encode(urlStr, "UTF-8");
+                } catch (Exception ignored) {
+                    effectiveUrl = urlStr;
+                }
+            }
+
+            URL url = new URL(effectiveUrl);
             conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(3500);
+            conn.setConnectTimeout(4000);
+            conn.setReadTimeout(5000);
             conn.setInstanceFollowRedirects(true);
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36 NotkaApp/2.5");
             conn.setRequestProperty("Accept", "image/webp,image/png,image/jpeg,image/*;q=0.9");

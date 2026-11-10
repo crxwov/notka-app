@@ -237,6 +237,10 @@ public class MainActivity extends Activity {
         webAppInterface = new WebAppInterface(this, webView);
         webView.addJavascriptInterface(webAppInterface, "NotkaAndroid");
 
+        webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
+            handleDownload(url, contentDisposition, mimetype, null);
+        });
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -295,6 +299,12 @@ public class MainActivity extends Activity {
                         Log.w(TAG, "Cannot launch intent URI", e);
                         return true;
                     }
+                }
+
+                // Direct track download routes
+                if (uri.getPath() != null && uri.getPath().contains("/download")) {
+                    handleDownload(uri.toString(), null, null, null);
+                    return true;
                 }
 
                 // External domains (t.me, telegram, github, etc.) open in external apps/browser
@@ -602,6 +612,50 @@ public class MainActivity extends Activity {
                 case MediaPlaybackService.ACTION_PREV:
                     webView.evaluateJavascript("window.NotkaAndroidBridge && window.NotkaAndroidBridge.prev()", null);
                     break;
+            }
+        });
+    }
+
+    public void handleDownload(String url, String contentDisposition, String mimeType, String customFileName) {
+        runOnUiThread(() -> {
+            try {
+                if (url == null || url.trim().isEmpty()) return;
+                Uri uri = Uri.parse(url);
+                android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(uri);
+
+                String resolvedMime = mimeType;
+                if (resolvedMime == null || resolvedMime.isEmpty() || "*/*".equals(resolvedMime)) {
+                    resolvedMime = url.contains(".mp3") ? "audio/mpeg" : "audio/mp4";
+                }
+                request.setMimeType(resolvedMime);
+
+                String fileName = customFileName;
+                if (fileName == null || fileName.trim().isEmpty()) {
+                    fileName = android.webkit.URLUtil.guessFileName(url, contentDisposition, resolvedMime);
+                }
+                if (fileName == null || fileName.isEmpty() || fileName.endsWith(".bin")) {
+                    fileName = "notka_track.m4a";
+                }
+
+                request.setTitle(fileName);
+                request.setDescription("Скачивание трека из Нотки");
+                request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName);
+
+                android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(android.content.Context.DOWNLOAD_SERVICE);
+                if (dm != null) {
+                    dm.enqueue(request);
+                    android.widget.Toast.makeText(this, "Скачивание: " + fileName, android.widget.Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Download error", e);
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                    startActivity(intent);
+                } catch (Exception ex) {
+                    android.widget.Toast.makeText(this, "Не удалось начать скачивание", android.widget.Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }
