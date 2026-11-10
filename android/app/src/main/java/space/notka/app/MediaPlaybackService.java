@@ -25,7 +25,7 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
 
-public class MediaPlaybackService extends Service implements AudioManager.OnAudioFocusChangeListener {
+public class MediaPlaybackService extends Service {
     private static final String TAG = "NotkaPlaybackService";
     private static final String CHANNEL_ID = "notka_playback_channel";
     private static final int NOTIFICATION_ID = 4242;
@@ -45,8 +45,6 @@ public class MediaPlaybackService extends Service implements AudioManager.OnAudi
     public static final String EXTRA_IS_PLAYING = "extra_is_playing";
 
     private MediaSession mediaSession;
-    private AudioManager audioManager;
-    private AudioFocusRequest audioFocusRequest;
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
 
@@ -56,7 +54,6 @@ public class MediaPlaybackService extends Service implements AudioManager.OnAudi
     private String currentArtworkUrl = "";
     private Bitmap currentArtworkBitmap = null;
     private boolean isPlaying = false;
-    private boolean pausedByTransientLoss = false;
 
     public static void updateMetadata(Context context, String title, String artist, String album, String artworkUrl, boolean isPlaying) {
         Intent intent = new Intent(context, MediaPlaybackService.class);
@@ -98,7 +95,6 @@ public class MediaPlaybackService extends Service implements AudioManager.OnAudi
         createNotificationChannel();
         initMediaSession();
         initPowerLocks();
-        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
     }
 
     private void initPowerLocks() {
@@ -155,7 +151,6 @@ public class MediaPlaybackService extends Service implements AudioManager.OnAudi
         mediaSession.setCallback(new MediaSession.Callback() {
             @Override
             public void onPlay() {
-                requestAudioFocus();
                 handleMediaAction(ACTION_PLAY);
             }
 
@@ -180,50 +175,6 @@ public class MediaPlaybackService extends Service implements AudioManager.OnAudi
             }
         });
         mediaSession.setActive(true);
-    }
-
-    private void requestAudioFocus() {
-        if (audioManager == null) return;
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                AudioAttributes attrs = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build();
-                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                        .setAudioAttributes(attrs)
-                        .setOnAudioFocusChangeListener(this)
-                        .build();
-                audioManager.requestAudioFocus(audioFocusRequest);
-            } else {
-                audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to request audio focus", e);
-        }
-    }
-
-    @Override
-    public void onAudioFocusChange(int focusChange) {
-        switch (focusChange) {
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                if (isPlaying) {
-                    pausedByTransientLoss = true;
-                    handleMediaAction(ACTION_PAUSE);
-                }
-                break;
-            case AudioManager.AUDIOFOCUS_LOSS:
-                pausedByTransientLoss = false;
-                handleMediaAction(ACTION_PAUSE);
-                break;
-            case AudioManager.AUDIOFOCUS_GAIN:
-                if (pausedByTransientLoss) {
-                    pausedByTransientLoss = false;
-                    handleMediaAction(ACTION_PLAY);
-                }
-                break;
-        }
     }
 
     private void handleMediaAction(String action) {
@@ -257,9 +208,6 @@ public class MediaPlaybackService extends Service implements AudioManager.OnAudi
             } else if (ACTION_UPDATE_STATE.equals(action)) {
                 isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false);
                 updateLocks(isPlaying);
-                if (isPlaying) {
-                    requestAudioFocus();
-                }
                 updateNotificationAndSession();
             } else if (ACTION_PLAY.equals(action) || ACTION_PAUSE.equals(action) ||
                        ACTION_NEXT.equals(action) || ACTION_PREV.equals(action) ||

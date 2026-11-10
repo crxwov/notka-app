@@ -203,7 +203,7 @@ public class MainActivity extends Activity {
         settings.setDatabaseEnabled(true);
 
         // Security: restrict local file access to bundled assets only
-        settings.setAllowFileAccess(true);
+        settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
         settings.setAllowUniversalAccessFromFileURLs(false);
@@ -504,21 +504,23 @@ public class MainActivity extends Activity {
             "  window.__notka_bridge_injected = true;" +
             "  window.NotkaAndroidBridge = {" +
             "    play: function() {" +
-            "      if (navigator.mediaSession && navigator.mediaSession._actions && navigator.mediaSession._actions.play) {" +
+            "      if (window.notkaMedia && typeof window.notkaMedia.play === 'function') {" +
+            "        window.notkaMedia.play();" +
+            "      } else if (navigator.mediaSession && navigator.mediaSession._actions && navigator.mediaSession._actions.play) {" +
             "        navigator.mediaSession._actions.play();" +
             "      } else {" +
-            "        var btn = document.getElementById('player-play-btn') || document.getElementById('mp-play-btn');" +
-            "        if (btn) btn.click();" +
-            "        else { var a = document.querySelector('audio'); if (a) a.play().catch(function(e){}); }" +
+            "        var a = document.querySelector('audio');" +
+            "        if (a && a.paused) a.play().catch(function(e){});" +
             "      }" +
             "    }," +
             "    pause: function() {" +
-            "      if (navigator.mediaSession && navigator.mediaSession._actions && navigator.mediaSession._actions.pause) {" +
+            "      if (window.notkaMedia && typeof window.notkaMedia.pause === 'function') {" +
+            "        window.notkaMedia.pause();" +
+            "      } else if (navigator.mediaSession && navigator.mediaSession._actions && navigator.mediaSession._actions.pause) {" +
             "        navigator.mediaSession._actions.pause();" +
             "      } else {" +
-            "        var btn = document.getElementById('player-play-btn') || document.getElementById('mp-play-btn');" +
-            "        if (btn) btn.click();" +
-            "        else { var a = document.querySelector('audio'); if (a) a.pause(); }" +
+            "        var a = document.querySelector('audio');" +
+            "        if (a && !a.paused) a.pause();" +
             "      }" +
             "    }," +
             "    next: function() {" +
@@ -560,7 +562,8 @@ public class MainActivity extends Activity {
             "          origMetaSet.call(this, meta);" +
             "          if (meta && window.NotkaAndroid) {" +
             "            var art = (meta.artwork && meta.artwork.length) ? meta.artwork[0].src : '';" +
-            "            window.NotkaAndroid.updateTrack(meta.title || 'Нотка', meta.artist || '', meta.album || '', art, true);" +
+            "            var isPlaying = (ms.playbackState === 'playing');" +
+            "            window.NotkaAndroid.updateTrack(meta.title || 'Нотка', meta.artist || '', meta.album || '', art, isPlaying);" +
             "            try {" +
             "              var pArt = document.getElementById('player-art');" +
             "              if (pArt) {" +

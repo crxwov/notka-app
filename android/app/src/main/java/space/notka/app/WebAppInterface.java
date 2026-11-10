@@ -19,7 +19,7 @@ public class WebAppInterface {
 
     public static final String DEFAULT_APP_URL = "https://notka.duckdns.org/app/?source=android";
     public static final String DEFAULT_API_URL = "https://notka.duckdns.org";
-    public static final String APP_VERSION = "2.5.1";
+    public static final String APP_VERSION = "2.5.2";
 
     private final MainActivity activity;
     private final WebView webView;
