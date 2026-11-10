@@ -79,16 +79,14 @@ public sealed class DiscordRpcManager : IDisposable
     {
         if (_isDisposed || !_isEnabled) return;
 
-        // Detect if pipe broke or Discord was closed
-        if (_isConnected && (_pipe == null || !_pipe.IsConnected))
-        {
-            Disconnect();
-        }
-
-        // When track is playing but Discord wasn't connected yet (e.g. launched after Notka), connect and set activity
-        if (_lastIsPlaying && !_isConnected && !string.IsNullOrWhiteSpace(_lastTitle) && _lastTitle != "Notka")
+        // When track is playing, continuously maintain presence and auto-reconnect if Discord started later
+        if (_lastIsPlaying && !string.IsNullOrWhiteSpace(_lastTitle) && _lastTitle != "Notka")
         {
             _ = UpdateActivityInternalAsync();
+        }
+        else if (_isConnected && (_pipe == null || !_pipe.IsConnected))
+        {
+            Disconnect();
         }
     }
 
@@ -249,7 +247,7 @@ public sealed class DiscordRpcManager : IDisposable
                 };
 
                 await SendPayloadAsync(1, activity);
-                try { await ReadPayloadAsync(); } catch { }
+                try { await ReadPayloadAsync(500); } catch { }
             }
             finally
             {
@@ -286,7 +284,7 @@ public sealed class DiscordRpcManager : IDisposable
                 };
 
                 await SendPayloadAsync(1, payload);
-                try { await ReadPayloadAsync(); } catch { }
+                try { await ReadPayloadAsync(500); } catch { }
             }
             finally
             {
@@ -305,12 +303,12 @@ public sealed class DiscordRpcManager : IDisposable
 
         Disconnect();
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 4; i++)
         {
             try
             {
                 var pipe = new NamedPipeClientStream(".", $"discord-ipc-{i}", PipeDirection.InOut, PipeOptions.Asynchronous);
-                await pipe.ConnectAsync(250);
+                await pipe.ConnectAsync(100);
 
                 _pipe = pipe;
 
@@ -319,7 +317,7 @@ public sealed class DiscordRpcManager : IDisposable
                 await SendPayloadAsync(0, handshake);
 
                 // Read Handshake response
-                var (op, json) = await ReadPayloadAsync();
+                var (op, json) = await ReadPayloadAsync(1000);
                 UI.MainForm.Log($"[DiscordRpc] discord-ipc-{i} handshake op={op} json={json}");
                 if (op == 1) // DISPATCH READY
                 {
@@ -341,8 +339,6 @@ public sealed class DiscordRpcManager : IDisposable
             }
         }
 
-        UI.MainForm.Log("[DiscordRpc] Could not connect to any discord-ipc-0..9 pipe");
-
         return false;
     }
 
@@ -360,12 +356,12 @@ public sealed class DiscordRpcManager : IDisposable
         await _pipe.FlushAsync();
     }
 
-    private async Task<(int Opcode, string Json)> ReadPayloadAsync(CancellationToken cancellationToken = default)
+    private async Task<(int Opcode, string Json)> ReadPayloadAsync(int timeoutMs = 1000, CancellationToken cancellationToken = default)
     {
         if (_pipe == null || !_pipe.IsConnected) throw new IOException("Pipe not connected");
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(3000);
+        cts.CancelAfter(timeoutMs);
 
         byte[] header = new byte[8];
         int read = await _pipe.ReadAsync(header.AsMemory(0, 8), cts.Token);

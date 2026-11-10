@@ -9,7 +9,7 @@
     <ApplicationIcon>Assets\notka.ico</ApplicationIcon>
     <AssemblyName>Notka</AssemblyName>
     <RootNamespace>Notka.Desktop</RootNamespace>
-    <Version>1.2.8</Version>
+    <Version>1.2.9</Version>
     <Authors>crxwov, leksik</Authors>
     <Company>Notka</Company>
     <Product>Notka Music Player</Product>
@@ -28,11 +28,14 @@
 
   <ItemGroup>
     <Content Include="Assets\notka.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </Content>
     <Content Include="Assets\notka-512.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </Content>
+    <EmbeddedResource Include="Assets\notka.ico" />
     <EmbeddedResource Include="Bridge\notka-bridge.js" />
   </ItemGroup>
 

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using Notka.Desktop.UI;
@@ -9,10 +10,20 @@ internal static class Program
 {
     private const string MutexName = "NotkaDesktop_SingleInstance_Mutex";
     private const string WakeEventName = "NotkaDesktop_WakeUp_Event";
+    public const string AppUserModelId = "Notka.MusicPlayer";
+
+    [DllImport("shell32.dll", SetLastError = true)]
+    private static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string appId);
 
     [STAThread]
     private static void Main(string[] args)
     {
+        try
+        {
+            SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
+        }
+        catch { /* ignore on platforms where not supported */ }
+
         // Single instance check
         using var mutex = new Mutex(true, MutexName, out bool isFirstInstance);
         if (!isFirstInstance)

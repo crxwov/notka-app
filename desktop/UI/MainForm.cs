@@ -17,12 +17,18 @@ namespace Notka.Desktop.UI;
 public sealed class MainForm : Form
 {
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    private const int WM_SETICON = 0x80;
+    private const int ICON_SMALL = 0;
+    private const int ICON_BIG = 1;
 
     [DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
     [DllImport("kernel32.dll", EntryPoint = "SetProcessWorkingSetSize", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
     private static extern int SetProcessWorkingSetSize(IntPtr process, int minimumWorkingSetSize, int maximumWorkingSetSize);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
     private readonly WebView2 _webView;
     private readonly SmtcManager _smtc;
@@ -106,8 +112,35 @@ public sealed class MainForm : Form
         InitializeWebViewAsync(_appDataDir);
     }
 
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        if (Icon != null)
+        {
+            try
+            {
+                SendMessage(Handle, WM_SETICON, (IntPtr)ICON_SMALL, Icon.Handle);
+                SendMessage(Handle, WM_SETICON, (IntPtr)ICON_BIG, Icon.Handle);
+            }
+            catch { /* ignore */ }
+        }
+    }
+
     private Icon LoadApplicationIcon()
     {
+        // 1. Load directly from embedded resource (always present in binary)
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            using var stream = assembly.GetManifestResourceStream("Notka.Desktop.Assets.notka.ico");
+            if (stream != null)
+            {
+                return new Icon(stream);
+            }
+        }
+        catch { /* fallback */ }
+
+        // 2. Load from disk Assets directory
         try
         {
             string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "notka.ico");
@@ -118,10 +151,15 @@ public sealed class MainForm : Form
         }
         catch { /* fallback */ }
 
+        // 3. Fallback to process executable icon
         try
         {
-            var exeIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-            if (exeIcon != null) return exeIcon;
+            string? procPath = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(procPath) && File.Exists(procPath))
+            {
+                var exeIcon = Icon.ExtractAssociatedIcon(procPath);
+                if (exeIcon != null) return exeIcon;
+            }
         }
         catch { /* fallback */ }
 
@@ -306,8 +344,8 @@ public sealed class MainForm : Form
                 BeginInvoke(() =>
                 {
                     Text = string.IsNullOrWhiteSpace(_currentArtist)
-                        ? $"Notka — {_currentTitle}"
-                        : $"Notka — {_currentArtist} — {_currentTitle}";
+                        ? (string.IsNullOrWhiteSpace(_currentTitle) ? "Notka" : _currentTitle)
+                        : $"{_currentArtist} — {_currentTitle}";
 
                     _smtc.UpdateMetadata(_currentTitle, _currentArtist, album, artwork);
                     _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
@@ -339,8 +377,8 @@ public sealed class MainForm : Form
                 BeginInvoke(() =>
                 {
                     Text = string.IsNullOrWhiteSpace(_currentArtist)
-                        ? $"Notka — {_currentTitle}"
-                        : $"Notka — {_currentArtist} — {_currentTitle}";
+                        ? (string.IsNullOrWhiteSpace(_currentTitle) ? "Notka" : _currentTitle)
+                        : $"{_currentArtist} — {_currentTitle}";
 
                     _smtc.UpdatePlaybackStatus(_isPlaying);
                     _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
@@ -463,6 +501,7 @@ public sealed class MainForm : Form
 
     private void RestoreWindow()
     {
+        ShowInTaskbar = true;
         if (WindowState == FormWindowState.Minimized)
         {
             WindowState = FormWindowState.Normal;
@@ -484,9 +523,11 @@ public sealed class MainForm : Form
     {
         if (!_isExiting && e.CloseReason == CloseReason.UserClosing)
         {
-            // Minimize to tray instead of quitting so playback continues uninterrupted
+            // Minimize to tray instead of quitting so playback continues uninterrupted,
+            // while preserving window handle so Discord process monitor continues detecting track
             e.Cancel = true;
-            Hide();
+            ShowInTaskbar = false;
+            WindowState = FormWindowState.Minimized;
 
             // Trim working set to reduce memory footprint while minimized
             TrimMemory();

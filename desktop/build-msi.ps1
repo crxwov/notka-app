@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$ProductVersion = '1.2.8',
+    [string]$ProductVersion = '1.2.9',
     [string]$OutputDir = ''
 )
 
@@ -47,6 +47,11 @@ $appProj = Join-Path $desktopDir "NotkaDesktop.csproj"
 if ($LASTEXITCODE -ne 0) {
     throw "Application publish failed with exit code $LASTEXITCODE"
 }
+
+# Ensure Assets (including notka.ico) are fully copied to publish dir
+$pubAssets = Join-Path $publishDir "Assets"
+if (-not (Test-Path $pubAssets)) { New-Item -ItemType Directory -Path $pubAssets -Force | Out-Null }
+Copy-Item (Join-Path $assetsDir "*") $pubAssets -Force
 
 # Remove any PDB or temporary files from publish dir
 Get-ChildItem -Path $publishDir -Filter "*.pdb" -Recurse | Remove-Item -Force
