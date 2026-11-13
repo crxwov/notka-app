@@ -34,6 +34,7 @@ public sealed class MainForm : Form
     private readonly SmtcManager _smtc;
     private readonly TrayIconManager _tray;
     private readonly DiscordRpcManager _discordRpc;
+    private readonly CoverCache _coverCache;
     private readonly string _startUrl;
     private readonly string _settingsFilePath;
     private readonly string _authFilePath;
@@ -73,6 +74,7 @@ public sealed class MainForm : Form
             "Notka"
         );
         Directory.CreateDirectory(_appDataDir);
+        _coverCache = new CoverCache(_appDataDir);
         _settingsFilePath = Path.Combine(_appDataDir, "window-settings.json");
         _authFilePath = Path.Combine(_appDataDir, "auth.json");
         _sessionFilePath = Path.Combine(_appDataDir, "session.json");
@@ -199,6 +201,10 @@ public sealed class MainForm : Form
             await _webView.EnsureCoreWebView2Async(env);
             Log("[WebView2] CoreWebView2 initialized successfully");
 
+            // Intercept image/cover requests with local high-speed cache
+            _webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.Image);
+            _webView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
+
             // Configure settings
             _webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
             _webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
@@ -319,6 +325,51 @@ public sealed class MainForm : Form
         catch { }
     }
 
+    private void OnWebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
+    {
+        string uri = e.Request.Uri;
+        if (_coverCache.IsCoverUrl(uri))
+        {
+            var deferral = e.GetDeferral();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    byte[]? bytes = await _coverCache.GetCoverAsync(uri);
+                    if (bytes != null && bytes.Length > 0)
+                    {
+                        string contentType = CoverCache.DetectContentType(bytes);
+                        string headers = $"Content-Type: {contentType}\r\n" +
+                                         "Access-Control-Allow-Origin: *\r\n" +
+                                         "Access-Control-Allow-Methods: GET, OPTIONS\r\n" +
+                                         "Cache-Control: public, max-age=31536000, immutable\r\n";
+
+                        var stream = new MemoryStream(bytes);
+                        var response = _webView.CoreWebView2.Environment.CreateWebResourceResponse(
+                            stream, 200, "OK", headers
+                        );
+
+                        BeginInvoke(() =>
+                        {
+                            try { e.Response = response; } catch { }
+                            deferral.Complete();
+                        });
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainForm] Cover interception error: {ex.Message}");
+                }
+
+                BeginInvoke(() =>
+                {
+                    try { deferral.Complete(); } catch { }
+                });
+            });
+        }
+    }
+
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         try
@@ -336,20 +387,28 @@ public sealed class MainForm : Form
                 string album = root.TryGetProperty("album", out var al) ? al.GetString() ?? "" : "";
                 string artwork = root.TryGetProperty("artwork", out var art) ? art.GetString() ?? "" : "";
 
-                _currentTitle = string.IsNullOrWhiteSpace(title) ? "Notka" : title;
+                string trackTitle = string.IsNullOrWhiteSpace(title) ? "Notka" : title;
+                _currentTitle = trackTitle;
                 _currentArtist = artist;
                 _currentAlbum = album;
                 _currentArtwork = artwork;
 
+                // Pre-cache cover to disk and memory in background
+                if (!string.IsNullOrWhiteSpace(artwork))
+                {
+                    _coverCache.Prefetch(artwork);
+                }
+
                 BeginInvoke(() =>
                 {
-                    Text = string.IsNullOrWhiteSpace(_currentArtist)
-                        ? (string.IsNullOrWhiteSpace(_currentTitle) ? "Notka" : _currentTitle)
-                        : $"{_currentArtist} — {_currentTitle}";
+                    Text = string.IsNullOrWhiteSpace(artist)
+                        ? trackTitle
+                        : $"{artist} — {trackTitle}";
 
-                    _smtc.UpdateMetadata(_currentTitle, _currentArtist, album, artwork);
-                    _tray.UpdateTrack(_currentTitle, _currentArtist, _isPlaying);
-                    _discordRpc.UpdateTrack(_currentTitle, _currentArtist, _currentAlbum, _currentArtwork, _isPlaying, _currentDuration, _currentPosition);
+                    string? localThumb = _coverCache.GetDiskCachePath(artwork);
+                    _smtc.UpdateMetadata(trackTitle, artist, album, artwork, localThumb);
+                    _tray.UpdateTrack(trackTitle, artist, _isPlaying);
+                    _discordRpc.UpdateTrack(trackTitle, artist, album, artwork, _isPlaying, _currentDuration, _currentPosition);
                 });
             }
             else if (type == "playback_state")
@@ -545,6 +604,7 @@ public sealed class MainForm : Form
         }
 
         SaveWindowSettings();
+        _coverCache.Dispose();
         _discordRpc.Dispose();
         _smtc.Dispose();
         _tray.Dispose();

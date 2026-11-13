@@ -21,6 +21,23 @@
 
   postToHost({ type: 'bridge_init', url: window.location.href });
 
+  // Suppress legacy guest modals in web app: miniapp handles native #login-modal cleanly
+  try {
+    sessionStorage.setItem('notka_guest_skip', '1');
+  } catch (e) {}
+
+  // Clean up any rogue auth overlays if left over from cached scripts
+  const cleanupRogueAuth = () => {
+    try {
+      const overlay = document.getElementById('notka-auth-overlay');
+      if (overlay) overlay.remove();
+      const style = document.getElementById('notka-auth-styles');
+      if (style) style.remove();
+    } catch (e) {}
+  };
+  cleanupRogueAuth();
+  document.addEventListener('DOMContentLoaded', cleanupRogueAuth);
+
   // Restore saved session from native host or localStorage
   let activeSession = null;
   try {
@@ -40,7 +57,6 @@
     }
 
     if (activeSession && activeSession.token) {
-      // The web login saves the account fields alongside the token.
       if (!activeSession.user && activeSession.userId) {
         activeSession.user = {
           id: activeSession.userId,
@@ -94,7 +110,7 @@
       localStorage.setItem('notka_session_v1', JSON.stringify(session));
       window.dispatchEvent(new Event('notka:telegram-avatar'));
     } catch (e) {
-      // Keep the cached photo when the network is unavailable.
+      // Keep cached avatar when network is unreachable
     }
   }
   document.addEventListener('DOMContentLoaded', refreshTelegramAvatar, { once: true });
@@ -105,10 +121,21 @@
     isDesktop: true,
     platform: 'windows-webview2',
     get user() { return activeSession?.user || null; },
-    version: '1.0.0',
+    version: '1.3.0',
     postMessage: postToHost,
     openExternal: (url) => postToHost({ type: 'open_external', url }),
-    showLogin: () => showAuthModal(),
+    showLogin: () => {
+      try {
+        const row = document.getElementById('menu-login') || document.getElementById('account-login-row');
+        if (row) {
+          row.click();
+        } else if (typeof window.openLogin === 'function') {
+          window.openLogin(false);
+        }
+      } catch (e) {
+        console.warn('[NotkaDesktop] showLogin failed:', e);
+      }
+    },
     logout: () => {
       try {
         localStorage.removeItem('notka_session_v1');
@@ -165,417 +192,108 @@
   };
 
   // ============================================================
-  // TELEGRAM AUTHENTICATION MODAL (как на телефоне)
+  // HIGH-PERFORMANCE PALETTE CACHE & SNAPPY TRANSITIONS
   // ============================================================
-  function ensureAuthStyles() {
-    if (document.getElementById('notka-auth-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'notka-auth-styles';
-    style.textContent = `
-      #notka-auth-overlay {
-        position: fixed;
-        inset: 0;
-        z-index: 999999;
-        display: grid;
-        place-items: center;
-        overflow: auto;
-        padding: 20px;
-        background: rgba(12, 10, 18, 0.84);
-      }
-      .notka-auth-card {
-        --auth-text: #f4efff;
-        --auth-muted: rgba(244, 239, 255, 0.72);
-        --auth-line: rgba(236, 228, 255, 0.14);
-        position: relative;
-        box-sizing: border-box;
-        width: min(100%, 400px);
-        padding: 28px;
-        border: 1px solid var(--auth-line);
-        border-radius: 24px;
-        background: #17131f;
-        color: var(--auth-text);
-        text-align: left;
-        font-family: Onest, system-ui, sans-serif;
-      }
-      .notka-auth-mark {
-        display: block;
-        width: 52px;
-        height: 52px;
-        border-radius: 14px;
-        margin-bottom: 16px;
-      }
-      .notka-auth-title {
-        margin: 0 0 8px;
-        font-size: 26px;
-        line-height: 1.15;
-        letter-spacing: -0.025em;
-      }
-      .notka-auth-sub {
-        margin: 0 0 20px;
-        color: var(--auth-muted);
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      .notka-auth-step {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .notka-auth-step .notka-auth-sub { margin: 0; }
-      .notka-auth-field-wrap, .notka-auth-code-input {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        box-sizing: border-box;
-        width: 100%;
-        min-height: 46px;
-        padding: 0 14px;
-        border: 1px solid var(--auth-line);
-        border-radius: 12px;
-        background: rgba(236, 228, 255, 0.055);
-        color: var(--auth-text);
-        font: inherit;
-      }
-      .notka-auth-at { color: var(--auth-muted); }
-      .notka-auth-input {
-        min-width: 0;
-        flex: 1;
-        height: 44px;
-        padding: 0;
-        border: 0;
-        outline: none;
-        background: transparent;
-        color: inherit;
-        font: inherit;
-      }
-      .notka-auth-card input::placeholder { color: var(--auth-muted); }
-      .notka-auth-card button:focus-visible,
-      .notka-auth-code-input:focus-visible,
-      .notka-auth-field-wrap:focus-within {
-        outline: 2px solid var(--auth-text);
-        outline-offset: 2px;
-      }
-      .notka-auth-card button {
-        min-height: 40px;
-        padding: 8px 14px;
-        border: 0;
-        border-radius: 12px;
-        background: transparent;
-        color: var(--auth-muted);
-        font: 600 14px/1.3 Onest, system-ui, sans-serif;
-        cursor: pointer;
-      }
-      .notka-auth-card button:hover { background: rgba(236, 228, 255, 0.09); }
-      .notka-auth-card .notka-auth-primary-btn {
-        min-height: 46px;
-        margin-top: 4px;
-        border-radius: 999px;
-        background: var(--auth-text);
-        color: #17131f;
-      }
-      .notka-auth-card .notka-auth-primary-btn:hover { background: #fff; }
-      .notka-auth-card button:disabled { opacity: 0.65; cursor: wait; }
-      .notka-auth-card .notka-auth-text-btn { border: 1px solid var(--auth-line); }
-      .notka-auth-card .notka-auth-close-btn {
-        position: absolute;
-        top: 14px;
-        right: 14px;
-        width: 40px;
-        padding: 0;
-        font-size: 22px;
-      }
-      .notka-auth-error {
-        color: #ff7a7a;
-        font-size: 13px;
-        line-height: 1.4;
-      }
-    `;
-    document.head.appendChild(style);
-  }
+  const PALETTE_CACHE_KEY = 'notka_palette_cache_v2';
+  let persistentPalettes = {};
+  try {
+    const raw = localStorage.getItem(PALETTE_CACHE_KEY);
+    if (raw) persistentPalettes = JSON.parse(raw);
+  } catch (e) {}
 
-  function showAuthModal() {
-    ensureAuthStyles();
-    let overlay = document.getElementById('notka-auth-overlay');
-    if (overlay) {
-      overlay.remove();
-    }
-
-    overlay = document.createElement('div');
-    overlay.id = 'notka-auth-overlay';
-    overlay.innerHTML = `
-      <div class="notka-auth-card" role="dialog" aria-modal="true" aria-labelledby="notka-auth-title" aria-describedby="notka-auth-description">
-        <button id="notka-auth-close-x" class="notka-auth-close-btn" type="button" aria-label="Закрыть">×</button>
-        <img class="notka-auth-mark" src="https://notka.duckdns.org/app/icons/icon-512.png" alt="" width="52" height="52">
-        <h1 id="notka-auth-title" class="notka-auth-title">Вход в Нотку</h1>
-        <p id="notka-auth-description" class="notka-auth-sub">Войди через Telegram, чтобы открыть свои треки, плейлисты и настройки.</p>
-
-        <!-- Step 1: Username / ID -->
-        <div class="notka-auth-step" id="notka-step-user">
-          <label class="notka-auth-field-wrap">
-            <span class="notka-auth-at">@</span>
-            <input id="notka-username-input" class="notka-auth-input" type="text" aria-label="Имя пользователя в Telegram" placeholder="Имя пользователя в Telegram" autocomplete="off" autocapitalize="none" spellcheck="false">
-          </label>
-          <div id="notka-user-error" class="notka-auth-error" role="alert" style="display:none;"></div>
-          <button id="notka-request-code-btn" class="notka-auth-primary-btn" type="button">Получить код в Telegram</button>
-          <button id="notka-open-bot-btn" class="notka-auth-text-btn" type="button">Открыть бота в Telegram</button>
-          <button id="notka-have-code-btn" class="notka-auth-secondary-btn" type="button">У меня уже есть код</button>
-          <button id="notka-skip-guest-btn" class="notka-auth-secondary-btn" type="button">Продолжить без входа</button>
-        </div>
-
-        <!-- Step 2: Confirmation code -->
-        <div class="notka-auth-step" id="notka-step-code" style="display:none;">
-          <p class="notka-auth-sub">Введи 6-значный код из сообщения бота <b id="notka-target-user-label"></b></p>
-          <input id="notka-code-input" class="notka-auth-code-input" type="text" inputmode="numeric" maxlength="6" aria-label="Код из Telegram" placeholder="000000" autocomplete="one-time-code">
-          <div id="notka-code-error" class="notka-auth-error" role="alert" style="display:none;"></div>
-          <button id="notka-verify-code-btn" class="notka-auth-primary-btn" type="button">Подтвердить и войти</button>
-          <button id="notka-change-user-btn" class="notka-auth-secondary-btn" type="button">Назад к вводу юзернейма</button>
-          <button id="notka-code-open-bot-btn" class="notka-auth-text-btn" type="button">Открыть бота в Telegram</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    const userStep = document.getElementById('notka-step-user');
-    const codeStep = document.getElementById('notka-step-code');
-    const userInput = document.getElementById('notka-username-input');
-    const codeInput = document.getElementById('notka-code-input');
-    const userErr = document.getElementById('notka-user-error');
-    const codeErr = document.getElementById('notka-code-error');
-    const reqBtn = document.getElementById('notka-request-code-btn');
-    const verifyBtn = document.getElementById('notka-verify-code-btn');
-    const haveBtn = document.getElementById('notka-have-code-btn');
-    const skipBtn = document.getElementById('notka-skip-guest-btn');
-    const backBtn = document.getElementById('notka-change-user-btn');
-    const closeX = document.getElementById('notka-auth-close-x');
-    const targetLabel = document.getElementById('notka-target-user-label');
-    const openBotBtn = document.getElementById('notka-open-bot-btn');
-    const codeOpenBotBtn = document.getElementById('notka-code-open-bot-btn');
-
-    let currentUsername = '';
-
-    const closeModal = () => {
-      overlay.remove();
-    };
-
-    closeX.addEventListener('click', closeModal);
-    skipBtn.addEventListener('click', () => {
-      try { sessionStorage.setItem('notka_guest_skip', '1'); } catch (e) {}
-      closeModal();
-    });
-
-    const openBot = (param) => {
-      const url = `https://t.me/notka_app_bot?start=${param || 'login'}`;
-      postToHost({ type: 'open_external', url });
-    };
-    if (openBotBtn) openBotBtn.addEventListener('click', () => openBot('login'));
-    if (codeOpenBotBtn) codeOpenBotBtn.addEventListener('click', () => openBot('code'));
-
-    const showUserErr = (msg) => {
-      userErr.textContent = msg;
-      userErr.style.display = 'block';
-    };
-    const hideUserErr = () => { userErr.style.display = 'none'; };
-
-    const showCodeErr = (msg) => {
-      codeErr.textContent = msg;
-      codeErr.style.display = 'block';
-    };
-    const hideCodeErr = () => { codeErr.style.display = 'none'; };
-
-    userInput.addEventListener('input', hideUserErr);
-    codeInput.addEventListener('input', () => {
-      hideCodeErr();
-      const val = codeInput.value.replace(/\D/g, '');
-      codeInput.value = val;
-      if (val.length === 6) {
-        verifyBtn.click();
-      }
-    });
-
-    userInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        reqBtn.click();
-      }
-    });
-    codeInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        verifyBtn.click();
-      }
-    });
-
-    reqBtn.addEventListener('click', async () => {
-      const u = (userInput.value || '').trim().replace(/^@/, '');
-      if (!u) {
-        showUserErr('Введи юзернейм в Telegram');
-        userInput.focus();
-        return;
-      }
-      hideUserErr();
-      reqBtn.disabled = true;
-      const origText = reqBtn.textContent;
-      reqBtn.textContent = 'Отправка кода...';
-
-      try {
-        const res = await fetch('https://notka.duckdns.org/auth/request-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: u })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          showUserErr(data.message || 'Пользователь не найден. Запустите бота @notka_app_bot в Telegram');
-          return;
-        }
-
-        currentUsername = data.username || u;
-        targetLabel.textContent = `@${currentUsername}`;
-        userStep.style.display = 'none';
-        codeStep.style.display = 'flex';
-        codeInput.value = '';
-        setTimeout(() => codeInput.focus(), 100);
-      } catch (err) {
-        showUserErr('Ошибка подключения к серверу');
-      } finally {
-        reqBtn.disabled = false;
-        reqBtn.textContent = origText;
-      }
-    });
-
-    haveBtn.addEventListener('click', () => {
-      currentUsername = (userInput.value || '').trim().replace(/^@/, '');
-      targetLabel.textContent = currentUsername ? `@${currentUsername}` : 'из бота @notka_app_bot';
-      userStep.style.display = 'none';
-      codeStep.style.display = 'flex';
-      codeInput.value = '';
-      setTimeout(() => codeInput.focus(), 100);
-    });
-
-    backBtn.addEventListener('click', () => {
-      hideCodeErr();
-      codeStep.style.display = 'none';
-      userStep.style.display = 'flex';
-      userInput.focus();
-    });
-
-    verifyBtn.addEventListener('click', async () => {
-      const c = (codeInput.value || '').trim();
-      if (!c || c.length < 6) {
-        showCodeErr('Введи 6-значный код подтверждения');
-        codeInput.focus();
-        return;
-      }
-      hideCodeErr();
-      verifyBtn.disabled = true;
-      const origText = verifyBtn.textContent;
-      verifyBtn.textContent = 'Проверка...';
-
-      try {
-        const res = await fetch('https://notka.duckdns.org/auth/verify-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: currentUsername, code: c })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          showCodeErr(data.message || 'Неверный код подтверждения');
-          return;
-        }
-
-        // Save session locally and native host
-        const sessionPayload = { token: data.token, user: data.user };
-        localStorage.setItem('notka_auth_token', data.token);
-        if (data.user) {
-          localStorage.setItem('notka_auth_user', JSON.stringify(data.user));
-        }
-        localStorage.setItem('notka_session_v1', JSON.stringify(sessionPayload));
-
-        postToHost({ type: 'session_save', session: sessionPayload });
-        postToHost({ type: 'auth_save', token: data.token, user: data.user });
-
-        // Merge server sync data into local state if provided
-        if (data.sync) {
-          try {
-            const rawState = localStorage.getItem('notka_state_v2');
-            const state = rawState ? JSON.parse(rawState) : {};
-            const keys = ['favorites', 'playlists', 'settings', 'followedArtists', 'followedMeta', 'playlistFlags', 'accountName', 'accountAvatar', 'recent', 'sharedImports', 'onboardingSeenV2', 'searchHistory'];
-            keys.forEach((k) => {
-              if (data.sync[k] !== undefined) state[k] = data.sync[k];
-            });
-            localStorage.setItem('notka_state_v2', JSON.stringify(state));
-          } catch (e) {}
-        }
-
-        closeModal();
-        window.location.reload();
-      } catch (err) {
-        showCodeErr('Ошибка подтверждения кода');
-      } finally {
-        verifyBtn.disabled = false;
-        verifyBtn.textContent = origText;
-      }
-    });
-
-    setTimeout(() => userInput.focus(), 150);
-  }
-
-  // Hook clicks on guest / login triggers in the interface
-  document.addEventListener('click', (e) => {
-    const target = e.target;
-    if (!target) return;
-
-    // Check if user clicked profile buttons or login triggers
-    const profileTrigger = target.closest('#side-profile-btn, #home-avatar-btn, [data-screen="account"], #menu-login');
-    const loginTextTrigger = target.closest('button, .row, .menu-item');
-    const isLoginText = loginTextTrigger && /войти через telegram|войти в аккаунт/i.test(loginTextTrigger.textContent || '');
-
-    if (profileTrigger || isLoginText) {
-      let session = null;
-      try {
-        session = JSON.parse(localStorage.getItem('notka_session_v1') || 'null');
-        if (!session || !session.token) {
-          const tok = localStorage.getItem('notka_auth_token');
-          if (tok) session = { token: tok };
-        }
-      } catch (e) {}
-
-      // If user is guest and clicked login trigger or profile, open auth modal
-      if (!session || !session.token) {
-        e.preventDefault();
-        e.stopPropagation();
-        showAuthModal();
-      }
-    }
-  }, true);
-
-  // Auto-show login modal on first launch if not logged in
-  const checkInitialLogin = () => {
-    let session = null;
+  const savePalette = (key, pal) => {
+    if (!key || !pal || !pal.core || !pal.deep) return;
     try {
-      session = JSON.parse(localStorage.getItem('notka_session_v1') || 'null');
-      if (!session || !session.token) {
-        const tok = localStorage.getItem('notka_auth_token');
-        if (tok) session = { token: tok };
+      persistentPalettes[key] = pal;
+      const keys = Object.keys(persistentPalettes);
+      if (keys.length > 300) {
+        delete persistentPalettes[keys[0]];
       }
+      localStorage.setItem(PALETTE_CACHE_KEY, JSON.stringify(persistentPalettes));
     } catch (e) {}
-
-    let guestDismissed = false;
-    try {
-      guestDismissed = sessionStorage.getItem('notka_guest_skip') === '1';
-    } catch (e) {}
-
-    if (!session && !guestDismissed) {
-      showAuthModal();
-    }
   };
 
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(checkInitialLogin, 600);
+  const applyInstantPalette = (pal) => {
+    if (!pal || !pal.core || !pal.deep) return;
+    try {
+      const s = document.documentElement.style;
+      s.setProperty('--c-core', pal.core);
+      s.setProperty('--c-warm', pal.warm);
+      s.setProperty('--c-mid', pal.mid);
+      s.setProperty('--c-deep', pal.deep);
+    } catch (e) {}
+  };
+
+  // Hook CSS variable changes to record any newly computed palette immediately
+  try {
+    const origSetProperty = document.documentElement.style.setProperty.bind(document.documentElement.style);
+    const pendingPalette = {};
+    document.documentElement.style.setProperty = function (prop, val, prio) {
+      origSetProperty(prop, val, prio);
+      if (prop === '--c-core') pendingPalette.core = val;
+      else if (prop === '--c-warm') pendingPalette.warm = val;
+      else if (prop === '--c-mid') pendingPalette.mid = val;
+      else if (prop === '--c-deep') {
+        pendingPalette.deep = val;
+        if (pendingPalette.core && pendingPalette.warm && pendingPalette.mid && pendingPalette.deep) {
+          const pal = { ...pendingPalette };
+          if (state.artwork) savePalette(state.artwork, pal);
+          if (state.title) savePalette(state.title, pal);
+        }
+      }
+    };
+  } catch (e) {}
+
+  // Inject snappy transition styles: replace 1.4s drag with fluid 0.4s hardware-accelerated motion
+  const injectPerformanceStyles = () => {
+    if (document.getElementById('notka-perf-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'notka-perf-styles';
+    style.textContent = `
+      .light-art {
+        transition: opacity 0.18s ease-out !important;
+      }
+      .cover {
+        transition-duration: 0.18s !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectPerformanceStyles, { once: true });
   } else {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(checkInitialLogin, 600));
+    injectPerformanceStyles();
   }
+
+  // Pre-warm and prefetch upcoming tracks in queue
+  const scheduleQueuePrewarm = () => {
+    try {
+      // Find next tracks from DOM or queue
+      const nextRows = document.querySelectorAll('.track-row, .sheet-row[data-id], .playlist-row, .queue-item');
+      if (!nextRows || nextRows.length === 0) return;
+
+      for (let i = 0; i < Math.min(nextRows.length, 3); i++) {
+        const row = nextRows[i];
+        const artEl = row.querySelector('.cover, img');
+        if (artEl) {
+          let artUrl = '';
+          if (artEl.tagName === 'IMG') artUrl = artEl.src || artEl.dataset.src || '';
+          else {
+            const bg = artEl.style.backgroundImage || '';
+            const m = bg.match(/url\(["']?([^"']+)["']?\)/);
+            if (m) artUrl = m[1];
+          }
+
+          if (artUrl) {
+            // Pre-decode in memory
+            const img = new Image();
+            img.src = artUrl;
+          }
+        }
+      }
+    } catch (e) {}
+  };
 
   // ============================================================
   // SYSTEM MEDIA TRANSPORT CONTROLS (SMTC) BRIDGE
@@ -607,6 +325,14 @@
           artUrl = (bestArt && (bestArt.src || bestArt)) || '';
         }
         state.artwork = artUrl;
+
+        // Apply instant palette from persistent cache if available
+        if (artUrl && persistentPalettes[artUrl]) {
+          applyInstantPalette(persistentPalettes[artUrl]);
+        } else if (state.title && persistentPalettes[state.title]) {
+          applyInstantPalette(persistentPalettes[state.title]);
+        }
+
         postToHost({
           type: 'metadata',
           title: state.title,
@@ -614,6 +340,8 @@
           album: state.album,
           artwork: state.artwork
         });
+
+        setTimeout(scheduleQueuePrewarm, 1200);
       }
       return inst;
     };
@@ -671,6 +399,13 @@
             state.album = meta.album || '';
             state.artwork = artUrl;
 
+            // Apply instant palette from persistent cache if available
+            if (artUrl && persistentPalettes[artUrl]) {
+              applyInstantPalette(persistentPalettes[artUrl]);
+            } else if (state.title && persistentPalettes[state.title]) {
+              applyInstantPalette(persistentPalettes[state.title]);
+            }
+
             postToHost({
               type: 'metadata',
               title: state.title,
@@ -678,6 +413,8 @@
               album: state.album,
               artwork: state.artwork
             });
+
+            setTimeout(scheduleQueuePrewarm, 1200);
           }
         },
         configurable: true,
@@ -753,6 +490,7 @@
   };
 
   document.querySelectorAll('audio').forEach(hookAudioElement);
+  // Efficient mutation observer: observe body directly for audio additions
   const audioObserver = new MutationObserver((mutations) => {
     for (const m of mutations) {
       for (const node of m.addedNodes) {
@@ -764,9 +502,15 @@
       }
     }
   });
-  audioObserver.observe(document, { childList: true, subtree: true });
+  if (document.body) {
+    audioObserver.observe(document.body, { childList: true });
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      audioObserver.observe(document.body, { childList: true });
+    }, { once: true });
+  }
 
-  // Fallback poll to ensure playback state and track metadata never get out of sync
+  // Periodic metadata sync check
   setInterval(() => {
     const audio = document.querySelector('audio');
     const titleEl = document.getElementById('player-title') || document.getElementById('mp-title');
@@ -865,9 +609,14 @@
     }
   };
 
-  // Back button handling
+  // Back button handling: preserve miniapp's native notkaBack if present
+  const originalNotkaBack = window.notkaBack;
   window.notkaBack = function () {
-    const closeBtn = document.querySelector('.sheet-close, .modal-close, .back-button');
+    if (typeof originalNotkaBack === 'function') {
+      const res = originalNotkaBack();
+      if (res === 'handled' || res === true) return res;
+    }
+    const closeBtn = document.querySelector('.sheet-close, .modal-close, .back-button, #player-back-btn');
     if (closeBtn) {
       closeBtn.click();
       return true;

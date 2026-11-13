@@ -8,7 +8,14 @@ public sealed class SmtcManager : IDisposable
 {
     private readonly SystemMediaTransportControls? _smtc;
     private readonly SystemMediaTransportControlsTimelineProperties _timelineProperties = new();
+    private readonly object _metadataUpdateLock = new();
     private bool _isDisposed;
+    private int _metadataGeneration;
+
+    private string _lastTitle = "";
+    private string _lastArtist = "";
+    private string _lastAlbum = "";
+    private string _lastArtwork = "";
 
     public event Action<string>? MediaCommandReceived;
 
@@ -56,42 +63,70 @@ public sealed class SmtcManager : IDisposable
         }
     }
 
-    public void UpdateMetadata(string title, string artist, string album, string? artworkUrl)
+    public void UpdateMetadata(string title, string artist, string album, string? artworkUrl, string? localThumbnailPath = null)
     {
         if (_smtc == null) return;
 
-        try
-        {
-            var updater = _smtc.DisplayUpdater;
-            updater.Type = MediaPlaybackType.Music;
-            updater.MusicProperties.Title = string.IsNullOrWhiteSpace(title) ? "Notka" : title;
-            updater.MusicProperties.Artist = artist ?? string.Empty;
-            updater.MusicProperties.AlbumTitle = album ?? string.Empty;
+        title = string.IsNullOrWhiteSpace(title) ? "Notka" : title;
+        artist = artist ?? string.Empty;
+        album = album ?? string.Empty;
+        artworkUrl = artworkUrl ?? string.Empty;
 
-            if (!string.IsNullOrWhiteSpace(artworkUrl) &&
-                (artworkUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                 artworkUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        if (title == _lastTitle && artist == _lastArtist && album == _lastAlbum && artworkUrl == _lastArtwork)
+        {
+            return;
+        }
+
+        _lastTitle = title;
+        _lastArtist = artist;
+        _lastAlbum = album;
+        _lastArtwork = artworkUrl;
+        int generation = System.Threading.Interlocked.Increment(ref _metadataGeneration);
+
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
             {
-                try
+                RandomAccessStreamReference? thumbnail = null;
+
+                if (!string.IsNullOrWhiteSpace(localThumbnailPath) && System.IO.File.Exists(localThumbnailPath))
                 {
-                    updater.Thumbnail = RandomAccessStreamReference.CreateFromUri(new Uri(artworkUrl));
+                    try
+                    {
+                        var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(localThumbnailPath);
+                        thumbnail = RandomAccessStreamReference.CreateFromFile(storageFile);
+                    }
+                    catch { }
                 }
-                catch
+                if (thumbnail == null && !string.IsNullOrWhiteSpace(artworkUrl) &&
+                    (artworkUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                     artworkUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
                 {
-                    updater.Thumbnail = null;
+                    try
+                    {
+                        thumbnail = RandomAccessStreamReference.CreateFromUri(new Uri(artworkUrl));
+                    }
+                    catch { }
+                }
+
+                lock (_metadataUpdateLock)
+                {
+                    if (_isDisposed || generation != System.Threading.Volatile.Read(ref _metadataGeneration)) return;
+
+                    var updater = _smtc.DisplayUpdater;
+                    updater.Type = MediaPlaybackType.Music;
+                    updater.MusicProperties.Title = title;
+                    updater.MusicProperties.Artist = artist;
+                    updater.MusicProperties.AlbumTitle = album;
+                    updater.Thumbnail = thumbnail;
+                    updater.Update();
                 }
             }
-            else
+            catch (Exception ex)
             {
-                updater.Thumbnail = null;
+                System.Diagnostics.Debug.WriteLine($"[SMTC] UpdateMetadata failed: {ex.Message}");
             }
-
-            updater.Update();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[SMTC] UpdateMetadata failed: {ex.Message}");
-        }
+        });
     }
 
     public void UpdatePlaybackStatus(bool isPlaying)
@@ -132,6 +167,7 @@ public sealed class SmtcManager : IDisposable
     {
         if (_isDisposed) return;
         _isDisposed = true;
+        System.Threading.Interlocked.Increment(ref _metadataGeneration);
 
         if (_smtc != null)
         {

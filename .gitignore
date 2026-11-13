@@ -3,6 +3,10 @@
 /desktop/bin/
 /desktop/obj/
 /desktop/installer/obj/
+/desktop/tests/bin/
+/desktop/tests/obj/
+/tests/desktop/bin/
+/tests/desktop/obj/
 *.apk
 *.aab
 *.dex
