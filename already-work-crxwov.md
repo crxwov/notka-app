@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-11-13T22:30:25Z
+updated_at_utc: 2026-11-13T22:52:26Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -16,8 +16,8 @@ Canonical repository: `https://github.com/crxwov/notka-app`. Keep backend-only c
 
 ## Stages
 1. Refresh canonical coordination and trace playback/cache paths — completed; user confirmed this is crxwov's WIP.
-2. Restore the measured progressive URL proxy and retain concurrent `/prepare` cache fill; add unlimited-cache handling and focused checks — active.
-3. Validate patch/tests in isolation, then commit the tracked patch on `tg-app` — pending.
+2. Restore the measured progressive URL proxy and retain concurrent `/prepare` cache fill; add unlimited-cache handling and focused checks — completed.
+3. Validate the patch/tests in isolation, then commit the tracked patch on `tg-app` — active.
 4. Deploy to `ssh notka`, verify service/cache behavior, and record results — pending.
 
 ## Findings / Decisions
@@ -30,7 +30,7 @@ Canonical repository: `https://github.com/crxwov/notka-app`. Keep backend-only c
 ## Validation / Blockers
 - `live_stream_test.py` baseline: all behavior checks passed except its final “nothing written to real cache” assertion, which incorrectly fails on an unchanged pre-existing test-shaped file from 2026-11-13. Snapshot before/after instead; preserve the file.
 - Production audio cache is 40 GB; filesystem is 97 GB with 36 GB free.
-- No source code or runtime config changed yet.
+- Backend patch artifact is prepared locally; no production source or runtime config has changed. `.gitattributes` preserves CRLF patch application.
 
 ## Next Action / Resume
-Build the patch from current server source, verify its application and tests, then deploy.
+Run a dry-run and the focused test in an isolated server tree, then commit the patch artifact.
