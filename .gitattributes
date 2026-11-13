@@ -1,1 +1,3 @@
 server-patches/*.patch text eol=crlf
+server-patches/*.conf text eol=lf
+server-patches/*.fstab text eol=lf
