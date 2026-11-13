@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-11-13T22:52:26Z
+updated_at_utc: 2026-11-13T23:06:24Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -17,7 +17,7 @@ Canonical repository: `https://github.com/crxwov/notka-app`. Keep backend-only c
 ## Stages
 1. Refresh canonical coordination and trace playback/cache paths — completed; user confirmed this is crxwov's WIP.
 2. Restore the measured progressive URL proxy and retain concurrent `/prepare` cache fill; add unlimited-cache handling and focused checks — completed.
-3. Validate the patch/tests in isolation, then commit the tracked patch on `tg-app` — active.
+3. Review and commit the validated patch artifact on `tg-app` — active.
 4. Deploy to `ssh notka`, verify service/cache behavior, and record results — pending.
 
 ## Findings / Decisions
@@ -28,9 +28,9 @@ Canonical repository: `https://github.com/crxwov/notka-app`. Keep backend-only c
 - `origin/main` lacks backlog/work-state/collaboration files; legacy server records are stale/completed. User explicitly confirmed the WIP and server scope.
 
 ## Validation / Blockers
-- `live_stream_test.py` baseline: all behavior checks passed except its final “nothing written to real cache” assertion, which incorrectly fails on an unchanged pre-existing test-shaped file from 2026-11-13. Snapshot before/after instead; preserve the file.
-- Production audio cache is 40 GB; filesystem is 97 GB with 36 GB free.
+- Isolated copy of the current server: patch dry-run and `live_stream_test.py` passed (0 failures, 140 output lines). Coverage includes cold direct GET, byte ranges, background cache fill, cache hit, unlimited cache, and unchanged real-shaped cache snapshot.
+- Production audio cache is 40 GB; filesystem is 97 GB with 36 GB free. No production source or runtime config has changed.
 - Backend patch artifact is prepared locally; no production source or runtime config has changed. `.gitattributes` preserves CRLF patch application.
 
 ## Next Action / Resume
-Run a dry-run and the focused test in an isolated server tree, then commit the patch artifact.
+Review and commit the patch artifact on `tg-app`, then apply it to `ssh notka` and verify service and playback.
