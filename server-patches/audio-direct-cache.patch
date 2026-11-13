@@ -1,0 +1,312 @@
+--- a/music_resolver/providers/youtube_common.py
++++ b/music_resolver/providers/youtube_common.py
+@@ -12,6 +12,7 @@
+ from urllib.parse import parse_qs, urlparse
+ 
+ from yt_dlp import YoutubeDL
++from yt_dlp.utils import DownloadError
+ from yt_dlp.postprocessor.common import PostProcessor
+ 
+ from music_resolver.config import Settings
+@@ -543,6 +544,29 @@
+             for leftover in dest_dir.glob(f"{tmp_stem}*"):
+                 leftover.unlink(missing_ok=True)
+             raise
++
++    def progressive_audio(self, video_id: str) -> tuple[str, dict[str, str]] | None:
++        if not YOUTUBE_ID_RE.fullmatch(video_id):
++            return None
++        if self.settings.ytdlp_force_ipv6 or self._uses_browser_cookies():
++            return None
++        opts = self._base_opts(use_cookies=False, fast=True)
++        opts["extractor_args"]["youtube"]["player_client"] = ["visionos"]
++        opts["format"] = "bestaudio[ext=m4a][protocol=https]"
++        opts["socket_timeout"] = min(float(opts["socket_timeout"]), 5.0)
++        opts["retries"] = opts["extractor_retries"] = 0
++        try:
++            with YoutubeDL(opts) as ydl:
++                info = ydl.extract_info(youtube_url(video_id), download=False)
++        except DownloadError:
++            return None
++        if not info or info.get("fragments") or info.get("protocol") != "https":
++            return None
++        url = info.get("url", "")
++        host = urlparse(url).hostname or ""
++        if not host.endswith(".googlevideo.com"):
++            return None
++        return url, info.get("http_headers") or {}
+ 
+     def _extract(self, target: str) -> dict:
+         opts = self._base_opts()
+--- a/music_resolver/providers/youtube_music.py
++++ b/music_resolver/providers/youtube_music.py
+@@ -641,6 +641,9 @@
+     async def resolve(self, id_or_url: str):
+         return await self._resolver.resolve(id_or_url)
+ 
++    async def progressive_audio(self, video_id: str):
++        return await asyncio.to_thread(self._resolver.progressive_audio, video_id)
++
+     async def download_to_file(self, id_or_url: str, dest_dir, dest_stem: str):
+         return await self._resolver.download_to_file(id_or_url, dest_dir, dest_stem)
+ 
+--- a/music_resolver/api/routes.py
++++ b/music_resolver/api/routes.py
+@@ -25,0 +26 @@
++from music_resolver.cache.ttl import TTLCache
+@@ -89,1 +90,2 @@
+-_CACHE_MAX_BYTES = int(os.environ.get("AUDIO_CACHE_MAX_MB") or 40000) * 1024 * 1024
++_CACHE_MAX_MB = int(os.environ.get("AUDIO_CACHE_MAX_MB") or 40000)
++_CACHE_MAX_BYTES = _CACHE_MAX_MB * 1024 * 1024 if _CACHE_MAX_MB > 0 else None
+@@ -164,0 +167,2 @@
++    if _CACHE_MAX_BYTES is None:
++        return
+@@ -2810,6 +2814,101 @@
+         info = await service.get_artist(source, id, fast=fast, songs=songs)
+         return ArtistResponse(**info.model_dump(by_alias=True))
+ 
++    # Stream a progressive YouTube URL immediately; audio_file fills the disk cache in the background.
++    progressive_urls: TTLCache[tuple[str, dict[str, str]]] = TTLCache(120, maxsize=256)
++    progressive_pending: dict[str, asyncio.Task] = {}
++    progressive_slots = asyncio.Semaphore(2)
++    cache_pending: set[str] = set()
++
++    async def progressive_audio(source: str, source_id: str):
++        provider = service.manager.get(source)
++        resolve = getattr(provider, "progressive_audio", None)
++        if resolve is None or not re.fullmatch(r"[A-Za-z0-9_-]{11}", source_id):
++            return None
++        key = f"{source}:{source_id}"
++        cached = progressive_urls.get(key)
++        if cached is not None:
++            return cached
++
++        async def resolve_once():
++            try:
++                async with progressive_slots:
++                    result = await resolve(source_id)
++                if result is not None:
++                    progressive_urls.set(key, result)
++                return result
++            finally:
++                progressive_pending.pop(key, None)
++
++        if key not in progressive_pending:
++            if len(progressive_pending) >= 16:
++                return None
++            progressive_pending[key] = asyncio.create_task(resolve_once())
++        return await asyncio.shield(progressive_pending[key])
++
++    async def progressive_response(request: Request, source: str, source_id: str):
++        try:
++            resolved = await progressive_audio(source, source_id)
++        except Exception:
++            return None
++        if resolved is None:
++            return None
++        url, source_headers = resolved
++        headers = httpx.Headers(source_headers)
++        headers["accept-encoding"] = "identity"
++        byte_range = request.headers.get("range")
++        if request.method == "GET":
++            headers["range"] = byte_range or "bytes=0-"
++        client = httpx.AsyncClient(timeout=10.0, proxy=settings.ytdlp_proxy, follow_redirects=True)
++        try:
++            upstream = await client.send(client.build_request(request.method, url, headers=headers), stream=True)
++        except httpx.HTTPError:
++            await client.aclose()
++            return None
++        except BaseException:
++            await client.aclose()
++            raise
++        if upstream.status_code not in (200, 206, 416):
++            await upstream.aclose()
++            await client.aclose()
++            return None
++        status = upstream.status_code
++        if byte_range is None and status == 206:
++            status = 200
++        outgoing = {"cache-control": "no-store", "accept-ranges": "bytes"}
++        for name in ("content-length", "content-range"):
++            if name in upstream.headers:
++                outgoing[name] = upstream.headers[name]
++        if status == 200:
++            outgoing.pop("content-range", None)
++        if request.method == "HEAD" or status == 416:
++            await upstream.aclose()
++            await client.aclose()
++            if status == 416:
++                outgoing.pop("content-length", None)
++            return Response(status_code=status, headers=outgoing, media_type="audio/mp4")
++
++        async def chunks():
++            try:
++                async for chunk in upstream.aiter_raw(chunk_size=65536):
++                    yield chunk
++            finally:
++                await upstream.aclose()
++                await client.aclose()
++
++        return StreamingResponse(chunks(), status_code=status, headers=outgoing, media_type="audio/mp4")
++
++    def cache_audio_in_background(source: str, source_id: str) -> None:
++        key = f"{source}:{source_id}"
++        if key in cache_pending:
++            return
++        cache_pending.add(key)
++        task = asyncio.create_task(_preload_download(source, source_id))
++        task.add_done_callback(lambda _task: cache_pending.discard(key))
++        _bg_tasks.add(task)
++        task.add_done_callback(_bg_tasks.discard)
++        task.add_done_callback(lambda done: done.cancelled() or done.exception())
++
+     @router.api_route("/stream", methods=["GET", "HEAD"])
+     async def stream(
+         request: Request,
+@@ -2823,6 +2918,18 @@
+             cache_preloader.notify_user_playback(20.0)
+         _download_who.set("stream")
+         stream_mode = mode or settings.stream_response_mode
++        if stream_mode == "proxy" and source == "youtube_music" and id and not url:
++            provider = service.manager.get(source)
++            if provider is not None and getattr(provider, "progressive_audio", None) is not None and re.fullmatch(r"[A-Za-z0-9_-]{11}", id) and f"{source}:{id}" not in healed:
++                cached = _find_cached_track(source, id, match_suffix_for(provider, id))
++                if cached:
++                    return audio_response(*cached)
++                direct = await progressive_response(request, source, id)
++                if direct is None:
++                    raise AppError(ErrorCode.RESOLVE_FAILED, "YouTube audio stream unavailable")
++                if request.method == "GET":
++                    cache_audio_in_background(source, id)
++                return direct
+         if live and stream_mode == "proxy" and source and id and not url and _LIVE_TOKEN.fullmatch(live):
+             if settings.stream_live:
+                 return await live_stream(request, source, id, live)
+--- a/tests/live_stream_test.py
++++ b/tests/live_stream_test.py
+@@ -17,6 +17,7 @@
+ import socket
+ import sys
+ import tempfile
++from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+ import threading
+ import time
+ from pathlib import Path
+@@ -25,6 +26,7 @@
+ CACHE = Path(tempfile.mkdtemp(prefix="notka-live-cache-"))
+ os.environ["NOTKA_DATA_DIR"] = str(DATA)
+ os.environ["NOTKA_NO_PROFILING"] = "1"
++os.environ["AUDIO_CACHE_MAX_MB"] = "0"
+ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+ atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in (DATA, CACHE)])
+ 
+@@ -32,6 +34,12 @@
+ from music_resolver.api import routes  # noqa: E402
+ 
+ REAL_CACHE = routes._CACHE_DIR
++REAL_CACHE_SNAPSHOT = {
++    p.name: (p.stat().st_size, p.stat().st_mtime_ns)
++    for p in REAL_CACHE.glob("youtube_music_l_*")
++    if p.is_file()
++}
++REAL_CACHE_LIMIT = routes._CACHE_MAX_BYTES
+ routes._CACHE_DIR = CACHE
+ 
+ import httpx  # noqa: E402
+@@ -41,6 +48,43 @@
+ from music_resolver.providers import youtube_common as yc  # noqa: E402
+ from music_resolver.services.music_service import MusicService  # noqa: E402
+ from music_resolver.services.provider_manager import ProviderManager  # noqa: E402
++
++class ProgressiveHandler(BaseHTTPRequestHandler):
++    payload = b""
++
++    def do_GET(self):
++        data = self.payload
++        value = self.headers.get("range")
++        status = 200
++        content_range = None
++        if value:
++            start_text, end_text = value.removeprefix("bytes=").split("-", 1)
++            start = int(start_text or 0)
++            end = int(end_text) if end_text else len(data) - 1
++            if start >= len(data):
++                self.send_response(416)
++                self.send_header("Content-Range", f"bytes */{len(data)}")
++                self.end_headers()
++                return
++            end = min(end, len(data) - 1)
++            status = 206
++            content_range = f"bytes {start}-{end}/{len(data)}"
++            data = data[start:end + 1]
++        self.send_response(status)
++        self.send_header("Content-Type", "audio/mp4")
++        self.send_header("Content-Length", str(len(data)))
++        if content_range:
++            self.send_header("Content-Range", content_range)
++        self.end_headers()
++        self.wfile.write(data)
++
++    def log_message(self, *_args):
++        pass
++
++
++progressive_upstream = ThreadingHTTPServer(("127.0.0.1", 0), ProgressiveHandler)
++threading.Thread(target=progressive_upstream.serve_forever, daemon=True).start()
++atexit.register(progressive_upstream.shutdown)
+ 
+ fails = 0
+ 
+@@ -593,6 +638,14 @@
+     routes._CACHE_MAX_BYTES = budget
+ ok(not big_live.exists() and bin_new.exists(), "prune: .live counts in AUDIO_CACHE_MAX_MB (the older .live goes first)")
+ 
++ok(REAL_CACHE_LIMIT is None, "AUDIO_CACHE_MAX_MB=0 disables byte eviction")
++unlimited_track = put("youtube_music_unlimited.bin", 5000, 1900)
++_previous_cache_limit = routes._CACHE_MAX_BYTES
++routes._CACHE_MAX_BYTES = None
++routes._prune_cache()
++ok(unlimited_track.exists(), "unlimited audio cache keeps completed tracks")
++routes._CACHE_MAX_BYTES = _previous_cache_limit
++
+ server.should_exit = True
+ 
+ # ---------------------------------------------------------------- STREAM_LIVE off: live is ignored
+@@ -617,6 +670,36 @@
+ ok(r.status_code == 200 and r.json().get("live") is False, f"/prepare says live: false with STREAM_LIVE off: the app sends no token ({r.json()})")
+ server_off.should_exit = True
+ 
+-ok(not any(REAL_CACHE.glob("youtube_music_l_*")), "nothing written to the real cache")
++# ---------------------------------------------------------------- progressive playback with a background disk-cache fill
++prov_direct = FakeYT()
++direct_plan = prov_direct.plan("l_direct000", size=256 * 1024, gates=(0,))
++ProgressiveHandler.payload = direct_plan["data"]
++progressive_calls = []
++async def progressive_audio(source_id):
++    progressive_calls.append(source_id)
++    return f"http://127.0.0.1:{progressive_upstream.server_address[1]}/{source_id}", {}
++prov_direct.progressive_audio = progressive_audio
++service_direct = MusicService(ProviderManager([prov_direct], timeout=2), base_settings)
++settings_direct = dataclasses.replace(base_settings, stream_live=False, ytdlp_proxy=None)
++URL_DIRECT, server_direct = serve(create_app(settings=settings_direct, service=service_direct))
++r = httpx.get(f"{URL_DIRECT}/stream", params={"source": "youtube_music", "id": "l_direct000"}, timeout=10)
++ok(r.status_code == 200 and r.content == direct_plan["data"], "cold track streams from the progressive source")
++ok(wait_until(lambda: "l_direct000" in prov_direct.calls), "direct playback starts its background cache fill")
++ok(not (CACHE / "youtube_music_l_direct000.bin").exists(), "playback does not wait for cache completion")
++r = httpx.get(f"{URL_DIRECT}/stream", params={"source": "youtube_music", "id": "l_direct000"}, headers={"Range": "bytes=20-39"}, timeout=10)
++ok(r.status_code == 206 and r.content == direct_plan["data"][20:40], "direct stream preserves byte ranges")
++direct_plan["gates"][0].set()
++ok(wait_until(lambda: (CACHE / "youtube_music_l_direct000.bin").exists()), "background cache completes")
++ok((CACHE / "youtube_music_l_direct000.bin").read_bytes() == rewritten(direct_plan["data"]), "background cache keeps the complete processed audio")
++r = httpx.get(f"{URL_DIRECT}/stream", params={"source": "youtube_music", "id": "l_direct000"}, timeout=10)
++ok(r.status_code == 200 and r.content == rewritten(direct_plan["data"]) and len(progressive_calls) == 1,
++   "cache hits use the local file without resolving a direct URL again")
++server_direct.should_exit = True
++
++ok({
++    p.name: (p.stat().st_size, p.stat().st_mtime_ns)
++    for p in REAL_CACHE.glob("youtube_music_l_*")
++    if p.is_file()
++} == REAL_CACHE_SNAPSHOT, "real cache unchanged")
+ print(f"\n{'OK' if not fails else 'FAILED'}: {fails} failure(s)")
+ sys.exit(1 if fails else 0)
