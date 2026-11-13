@@ -19,7 +19,7 @@ public class WebAppInterface {
 
     public static final String DEFAULT_APP_URL = "https://notka.duckdns.org/app/?source=android";
     public static final String DEFAULT_API_URL = "https://notka.duckdns.org";
-    public static final String APP_VERSION = "2.5.2";
+    public static final String APP_VERSION = "2.5.3";
 
     private final MainActivity activity;
     private final WebView webView;
@@ -88,6 +88,12 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public void updateTrack(String title, String artist, String album, String artworkUrl, boolean isPlaying) {
+        if (artworkUrl != null && !artworkUrl.trim().isEmpty()) {
+            CoverCache cache = CoverCache.getInstance();
+            if (cache != null) {
+                cache.prefetchAsync(artworkUrl);
+            }
+        }
         MediaPlaybackService.updateMetadata(activity, title, artist, album, artworkUrl, isPlaying);
     }
 

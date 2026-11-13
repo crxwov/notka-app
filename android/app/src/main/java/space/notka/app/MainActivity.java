@@ -431,7 +431,8 @@ public class MainActivity extends Activity {
             "      img, svg { -webkit-touch-callout: none !important; }" +
             "      .cover img { transition: opacity 0.28s ease !important; will-change: opacity; }" +
             "      #login-modal.gate .modal-actions { display: grid !important; grid-template-columns: 1fr 1.35fr !important; gap: 10px !important; margin-top: 10px !important; }" +
-            "      #login-modal.gate #login-cancel { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; }" +
+            "      #login-modal.gate #login-cancel, #login-modal #login-cancel { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; }" +
+            "      #login-modal.gate #login-cancel[hidden], #login-modal #login-cancel[hidden] { display: flex !important; }" +
             "      #login-modal.gate #login-next { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; width: 100% !important; }" +
             "      #login-modal.gate .modal { transition: padding 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important; }" +
             "      #login-modal.gate .login-hero { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease, max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), margin 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important; will-change: transform, opacity, max-height; max-height: 480px; }" +
@@ -448,8 +449,37 @@ public class MainActivity extends Activity {
             "      body.keyboard-open .screen { padding-bottom: 24px !important; }';" +
             "    (document.head || document.documentElement).appendChild(style);" +
             "  }" +
+            "  function ensureCancelBtn() {" +
+            "    var lc = document.getElementById('login-cancel');" +
+            "    if (lc) {" +
+            "      if (lc.hasAttribute('hidden')) lc.removeAttribute('hidden');" +
+            "      if (lc.style.display === 'none') lc.style.removeProperty('display');" +
+            "      if (!lc.__notka_cancel_bound) {" +
+            "        lc.__notka_cancel_bound = true;" +
+            "        var dismiss = function(e) {" +
+            "          if (e) { e.preventDefault(); e.stopPropagation(); }" +
+            "          var m = document.getElementById('login-modal');" +
+            "          if (m) {" +
+            "            m.classList.remove('open', 'gate');" +
+            "            m.style.display = 'none';" +
+            "          }" +
+            "          document.body.classList.remove('overlay-open');" +
+            "        };" +
+            "        lc.onclick = dismiss;" +
+            "        lc.addEventListener('pointerdown', dismiss, true);" +
+            "        lc.addEventListener('touchstart', dismiss, true);" +
+            "      }" +
+            "    }" +
+            "  }" +
+            "  ensureCancelBtn();" +
+            "  if (window.MutationObserver && !window.__notka_modal_mo) {" +
+            "    window.__notka_modal_mo = true;" +
+            "    var mo = new MutationObserver(ensureCancelBtn);" +
+            "    mo.observe(document.documentElement || document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'style', 'class'] });" +
+            "  }" +
             "  document.addEventListener('click', function(e) {" +
-            "    if (e.target && e.target.id === 'login-cancel') {" +
+            "    var btn = e.target ? (e.target.id === 'login-cancel' ? e.target : (e.target.closest ? e.target.closest('#login-cancel') : null)) : null;" +
+            "    if (btn) {" +
             "      var m = document.getElementById('login-modal');" +
             "      if (m) {" +
             "        m.classList.remove('open', 'gate');" +
@@ -544,11 +574,28 @@ public class MainActivity extends Activity {
             "      }" +
             "    }" +
             "  };" +
+            "  function syncAudioEvents() {" +
+            "    var a = document.querySelector('audio');" +
+            "    if (a && !a.__notka_synced) {" +
+            "      a.__notka_synced = true;" +
+            "      ['play', 'playing'].forEach(function(ev) {" +
+            "        a.addEventListener(ev, function() {" +
+            "          if (window.NotkaAndroid) window.NotkaAndroid.updatePlaybackState(true);" +
+            "        });" +
+            "      });" +
+            "      ['pause', 'ended'].forEach(function(ev) {" +
+            "        a.addEventListener(ev, function() {" +
+            "          if (window.NotkaAndroid) window.NotkaAndroid.updatePlaybackState(false);" +
+            "        });" +
+            "      });" +
+            "    }" +
+            "  }" +
+            "  syncAudioEvents();" +
             "  if ('mediaSession' in navigator) {" +
             "    var origSet = Object.getOwnPropertyDescriptor(Navigator.prototype, 'mediaSession') ||" +
             "                 Object.getOwnPropertyDescriptor(navigator, 'mediaSession');" +
             "    var ms = navigator.mediaSession;" +
-            "    ms._actions = {};" +
+            "    ms._actions = ms._actions || {};" +
             "    var origSetAction = ms.setActionHandler.bind(ms);" +
             "    ms.setActionHandler = function(action, fn) {" +
             "      ms._actions[action] = fn;" +
@@ -560,26 +607,11 @@ public class MainActivity extends Activity {
             "      Object.defineProperty(ms, 'metadata', {" +
             "        set: function(meta) {" +
             "          origMetaSet.call(this, meta);" +
+            "          syncAudioEvents();" +
             "          if (meta && window.NotkaAndroid) {" +
             "            var art = (meta.artwork && meta.artwork.length) ? meta.artwork[0].src : '';" +
             "            var isPlaying = (ms.playbackState === 'playing');" +
             "            window.NotkaAndroid.updateTrack(meta.title || 'Нотка', meta.artist || '', meta.album || '', art, isPlaying);" +
-            "            try {" +
-            "              var pArt = document.getElementById('player-art');" +
-            "              if (pArt) {" +
-            "                var pImg = pArt.querySelector('img');" +
-            "                if (pImg && art && pImg.getAttribute('src') !== art) {" +
-            "                  pImg.style.opacity = '0.15';" +
-            "                }" +
-            "              }" +
-            "              var mArt = document.getElementById('mp-art');" +
-            "              if (mArt) {" +
-            "                var mImg = mArt.querySelector('img');" +
-            "                if (mImg && art && mImg.getAttribute('src') !== art) {" +
-            "                  mImg.style.opacity = '0.15';" +
-            "                }" +
-            "              }" +
-            "            } catch(_){}" +
             "          }" +
             "        }" +
             "      });" +
@@ -669,7 +701,13 @@ public class MainActivity extends Activity {
             webView.evaluateJavascript(
                 "(function(){ " +
                 "  try { " +
-                "    var openModal = document.querySelector('.sheet-anim.open, .modal-anim.open, .sheet.open, .modal-wrap.open, #login-modal.open'); " +
+                "    var lm = document.getElementById('login-modal'); " +
+                "    if (lm && (lm.classList.contains('open') || (lm.style.display !== 'none' && lm.offsetWidth > 0))) { " +
+                "      lm.classList.remove('open', 'gate'); " +
+                "      lm.style.display = 'none'; " +
+                "      return 'handled'; " +
+                "    } " +
+                "    var openModal = document.querySelector('.sheet-anim.open, .modal-anim.open, .sheet.open, .modal-wrap.open'); " +
                 "    if (openModal) { " +
                 "      var closeBtn = openModal.querySelector('#login-cancel, .sheet-close, .modal-close, .btn-close, [data-close]'); " +
                 "      if (closeBtn) { closeBtn.click(); return 'handled'; } " +

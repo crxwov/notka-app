@@ -13,6 +13,8 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,7 +25,7 @@ import java.util.concurrent.Executors;
 public class CoverCache {
     private static final String TAG = "NotkaCoverCache";
     private static final String CACHE_DIR_NAME = "notka_covers";
-    private static final int MAX_MEMORY_CACHE_BYTES = 16 * 1024 * 1024; // 16 MB memory cache
+    private static final int MAX_MEMORY_CACHE_BYTES = 32 * 1024 * 1024; // 32 MB high-speed memory cache
 
     private static CoverCache sInstance;
 
@@ -55,25 +57,84 @@ public class CoverCache {
             }
         };
 
-        this.prefetchPool = Executors.newFixedThreadPool(6);
+        this.prefetchPool = Executors.newFixedThreadPool(8);
+    }
+
+    public static String extractTargetUrl(String urlStr) {
+        if (urlStr == null) return null;
+        try {
+            if (urlStr.contains("/img?u=")) {
+                int idx = urlStr.indexOf("/img?u=");
+                String param = urlStr.substring(idx + 7);
+                int amp = param.indexOf('&');
+                if (amp != -1) param = param.substring(0, amp);
+                return URLDecoder.decode(param, "UTF-8");
+            }
+            if (urlStr.contains("/artwork?url=")) {
+                int idx = urlStr.indexOf("/artwork?url=");
+                String param = urlStr.substring(idx + 13);
+                int amp = param.indexOf('&');
+                if (amp != -1) param = param.substring(0, amp);
+                return URLDecoder.decode(param, "UTF-8");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to decode target url from: " + urlStr, e);
+        }
+        return urlStr;
+    }
+
+    public static String toFetchableUrl(String urlStr) {
+        if (urlStr == null || urlStr.trim().isEmpty()) return null;
+        String lower = urlStr.toLowerCase();
+
+        // If it's already an /img?u= proxy URL, use it directly
+        if (urlStr.contains("/img?u=")) {
+            return urlStr;
+        }
+
+        // If it's an /artwork?url= proxy URL, convert to working /img?u= proxy
+        if (urlStr.contains("/artwork?url=")) {
+            int idx = urlStr.indexOf("/artwork?url=");
+            String param = urlStr.substring(idx + 13);
+            int amp = param.indexOf('&');
+            if (amp != -1) param = param.substring(0, amp);
+            try {
+                String decoded = URLDecoder.decode(param, "UTF-8");
+                return "https://notka.duckdns.org/img?u=" + URLEncoder.encode(decoded, "UTF-8");
+            } catch (Exception e) {
+                return urlStr;
+            }
+        }
+
+        // In Russia, YouTube/Googleusercontent CDN IPs are blocked by DPI; route through server proxy
+        if (lower.contains("googleusercontent.com") || lower.contains("ytimg.com") || lower.contains("ggpht.com")) {
+            try {
+                return "https://notka.duckdns.org/img?u=" + URLEncoder.encode(urlStr, "UTF-8");
+            } catch (Exception e) {
+                return urlStr;
+            }
+        }
+
+        // Direct CDN URLs (Apple mzstatic.com, etc.)
+        return urlStr;
     }
 
     public boolean isCoverUrl(String url) {
         if (url == null) return false;
         String lower = url.toLowerCase();
 
-        // Artwork proxy endpoint
-        if (lower.contains("/artwork?url=") || lower.contains("/artwork")) {
+        // Image proxy endpoints from web app
+        if (lower.contains("/img?u=") || lower.contains("/artwork?url=") || lower.contains("/artwork")) {
             return true;
         }
 
-        // Must not be web app code or API endpoints
+        // Must not intercept web app scripts, styles, or core API endpoints
         if (lower.contains("/app/") || lower.contains("/api/") || lower.contains("/auth/") ||
             lower.contains("/stream") || lower.contains(".js") || lower.contains(".css") || lower.contains(".html")) {
             return false;
         }
 
-        // Common music artwork hosts and patterns
+        // Common music artwork hosts and image extensions
         return lower.contains("mzstatic.com") ||
                lower.contains("googleusercontent.com") ||
                lower.contains("ytimg.com") ||
@@ -91,7 +152,8 @@ public class CoverCache {
 
     private String getMimeType(String url) {
         if (url == null) return "image/jpeg";
-        String lower = url.toLowerCase();
+        String target = extractTargetUrl(url);
+        String lower = (target != null ? target : url).toLowerCase();
         if (lower.contains(".png")) return "image/png";
         if (lower.contains(".webp")) return "image/webp";
         if (lower.contains(".gif")) return "image/gif";
@@ -101,13 +163,14 @@ public class CoverCache {
     private Map<String, String> getResponseHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("Access-Control-Allow-Origin", "*");
+        headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        headers.put("Access-Control-Allow-Headers", "*");
         headers.put("Cache-Control", "public, max-age=31536000, immutable");
         return headers;
     }
 
     public WebResourceResponse getInterceptedResponse(String url) {
         try {
-            // Check memory -> flash disk -> fast proxy fetch
             byte[] cached = getCoverBytes(url, true);
             if (cached != null && cached.length > 0) {
                 return new WebResourceResponse(
@@ -126,9 +189,11 @@ public class CoverCache {
         return null;
     }
 
-    public byte[] getCoverBytes(String urlStr, boolean allowDownload) {
-        if (urlStr == null || urlStr.trim().isEmpty()) return null;
-        String key = hashKey(urlStr);
+    public byte[] getCoverBytes(String rawUrl, boolean allowDownload) {
+        if (rawUrl == null || rawUrl.trim().isEmpty()) return null;
+        String canonicalTarget = extractTargetUrl(rawUrl);
+        if (canonicalTarget == null || canonicalTarget.trim().isEmpty()) return null;
+        String key = hashKey(canonicalTarget);
 
         // 1. Check in-memory RAM cache (0.01 ms)
         byte[] mem = memoryCache.get(key);
@@ -160,29 +225,21 @@ public class CoverCache {
             return null;
         }
 
-        // 3. Download from network via optimized native connection
-        return downloadAndCache(urlStr, key);
+        // 3. Download via fetchable URL (using proxy for blocked domains)
+        String fetchUrl = toFetchableUrl(rawUrl);
+        return downloadAndCache(fetchUrl, key);
     }
 
-    private byte[] downloadAndCache(String urlStr, String key) {
+    private byte[] downloadAndCache(String fetchUrl, String key) {
         HttpURLConnection conn = null;
         try {
             System.setProperty("java.net.preferIPv4Stack", "true");
             System.setProperty("java.net.preferIPv6Addresses", "false");
 
-            String effectiveUrl = urlStr;
-            if (effectiveUrl != null && (effectiveUrl.contains("ytimg.com") || effectiveUrl.contains("googleusercontent.com") || effectiveUrl.contains("ggpht.com")) && !effectiveUrl.contains("/artwork?url=")) {
-                try {
-                    effectiveUrl = "https://notka.duckdns.org/artwork?url=" + java.net.URLEncoder.encode(urlStr, "UTF-8");
-                } catch (Exception ignored) {
-                    effectiveUrl = urlStr;
-                }
-            }
-
-            URL url = new URL(effectiveUrl);
+            URL url = new URL(fetchUrl);
             conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(4000);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(6000);
             conn.setInstanceFollowRedirects(true);
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36 NotkaApp/2.5");
             conn.setRequestProperty("Accept", "image/webp,image/png,image/jpeg,image/*;q=0.9");
@@ -222,10 +279,10 @@ public class CoverCache {
                     return data;
                 }
             } else {
-                Log.w(TAG, "Cover fetch returned status: " + status + " for " + urlStr);
+                Log.w(TAG, "Cover fetch returned status: " + status + " for " + fetchUrl);
             }
         } catch (Exception e) {
-            Log.w(TAG, "Cover download failed: " + e.getMessage() + " (" + urlStr + ")");
+            Log.w(TAG, "Cover download failed: " + e.getMessage() + " (" + fetchUrl + ")");
         } finally {
             if (conn != null) {
                 conn.disconnect();
@@ -234,9 +291,11 @@ public class CoverCache {
         return null;
     }
 
-    public void prefetchAsync(String urlStr) {
-        if (urlStr == null || urlStr.trim().isEmpty()) return;
-        String key = hashKey(urlStr);
+    public void prefetchAsync(String rawUrl) {
+        if (rawUrl == null || rawUrl.trim().isEmpty()) return;
+        String canonicalTarget = extractTargetUrl(rawUrl);
+        if (canonicalTarget == null || canonicalTarget.trim().isEmpty()) return;
+        String key = hashKey(canonicalTarget);
         if (memoryCache.get(key) != null) return;
         File file = new File(cacheDir, key);
         if (file.exists() && file.length() > 0) return;
@@ -244,7 +303,8 @@ public class CoverCache {
         if (inFlightDownloads.putIfAbsent(key, Boolean.TRUE) == null) {
             prefetchPool.submit(() -> {
                 try {
-                    downloadAndCache(urlStr, key);
+                    String fetchUrl = toFetchableUrl(rawUrl);
+                    downloadAndCache(fetchUrl, key);
                 } finally {
                     inFlightDownloads.remove(key);
                 }
