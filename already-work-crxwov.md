@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-11-13T23:06:24Z
+updated_at_utc: 2026-11-13T23:11:11Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -29,7 +29,7 @@ Canonical repository: `https://github.com/crxwov/notka-app`. Keep backend-only c
 
 ## Validation / Blockers
 - Isolated copy of the current server: patch dry-run and `live_stream_test.py` passed (0 failures, 140 output lines). Coverage includes cold direct GET, byte ranges, background cache fill, cache hit, unlimited cache, and unchanged real-shaped cache snapshot.
-- Production audio cache is 40 GB; filesystem is 97 GB with 36 GB free. No production source or runtime config has changed.
+- Production audio cache is 40 GB; filesystem is 97 GB with 36 GB free. Patch is in main at 14b389e; production source/config deployment is pending.
 - Backend patch artifact is prepared locally; no production source or runtime config has changed. `.gitattributes` preserves CRLF patch application.
 
 ## Next Action / Resume
