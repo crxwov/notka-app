@@ -3,34 +3,34 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-11-13T22:18:21Z
+updated_at_utc: 2026-11-13T22:30:25Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
 
 ## Objective / Success Criteria
-Uncached tracks start from the first available bytes while the server completes and retains the audio cache. Disable the 40 GB eviction limit for this server without treating partial downloads as cache hits. Keep client/server compatibility and verify focused tests plus the running service.
+For uncached YouTube Music tracks, start playback from the progressive source while a concurrent background download fills the server audio cache. Remove byte-based audio eviction for this server without breaking cache correctness or partial-file cleanup.
 
 ## Scope / Reservation
-Canonical repository: `https://github.com/crxwov/notka-app`. Track the server-only change as an applyable patch because current `origin/main` contains client sources but no backend or deployment tree. Patch scope: `music_resolver/api/routes.py`, `miniapp/app.js`, `miniapp/index.html`, and the existing live-stream test. Apply the reviewed patch to `ssh notka`, set `STREAM_LIVE=1` and unlimited audio cache, restart `notka.service`, then verify.
+Canonical repository: `https://github.com/crxwov/notka-app`. Keep backend-only changes as an applyable, reviewed patch because fresh `origin/main` has no backend source. Patch scope: `music_resolver/providers/youtube_common.py`, `music_resolver/providers/youtube_music.py`, `music_resolver/api/routes.py`, and focused server tests. Runtime config: `AUDIO_CACHE_MAX_MB=0`; leave the separate `STREAM_LIVE` feature off. Apply reviewed patch to `ssh notka`, restart `notka.service`, verify.
 
 ## Stages
-1. Refresh canonical coordination and inspect the server's live/cache paths — completed; user confirmed this continues crxwov's WIP.
-2. Add and review a tracked server patch; enable first-track live playback and unlimited cache — active.
-3. Run the isolated live-stream test and patch checks — pending.
-4. Deploy to `ssh notka`, verify service and cache behavior, record results — pending.
+1. Refresh canonical coordination and trace playback/cache paths — completed; user confirmed this is crxwov's WIP.
+2. Restore the measured progressive URL proxy and retain concurrent `/prepare` cache fill; add unlimited-cache handling and focused checks — active.
+3. Validate patch/tests in isolation, then commit the tracked patch on `tg-app` — pending.
+4. Deploy to `ssh notka`, verify service/cache behavior, and record results — pending.
 
 ## Findings / Decisions
-- Live-stream plumbing and tokenized range support already exist on the server; `STREAM_LIVE` is unset and `AUDIO_CACHE_MAX_MB=40000`.
-- The miniapp only enables live mode after a prior `/prepare` response; the first cold track therefore misses it.
-- `origin/main` has no `todo.md`, either participant work file, or `docs/operations/collaboration.md`; the legacy server work record is old and completed. The user's direct instruction authorizes this task scope.
-- Preserve completed `.bin` files; do not change image/cover cache limits. Expired raw live copies and stale partial downloads retain existing cleanup.
+- Current server has tokenized file-live support, but `.env` leaves it off (comment says ~0.3 s gain); it still waits for yt-dlp extraction and does not fix the reported cold-start delay.
+- The Nov 9 direct progressive stream was measured at 1.3–2.4 s for uncached YouTube tracks. Current miniapp already launches `/prepare` and `/stream` together; `/prepare` will keep filling the cache while the progressive `/stream` response plays.
+- The direct route will use the local cache on hits and preserve normal errors/behavior for unsupported providers. Keep the `STREAM_LIVE` path off.
+- `AUDIO_CACHE_MAX_MB=40000`; define `0` as no byte eviction. Keep stale `.part` and expired raw-live cleanup; do not alter image cache or delete any existing audio.
+- `origin/main` lacks backlog/work-state/collaboration files; legacy server records are stale/completed. User explicitly confirmed the WIP and server scope.
 
 ## Validation / Blockers
-- Fresh canonical origin/main fetched; clean client worktree; no active other-participant reservation exists in fresh main.
-- Server `notka.service` is running as `notka`; audio cache is 40 GB on a 97 GB filesystem.
-- Relevant isolated test: `/opt/notka/app/tests/live_stream_test.py` uses temporary data/cache and checks it does not write to production cache.
-- No source modifications or deployment yet.
+- `live_stream_test.py` baseline: all behavior checks passed except its final “nothing written to real cache” assertion, which incorrectly fails on an unchanged pre-existing test-shaped file from 2026-11-13. Snapshot before/after instead; preserve the file.
+- Production audio cache is 40 GB; filesystem is 97 GB with 36 GB free.
+- No source code or runtime config changed yet.
 
 ## Next Action / Resume
-Create the patch on `tg-app`, validate it against the live server tree, then test and deploy.
+Build the patch from current server source, verify its application and tests, then deploy.
