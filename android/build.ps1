@@ -95,6 +95,7 @@ $javaSources += (Get-ChildItem -Recurse -Path "$build\gen" -Filter "*.java" | Fo
 $ecjArgs = @(
     "-jar", $ecj,
     "-8",
+    "-encoding", "UTF-8",
     "-nowarn",
     "-cp", $androidJar,
     "-d", "$build\bin"

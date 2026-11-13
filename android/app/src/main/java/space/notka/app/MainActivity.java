@@ -611,7 +611,7 @@ public class MainActivity extends Activity {
             "          if (meta && window.NotkaAndroid) {" +
             "            var art = (meta.artwork && meta.artwork.length) ? meta.artwork[0].src : '';" +
             "            var isPlaying = (ms.playbackState === 'playing');" +
-            "            window.NotkaAndroid.updateTrack(meta.title || 'Нотка', meta.artist || '', meta.album || '', art, isPlaying);" +
+            "            window.NotkaAndroid.updateTrack(meta.title || '\\u041d\\u043e\\u0442\\u043a\\u0430', meta.artist || '', meta.album || '', art, isPlaying);" +
             "          }" +
             "        }" +
             "      });" +
@@ -673,14 +673,14 @@ public class MainActivity extends Activity {
                 }
 
                 request.setTitle(fileName);
-                request.setDescription("Скачивание трека из Нотки");
+                request.setDescription("\u0421\u043a\u0430\u0447\u0438\u0432\u0430\u043d\u0438\u0435 \u0442\u0440\u0435\u043a\u0430 \u0438\u0437 \u041d\u043e\u0442\u043a\u0438"); // Скачивание трека из Нотки
                 request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
                 request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName);
 
                 android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(android.content.Context.DOWNLOAD_SERVICE);
                 if (dm != null) {
                     dm.enqueue(request);
-                    android.widget.Toast.makeText(this, "Скачивание: " + fileName, android.widget.Toast.LENGTH_SHORT).show();
+                    android.widget.Toast.makeText(this, "\u0421\u043a\u0430\u0447\u0438\u0432\u0430\u043d\u0438\u0435: " + fileName, android.widget.Toast.LENGTH_SHORT).show(); // Скачивание:
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Download error", e);
@@ -689,7 +689,7 @@ public class MainActivity extends Activity {
                     intent.addCategory(Intent.CATEGORY_BROWSABLE);
                     startActivity(intent);
                 } catch (Exception ex) {
-                    android.widget.Toast.makeText(this, "Не удалось начать скачивание", android.widget.Toast.LENGTH_SHORT).show();
+                    android.widget.Toast.makeText(this, "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043d\u0430\u0447\u0430\u0442\u044c \u0441\u043a\u0430\u0447\u0438\u0432\u0430\u043d\u0438\u0435", android.widget.Toast.LENGTH_SHORT).show(); // Не удалось начать скачивание
                 }
             }
         });

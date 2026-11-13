@@ -24,6 +24,8 @@ import org.json.JSONObject;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class AppUpdater {
     private static final String TAG = "NotkaAppUpdater";
@@ -44,17 +46,30 @@ public class AppUpdater {
                 } else {
                     currentVersionCode = pInfo.versionCode;
                 }
+                String currentVersionName = (pInfo.versionName != null) ? pInfo.versionName : "2.5.3";
 
                 JSONObject versionData = fetchVersionInfo();
                 if (versionData == null) return;
 
                 int latestVersionCode = versionData.optInt("versionCode", 0);
                 String latestVersionName = versionData.optString("versionName", "");
-                String changelog = versionData.optString("changelog", "Обновления производительности и исправления ошибок.");
+                String changelog = versionData.optString("changelog", "\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u0438 \u0438 \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f \u043e\u0448\u0438\u0431\u043e\u043a.");
                 String downloadUrl = versionData.optString("downloadUrl", "");
 
-                if (latestVersionCode > currentVersionCode && !downloadUrl.isEmpty()) {
-                    activity.runOnUiThread(() -> showUpdateDialog(activity, latestVersionName, changelog, downloadUrl));
+                if (downloadUrl.isEmpty()) return;
+
+                boolean isUpdate = false;
+                if (!latestVersionName.isEmpty()) {
+                    isUpdate = isNewerSemver(latestVersionName, currentVersionName);
+                } else if (latestVersionCode > 0) {
+                    isUpdate = (latestVersionCode > currentVersionCode);
+                }
+
+                if (isUpdate) {
+                    final String verName = latestVersionName;
+                    final String log = changelog;
+                    final String url = downloadUrl;
+                    activity.runOnUiThread(() -> showUpdateDialog(activity, verName, log, url));
                 }
             } catch (Exception e) {
                 Log.d(TAG, "Update check completed without prompt: " + e.getMessage());
@@ -62,11 +77,30 @@ public class AppUpdater {
         }).start();
     }
 
+    public static boolean isNewerSemver(String latest, String current) {
+        if (latest == null || current == null) return false;
+        try {
+            String lClean = latest.replaceAll("[^0-9.]", "");
+            String cClean = current.replaceAll("[^0-9.]", "");
+            if (lClean.isEmpty() || cClean.isEmpty()) return false;
+            String[] lParts = lClean.split("\\.");
+            String[] cParts = cClean.split("\\.");
+            int maxLen = Math.max(lParts.length, cParts.length);
+            for (int i = 0; i < maxLen; i++) {
+                int l = (i < lParts.length && !lParts[i].isEmpty()) ? Integer.parseInt(lParts[i]) : 0;
+                int c = (i < cParts.length && !cParts[i].isEmpty()) ? Integer.parseInt(cParts[i]) : 0;
+                if (l > c) return true;
+                if (l < c) return false;
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
     private static JSONObject fetchVersionInfo() {
         // 1. Try primary server mirror in Russia
         try {
             JSONObject data = fetchJson(PRIMARY_VERSION_URL);
-            if (data != null && data.has("versionCode")) {
+            if (data != null && (data.has("versionCode") || data.has("versionName"))) {
                 return data;
             }
         } catch (Exception e) {
@@ -76,8 +110,9 @@ public class AppUpdater {
         // 2. Try GitHub API fallback
         try {
             JSONObject gh = fetchJson(GITHUB_RELEASE_URL);
-            if (gh != null && gh.has("tag_name")) {
-                String tag = gh.getString("tag_name"); // e.g. "v2.5.1"
+            if (gh != null) {
+                String tag = gh.optString("tag_name", "");
+                String name = gh.optString("name", "");
                 String body = gh.optString("body", "");
                 String downloadUrl = "";
                 if (gh.has("assets")) {
@@ -90,13 +125,14 @@ public class AppUpdater {
                     }
                 }
                 if (!downloadUrl.isEmpty()) {
-                    JSONObject res = new JSONObject();
-                    int code = parseVersionTag(tag);
-                    res.put("versionCode", code);
-                    res.put("versionName", tag);
-                    res.put("changelog", body);
-                    res.put("downloadUrl", downloadUrl);
-                    return res;
+                    String androidVersion = extractAndroidVersion(tag, name, body);
+                    if (androidVersion != null && !androidVersion.isEmpty()) {
+                        JSONObject res = new JSONObject();
+                        res.put("versionName", androidVersion);
+                        res.put("changelog", extractAndroidChangelog(body));
+                        res.put("downloadUrl", downloadUrl);
+                        return res;
+                    }
                 }
             }
         } catch (Exception e) {
@@ -105,17 +141,39 @@ public class AppUpdater {
         return null;
     }
 
-    private static int parseVersionTag(String tag) {
-        try {
-            String clean = tag.replaceAll("[^0-9.]", "");
-            String[] parts = clean.split("\\.");
-            int major = parts.length > 0 ? Integer.parseInt(parts[0]) : 0;
-            int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
-            int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
-            return major * 100 + minor * 10 + patch;
-        } catch (Exception e) {
-            return 0;
+    private static String extractAndroidVersion(String tag, String name, String body) {
+        String tagLower = (tag != null) ? tag.toLowerCase() : "";
+        if (!tagLower.startsWith("desktop") && !tagLower.startsWith("win")) {
+            String clean = tagLower.replaceAll("[^0-9.]", "");
+            if (!clean.isEmpty()) return clean;
         }
+
+        if (name != null) {
+            Matcher m = Pattern.compile("Android\\s*(?:v|version)?\\s*([0-9]+(?:\\.[0-9]+)+)", Pattern.CASE_INSENSITIVE).matcher(name);
+            if (m.find()) {
+                return m.group(1);
+            }
+        }
+
+        if (body != null) {
+            Matcher mBody = Pattern.compile("###\\s*Android\\s*([0-9]+(?:\\.[0-9]+)+)", Pattern.CASE_INSENSITIVE).matcher(body);
+            if (mBody.find()) {
+                return mBody.group(1);
+            }
+        }
+
+        return null;
+    }
+
+    private static String extractAndroidChangelog(String body) {
+        if (body == null || body.isEmpty()) {
+            return "\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u0438 \u0438 \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f \u043e\u0448\u0438\u0431\u043e\u043a.";
+        }
+        Matcher m = Pattern.compile("(###\\s*Android[^\n]*\n(?:(?!\n###|\n---).)*)", Pattern.DOTALL | Pattern.CASE_INSENSITIVE).matcher(body);
+        if (m.find()) {
+            return m.group(1).trim();
+        }
+        return body.trim();
     }
 
     private static JSONObject fetchJson(String urlStr) throws Exception {
@@ -138,6 +196,8 @@ public class AppUpdater {
         if (activity.isFinishing()) return;
 
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        builder.setCancelable(true);
+
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(activity, 24), dp(activity, 24), dp(activity, 24), dp(activity, 20));
@@ -150,14 +210,14 @@ public class AppUpdater {
         root.setBackground(bg);
 
         TextView title = new TextView(activity);
-        title.setText("Доступно обновление");
+        title.setText("\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435"); // Доступно обновление
         title.setTextColor(Color.WHITE);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         root.addView(title);
 
         TextView sub = new TextView(activity);
-        sub.setText("Нотка " + versionName);
+        sub.setText("\u041d\u043e\u0442\u043a\u0430 " + versionName); // Нотка <version>
         sub.setTextColor(Color.parseColor("#FF2D55"));
         sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         sub.setPadding(0, dp(activity, 4), 0, dp(activity, 16));
@@ -179,12 +239,12 @@ public class AppUpdater {
         buttons.setPadding(0, dp(activity, 16), 0, 0);
 
         Button laterBtn = new Button(activity);
-        laterBtn.setText("Позже");
+        laterBtn.setText("\u041f\u043e\u0437\u0436\u0435"); // Позже
         laterBtn.setTextColor(Color.parseColor("#8E8B9E"));
         laterBtn.setBackgroundColor(Color.TRANSPARENT);
 
         Button updateBtn = new Button(activity);
-        updateBtn.setText("Обновить");
+        updateBtn.setText("\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c"); // Обновить
         updateBtn.setTextColor(Color.WHITE);
         GradientDrawable btnBg = new GradientDrawable();
         btnBg.setColor(Color.parseColor("#FF2D55"));
@@ -197,6 +257,7 @@ public class AppUpdater {
 
         builder.setView(root);
         AlertDialog dialog = builder.create();
+        dialog.setCanceledOnTouchOutside(true);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }

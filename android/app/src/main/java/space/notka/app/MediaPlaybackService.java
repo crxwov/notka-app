@@ -48,8 +48,8 @@ public class MediaPlaybackService extends Service {
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
 
-    private String currentTitle = "Нотка";
-    private String currentArtist = "Музыка";
+    private String currentTitle = "\u041d\u043e\u0442\u043a\u0430"; // Нотка
+    private String currentArtist = "\u041c\u0443\u0437\u044b\u043a\u0430"; // Музыка
     private String currentAlbum = "";
     private String currentArtworkUrl = "";
     private Bitmap currentArtworkBitmap = null;
@@ -309,7 +309,7 @@ public class MediaPlaybackService extends Service {
 
         builder.setContentTitle(currentTitle)
                .setContentText(currentArtist)
-               .setSubText(currentAlbum.isEmpty() ? "Нотка" : currentAlbum)
+               .setSubText(currentAlbum.isEmpty() ? "\u041d\u043e\u0442\u043a\u0430" : currentAlbum) // Нотка
                .setSmallIcon(R.drawable.ic_notification)
                .setLargeIcon(getFallbackIcon())
                .setContentIntent(contentIntent)
@@ -318,12 +318,12 @@ public class MediaPlaybackService extends Service {
                .setShowWhen(false);
 
         Notification.Action prevAction = new Notification.Action.Builder(
-                R.drawable.ic_notification, "Предыдущий", createPendingIntent(ACTION_PREV, 1)).build();
+                R.drawable.ic_notification, "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0439", createPendingIntent(ACTION_PREV, 1)).build(); // Предыдущий
         Notification.Action playPauseAction = new Notification.Action.Builder(
-                R.drawable.ic_notification, isPlaying ? "Пауза" : "Воспроизведение",
+                R.drawable.ic_notification, isPlaying ? "\u041f\u0430\u0443\u0437\u0430" : "\u0412\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u0435", // Пауза : Воспроизведение
                 createPendingIntent(isPlaying ? ACTION_PAUSE : ACTION_PLAY, 2)).build();
         Notification.Action nextAction = new Notification.Action.Builder(
-                R.drawable.ic_notification, "Следующий", createPendingIntent(ACTION_NEXT, 3)).build();
+                R.drawable.ic_notification, "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439", createPendingIntent(ACTION_NEXT, 3)).build(); // Следующий
 
         builder.addAction(prevAction);
         builder.addAction(playPauseAction);
