@@ -110,60 +110,10 @@ public class MainActivity extends Activity {
         }
     }
 
-    private ValueAnimator marginAnimator = null;
-    private int currentBottomMargin = 0;
-
-    private void animateBottomMargin(int targetMargin) {
-        if (webView == null || currentBottomMargin == targetMargin) return;
-        if (marginAnimator != null && marginAnimator.isRunning()) {
-            marginAnimator.cancel();
-        }
-
-        final boolean isOpen = targetMargin > 0;
-        if (isOpen) {
-            webView.evaluateJavascript("document.body.classList.add('keyboard-open');", null);
-        }
-
-        int startMargin = currentBottomMargin;
-        marginAnimator = ValueAnimator.ofInt(startMargin, targetMargin);
-        marginAnimator.setDuration(300);
-        marginAnimator.setInterpolator(new DecelerateInterpolator(1.8f));
-        marginAnimator.addUpdateListener(animation -> {
-            int val = (int) animation.getAnimatedValue();
-            currentBottomMargin = val;
-            ViewGroup.LayoutParams rawLp = webView.getLayoutParams();
-            if (rawLp instanceof FrameLayout.LayoutParams) {
-                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) rawLp;
-                lp.bottomMargin = val;
-                webView.setLayoutParams(lp);
-            }
-        });
-        marginAnimator.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                currentBottomMargin = targetMargin;
-                if (isOpen) {
-                    webView.evaluateJavascript(
-                        "(function(){ " +
-                        "  var el = document.activeElement; " +
-                        "  if (el && typeof el.scrollIntoView === 'function') { " +
-                        "    el.scrollIntoView({ block: 'center', behavior: 'smooth' }); " +
-                        "  } " +
-                        "})();",
-                        null
-                    );
-                } else {
-                    webView.evaluateJavascript("document.body.classList.remove('keyboard-open');", null);
-                }
-            }
-        });
-        marginAnimator.start();
-    }
-
     private void setupKeyboardListener() {
         final View decorView = getWindow().getDecorView();
         decorView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-            private int previousTargetMargin = -1;
+            private boolean wasOpen = false;
 
             @Override
             public void onGlobalLayout() {
@@ -174,11 +124,15 @@ public class MainActivity extends Activity {
 
                 // Detect if keyboard is open (> 15% of screen height)
                 boolean isOpen = keypadHeight > screenHeight * 0.15;
-                int targetMargin = isOpen ? keypadHeight : 0;
-
-                if (targetMargin != previousTargetMargin) {
-                    previousTargetMargin = targetMargin;
-                    animateBottomMargin(targetMargin);
+                if (isOpen != wasOpen) {
+                    wasOpen = isOpen;
+                    if (webView != null) {
+                        if (isOpen) {
+                            webView.evaluateJavascript("document.body.classList.add('keyboard-open');", null);
+                        } else {
+                            webView.evaluateJavascript("document.body.classList.remove('keyboard-open');", null);
+                        }
+                    }
                 }
             }
         });
@@ -229,6 +183,7 @@ public class MainActivity extends Activity {
         // Hardware acceleration and styling
         webView.setBackgroundColor(Color.parseColor("#0C0A12"));
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             WebView.setWebContentsDebuggingEnabled(true);
@@ -322,6 +277,12 @@ public class MainActivity extends Activity {
                 }
 
                 return false;
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                injectKeyboardStyles();
             }
 
             @Override
@@ -420,6 +381,27 @@ public class MainActivity extends Activity {
         if (webView == null) return;
         String script = 
             "(function() {" +
+            "  try {" +
+            "    document.documentElement.classList.add('perf-lite', 'motion-lite');" +
+            "    document.body.classList.add('android-app');" +
+            "    var anims = document.getAnimations();" +
+            "    for (var i = 0; i < anims.length; i++) {" +
+            "      var t = anims[i].effect && anims[i].effect.target;" +
+            "      if (t && (t.classList.contains('orb') || t.id === 'light-art')) {" +
+            "        anims[i].cancel();" +
+            "      }" +
+            "    }" +
+            "    if (!window.__notka_orb_tamed) {" +
+            "      window.__notka_orb_tamed = true;" +
+            "      var origAnimate = Element.prototype.animate;" +
+            "      Element.prototype.animate = function(kf, opts) {" +
+            "        if (this.classList && (this.classList.contains('orb') || this.id === 'light-art')) {" +
+            "          return { play: function(){}, pause: function(){}, cancel: function(){}, finish: function(){}, updatePlaybackRate: function(){}, playState: 'paused' };" +
+            "        }" +
+            "        return origAnimate.apply(this, arguments);" +
+            "      };" +
+            "    }" +
+            "  } catch (e) {}" +
             "  var style = document.getElementById('notka-keyboard-style');" +
             "  if (!style) {" +
             "    style = document.createElement('style');" +
@@ -427,26 +409,19 @@ public class MainActivity extends Activity {
             "    style.textContent = '" +
             "      * { -webkit-tap-highlight-color: transparent !important; }" +
             "      body { -webkit-user-select: none !important; user-select: none !important; }" +
-            "      input, textarea { -webkit-user-select: auto !important; user-select: auto !important; }" +
+            "      input, textarea, .modal-input { -webkit-user-select: text !important; user-select: text !important; touch-action: manipulation !important; cursor: text !important; }" +
             "      img, svg { -webkit-touch-callout: none !important; }" +
             "      .cover img { transition: opacity 0.28s ease !important; will-change: opacity; }" +
             "      #login-modal.gate .modal-actions { display: grid !important; grid-template-columns: 1fr 1.35fr !important; gap: 10px !important; margin-top: 10px !important; }" +
-            "      #login-modal.gate #login-cancel, #login-modal #login-cancel { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; }" +
+            "      #login-modal.gate #login-cancel, #login-modal #login-cancel { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; touch-action: manipulation !important; }" +
             "      #login-modal.gate #login-cancel[hidden], #login-modal #login-cancel[hidden] { display: flex !important; }" +
-            "      #login-modal.gate #login-next { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; width: 100% !important; }" +
-            "      #login-modal.gate .modal { transition: padding 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important; }" +
-            "      #login-modal.gate .login-hero { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease, max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), margin 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important; will-change: transform, opacity, max-height; max-height: 480px; }" +
-            "      body.keyboard-open #login-modal.gate .login-hero { opacity: 0 !important; transform: translateY(-26px) scale(0.92) !important; max-height: 0 !important; margin: 0 !important; overflow: hidden !important; pointer-events: none !important; }" +
-            "      #login-modal.gate .login-card { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease !important; will-change: transform; }" +
-            "      body.keyboard-open #login-modal.gate .modal { justify-content: center !important; height: 100% !important; padding-top: 14px !important; padding-bottom: 14px !important; }" +
-            "      body.keyboard-open #login-modal.gate { overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }" +
-            "      .modal-anim .modal { transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important; will-change: transform; }" +
-            "      body.keyboard-open .modal-anim { overflow-y: auto !important; align-items: center !important; justify-content: center !important; }" +
-            "      body.keyboard-open .modal { margin: auto !important; max-height: calc(100vh - 20px) !important; }" +
-            "      body.keyboard-open .sheet { max-height: calc(100vh - 20px) !important; }" +
-            "      body.keyboard-open .tabbar, body.keyboard-open #bottom-nav, body.keyboard-open .mini-player { opacity: 0 !important; pointer-events: none !important; transform: translateY(120px) !important; transition: opacity 0.22s ease, transform 0.22s ease !important; }" +
+            "      #login-modal.gate #login-next { display: flex !important; align-items: center !important; justify-content: center !important; min-height: 52px !important; font-size: 16px !important; width: 100% !important; touch-action: manipulation !important; }" +
+            "      #login-modal.gate .modal { overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }" +
+            "      body.keyboard-open .login-hero { display: none !important; }" +
+            "      body.keyboard-open #login-modal .modal { justify-content: center !important; }" +
+            "      body.keyboard-open .tabbar, body.keyboard-open #bottom-nav, body.keyboard-open .mini-player { opacity: 0 !important; pointer-events: none !important; transform: translateY(120px) !important; transition: opacity 0.2s ease, transform 0.2s ease !important; }" +
             "      .tabbar, #bottom-nav, .mini-player { transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important; }" +
-            "      body.keyboard-open .screen { padding-bottom: 24px !important; }';" +
+            "    ';" +
             "    (document.head || document.documentElement).appendChild(style);" +
             "  }" +
             "  function ensureCancelBtn() {" +
@@ -461,7 +436,7 @@ public class MainActivity extends Activity {
             "          var m = document.getElementById('login-modal');" +
             "          if (m) {" +
             "            m.classList.remove('open', 'gate');" +
-            "            m.style.display = 'none';" +
+            "            m.style.setProperty('display', 'none', 'important');" +
             "          }" +
             "          document.body.classList.remove('overlay-open');" +
             "        };" +
@@ -472,10 +447,11 @@ public class MainActivity extends Activity {
             "    }" +
             "  }" +
             "  ensureCancelBtn();" +
-            "  if (window.MutationObserver && !window.__notka_modal_mo) {" +
+            "  var lm = document.getElementById('login-modal');" +
+            "  if (lm && !window.__notka_modal_mo) {" +
             "    window.__notka_modal_mo = true;" +
             "    var mo = new MutationObserver(ensureCancelBtn);" +
-            "    mo.observe(document.documentElement || document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'style', 'class'] });" +
+            "    mo.observe(lm, { childList: true, subtree: true });" +
             "  }" +
             "  document.addEventListener('click', function(e) {" +
             "    var btn = e.target ? (e.target.id === 'login-cancel' ? e.target : (e.target.closest ? e.target.closest('#login-cancel') : null)) : null;" +
@@ -483,46 +459,26 @@ public class MainActivity extends Activity {
             "      var m = document.getElementById('login-modal');" +
             "      if (m) {" +
             "        m.classList.remove('open', 'gate');" +
-            "        m.style.display = 'none';" +
+            "        m.style.setProperty('display', 'none', 'important');" +
             "      }" +
             "    }" +
             "  }, true);" +
-            "  if (window.visualViewport && !window.__notka_viewport_listener_added) {" +
-            "    window.__notka_viewport_listener_added = true;" +
-            "    window.visualViewport.addEventListener('resize', function() {" +
-            "      var isKb = (window.innerHeight - window.visualViewport.height) > 150;" +
-            "      if (isKb) document.body.classList.add('keyboard-open');" +
-            "      else {" +
-            "        var a = document.activeElement;" +
-            "        if (!a || (a.tagName !== 'INPUT' && a.tagName !== 'TEXTAREA')) {" +
-            "          document.body.classList.remove('keyboard-open');" +
-            "        }" +
+            "  function bindFastInputs() {" +
+            "    var inputs = document.querySelectorAll('input, textarea');" +
+            "    for (var i = 0; i < inputs.length; i++) {" +
+            "      var inp = inputs[i];" +
+            "      if (!inp.__fast_touch) {" +
+            "        inp.__fast_touch = true;" +
+            "        inp.style.touchAction = 'manipulation';" +
+            "        inp.addEventListener('pointerdown', function() { this.focus(); }, { passive: true });" +
+            "        inp.addEventListener('touchstart', function() { this.focus(); }, { passive: true });" +
             "      }" +
-            "    });" +
+            "    }" +
             "  }" +
-            "  if (!window.__notka_focus_listener_added) {" +
-            "    window.__notka_focus_listener_added = true;" +
-            "    window.addEventListener('focusin', function(e) {" +
-            "      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {" +
-            "        document.body.classList.add('keyboard-open');" +
-            "        setTimeout(function() {" +
-            "          if (typeof e.target.scrollIntoView === 'function') {" +
-            "            e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });" +
-            "          }" +
-            "        }, 100);" +
-            "      }" +
-            "    });" +
-            "    window.addEventListener('focusout', function(e) {" +
-            "      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {" +
-            "        setTimeout(function() {" +
-            "          var a = document.activeElement;" +
-            "          if (!a || (a.tagName !== 'INPUT' && a.tagName !== 'TEXTAREA')) {" +
-            "            document.body.classList.remove('keyboard-open');" +
-            "          }" +
-            "        }, 200);" +
-            "      }" +
-            "    });" +
-            "  }" +
+            "  bindFastInputs();" +
+            "  document.addEventListener('DOMContentLoaded', bindFastInputs);" +
+            "  setTimeout(bindFastInputs, 600);" +
+            "  setTimeout(bindFastInputs, 1800);" +
             "})();";
         webView.evaluateJavascript(script, null);
     }
