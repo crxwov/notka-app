@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: completed
-updated_at_utc: 2026-11-13T23:19:59Z
+updated_at_utc: 2026-11-13T23:20:47Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
@@ -17,8 +17,8 @@ Canonical repository: `https://github.com/crxwov/notka-app`. Keep backend-only c
 ## Stages
 1. Refresh canonical coordination and trace playback/cache paths — completed; user confirmed this is crxwov's WIP.
 2. Restore the measured progressive URL proxy and retain concurrent `/prepare` cache fill; add unlimited-cache handling and focused checks — completed.
-3. Review and commit the validated patch artifact on `tg-app` — active.
-4. Deploy to `ssh notka`, verify service/cache behavior, and record results — pending.
+3. Review and commit the validated patch artifact — completed as 14b389e on main.
+4. Deploy to ssh notka, verify service/cache behavior, and record results — completed.
 
 ## Findings / Decisions
 - Current server has tokenized file-live support, but `.env` leaves it off (comment says ~0.3 s gain); it still waits for yt-dlp extraction and does not fix the reported cold-start delay.
@@ -29,8 +29,8 @@ Canonical repository: `https://github.com/crxwov/notka-app`. Keep backend-only c
 
 ## Validation / Blockers
 - Isolated copy of the current server: patch dry-run and `live_stream_test.py` passed (0 failures, 140 output lines). Coverage includes cold direct GET, byte ranges, background cache fill, cache hit, unlimited cache, and unchanged real-shaped cache snapshot.
-- Production audio cache is 40 GB; filesystem is 97 GB with 36 GB free. Patch is in main at 14b389e; production source/config deployment is pending.
-- Backend patch artifact is prepared locally; no production source or runtime config has changed. `.gitattributes` preserves CRLF patch application.
+- Production deployment: notka.service active, /health 200, AUDIO_CACHE_MAX_MB=0; STREAM_LIVE remains off. Cold range returned 206 in 2.00 s; background cache completed at 3,447,032 bytes; cached range first byte in 0.003 s.
+- Backup retained at /opt/notka/backups/audio-direct-cache-20261113T231359Z; no server cache files were removed.
 
 ## Next Action / Resume
-Review and commit the patch artifact on `tg-app`, then apply it to `ssh notka` and verify service and playback.
+No outstanding actions; retain the server backup above.
