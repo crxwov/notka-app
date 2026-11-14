@@ -2,43 +2,31 @@
 
 participant: crxwov
 agent: Codex
-status: active
-updated_at_utc: 2026-11-14T10:20:39Z
+status: completed
+updated_at_utc: 2026-11-14T10:23:07Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: tg-app
 
-## Objective / Success Criteria
-Prevent the Notka nightly catalog refresh from failing when the live backend and catalog worker write track profiles concurrently.
-- Confirm the shared-file race from the production traceback and source.
-- Add a focused regression test that fails with a shared temporary filename.
-- Prepare a minimal backend patch artifact in the canonical repository.
-- Verify patch applicability and the focused check on an isolated source copy.
-- Do not deploy or restart production in this task.
+## Objective / Result
+Prevent the Notka nightly catalog refresh from failing when the live backend and catalog worker write track profiles concurrently. The fixed temporary filename is replaced with a UUID-scoped filename, and a deterministic concurrent-writer regression is included.
 
-## Scope / Reservation
-Canonical repository: https://github.com/crxwov/notka-app, working branch tg-app.
-Only server-patches/track-profile-write-race.patch is in scope; it contains the backend writer fix and the matching focused test. Preserve server-patches/audio-direct-cache.patch and all existing work. No production source, environment, systemd unit, or data changes.
+## Scope
+Canonical repository: https://github.com/crxwov/notka-app.
+Only server-patches/track-profile-write-race.patch was changed. The prior audio-cache patch was preserved. Production source, environment, systemd, and data were not changed.
 
 ## Stages
-1. Refresh canonical coordination, reconcile the previous audio-cache work, and reserve this task — completed.
-2. Trace the catalog failure and confirm the shared writer path — completed.
-3. Add a deterministic regression test and minimal unique-temp-name fix — completed.
-4. Validate patch applicability and the focused test on an isolated source copy — completed.
-5. Review and publish the scoped patch on tg-app; leave deployment to the designated release action — active.
+1. Refresh canonical coordination and reconcile the prior audio-cache task — completed.
+2. Confirm the live shared-file race — completed.
+3. Add the regression and writer fix — completed.
+4. Verify patch application and focused test on an isolated copy — completed.
+5. Review and publish on tg-app — completed.
 
-## Findings / Decisions
-- The 2026-11-14 catalog run failed in track_profile._write() while replacing track_profiles.json.tmp.
-- The live app and nightly worker share NOTKA_DATA_DIR; _write() used the same fixed .tmp path, allowing one process to consume the other process's temporary file.
-- Live source was read-only copied into .notka-local; its SHA-256 matched the observed production file (8920f14b…b07fbf29). The existing test file also matched the verified production hash.
-- The nightly script redirects task output to a separate log, so journalctl -u notka-catalog.service omits the traceback.
-- The earlier audio-cache patch is committed at origin/tg-app (1ef398d). The user confirmed that task is closed; this task will not touch its patch or deploy it.
-- The live service was active during the read-only check. Its earlier stop was a graceful SIGTERM; no OOM evidence was found. Memory tuning is out of scope.
+## Validation
+- The deterministic regression failed against the original source and passed with the fix.
+- patch --dry-run --binary -p1 and patch application passed against an isolated source copy.
+- tests/profile_test.py passed on the patched copy.
+- Commit 2110cfd (bugfix: устраняет гонку записи профилей) was pushed to origin/tg-app.
 
-## Validation / Blockers
-- The deterministic concurrency regression failed against the unchanged source and passed after using unique temporary filenames.
-- patch --dry-run --binary -p1 and patch application passed on an isolated copy; the full profile_test.py script passed there.
-- No production source or runtime configuration has changed.
-
-## Next Action / Resume
-Commit and push the reviewed patch artifact on tg-app, then publish completion. Do not deploy.
+## Remaining
+- Production was not deployed or restarted. The live nightly worker will keep using the old writer until the designated deployment action applies this patch.
