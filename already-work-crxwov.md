@@ -2,37 +2,42 @@
 
 participant: crxwov
 agent: Codex
-status: completed
-updated_at_utc: 2026-11-14T08:57:22Z
+status: active
+updated_at_utc: 2026-11-14T09:21:02Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
-branch: main
+branch: tg-app
 
 ## Objective / Success Criteria
-Publish the latest Windows 1.3.0 MSI and Android 2.5.5 APK together in one GitHub Latest release. Remove the remaining platform-only release after preserving its asset. Point README downloads to the combined release.
+Prevent the Notka nightly catalog refresh from failing when the live backend and catalog worker write track profiles concurrently.
+- Confirm the shared-file race from the production traceback and source.
+- Add a focused regression test that fails with a shared temporary filename.
+- Prepare a minimal backend patch artifact in the canonical repository.
+- Verify patch applicability and the focused check on an isolated source copy.
+- Do not deploy or restart production in this task.
 
 ## Scope / Reservation
-Canonical repository: https://github.com/crxwov/notka-app. Release entries `v2.5.5` and `desktop-v1.3.0`, plus `README.md` download links. No client source, server, or production changes. `already-work-leksik.md` and `todo.md` were absent from current origin/main, so leksik work state remains unknown.
+Canonical repository: `https://github.com/crxwov/notka-app`, working branch `tg-app`.
+Only `server-patches/track-profile-write-race.patch` and its focused backend test changes are in scope. Preserve `server-patches/audio-direct-cache.patch` and all existing work. No production source, environment, systemd unit, or data changes.
 
 ## Stages
-1. Fetch origin/main, read available work state, classify releases, and verify current asset hashes, embedded versions, signatures, and tag ancestry — completed.
-2. Add Windows MSI to current Android Latest release and update combined title/notes — completed.
-3. Delete the Windows-only release after verifying both assets are attached to the combined release — completed.
-4. Update README links, verify GitHub Latest and download URLs, and publish completion state — completed.
+1. Refresh canonical coordination, reconcile the previous audio-cache work, and reserve this task — active.
+2. Trace the catalog failure and confirm the shared writer path — completed.
+3. Add the regression test and prepare the applyable patch — pending.
+4. Validate patch application and the focused test on an isolated copy — pending.
+5. Review and publish the scoped patch on `tg-app`; leave deployment to the designated release action — pending.
 
 ## Findings / Decisions
-- GitHub Latest is `v2.5.5`, named `Notka Windows 1.3.0 / Android 2.5.5`, containing `Notka-Setup-1.3.0.msi` and `notka.apk`, with both SHA-256 hashes in its notes.
-- Removed the Windows-only `desktop-v1.3.0` release after preserving the MSI in the combined release. Three earlier combined releases remain.
-- Updated README download links to the combined release and pushed commit `175cf0d` (`docs: обновить ссылки на объединенный релиз`).
-- APK: hash `699cc551127a7f89dfcd671829fae12c0c37c67fb7d0d21eca9e351a3f6333bb`; package `space.notka.app`, version 2.5.5, code 30; v2/v3 signatures verify.
-- MSI: hash `7d61db76d7220f9d49ca31bae09b0a25bed1114a26a5f1371301b6d9c9b8ec50`; ProductVersion 1.3.0; MSI File table lists embedded `Notka.exe` version 1.3.0.0, 58,457,227 bytes. The release source commit is an ancestor of origin/main.
-- Android's latest-release fallback still sees tag `v2.5.5`; the release title/body expose Android 2.5.5 for version and changelog parsing.
+- The 2026-11-14 catalog run failed in `track_profile._write()` while replacing `track_profiles.json.tmp`.
+- The live app and nightly worker share `NOTKA_DATA_DIR`; `_write()` uses the same fixed `.tmp` path, allowing one process to consume the other process's temporary file.
+- The nightly script redirects task output to a separate log, so `journalctl -u notka-catalog.service` omits the traceback.
+- The earlier audio-cache patch is committed at `origin/tg-app` (`1ef398d`). The user confirmed that task is closed; this task will not touch its patch or deploy it.
+- The live service was active during the read-only check. Its earlier stop was a graceful `SIGTERM`; no OOM evidence was found. Memory tuning is out of scope.
 
 ## Validation / Blockers
-- `/releases/latest` returns `v2.5.5` with both expected assets and digests; both download URLs return HTTP 200 with expected content lengths.
-- Three historic combined releases remain; no platform-only release remains in the release list.
-- `git diff --check` passed; main is pushed and clean. No client tests or interactive installs were run.
-- The MSI is unsigned. Windows may show an installation warning.
+- Current `origin/main` has no `todo.md` or `already-work-leksik.md`; the available crxwov work record was completed before this reservation.
+- The canonical repository keeps backend changes as applyable artifacts because it has no backend source tree.
+- No code or runtime changes have been made yet. Production deployment is explicitly excluded.
 
 ## Next Action / Resume
-Complete. No pending code, release, or production action.
+Publish this reservation to `origin/main`, then prepare the isolated regression test and backend patch on `tg-app`.
