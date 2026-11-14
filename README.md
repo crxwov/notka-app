@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/crxwov/notka-app/releases/download/desktop-v1.2.7/notka.apk"><strong>Скачать для Android</strong></a>
+  <a href="https://github.com/crxwov/notka-app/releases/download/v2.5.5/notka.apk"><strong>Скачать для Android</strong></a>
   ·
-  <a href="https://github.com/crxwov/notka-app/releases/download/desktop-v1.2.7/Notka-Setup-1.2.7.msi"><strong>Скачать для Windows</strong></a>
+  <a href="https://github.com/crxwov/notka-app/releases/download/v2.5.5/Notka-Setup-1.3.0.msi"><strong>Скачать для Windows</strong></a>
   ·
   <a href="https://notka.duckdns.org/app/">Открыть в браузере</a>
 </p>
