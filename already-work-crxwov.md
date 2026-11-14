@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-11-14T08:47:31Z
+updated_at_utc: 2026-11-14T08:50:03Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: main
@@ -28,7 +28,7 @@ Canonical repository: https://github.com/crxwov/notka-app. Release entries `v2.5
 
 ## Validation / Blockers
 - Repository state is clean before this reservation. Current origin/main contains only crxwov work state; leksik state and shared todo are unavailable in this repository.
-- GitHub connector supports reads only; release edits will use the authorized browser session.
+- GitHub connector supports reads only; release edits will use the repository GitHub credential through REST, without exposing the credential.
 - No blocker to the explicitly assigned release scope.
 
 ## Next Action / Resume
