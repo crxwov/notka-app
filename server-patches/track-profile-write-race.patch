@@ -1,0 +1,81 @@
+diff --git a/music_resolver/services/track_profile.py b/music_resolver/services/track_profile.py
+index 68ac4c5..20f2541 100644
+--- a/music_resolver/services/track_profile.py
++++ b/music_resolver/services/track_profile.py
+@@ -74,7 +74,7 @@ def _read(path: Path) -> dict:
+ 
+ def _write(path: Path, data: dict) -> None:
+     DATA_DIR.mkdir(parents=True, exist_ok=True)
+-    tmp = path.with_name(path.name + ".tmp")
++    tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+     tmp.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+     tmp.replace(path)
+ 
+diff --git a/tests/profile_test.py b/tests/profile_test.py
+index 7ec05d8..ac30b88 100644
+--- a/tests/profile_test.py
++++ b/tests/profile_test.py
+@@ -1,9 +1,12 @@
+ """python tests/profile_test.py — the mood scoring of track_profile (no network).
+ 
+ The numbers below are real measurements of real songs, taken on 2026-10-12."""
++import json
+ import os
+ import sys
+ import tempfile
++import threading
++from pathlib import Path
+ 
+ os.environ["NOTKA_DATA_DIR"] = tempfile.mkdtemp()
+ os.environ["NOTKA_NO_PROFILING"] = "1"
+@@ -82,5 +85,50 @@ ok(how == "tags" and fit <= 0.3, f"known genres that do not point to the mood co
+ fit, how = tp.fit_for("yt:y", "Nobody Known", "sleep")
+ ok(fit is None and how == "none", "nothing known -> no opinion")
+ 
++# Concurrent writers need separate temporary files before atomic replacement.
++with tempfile.TemporaryDirectory() as directory:
++    profile_path = Path(directory) / "track_profiles.json"
++    barrier = threading.Barrier(2)
++    replace_lock = threading.Lock()
++    errors = []
++    temporary_names = []
++    original_replace = Path.replace
++
++    def wait_before_replace(self, target):
++        if self.parent == profile_path.parent:
++            temporary_names.append(self.name)
++            barrier.wait(timeout=3)
++            with replace_lock:
++                return original_replace(self, target)
++        return original_replace(self, target)
++
++    def write_profile(value):
++        try:
++            tp._write(profile_path, value)
++        except Exception as exc:
++            errors.append(exc)
++
++    Path.replace = wait_before_replace
++    try:
++        threads = [
++            threading.Thread(target=write_profile, args=({"writer": index},))
++            for index in range(2)
++        ]
++        for thread in threads:
++            thread.start()
++        for thread in threads:
++            thread.join(4)
++    finally:
++        Path.replace = original_replace
++
++    result = json.loads(profile_path.read_text(encoding="utf-8"))
++    writes_are_safe = (
++        not any(thread.is_alive() for thread in threads)
++        and not errors
++        and len(set(temporary_names)) == 2
++        and result in ({"writer": 0}, {"writer": 1})
++    )
++    ok(writes_are_safe, "concurrent profile writes do not collide")
++
+ print("\n" + (f"{fails} FAILED" if fails else "all passed"))
+ sys.exit(1 if fails else 0)
