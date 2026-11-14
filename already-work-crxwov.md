@@ -2,39 +2,34 @@
 
 participant: crxwov
 agent: Codex
-status: completed
-updated_at_utc: 2026-11-14T00:16:45Z
+status: active
+updated_at_utc: 2026-11-14T08:47:31Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: main
 
 ## Objective / Success Criteria
-Move Notka's existing audio cache off the 97 GiB root filesystem and onto the spare 256 GiB disk, preserving cached files and keeping the service available after restart.
+Publish the latest Windows 1.3.0 MSI and Android 2.5.5 APK together in one GitHub Latest release. Remove the remaining platform-only release after the asset is preserved in the combined release. Point README downloads to the combined release.
 
 ## Scope / Reservation
-Canonical repository: https://github.com/crxwov/notka-app. Server: ssh notka. Dedicated ext4 filesystem on /dev/sdb mounted at /opt/notka/app/cache/audio_v2. Keep AUDIO_CACHE_MAX_MB=0 and STREAM_LIVE off. Preserve the old copy until data and service checks pass.
+Canonical repository: https://github.com/crxwov/notka-app. Release entries `v2.5.5` and `desktop-v1.3.0`, plus `README.md` download links. No client source, server, or production changes. `already-work-leksik.md` and `todo.md` are absent from current origin/main, so leksik work state is unknown; this direct request is limited to the specified release and its download links.
 
 ## Stages
-1. Inspect disks, filesystems, mounts, and cache size — completed.
-2. Prepare /dev/sdb and configure a persistent mount and systemd dependency — completed.
-3. Copy and verify the existing cache, switch the mount, and restart the service — completed.
-4. Verify cached and uncached playback, remove the old root copy, and record results — completed.
+1. Fetch origin/main, read available work state, classify releases, and verify current asset hashes, embedded versions, signatures, and tag ancestry — completed.
+2. Publish this reservation; add Windows MSI to current Android Latest release and update combined title/notes — active.
+3. Delete the Windows-only release after verifying the MSI and APK are attached to the combined release — pending.
+4. Update README links, verify GitHub Latest and download URLs, and publish completion state — pending.
 
 ## Findings / Decisions
-- /dev/sda is the 100 GiB OS disk; /dev/sda3 backs the 97 GiB root filesystem. /dev/sdb is a separate 256 GiB disk, initially unpartitioned and without recognized data or filesystem signatures.
-- Formatted /dev/sdb as ext4 (label notka-audio, reserved blocks 0) and mounted it at the existing cache path. `/etc/fstab` uses the filesystem label; a systemd drop-in requires the mount before Notka starts, preventing silent fallback to the root disk.
-- Runtime configuration remains AUDIO_CACHE_MAX_MB=0 and STREAM_LIVE off.
-- Repository mount templates are in commit 656ab72 on main.
-- After copy, final source inventory was 27,541 files / 41,997,457,708 bytes. All files copied during final sync were content-checked; both directory byte totals matched before switch.
-- Removed the verified old root copy only after the new volume was mounted, service healthy, and a cold stream had completed background caching on /dev/sdb.
+- `v2.5.5` is GitHub's current `/releases/latest`; it contains the Android 2.5.5 APK only.
+- `desktop-v1.3.0` contains the Windows 1.3.0 MSI only. Three older releases already contain both platforms and will remain as history.
+- The APK hash matches GitHub (`699cc551127a7f89dfcd671829fae12c0c37c67fb7d0d21eca9e351a3f6333bb`), package/version is `space.notka.app` 2.5.5 (code 30), APK v2/v3 signatures verify, and signer fingerprint matches prior release certificate.
+- The MSI hash matches GitHub (`7d61db76d7220f9d49ca31bae09b0a25bed1114a26a5f1371301b6d9c9b8ec50`), embedded ProductVersion is 1.3.0, and its tagged source commit is an ancestor of origin/main.
 
 ## Validation / Blockers
-- `/dev/sdb` is mounted as ext4 at `/opt/notka/app/cache/audio_v2`; systemd `Requires` and `After` include the mount unit.
-- `notka.service` is active; production `/health` returned HTTP 200 after migration.
-- A migrated cached audio range returned HTTP 206. An uncached range streamed directly with HTTP 206, then its 21,731,581-byte `.bin` and MIME sidecar appeared on the new volume.
-- Root usage fell from 57 GiB to 18 GiB; root now has 75 GiB free. The cache volume has about 212 GiB free.
-- Service restart was verified; host reboot was not performed.
-- No known blockers. The cache disk is a single volume without redundancy; cached audio can be regenerated if it fails.
+- Repository state is clean before this reservation. Current origin/main contains only crxwov work state; leksik state and shared todo are unavailable in this repository.
+- GitHub connector supports reads only; release edits will use the authorized browser session.
+- No blocker to the explicitly assigned release scope.
 
 ## Next Action / Resume
-Complete. Monitor available space on `/dev/sdb`; no code change or reboot is pending.
+Edit current release `v2.5.5` to include the verified MSI, then remove the Windows-only `desktop-v1.3.0` release. Update README links after release verification.
