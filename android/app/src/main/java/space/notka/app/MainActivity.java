@@ -58,6 +58,9 @@ public class MainActivity extends Activity {
         // Configure edge-to-edge full bleed window
         setupEdgeToEdge();
 
+        // Unlock maximum display refresh rate (120Hz/144Hz/165Hz)
+        configureHighRefreshRate();
+
         FrameLayout rootLayout = new FrameLayout(this);
         rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -79,6 +82,87 @@ public class MainActivity extends Activity {
 
         // Check for app updates in the background
         AppUpdater.checkForUpdatesAsync(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        configureHighRefreshRate();
+    }
+
+    private void configureHighRefreshRate() {
+        try {
+            Window window = getWindow();
+            WindowManager.LayoutParams params = window.getAttributes();
+            float maxRefreshRate = 60.0f;
+            int bestModeId = -1;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                android.view.Display display = null;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        display = getDisplay();
+                    } catch (Throwable ignored) {}
+                }
+                if (display == null) {
+                    display = getWindowManager().getDefaultDisplay();
+                }
+
+                if (display != null) {
+                    android.view.Display.Mode[] modes = display.getSupportedModes();
+                    if (modes != null) {
+                        for (android.view.Display.Mode mode : modes) {
+                            if (mode.getRefreshRate() > maxRefreshRate) {
+                                maxRefreshRate = mode.getRefreshRate();
+                                bestModeId = mode.getModeId();
+                            }
+                        }
+                    }
+                }
+
+                if (bestModeId != -1) {
+                    params.preferredDisplayModeId = bestModeId;
+                    params.preferredRefreshRate = maxRefreshRate;
+                    Log.i(TAG, "Selected preferred display mode id: " + bestModeId + " (" + maxRefreshRate + " Hz)");
+                }
+
+                // Enable frame rate touch boost if supported
+                try {
+                    params.setFrameRateBoostOnTouchEnabled(true);
+                } catch (Throwable ignored) {}
+
+                // API 30+ min/max display refresh rates via reflection
+                try {
+                    java.lang.reflect.Field minField = params.getClass().getField("preferredMinDisplayRefreshRate");
+                    minField.setFloat(params, maxRefreshRate);
+                    java.lang.reflect.Field maxField = params.getClass().getField("preferredMaxDisplayRefreshRate");
+                    maxField.setFloat(params, maxRefreshRate);
+                } catch (Throwable ignored) {}
+
+                window.setAttributes(params);
+            }
+
+            // Surface / View frame rate hint via reflection
+            try {
+                View decor = window.getDecorView();
+                java.lang.reflect.Method setFrameRateMethod = View.class.getMethod("setFrameRate", float.class, int.class);
+                setFrameRateMethod.invoke(decor, maxRefreshRate, 0);
+                if (webView != null) {
+                    setFrameRateMethod.invoke(webView, maxRefreshRate, 0);
+                }
+            } catch (Throwable ignored) {}
+
+            // Android 15/16+ (API 35+) high frame rate category hint
+            try {
+                java.lang.reflect.Method catMethod = View.class.getMethod("setFrameRateCategory", int.class);
+                catMethod.invoke(window.getDecorView(), 3);
+                if (webView != null) {
+                    catMethod.invoke(webView, 3);
+                }
+            } catch (Throwable ignored) {}
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to configure high refresh rate", e);
+        }
     }
 
     public void loadAppUrl() {
@@ -110,32 +194,56 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean isKeyboardOpen = false;
+
     private void setupKeyboardListener() {
         final View decorView = getWindow().getDecorView();
-        decorView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-            private boolean wasOpen = false;
-
-            @Override
-            public void onGlobalLayout() {
-                Rect r = new Rect();
-                decorView.getWindowVisibleDisplayFrame(r);
-                int screenHeight = decorView.getRootView().getHeight();
-                int keypadHeight = screenHeight - r.bottom;
-
-                // Detect if keyboard is open (> 15% of screen height)
-                boolean isOpen = keypadHeight > screenHeight * 0.15;
-                if (isOpen != wasOpen) {
-                    wasOpen = isOpen;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            decorView.setOnApplyWindowInsetsListener((v, insets) -> {
+                boolean imeVisible = insets.isVisible(WindowInsets.Type.ime());
+                if (imeVisible != isKeyboardOpen) {
+                    isKeyboardOpen = imeVisible;
                     if (webView != null) {
-                        if (isOpen) {
-                            webView.evaluateJavascript("document.body.classList.add('keyboard-open');", null);
-                        } else {
-                            webView.evaluateJavascript("document.body.classList.remove('keyboard-open');", null);
+                        webView.evaluateJavascript(
+                            imeVisible ? "document.body.classList.add('keyboard-open');" : "document.body.classList.remove('keyboard-open');",
+                            null
+                        );
+                    }
+                }
+                injectInsets();
+                return insets;
+            });
+        } else {
+            decorView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                private boolean wasOpen = false;
+                private long lastCheckTime = 0;
+
+                @Override
+                public void onGlobalLayout() {
+                    long now = System.currentTimeMillis();
+                    if (now - lastCheckTime < 100) return; // Debounce IPC to eliminate layout frame drops
+                    lastCheckTime = now;
+
+                    Rect r = new Rect();
+                    decorView.getWindowVisibleDisplayFrame(r);
+                    int screenHeight = decorView.getRootView().getHeight();
+                    int keypadHeight = screenHeight - r.bottom;
+
+                    // Detect if keyboard is open (> 15% of screen height)
+                    boolean isOpen = keypadHeight > screenHeight * 0.15;
+                    if (isOpen != wasOpen) {
+                        wasOpen = isOpen;
+                        if (webView != null) {
+                            if (isOpen) {
+                                webView.evaluateJavascript("document.body.classList.add('keyboard-open');", null);
+                            } else {
+                                webView.evaluateJavascript("document.body.classList.remove('keyboard-open');", null);
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 
     public void setHeaderColor(String hexColor) {
@@ -183,7 +291,13 @@ public class MainActivity extends Activity {
         // Hardware acceleration and styling
         webView.setBackgroundColor(Color.parseColor("#0C0A12"));
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        // Direct GPU rendering without offscreen texture churn
+        webView.setLayerType(View.LAYER_TYPE_NONE, null);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            // Pre-rasterize offscreen web content for silky 120/165 FPS scrolling
+            settings.setOffscreenPreRaster(true);
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             WebView.setWebContentsDebuggingEnabled(true);
@@ -342,6 +456,9 @@ public class MainActivity extends Activity {
         }
     }
 
+    private int lastTopDp = -1;
+    private int lastBottomDp = -1;
+
     private void injectInsets() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             View decor = getWindow().getDecorView();
@@ -357,6 +474,12 @@ public class MainActivity extends Activity {
                 if (bottomDp < 16) {
                     bottomDp = 24;
                 }
+
+                if (topDp == lastTopDp && bottomDp == lastBottomDp) {
+                    return; // Avoid costly JS evaluation on every insets tick
+                }
+                lastTopDp = topDp;
+                lastBottomDp = bottomDp;
 
                 String js = String.format(
                     "(function() {" +
@@ -401,14 +524,28 @@ public class MainActivity extends Activity {
             "        return origAnimate.apply(this, arguments);" +
             "      };" +
             "    }" +
+            "    if (!window.__notka_touch_tuned) {" +
+            "      window.__notka_touch_tuned = true;" +
+            "      var origAdd = EventTarget.prototype.addEventListener;" +
+            "      EventTarget.prototype.addEventListener = function(t, fn, opts) {" +
+            "        if (t === 'touchstart' || t === 'touchmove') {" +
+            "          if (typeof opts === 'boolean') opts = { capture: opts, passive: true };" +
+            "          else if (typeof opts === 'object' && opts !== null && opts.passive === undefined) opts.passive = true;" +
+            "          else if (opts === undefined) opts = { passive: true };" +
+            "        }" +
+            "        return origAdd.call(this, t, fn, opts);" +
+            "      };" +
+            "    }" +
             "  } catch (e) {}" +
             "  var style = document.getElementById('notka-keyboard-style');" +
             "  if (!style) {" +
             "    style = document.createElement('style');" +
             "    style.id = 'notka-keyboard-style';" +
             "    style.textContent = '" +
+            "      html, body { overscroll-behavior-y: none !important; -webkit-overflow-scrolling: touch !important; touch-action: pan-y pinch-zoom !important; }" +
             "      * { -webkit-tap-highlight-color: transparent !important; }" +
             "      body { -webkit-user-select: none !important; user-select: none !important; }" +
+            "      .screen, .track-row, .modal, .sheet, .mini-player, .tabbar, #bottom-nav { transform: translateZ(0); backface-visibility: hidden; }" +
             "      input, textarea, .modal-input { -webkit-user-select: text !important; user-select: text !important; touch-action: manipulation !important; cursor: text !important; }" +
             "      img, svg { -webkit-touch-callout: none !important; }" +
             "      .cover img { transition: opacity 0.28s ease !important; will-change: opacity; }" +
