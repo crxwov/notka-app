@@ -18,13 +18,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android Platform 35
-        run: |
-          echo "y" | & $env:ANDROID_HOME\cmdline-tools\latest\bin\sdkmanager.bat "platforms;android-35"
-
       - name: Build and Sign APK
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File android/build.ps1
