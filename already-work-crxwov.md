@@ -3,7 +3,7 @@
 participant: crxwov
 agent: Codex
 status: active
-updated_at_utc: 2026-11-16T19:53:22Z
+updated_at_utc: 2026-11-16T19:54:46Z
 heartbeat_interval_seconds: 60
 stale_after_seconds: 180
 branch: main (coordination only)
@@ -21,4 +21,5 @@ Restore public media throughput and stop accidental audio-cache eviction. crxwov
 - Cache regression reproduced on the production source and passed with the one-line patch. Positive budgets and partial cleanup passed.
 - The canonical remote has no leksik record or shared backlog. crxwov's former Android work is completed. Missing coordination context was disclosed before approval.
 - Backend patch deployed and checksum confirmed; service healthy, cached prepare 0 ms, Range 206 with 524288 bytes. Backup: loading-latency-sYTOP49P.
-- Next: update A record, verify public HTTP and cache retention. Roll back DNS if its checks fail.
+- DuckDNS A changed to 5.227.61.107 and three public resolvers agree. Normal hostname: cached range 0.90 s, page 0.33 s and cover 0.17 s, valid TLS.
+- Next: verify cold start, seek, cache retention and client flows where available.
