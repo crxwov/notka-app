@@ -88,6 +88,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         configureHighRefreshRate();
+        injectInsets();
     }
 
     private void configureHighRefreshRate() {
@@ -360,6 +361,7 @@ public class MainActivity extends Activity {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+                injectInsets(true);
                 injectKeyboardStyles();
             }
 
@@ -367,7 +369,7 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 injectMediaBridge();
-                injectInsets();
+                injectInsets(true);
                 injectKeyboardStyles();
                 if (url != null && !url.startsWith("file:///android_asset/")) {
                     AppUpdater.onPageReady(MainActivity.this, view);
@@ -423,57 +425,115 @@ public class MainActivity extends Activity {
         }
     }
 
+    private int getStatusBarHeightPx() {
+        int statusBarHeight = 0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            View decor = getWindow().getDecorView();
+            WindowInsets insets = decor.getRootWindowInsets();
+            if (insets != null) {
+                statusBarHeight = insets.getInsets(WindowInsets.Type.statusBars()).top;
+                if (statusBarHeight <= 0) {
+                    statusBarHeight = insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top;
+                }
+            }
+        }
+        if (statusBarHeight <= 0) {
+            int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+            if (resourceId > 0) {
+                statusBarHeight = getResources().getDimensionPixelSize(resourceId);
+            }
+        }
+        if (statusBarHeight <= 0) {
+            statusBarHeight = (int) (38 * getResources().getDisplayMetrics().density + 0.5f);
+        }
+        return statusBarHeight;
+    }
+
+    private int getNavigationBarHeightPx() {
+        int navHeight = 0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            View decor = getWindow().getDecorView();
+            WindowInsets insets = decor.getRootWindowInsets();
+            if (insets != null) {
+                navHeight = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+            }
+        }
+        if (navHeight <= 0) {
+            int resourceId = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+            if (resourceId > 0) {
+                navHeight = getResources().getDimensionPixelSize(resourceId);
+            }
+        }
+        int minPill = (int) (24 * getResources().getDisplayMetrics().density + 0.5f);
+        return Math.max(minPill, navHeight);
+    }
+
     private int lastTopDp = -1;
     private int lastBottomDp = -1;
 
     private void injectInsets() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            View decor = getWindow().getDecorView();
-            WindowInsets insets = decor.getRootWindowInsets();
-            if (insets != null) {
-                float density = getResources().getDisplayMetrics().density;
-                int topPx = insets.getSystemWindowInsetTop();
-                int bottomPx = insets.getSystemWindowInsetBottom();
-                int topDp = Math.round(topPx / density);
-                int bottomDp = Math.round(bottomPx / density);
+        injectInsets(false);
+    }
 
-                // Ensure bottom inset accounts for gesture navigation pill (minimum 24dp)
-                if (bottomDp < 16) {
-                    bottomDp = 24;
-                }
+    private void injectInsets(boolean force) {
+        try {
+            float density = getResources().getDisplayMetrics().density;
+            int topPx = getStatusBarHeightPx();
+            int bottomPx = getNavigationBarHeightPx();
 
-                if (topDp == lastTopDp && bottomDp == lastBottomDp) {
-                    return; // Avoid costly JS evaluation on every insets tick
-                }
-                lastTopDp = topDp;
-                lastBottomDp = bottomDp;
+            int topDp = Math.round(topPx / density);
+            int bottomDp = Math.round(bottomPx / density);
 
-                String js = String.format(
-                    "(function() {" +
-                    "  var r = document.documentElement.style;" +
-                    "  r.setProperty('--sat', '%dpx');" +
-                    "  r.setProperty('--sab', '%dpx');" +
-                    "  r.setProperty('--tg-safe-area-inset-top', '%dpx');" +
-                    "  r.setProperty('--tg-safe-area-inset-bottom', '%dpx');" +
-                    "  if (window.Telegram && window.Telegram.WebApp) {" +
-                    "    window.Telegram.WebApp.safeAreaInset = { top: %d, bottom: %d, left: 0, right: 0 };" +
-                    "    window.Telegram.WebApp.contentSafeAreaInset = { top: %d, bottom: %d, left: 0, right: 0 };" +
-                    "  }" +
-                    "})();",
-                    topDp, bottomDp, topDp, bottomDp, topDp, bottomDp, topDp, bottomDp
-                );
+            if (topDp < 28) topDp = 38;
+            if (bottomDp < 16) bottomDp = 24;
+
+            if (!force && topDp == lastTopDp && bottomDp == lastBottomDp) {
+                return; // Avoid costly JS evaluation on every insets tick
+            }
+            lastTopDp = topDp;
+            lastBottomDp = bottomDp;
+
+            Log.i(TAG, "Applying safe area insets: top=" + topDp + "dp (" + topPx + "px), bottom=" + bottomDp + "dp (" + bottomPx + "px)");
+
+            String js = String.format(
+                java.util.Locale.US,
+                "(function() {" +
+                "  var r = document.documentElement.style;" +
+                "  r.setProperty('--sat', '%dpx');" +
+                "  r.setProperty('--sab', '%dpx');" +
+                "  r.setProperty('--tg-safe-area-inset-top', '%dpx');" +
+                "  r.setProperty('--tg-safe-area-inset-bottom', '%dpx');" +
+                "  if (window.Telegram && window.Telegram.WebApp) {" +
+                "    window.Telegram.WebApp.safeAreaInset = { top: %d, bottom: %d, left: 0, right: 0 };" +
+                "    window.Telegram.WebApp.contentSafeAreaInset = { top: 0, bottom: 0, left: 0, right: 0 };" +
+                "  }" +
+                "})();",
+                topDp, bottomDp, topDp, bottomDp, topDp, bottomDp
+            );
+            if (webView != null) {
                 webView.evaluateJavascript(js, null);
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error injecting insets", e);
         }
     }
 
     private void injectKeyboardStyles() {
         if (webView == null) return;
+        int topDp = lastTopDp > 0 ? lastTopDp : Math.round(getStatusBarHeightPx() / getResources().getDisplayMetrics().density);
+        int bottomDp = lastBottomDp > 0 ? lastBottomDp : 24;
         String script = 
             "(function() {" +
             "  try {" +
             "    document.documentElement.classList.add('perf-lite', 'motion-lite');" +
             "    document.body.classList.add('android-app');" +
+            "    var r = document.documentElement.style;" +
+            "    if (!r.getPropertyValue('--sat') || r.getPropertyValue('--sat') === '0px') {" +
+            "      r.setProperty('--sat', '" + topDp + "px');" +
+            "    }" +
+            "    if (!r.getPropertyValue('--sab') || r.getPropertyValue('--sab') === '0px') {" +
+            "      r.setProperty('--sab', '" + bottomDp + "px');" +
+            "    }" +
             "    var anims = document.getAnimations();" +
             "    for (var i = 0; i < anims.length; i++) {" +
             "      var t = anims[i].effect && anims[i].effect.target;" +
