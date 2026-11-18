@@ -110,6 +110,7 @@ $classFiles = Get-ChildItem -Recurse -Path "$build\bin" -Filter "*.class" | ForE
 $d8Args = @(
     "-cp", $r8,
     "com.android.tools.r8.D8",
+    "--release",
     "--lib", $androidJar,
     "--min-api", "24",
     "--output", "$build\dex"

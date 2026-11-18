@@ -19,7 +19,7 @@ public class WebAppInterface {
 
     public static final String DEFAULT_APP_URL = "https://notka.duckdns.org/app/?source=android";
     public static final String DEFAULT_API_URL = "https://notka.duckdns.org";
-    public static final String APP_VERSION = "2.6.0";
+    public static final String APP_VERSION = "2.6.1";
 
     private final MainActivity activity;
     private final WebView webView;
@@ -40,7 +40,7 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public void setAppUrl(String url) {
-        if (url != null && !url.trim().isEmpty()) {
+        if (AppUpdater.isTrustedServerUrl(url)) {
             String clean = url.trim();
             prefs.edit().putString(KEY_APP_URL, clean).apply();
             Log.d(TAG, "Saved App URL: " + clean);
@@ -59,7 +59,7 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public void setApiBaseUrl(String url) {
-        if (url != null && !url.trim().isEmpty()) {
+        if (AppUpdater.isTrustedServerUrl(url)) {
             String clean = url.trim();
             if (clean.endsWith("/")) {
                 clean = clean.substring(0, clean.length() - 1);
@@ -118,7 +118,12 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public void startAppUpdate() {
-        AppUpdater.startDownloadAndInstall(activity);
+        AppUpdater.startDownload(activity);
+    }
+
+    @JavascriptInterface
+    public void openUpdateDownloads() {
+        AppUpdater.openDownloads(activity);
     }
 
     @JavascriptInterface

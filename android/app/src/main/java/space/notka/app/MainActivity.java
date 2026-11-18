@@ -88,7 +88,6 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         configureHighRefreshRate();
-        AppUpdater.onResume(this);
     }
 
     private void configureHighRefreshRate() {
@@ -127,40 +126,8 @@ public class MainActivity extends Activity {
                     Log.i(TAG, "Selected preferred display mode id: " + bestModeId + " (" + maxRefreshRate + " Hz)");
                 }
 
-                // Enable frame rate touch boost if supported
-                try {
-                    params.setFrameRateBoostOnTouchEnabled(true);
-                } catch (Throwable ignored) {}
-
-                // API 30+ min/max display refresh rates via reflection
-                try {
-                    java.lang.reflect.Field minField = params.getClass().getField("preferredMinDisplayRefreshRate");
-                    minField.setFloat(params, maxRefreshRate);
-                    java.lang.reflect.Field maxField = params.getClass().getField("preferredMaxDisplayRefreshRate");
-                    maxField.setFloat(params, maxRefreshRate);
-                } catch (Throwable ignored) {}
-
                 window.setAttributes(params);
             }
-
-            // Surface / View frame rate hint via reflection
-            try {
-                View decor = window.getDecorView();
-                java.lang.reflect.Method setFrameRateMethod = View.class.getMethod("setFrameRate", float.class, int.class);
-                setFrameRateMethod.invoke(decor, maxRefreshRate, 0);
-                if (webView != null) {
-                    setFrameRateMethod.invoke(webView, maxRefreshRate, 0);
-                }
-            } catch (Throwable ignored) {}
-
-            // Android 15/16+ (API 35+) high frame rate category hint
-            try {
-                java.lang.reflect.Method catMethod = View.class.getMethod("setFrameRateCategory", int.class);
-                catMethod.invoke(window.getDecorView(), 3);
-                if (webView != null) {
-                    catMethod.invoke(webView, 3);
-                }
-            } catch (Throwable ignored) {}
         } catch (Exception e) {
             Log.e(TAG, "Failed to configure high refresh rate", e);
         }
@@ -298,10 +265,6 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             // Pre-rasterize offscreen web content for silky 120/165 FPS scrolling
             settings.setOffscreenPreRaster(true);
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            WebView.setWebContentsDebuggingEnabled(true);
         }
 
         webAppInterface = new WebAppInterface(this, webView);
