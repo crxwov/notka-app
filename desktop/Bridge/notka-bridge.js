@@ -121,9 +121,10 @@
     isDesktop: true,
     platform: 'windows-webview2',
     get user() { return activeSession?.user || null; },
-    version: '1.3.0',
+    version: '1.4.0',
     postMessage: postToHost,
     openExternal: (url) => postToHost({ type: 'open_external', url }),
+    checkForUpdates: () => postToHost({ type: 'update_check' }),
     showLogin: () => {
       try {
         const row = document.getElementById('menu-login') || document.getElementById('account-login-row');
@@ -626,6 +627,218 @@
       return true;
     }
     return false;
+  };
+
+  // ============================================================
+  // IN-APP AUTO-UPDATE MODAL (Matches live Notka Living Light UI)
+  // ============================================================
+  window.__notkaShowToast = function (message) {
+    try {
+      const t = document.getElementById('toast');
+      if (t) {
+        t.textContent = String(message || '');
+        t.classList.add('show');
+        clearTimeout(window.__notkaToastTimer);
+        window.__notkaToastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+      }
+    } catch (e) {}
+  };
+
+  window.__notkaShowUpdateModal = function (info) {
+    try {
+      if (!document.body || !info) return;
+      if (!document.getElementById('notka-upd-style')) {
+        const st = document.createElement('style');
+        st.id = 'notka-upd-style';
+        st.textContent = `
+          #notka-update-modal { z-index: 95; }
+          #notka-update-modal .modal { text-align: center; padding: 22px 18px 18px; }
+          #notka-update-modal .sheet-title { justify-content: center; text-align: center; padding: 0; margin: 0 0 2px; }
+          .notka-upd-badge {
+            display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px;
+            margin-bottom: 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+            background: color-mix(in srgb, var(--c-warm, #FFA6B8) 18%, var(--surface-2, rgba(255,233,223,0.09)));
+            color: var(--c-core, #FFE9DF);
+            box-shadow: inset 0 0 0 1px var(--line, rgba(255,233,223,0.12));
+          }
+          .notka-upd-badge i {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--c-warm, #FFA6B8);
+            box-shadow: 0 0 8px var(--c-mid, #FF4FA0);
+          }
+          .notka-upd-log {
+            text-align: left; margin: 12px 0 14px; padding: 12px 14px; border-radius: 18px;
+            max-height: 240px; overflow-y: auto; font-size: 14px; line-height: 1.48;
+            color: var(--text-2, rgba(255,241,234,0.72));
+            background: var(--surface-1, rgba(255,233,223,0.055));
+            box-shadow: inset 0 0 0 1px var(--line, rgba(255,233,223,0.09));
+            white-space: pre-line;
+          }
+          .notka-upd-prog { margin: 4px 0 14px; text-align: left; }
+          .notka-upd-prog-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            margin-bottom: 8px; font-size: 13px; color: var(--text-2, rgba(255,241,234,0.72));
+            font-variant-numeric: tabular-nums;
+          }
+          .notka-upd-bar {
+            height: 6px; border-radius: 999px; overflow: hidden;
+            background: var(--surface-2, rgba(255,233,223,0.1));
+          }
+          .notka-upd-fill {
+            height: 100%; width: 0%; border-radius: 999px;
+            background: var(--btn-light, #FFF1EA); transition: width 0.18s ease-out;
+          }
+          .notka-upd-err { margin: 0 0 12px; font-size: 13px; line-height: 1.4; color: #ff8e9e; }
+          #notka-update-modal .pill-btn { cursor: pointer; }
+          #notka-update-modal .pill-btn:disabled { opacity: 0.55; pointer-events: none; }
+        `;
+        (document.head || document.documentElement).appendChild(st);
+      }
+
+      const existing = document.getElementById('notka-update-modal');
+      if (existing) existing.remove();
+
+      const wrap = document.createElement('div');
+      wrap.id = 'notka-update-modal';
+      wrap.className = 'modal-anim';
+      wrap.setAttribute('role', 'dialog');
+      wrap.setAttribute('aria-modal', 'true');
+      wrap.style.display = 'flex';
+
+      const card = document.createElement('div');
+      card.className = 'modal';
+
+      const badge = document.createElement('span');
+      badge.className = 'notka-upd-badge';
+      badge.appendChild(document.createElement('i'));
+      const verLabel = (info.currentVersion && info.version && info.currentVersion !== info.version)
+        ? `v${info.currentVersion} → v${info.version}`
+        : `Нотка ${info.version || ''}`;
+      badge.appendChild(document.createTextNode(verLabel));
+      card.appendChild(badge);
+
+      const title = document.createElement('p');
+      title.className = 'sheet-title';
+      title.textContent = 'Доступно обновление';
+      card.appendChild(title);
+
+      const log = document.createElement('div');
+      log.className = 'notka-upd-log';
+      log.textContent = info.changelog || 'Улучшения стабильности и исправления ошибок.';
+      card.appendChild(log);
+
+      const prog = document.createElement('div');
+      prog.className = 'notka-upd-prog';
+      prog.hidden = true;
+      const progRow = document.createElement('div');
+      progRow.className = 'notka-upd-prog-row';
+      const progTxt = document.createElement('span');
+      const progMb = document.createElement('span');
+      progRow.appendChild(progTxt);
+      progRow.appendChild(progMb);
+      const bar = document.createElement('div');
+      bar.className = 'notka-upd-bar';
+      const fill = document.createElement('div');
+      fill.className = 'notka-upd-fill';
+      bar.appendChild(fill);
+      prog.appendChild(progRow);
+      prog.appendChild(bar);
+      card.appendChild(prog);
+
+      const err = document.createElement('p');
+      err.className = 'notka-upd-err';
+      err.hidden = true;
+      card.appendChild(err);
+
+      const acts = document.createElement('div');
+      acts.className = 'modal-actions';
+      const laterBtn = document.createElement('button');
+      laterBtn.type = 'button';
+      laterBtn.className = 'pill-btn pill-quiet';
+      laterBtn.setAttribute('data-close', '1');
+      laterBtn.textContent = 'Позже';
+
+      const goBtn = document.createElement('button');
+      goBtn.type = 'button';
+      goBtn.className = 'pill-btn pill-primary';
+      goBtn.textContent = 'Обновить';
+
+      acts.appendChild(laterBtn);
+      acts.appendChild(goBtn);
+      card.appendChild(acts);
+      wrap.appendChild(card);
+      document.body.appendChild(wrap);
+
+      let busy = false;
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape' && !busy) closeModal();
+      };
+      const closeModal = () => {
+        document.removeEventListener('keydown', onKeyDown);
+        wrap.classList.remove('open');
+        setTimeout(() => { if (wrap.parentNode) wrap.remove(); }, 320);
+        postToHost({ type: 'update_dismiss' });
+      };
+
+      document.addEventListener('keydown', onKeyDown);
+      laterBtn.addEventListener('click', () => {
+        if (busy) {
+          postToHost({ type: 'update_cancel' });
+        } else {
+          closeModal();
+        }
+      });
+      wrap.addEventListener('click', (e) => {
+        if (e.target === wrap && !busy) closeModal();
+      });
+      goBtn.addEventListener('click', () => {
+        if (busy) return;
+        postToHost({ type: 'update_start' });
+      });
+
+      const fmtBytes = (b) => {
+        if (!b || b <= 0) return '';
+        if (b < 1048576) return Math.round(b / 1024) + ' КБ';
+        return (b / 1048576).toFixed(1) + ' МБ';
+      };
+
+      window.__notkaUpdateState = function (s) {
+        if (!s) return;
+        if (s.phase === 'downloading' || s.phase === 'verifying' || s.phase === 'installing') {
+          busy = true;
+          prog.hidden = false;
+          err.hidden = true;
+          progTxt.textContent = s.text || '';
+          progMb.textContent = s.total > 0 ? `${fmtBytes(s.loaded)} / ${fmtBytes(s.total)}` : fmtBytes(s.loaded);
+          fill.style.width = `${s.percent >= 0 ? s.percent : 35}%`;
+          goBtn.disabled = true;
+          goBtn.textContent = s.phase === 'installing' ? 'Установка…' : 'Загрузка…';
+          laterBtn.textContent = 'Отмена';
+          laterBtn.disabled = s.phase === 'installing';
+        } else if (s.phase === 'error') {
+          busy = false;
+          prog.hidden = true;
+          err.hidden = false;
+          err.textContent = s.error || 'Ошибка загрузки обновления';
+          goBtn.disabled = false;
+          goBtn.textContent = 'Повторить';
+          laterBtn.disabled = false;
+          laterBtn.textContent = 'Позже';
+        } else {
+          busy = false;
+          prog.hidden = true;
+          err.hidden = true;
+          goBtn.disabled = false;
+          goBtn.textContent = 'Обновить';
+          laterBtn.disabled = false;
+          laterBtn.textContent = 'Позже';
+        }
+      };
+
+      requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
+    } catch (e) {
+      console.warn('[NotkaDesktop] Update modal error:', e);
+    }
   };
 
   postToHost({ type: 'bridge_ready' });

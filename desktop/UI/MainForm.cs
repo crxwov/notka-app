@@ -5,12 +5,15 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Notka.Desktop.Discord;
 using Notka.Desktop.Smtc;
 using Notka.Desktop.Tray;
+using Notka.Desktop.Updater;
 
 namespace Notka.Desktop.UI;
 
@@ -35,6 +38,7 @@ public sealed class MainForm : Form
     private readonly TrayIconManager _tray;
     private readonly DiscordRpcManager _discordRpc;
     private readonly CoverCache _coverCache;
+    private readonly AppUpdater _updater;
     private readonly string _startUrl;
     private readonly string _settingsFilePath;
     private readonly string _authFilePath;
@@ -43,6 +47,10 @@ public sealed class MainForm : Form
 
     private bool _isExiting;
     private bool _balloonShown;
+    private bool _initialUpdateChecked;
+    private bool _updateDownloading;
+    private UpdateInfo? _pendingUpdate;
+    private CancellationTokenSource? _updateDownloadCts;
     private string _currentTitle = "Notka";
     private string _currentArtist = "";
     private string _currentAlbum = "";
@@ -56,7 +64,7 @@ public sealed class MainForm : Form
         // Window appearance
         Text = "Notka";
         Icon = LoadApplicationIcon();
-        BackColor = Color.FromArgb(13, 13, 15);
+        BackColor = Color.FromArgb(19, 8, 15);
         ForeColor = Color.White;
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1060, 740);
@@ -75,6 +83,7 @@ public sealed class MainForm : Form
         );
         Directory.CreateDirectory(_appDataDir);
         _coverCache = new CoverCache(_appDataDir);
+        _updater = new AppUpdater(_appDataDir, AppUpdater.NormalizeVersion(Application.ProductVersion));
         _settingsFilePath = Path.Combine(_appDataDir, "window-settings.json");
         _authFilePath = Path.Combine(_appDataDir, "auth.json");
         _sessionFilePath = Path.Combine(_appDataDir, "session.json");
@@ -101,13 +110,18 @@ public sealed class MainForm : Form
             _discordRpc.IsEnabled = !_discordRpc.IsEnabled;
             _tray.SetDiscordState(_discordRpc.IsEnabled);
         };
+        _tray.CheckUpdateRequested += () =>
+        {
+            RestoreWindow();
+            _ = CheckForUpdatesAndPromptAsync(manual: true);
+        };
         _tray.ExitRequested += ExitApplication;
 
         // WebView2 control
         _webView = new WebView2
         {
             Dock = DockStyle.Fill,
-            DefaultBackgroundColor = Color.FromArgb(13, 13, 15)
+            DefaultBackgroundColor = Color.FromArgb(19, 8, 15)
         };
         Controls.Add(_webView);
 
@@ -259,7 +273,17 @@ public sealed class MainForm : Form
             _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             _webView.CoreWebView2.NavigationCompleted += (_, e) =>
             {
-                Log($"[WebView2] NavigationCompleted: success={e.IsSuccess}, httpStatus={e.HttpStatusCode}");
+                string src = _webView.CoreWebView2?.Source ?? "";
+                Log($"[WebView2] NavigationCompleted: success={e.IsSuccess}, httpStatus={e.HttpStatusCode}, url={src}");
+                if (e.IsSuccess && !_initialUpdateChecked && src.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    _initialUpdateChecked = true;
+                    _ = CheckForUpdatesAndPromptAsync(manual: false);
+                }
+                else if (!e.IsSuccess && e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled)
+                {
+                    try { _webView.CoreWebView2?.NavigateToString(BuildOfflineHtml()); } catch { }
+                }
             };
 
             // Open external links in default browser
@@ -531,6 +555,25 @@ public sealed class MainForm : Form
                     OpenExternalUrl(url);
                 }
             }
+            else if (type == "update_start")
+            {
+                _ = StartDesktopUpdateDownloadAsync();
+            }
+            else if (type == "update_cancel" || type == "update_dismiss")
+            {
+                try { _updateDownloadCts?.Cancel(); } catch { }
+            }
+            else if (type == "update_check")
+            {
+                _ = CheckForUpdatesAndPromptAsync(manual: true);
+            }
+            else if (type == "retry_connect")
+            {
+                BeginInvoke(() =>
+                {
+                    try { _webView.CoreWebView2?.Navigate(_startUrl); } catch { }
+                });
+            }
         }
         catch (Exception ex)
         {
@@ -604,12 +647,191 @@ public sealed class MainForm : Form
         }
 
         SaveWindowSettings();
+        try { _updateDownloadCts?.Cancel(); _updateDownloadCts?.Dispose(); } catch { }
+        _updater.Dispose();
         _coverCache.Dispose();
         _discordRpc.Dispose();
         _smtc.Dispose();
         _tray.Dispose();
         base.OnFormClosing(e);
     }
+
+    private async Task CheckForUpdatesAndPromptAsync(bool manual)
+    {
+        try
+        {
+            if (!manual)
+            {
+                await Task.Delay(750);
+            }
+
+            var info = await _updater.CheckForUpdatesAsync();
+            if (IsDisposed) return;
+
+            if (info == null)
+            {
+                _pendingUpdate = null;
+                if (manual)
+                {
+                    string msg = JsonSerializer.Serialize($"У вас последняя версия Нотки ({_updater.CurrentVersion})");
+                    BeginInvoke(async () =>
+                    {
+                        try
+                        {
+                            if (_webView.CoreWebView2 != null)
+                            {
+                                await _webView.CoreWebView2.ExecuteScriptAsync($"window.__notkaShowToast && window.__notkaShowToast({msg});");
+                            }
+                        }
+                        catch { }
+                    });
+                }
+                return;
+            }
+
+            _pendingUpdate = info;
+            Log($"[Updater] Update available: {info.CurrentVersion} -> {info.Version} ({info.DownloadUrl})");
+
+            string payload = JsonSerializer.Serialize(new
+            {
+                version = info.Version,
+                currentVersion = info.CurrentVersion,
+                changelog = info.Changelog,
+                size = info.SizeBytes
+            });
+
+            BeginInvoke(async () =>
+            {
+                try
+                {
+                    if (_webView.CoreWebView2 != null)
+                    {
+                        await _webView.CoreWebView2.ExecuteScriptAsync($"window.__notkaShowUpdateModal && window.__notkaShowUpdateModal({payload});");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[Updater] Failed to open modal: {ex.Message}");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Log($"[Updater] Check error: {ex.Message}");
+            if (manual && !IsDisposed)
+            {
+                string msg = JsonSerializer.Serialize("Не удалось проверить обновления");
+                BeginInvoke(async () =>
+                {
+                    try
+                    {
+                        if (_webView.CoreWebView2 != null)
+                        {
+                            await _webView.CoreWebView2.ExecuteScriptAsync($"window.__notkaShowToast && window.__notkaShowToast({msg});");
+                        }
+                    }
+                    catch { }
+                });
+            }
+        }
+    }
+
+    private async Task StartDesktopUpdateDownloadAsync()
+    {
+        var info = _pendingUpdate;
+        if (info == null || _updateDownloading) return;
+        _updateDownloading = true;
+
+        _updateDownloadCts?.Dispose();
+        _updateDownloadCts = new CancellationTokenSource();
+        var ct = _updateDownloadCts.Token;
+
+        try
+        {
+            string msiPath = await _updater.DownloadUpdateAsync(
+                info,
+                progress => PushUpdateStateToWebView(progress),
+                ct
+            );
+
+            Log($"[Updater] Verified MSI ready at {msiPath}, launching upgrade...");
+            AppUpdater.LaunchMsiUpgradeDetached(msiPath, Environment.ProcessId);
+            await Task.Delay(300);
+            if (!IsDisposed)
+            {
+                BeginInvoke(ExitApplication);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            PushUpdateStateToWebView(new UpdateProgress("idle", 0, 0, 0));
+        }
+        catch (Exception ex)
+        {
+            Log($"[Updater] Download failed: {ex.Message}");
+            PushUpdateStateToWebView(new UpdateProgress("error", 0, 0, 0, Error: ex.Message));
+        }
+        finally
+        {
+            _updateDownloading = false;
+        }
+    }
+
+    private void PushUpdateStateToWebView(UpdateProgress progress)
+    {
+        if (IsDisposed || !IsHandleCreated) return;
+        string json = JsonSerializer.Serialize(new
+        {
+            phase = progress.Phase,
+            percent = progress.Percent,
+            loaded = progress.LoadedBytes,
+            total = progress.TotalBytes,
+            text = progress.Text,
+            error = progress.Error
+        });
+
+        BeginInvoke(async () =>
+        {
+            try
+            {
+                if (_webView.CoreWebView2 != null)
+                {
+                    await _webView.CoreWebView2.ExecuteScriptAsync($"window.__notkaUpdateState && window.__notkaUpdateState({json});");
+                }
+            }
+            catch { }
+        });
+    }
+
+    private static string BuildOfflineHtml() => """
+        <!DOCTYPE html>
+        <html lang="ru">
+        <head>
+          <meta charset="UTF-8">
+          <title>Нотка — Нет связи</title>
+          <style>
+            :root { --bg:#1A0B16; --ground:#13080F; --text:#FFF1EA; --text-2:rgba(255,241,234,0.66); --c-core:#FFE9DF; --c-warm:#FFA6B8; --c-mid:#FF4FA0; --c-deep:#44112F; --btn-light:linear-gradient(150deg,#FFFFFF 0%,#FFF4EE 45%,#FFD7DF 100%); }
+            * { box-sizing:border-box; margin:0; padding:0; user-select:none; }
+            body { background:radial-gradient(circle at 50% 24%,rgba(68,17,47,0.72) 0%,var(--ground) 64%); background-color:var(--ground); color:var(--text); font-family:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; text-align:center; }
+            .card { width:100%; max-width:360px; padding:28px 22px 22px; border-radius:32px; background:linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.03) 40%),linear-gradient(135deg,rgba(64,34,52,0.62),rgba(24,14,24,0.86)); box-shadow:inset 0 1px 0.5px rgba(255,255,255,0.32),inset 0 0 0 0.5px rgba(255,255,255,0.14),0 30px 70px -20px rgba(0,0,0,0.75); display:flex; flex-direction:column; align-items:center; }
+            .orb { width:68px; height:68px; border-radius:50%; background:radial-gradient(circle at 36% 30%,var(--c-core) 0 12%,var(--c-warm) 36%,var(--c-mid) 66%,var(--c-deep) 100%); display:flex; align-items:center; justify-content:center; margin-bottom:20px; box-shadow:0 10px 30px -8px rgba(255,79,160,0.45); }
+            .orb svg { width:30px; height:30px; fill:none; stroke:var(--bg); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+            h1 { font-size:22px; font-weight:700; letter-spacing:-0.02em; margin-bottom:8px; }
+            p { font-size:15px; line-height:1.45; color:var(--text-2); margin-bottom:22px; }
+            button { width:100%; height:50px; border-radius:999px; border:none; background:var(--btn-light); color:var(--bg); font:inherit; font-size:16px; font-weight:600; cursor:pointer; }
+            button:active { transform:scale(0.97); }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="orb"><svg viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg></div>
+            <h1>Нет подключения к сети</h1>
+            <p>Проверьте интернет-соединение и попробуйте снова.</p>
+            <button onclick="window.chrome&&window.chrome.webview&&window.chrome.webview.postMessage({type:'retry_connect'})">Повторить</button>
+          </div>
+        </body>
+        </html>
+        """;
 
     protected override void OnResize(EventArgs e)
     {

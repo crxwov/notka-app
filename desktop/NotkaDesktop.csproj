@@ -9,7 +9,7 @@
     <ApplicationIcon>Assets\notka.ico</ApplicationIcon>
     <AssemblyName>Notka</AssemblyName>
     <RootNamespace>Notka.Desktop</RootNamespace>
-    <Version>1.3.0</Version>
+    <Version>1.4.0</Version>
     <Authors>crxwov, leksik</Authors>
     <Company>Notka</Company>
     <Product>Notka Music Player</Product>
@@ -20,6 +20,7 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;installer\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

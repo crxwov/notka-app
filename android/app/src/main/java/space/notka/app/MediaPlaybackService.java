@@ -32,6 +32,7 @@ public class MediaPlaybackService extends Service {
 
     public static final String ACTION_UPDATE_TRACK = "space.notka.app.UPDATE_TRACK";
     public static final String ACTION_UPDATE_STATE = "space.notka.app.UPDATE_STATE";
+    public static final String ACTION_UPDATE_POSITION = "space.notka.app.UPDATE_POSITION";
     public static final String ACTION_PLAY = "space.notka.app.PLAY";
     public static final String ACTION_PAUSE = "space.notka.app.PAUSE";
     public static final String ACTION_PREV = "space.notka.app.PREV";
@@ -43,6 +44,8 @@ public class MediaPlaybackService extends Service {
     public static final String EXTRA_ALBUM = "extra_album";
     public static final String EXTRA_ARTWORK = "extra_artwork";
     public static final String EXTRA_IS_PLAYING = "extra_is_playing";
+    public static final String EXTRA_DURATION_MS = "extra_duration_ms";
+    public static final String EXTRA_POSITION_MS = "extra_position_ms";
 
     private MediaSession mediaSession;
     private PowerManager.WakeLock wakeLock;
@@ -54,6 +57,8 @@ public class MediaPlaybackService extends Service {
     private String currentArtworkUrl = "";
     private Bitmap currentArtworkBitmap = null;
     private boolean isPlaying = false;
+    private long currentDurationMs = -1L;
+    private long currentPositionMs = PlaybackState.PLAYBACK_POSITION_UNKNOWN;
 
     public static void updateMetadata(Context context, String title, String artist, String album, String artworkUrl, boolean isPlaying) {
         Intent intent = new Intent(context, MediaPlaybackService.class);
@@ -87,6 +92,21 @@ public class MediaPlaybackService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Failed to start service for state update", e);
         }
+    }
+
+    public static void updatePosition(Context context, double durationSec, double positionSec, boolean isPlaying) {
+        long durMs = (!Double.isNaN(durationSec) && !Double.isInfinite(durationSec) && durationSec > 0)
+                ? (long) (durationSec * 1000.0) : -1L;
+        long posMs = (!Double.isNaN(positionSec) && !Double.isInfinite(positionSec) && positionSec >= 0)
+                ? (long) (positionSec * 1000.0) : PlaybackState.PLAYBACK_POSITION_UNKNOWN;
+        Intent intent = new Intent(context, MediaPlaybackService.class);
+        intent.setAction(ACTION_UPDATE_POSITION);
+        intent.putExtra(EXTRA_DURATION_MS, durMs);
+        intent.putExtra(EXTRA_POSITION_MS, posMs);
+        intent.putExtra(EXTRA_IS_PLAYING, isPlaying);
+        try {
+            context.startService(intent);
+        } catch (Exception ignored) {}
     }
 
     @Override
@@ -173,6 +193,15 @@ public class MediaPlaybackService extends Service {
             public void onStop() {
                 handleMediaAction(ACTION_STOP);
             }
+
+            @Override
+            public void onSeekTo(long pos) {
+                currentPositionMs = Math.max(0L, pos);
+                updatePlaybackStateOnly();
+                if (MainActivity.getInstance() != null) {
+                    MainActivity.getInstance().dispatchSeek(pos / 1000.0);
+                }
+            }
         });
         mediaSession.setActive(true);
     }
@@ -209,6 +238,19 @@ public class MediaPlaybackService extends Service {
                 isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false);
                 updateLocks(isPlaying);
                 updateNotificationAndSession();
+            } else if (ACTION_UPDATE_POSITION.equals(action)) {
+                long durMs = intent.getLongExtra(EXTRA_DURATION_MS, -1L);
+                long posMs = intent.getLongExtra(EXTRA_POSITION_MS, PlaybackState.PLAYBACK_POSITION_UNKNOWN);
+                boolean playing = intent.getBooleanExtra(EXTRA_IS_PLAYING, isPlaying);
+                boolean durationChanged = (durMs > 0 && durMs != currentDurationMs);
+                if (durMs > 0) currentDurationMs = durMs;
+                currentPositionMs = posMs;
+                isPlaying = playing;
+                if (durationChanged) {
+                    updateNotificationAndSession();
+                } else {
+                    updatePlaybackStateOnly();
+                }
             } else if (ACTION_PLAY.equals(action) || ACTION_PAUSE.equals(action) ||
                        ACTION_NEXT.equals(action) || ACTION_PREV.equals(action) ||
                        ACTION_STOP.equals(action)) {
@@ -249,21 +291,29 @@ public class MediaPlaybackService extends Service {
         return b;
     }
 
-    private void updateNotificationAndSession() {
+    private void updatePlaybackStateOnly() {
+        if (mediaSession == null) return;
         long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE |
-                       PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS;
-
+                       PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS |
+                       PlaybackState.ACTION_SEEK_TO;
         PlaybackState state = new PlaybackState.Builder()
                 .setActions(actions)
                 .setState(isPlaying ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED,
-                          PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+                          currentPositionMs, isPlaying ? 1.0f : 0.0f)
                 .build();
         mediaSession.setPlaybackState(state);
+    }
+
+    private void updateNotificationAndSession() {
+        updatePlaybackStateOnly();
 
         MediaMetadata.Builder metaBuilder = new MediaMetadata.Builder()
                 .putString(MediaMetadata.METADATA_KEY_TITLE, currentTitle)
                 .putString(MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
                 .putString(MediaMetadata.METADATA_KEY_ALBUM, currentAlbum);
+        if (currentDurationMs > 0) {
+            metaBuilder.putLong(MediaMetadata.METADATA_KEY_DURATION, currentDurationMs);
+        }
         if (currentArtworkBitmap != null) {
             metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, currentArtworkBitmap);
         }

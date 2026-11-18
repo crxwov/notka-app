@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\desktop\UI\CoverCache.cs" Link="CoverCache.cs" />
+    <Compile Include="..\..\desktop\Updater\AppUpdater.cs" Link="AppUpdater.cs" />
   </ItemGroup>
 </Project>

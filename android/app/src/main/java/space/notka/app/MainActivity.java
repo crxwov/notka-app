@@ -35,7 +35,7 @@ import java.io.File;
 public class MainActivity extends Activity {
     private static final String TAG = "NotkaMainActivity";
     private static final String CHROME_USER_AGENT = 
-        "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36 NotkaApp/2.5";
+        "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36 NotkaApp/2.6";
 
     private static MainActivity sInstance;
 
@@ -88,6 +88,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         configureHighRefreshRate();
+        AppUpdater.onResume(this);
     }
 
     private void configureHighRefreshRate() {
@@ -288,8 +289,8 @@ public class MainActivity extends Activity {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
 
-        // Hardware acceleration and styling
-        webView.setBackgroundColor(Color.parseColor("#0C0A12"));
+        // Hardware acceleration and styling (matches Living Light dark ground)
+        webView.setBackgroundColor(Color.parseColor("#13080F"));
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         // Direct GPU rendering without offscreen texture churn
         webView.setLayerType(View.LAYER_TYPE_NONE, null);
@@ -405,6 +406,9 @@ public class MainActivity extends Activity {
                 injectMediaBridge();
                 injectInsets();
                 injectKeyboardStyles();
+                if (url != null && !url.startsWith("file:///android_asset/")) {
+                    AppUpdater.onPageReady(MainActivity.this, view);
+                }
             }
 
             @Override
@@ -741,6 +745,17 @@ public class MainActivity extends Activity {
                     webView.evaluateJavascript("window.NotkaAndroidBridge && window.NotkaAndroidBridge.prev()", null);
                     break;
             }
+        });
+    }
+
+    public void dispatchSeek(double seconds) {
+        if (Double.isNaN(seconds) || Double.isInfinite(seconds) || seconds < 0) return;
+        runOnUiThread(() -> {
+            if (webView == null) return;
+            String js = String.format(java.util.Locale.US,
+                "if (window.notkaMedia && typeof window.notkaMedia.seek === 'function') { window.notkaMedia.seek(%.3f); } else { var a = document.querySelector('audio'); if (a) a.currentTime = %.3f; }",
+                seconds, seconds);
+            webView.evaluateJavascript(js, null);
         });
     }
 

@@ -19,7 +19,7 @@ public class WebAppInterface {
 
     public static final String DEFAULT_APP_URL = "https://notka.duckdns.org/app/?source=android";
     public static final String DEFAULT_API_URL = "https://notka.duckdns.org";
-    public static final String APP_VERSION = "2.5.6";
+    public static final String APP_VERSION = "2.6.0";
 
     private final MainActivity activity;
     private final WebView webView;
@@ -78,6 +78,10 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public String getAppVersion() {
+        try {
+            String vn = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0).versionName;
+            if (vn != null && !vn.isEmpty()) return vn;
+        } catch (Exception ignored) {}
         return APP_VERSION;
     }
 
@@ -100,6 +104,36 @@ public class WebAppInterface {
     @JavascriptInterface
     public void updatePlaybackState(boolean isPlaying) {
         MediaPlaybackService.updateState(activity, isPlaying);
+    }
+
+    @JavascriptInterface
+    public void updatePosition(double durationSec, double positionSec, boolean isPlaying) {
+        MediaPlaybackService.updatePosition(activity, durationSec, positionSec, isPlaying);
+    }
+
+    @JavascriptInterface
+    public void hapticSelection() {
+        hapticImpact("light");
+    }
+
+    @JavascriptInterface
+    public void startAppUpdate() {
+        AppUpdater.startDownloadAndInstall(activity);
+    }
+
+    @JavascriptInterface
+    public void cancelAppUpdate() {
+        AppUpdater.cancelDownload(activity);
+    }
+
+    @JavascriptInterface
+    public void dismissAppUpdate() {
+        AppUpdater.dismissPrompt();
+    }
+
+    @JavascriptInterface
+    public void checkAppUpdate() {
+        AppUpdater.checkForUpdatesAsync(activity, true);
     }
 
     @JavascriptInterface

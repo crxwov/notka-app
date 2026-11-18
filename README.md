@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/crxwov/notka-app/releases/download/v2.5.5/notka.apk"><strong>Скачать для Android</strong></a>
+  <a href="https://notka.duckdns.org/app/releases/notka.apk"><strong>Скачать для Android</strong></a>
   ·
-  <a href="https://github.com/crxwov/notka-app/releases/download/v2.5.5/Notka-Setup-1.3.0.msi"><strong>Скачать для Windows</strong></a>
+  <a href="https://notka.duckdns.org/app/releases/Notka-Setup.msi"><strong>Скачать для Windows</strong></a>
   ·
   <a href="https://notka.duckdns.org/app/">Открыть в браузере</a>
 </p>
@@ -21,8 +21,8 @@
 
 | Платформа | Что умеет приложение |
 | --- | --- |
-| **Android** · APK | Воспроизведение с выключенным экраном, управление из шторки, кэш обложек и проверка обновлений в приложении. |
-| **Windows** · MSI | Фоновое воспроизведение в трее, системные медиаклавиши и статус в Discord с названием трека и исполнителем. |
+| **Android** · APK | Воспроизведение с выключенным экраном, полоса перемотки и управление из шторки, кэш обложек и автообновление с сервера Нотки. |
+| **Windows** · MSI | Фоновое воспроизведение в трее, системные медиаклавиши, статус в Discord и автообновление прямо в приложении. |
 
 На странице последнего релиза есть список изменений и контрольные суммы SHA-256 установщиков. [GitHub Releases](https://github.com/crxwov/notka-app/releases/latest)
 

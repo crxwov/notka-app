@@ -14,6 +14,7 @@ public sealed class TrayIconManager : IDisposable
     private readonly ToolStripMenuItem _itemPrev;
     private readonly ToolStripMenuItem _itemShow;
     private readonly ToolStripMenuItem _itemDiscord;
+    private readonly ToolStripMenuItem _itemCheckUpdate;
     private readonly ToolStripMenuItem _itemExit;
 
     private bool _isPlaying;
@@ -22,6 +23,7 @@ public sealed class TrayIconManager : IDisposable
     public event Action<string>? MediaCommandRequested;
     public event Action? RestoreWindowRequested;
     public event Action? ToggleDiscordRequested;
+    public event Action? CheckUpdateRequested;
     public event Action? ExitRequested;
 
     public TrayIconManager(Icon appIcon)
@@ -43,6 +45,7 @@ public sealed class TrayIconManager : IDisposable
         _itemPrev = new ToolStripMenuItem("⏮  Предыдущий трек", null, (_, _) => MediaCommandRequested?.Invoke("prev"));
 
         _itemDiscord = new ToolStripMenuItem("✓  Активность в Discord", null, (_, _) => ToggleDiscordRequested?.Invoke());
+        _itemCheckUpdate = new ToolStripMenuItem("Проверить обновления", null, (_, _) => CheckUpdateRequested?.Invoke());
 
         _itemShow = new ToolStripMenuItem("Развернуть Notka", null, (_, _) => RestoreWindowRequested?.Invoke())
         {
@@ -58,6 +61,7 @@ public sealed class TrayIconManager : IDisposable
         _contextMenu.Items.Add(_itemPrev);
         _contextMenu.Items.Add(new ToolStripSeparator());
         _contextMenu.Items.Add(_itemDiscord);
+        _contextMenu.Items.Add(_itemCheckUpdate);
         _contextMenu.Items.Add(new ToolStripSeparator());
         _contextMenu.Items.Add(_itemShow);
         _contextMenu.Items.Add(new ToolStripSeparator());
