@@ -10,11 +10,11 @@
 </p>
 
 <p align="center">
-  <a href="https://notka.duckdns.org/app/releases/notka.apk"><strong>Скачать для Android</strong></a>
+  <a href="https://notka.site/app/releases/notka.apk"><strong>Скачать для Android</strong></a>
   ·
-  <a href="https://notka.duckdns.org/app/releases/Notka-Setup.msi"><strong>Скачать для Windows</strong></a>
+  <a href="https://notka.site/app/releases/Notka-Setup.msi"><strong>Скачать для Windows</strong></a>
   ·
-  <a href="https://notka.duckdns.org/app/">Открыть в браузере</a>
+  <a href="https://notka.site/app/">Открыть в браузере</a>
 </p>
 
 ## Выбери свою платформу

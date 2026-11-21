@@ -257,6 +257,26 @@ public class MainActivity extends Activity {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
 
+        // Migrate existing session cookies from duckdns domain to notka.site
+        try {
+            String oldCookies = cookieManager.getCookie("https://notka.duckdns.org");
+            if (oldCookies != null && !oldCookies.isEmpty()) {
+                String newCookies = cookieManager.getCookie("https://notka.site");
+                if (newCookies == null || !newCookies.contains("session")) {
+                    for (String cookie : oldCookies.split(";")) {
+                        String trimmed = cookie.trim();
+                        if (!trimmed.isEmpty()) {
+                            cookieManager.setCookie("https://notka.site", trimmed);
+                        }
+                    }
+                    cookieManager.flush();
+                    Log.i(TAG, "Migrated session cookies to notka.site");
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Cookie migration notice: " + e.getMessage());
+        }
+
         // Hardware acceleration and styling (matches Living Light dark ground)
         webView.setBackgroundColor(Color.parseColor("#13080F"));
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
@@ -341,10 +361,10 @@ public class MainActivity extends Activity {
                     return true;
                 }
 
-                // External domains (t.me, telegram, github, etc.) open in external apps/browser
+                // External domains (t.me, telegram, github, google auth, etc.) open in external apps/browser
                 String host = uri.getHost();
                 if (host != null && (host.contains("t.me") || host.contains("telegram.me") ||
-                    host.contains("github.com") || host.contains("google.com"))) {
+                    host.contains("github.com") || host.contains("google.com") || host.contains("accounts.google"))) {
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, uri);
                         intent.addCategory(Intent.CATEGORY_BROWSABLE);
@@ -406,7 +426,8 @@ public class MainActivity extends Activity {
             public void onPermissionRequest(PermissionRequest request) {
                 // Security check: only allow media permissions from the verified Notka origin
                 Uri origin = request.getOrigin();
-                if (origin != null && ("notka.duckdns.org".equalsIgnoreCase(origin.getHost()) ||
+                if (origin != null && ("notka.site".equalsIgnoreCase(origin.getHost()) ||
+                                       "notka.duckdns.org".equalsIgnoreCase(origin.getHost()) ||
                                        "127.0.0.1".equals(origin.getHost()) ||
                                        "localhost".equals(origin.getHost()))) {
                     request.grant(request.getResources());

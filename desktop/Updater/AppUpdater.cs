@@ -32,14 +32,16 @@ public sealed record UpdateProgress(
 
 /// <summary>
 /// Self-hosted auto-updater for Notka Desktop.
-/// Checks https://notka.duckdns.org/app/version.json on every startup,
+/// Checks https://notka.site/app/version.json on every startup,
 /// downloads Notka-Setup.msi directly from the Notka server with SHA-256 verification,
 /// and hands off cleanly to msiexec after the running app exits.
 /// </summary>
 public sealed class AppUpdater : IDisposable
 {
-    public const string PrimaryVersionUrl = "https://notka.duckdns.org/app/version.json";
-    public const string TrustedHost = "notka.duckdns.org";
+    public const string PrimaryVersionUrl = "https://notka.site/app/version.json";
+    public const string FallbackVersionUrl = "https://notka.duckdns.org/app/version.json";
+    public const string TrustedHost = "notka.site";
+    public const string LegacyTrustedHost = "notka.duckdns.org";
 
     private readonly string _updatesDir;
     private readonly string _currentVersion;
@@ -69,17 +71,55 @@ public sealed class AppUpdater : IDisposable
         using var req = new HttpRequestMessage(HttpMethod.Get, url);
         req.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
 
-        using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseContentRead, reqCts.Token);
-        if (!resp.IsSuccessStatusCode) return null;
-
-        string json = await resp.Content.ReadAsStringAsync(reqCts.Token);
-        var info = ParseWindowsManifest(json, _currentVersion);
-        if (info == null)
+        HttpResponseMessage? resp = null;
+        try
         {
-            CleanupStaleUpdates();
-            return null;
+            resp = await _http.SendAsync(req, HttpCompletionOption.ResponseContentRead, reqCts.Token);
+            if (!resp.IsSuccessStatusCode)
+            {
+                resp.Dispose();
+                resp = null;
+            }
         }
-        return info;
+        catch
+        {
+            resp = null;
+        }
+
+        // Fallback to legacy version manifest if primary domain fails
+        if (resp == null)
+        {
+            try
+            {
+                string fbUrl = $"{FallbackVersionUrl}?t={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+                using var fbReq = new HttpRequestMessage(HttpMethod.Get, fbUrl);
+                fbReq.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
+                var fbResp = await _http.SendAsync(fbReq, HttpCompletionOption.ResponseContentRead, reqCts.Token);
+                if (fbResp.IsSuccessStatusCode)
+                {
+                    resp = fbResp;
+                }
+                else
+                {
+                    fbResp.Dispose();
+                }
+            }
+            catch { }
+        }
+
+        if (resp == null || !resp.IsSuccessStatusCode) return null;
+
+        using (resp)
+        {
+            string json = await resp.Content.ReadAsStringAsync(reqCts.Token);
+            var info = ParseWindowsManifest(json, _currentVersion);
+            if (info == null)
+            {
+                CleanupStaleUpdates();
+                return null;
+            }
+            return info;
+        }
     }
 
     public static UpdateInfo? ParseWindowsManifest(string json, string currentVersion)
@@ -262,7 +302,8 @@ public sealed class AppUpdater : IDisposable
         if (string.IsNullOrWhiteSpace(url)) return false;
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
         return string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(uri.Host, TrustedHost, StringComparison.OrdinalIgnoreCase);
+            && (string.Equals(uri.Host, TrustedHost, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Host, LegacyTrustedHost, StringComparison.OrdinalIgnoreCase));
     }
 
     public static string NormalizeVersion(string? raw)

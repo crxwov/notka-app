@@ -13,7 +13,7 @@
 
     <Icon Id="NotkaProductIcon" SourceFile="$(var.AssetsDir)/notka.ico" />
     <Property Id="ARPPRODUCTICON" Value="NotkaProductIcon" />
-    <Property Id="ARPURLINFOABOUT" Value="https://notka.duckdns.org" />
+    <Property Id="ARPURLINFOABOUT" Value="https://notka.site" />
 
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Запустить Notka после закрытия установщика" />

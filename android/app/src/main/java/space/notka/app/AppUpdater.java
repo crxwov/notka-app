@@ -24,15 +24,17 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Self-hosted update notifier for Notka Android.
- * Checks https://notka.duckdns.org/app/version.json on every startup, renders
+ * Checks https://notka.site/app/version.json on every startup, renders
  * the update modal in the live Living Light WebView UI, and downloads the update
  * cleanly via Android's system DownloadManager without requesting sensitive
  * REQUEST_INSTALL_PACKAGES permissions.
  */
 public class AppUpdater {
     private static final String TAG = "NotkaAppUpdater";
-    private static final String PRIMARY_VERSION_URL = "https://notka.duckdns.org/app/version.json";
-    private static final String TRUSTED_HOST = "notka.duckdns.org";
+    private static final String PRIMARY_VERSION_URL = "https://notka.site/app/version.json";
+    private static final String FALLBACK_VERSION_URL = "https://notka.duckdns.org/app/version.json";
+    private static final String TRUSTED_HOST = "notka.site";
+    private static final String LEGACY_TRUSTED_HOST = "notka.duckdns.org";
 
     public static final class UpdateInfo {
         public final int versionCode;
@@ -85,6 +87,11 @@ public class AppUpdater {
 
                 String urlWithBust = PRIMARY_VERSION_URL + "?t=" + System.currentTimeMillis();
                 JSONObject root = fetchJson(urlWithBust);
+                if (root == null) {
+                    try {
+                        root = fetchJson(FALLBACK_VERSION_URL + "?t=" + System.currentTimeMillis());
+                    } catch (Exception ignored) {}
+                }
                 if (root == null) {
                     if (manual) {
                         showToast(activity, "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f");
@@ -489,8 +496,9 @@ public class AppUpdater {
         if (urlStr == null || urlStr.isEmpty()) return false;
         try {
             URL u = new URL(urlStr.trim());
+            String host = u.getHost();
             return "https".equalsIgnoreCase(u.getProtocol())
-                    && TRUSTED_HOST.equalsIgnoreCase(u.getHost());
+                    && (TRUSTED_HOST.equalsIgnoreCase(host) || LEGACY_TRUSTED_HOST.equalsIgnoreCase(host));
         } catch (Exception e) {
             return false;
         }

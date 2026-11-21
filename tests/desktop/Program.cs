@@ -11,7 +11,8 @@ try
     const int concurrentCalls = 8;
     var handler = new CountingHandler(concurrentCalls);
     using var cache = new CoverCache(tempDir, handler);
-    Require(cache.IsCoverUrl("https://notka.duckdns.org/img?u=https%3A%2F%2Fyt3.googleusercontent.com%2Fcover.jpg"), "Notka artwork proxy");
+    Require(cache.IsCoverUrl("https://notka.site/img?u=https%3A%2F%2Fyt3.googleusercontent.com%2Fcover.jpg"), "Notka artwork proxy");
+    Require(cache.IsCoverUrl("https://notka.duckdns.org/img?u=https%3A%2F%2Fyt3.googleusercontent.com%2Fcover.jpg"), "Notka legacy artwork proxy");
     Require(cache.IsCoverUrl("https://i.ytimg.com/vi/test/hqdefault.jpg"), "YouTube artwork CDN");
     Require(!cache.IsCoverUrl("https://ytimg.com.evil.example/cover.jpg"), "lookalike CDN host");
     Require(!cache.IsCoverUrl("http://127.0.0.1/artwork?url=https%3A%2F%2Fytimg.com%2Fx"), "local HTTP endpoint");
@@ -37,23 +38,24 @@ try
     Require(AppUpdater.IsNewerVersion("1.10.0", "1.9.9"), "1.10.0 > 1.9.9");
     Require(!AppUpdater.IsNewerVersion("1.4.0", "1.4.0+abc123"), "same version must not prompt");
     Require(!AppUpdater.IsNewerVersion("1.3.9", "1.4.0"), "downgrade must not prompt");
-    Require(AppUpdater.IsTrustedServerUrl("https://notka.duckdns.org/app/releases/Notka-Setup.msi"), "trusted server MSI");
+    Require(AppUpdater.IsTrustedServerUrl("https://notka.site/app/releases/Notka-Setup.msi"), "trusted server MSI");
+    Require(AppUpdater.IsTrustedServerUrl("https://notka.duckdns.org/app/releases/Notka-Setup.msi"), "trusted legacy server MSI");
     Require(!AppUpdater.IsTrustedServerUrl("https://github.com/crxwov/notka-app/releases/download/v1.4.0/Notka-Setup.msi"), "GitHub rejected");
-    Require(!AppUpdater.IsTrustedServerUrl("http://notka.duckdns.org/app/releases/Notka-Setup.msi"), "HTTP rejected");
-    Require(!AppUpdater.IsTrustedServerUrl("https://notka.duckdns.org.evil.example/Notka-Setup.msi"), "lookalike rejected");
+    Require(!AppUpdater.IsTrustedServerUrl("http://notka.site/app/releases/Notka-Setup.msi"), "HTTP rejected");
+    Require(!AppUpdater.IsTrustedServerUrl("https://notka.site.evil.example/Notka-Setup.msi"), "lookalike rejected");
 
     byte[] fakeMsi = new byte[4096];
     Random.Shared.NextBytes(fakeMsi);
     string expectedSha = Convert.ToHexString(SHA256.HashData(fakeMsi)).ToLowerInvariant();
     string manifestJson = $$"""
     {
-      "versionCode": 32,
-      "versionName": "2.6.0",
-      "downloadUrl": "https://notka.duckdns.org/app/releases/notka.apk",
+      "versionCode": 35,
+      "versionName": "2.6.3",
+      "downloadUrl": "https://notka.site/app/releases/notka.apk",
       "windows": {
-        "version": "1.4.0",
+        "version": "1.4.1",
         "changelog": "• Автообновление с сервера Нотки",
-        "downloadUrl": "https://notka.duckdns.org/app/releases/Notka-Setup.msi",
+        "downloadUrl": "https://notka.site/app/releases/Notka-Setup.msi",
         "sha256": "{{expectedSha}}",
         "size": {{fakeMsi.Length}}
       }
@@ -63,8 +65,8 @@ try
     var updHandler = new MockUpdaterHandler(manifestJson, fakeMsi);
     using var updater = new AppUpdater(tempDir, "1.3.0+commit", updHandler);
     var updateInfo = await updater.CheckForUpdatesAsync();
-    Require(updateInfo is not null, "update should be detected for 1.3.0 -> 1.4.0");
-    Require(updateInfo!.Version == "1.4.0", "parsed version 1.4.0");
+    Require(updateInfo is not null, "update should be detected for 1.3.0 -> 1.4.1");
+    Require(updateInfo!.Version == "1.4.1", "parsed version 1.4.1");
 
     var phases = new List<string>();
     string msiPath = await updater.DownloadUpdateAsync(updateInfo, p => phases.Add(p.Phase));
@@ -77,15 +79,15 @@ try
     Require(cachedPath == msiPath && updHandler.DownloadCount == dlBefore, "verified MSI reused from cache");
 
     // Verify SHA-256 mismatch rejects corrupted payload
-    var badInfo = updateInfo with { Version = "1.4.1", Sha256 = new string('0', 64) };
+    var badInfo = updateInfo with { Version = "1.4.2", Sha256 = new string('0', 64) };
     bool threwHashError = false;
     try { await updater.DownloadUpdateAsync(badInfo, null); }
     catch (InvalidOperationException ex) when (ex.Message.Contains("SHA-256")) { threwHashError = true; }
     Require(threwHashError, "corrupted MSI rejected on SHA-256 mismatch");
 
     // Verify up-to-date client gets null
-    using var upToDate = new AppUpdater(tempDir, "1.4.0+commit", updHandler);
-    Require(await upToDate.CheckForUpdatesAsync() is null, "1.4.0 client sees no update");
+    using var upToDate = new AppUpdater(tempDir, "1.4.1+commit", updHandler);
+    Require(await upToDate.CheckForUpdatesAsync() is null, "1.4.1 client sees no update");
 
     Console.WriteLine("AppUpdater checks passed.");
 }

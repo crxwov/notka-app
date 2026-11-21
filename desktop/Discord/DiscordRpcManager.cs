@@ -204,7 +204,7 @@ public sealed class DiscordRpcManager : IDisposable
 
                 string artworkUrl = !string.IsNullOrWhiteSpace(_lastArtwork) && _lastArtwork.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                     ? _lastArtwork
-                    : "https://notka.duckdns.org/app/icons/icon-512.png";
+                    : "https://notka.site/app/icons/icon-512.png";
 
                 var timestampsObj = end > start
                     ? (object)new { start = start, end = end }
@@ -230,7 +230,7 @@ public sealed class DiscordRpcManager : IDisposable
                             assets = new
                             {
                                 large_image = artworkUrl,
-                                small_image = "https://notka.duckdns.org/app/icons/icon-512.png",
+                                small_image = "https://notka.site/app/icons/icon-512.png",
                                 small_text = "Нотка — Музыка для души"
                             },
                             buttons = new[]
@@ -238,7 +238,7 @@ public sealed class DiscordRpcManager : IDisposable
                                 new
                                 {
                                     label = "Слушать в Нотке",
-                                    url = "https://notka.duckdns.org/app/"
+                                    url = "https://notka.site/app/"
                                 }
                             }
                         }

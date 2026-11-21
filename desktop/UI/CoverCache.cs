@@ -79,7 +79,8 @@ public sealed class CoverCache : IDisposable
         }
 
         string host = uri.IdnHost;
-        if (host.Equals("notka.duckdns.org", StringComparison.OrdinalIgnoreCase))
+        if (host.Equals("notka.site", StringComparison.OrdinalIgnoreCase) ||
+            host.Equals("notka.duckdns.org", StringComparison.OrdinalIgnoreCase))
         {
             return (uri.AbsolutePath.EndsWith("/img", StringComparison.OrdinalIgnoreCase) && uri.Query.Contains("u=", StringComparison.OrdinalIgnoreCase)) ||
                    (uri.AbsolutePath.EndsWith("/artwork", StringComparison.OrdinalIgnoreCase) && uri.Query.Contains("url=", StringComparison.OrdinalIgnoreCase));
@@ -123,6 +124,10 @@ public sealed class CoverCache : IDisposable
 
         if (urlStr.Contains("/img?u="))
         {
+            if (urlStr.Contains("notka.duckdns.org"))
+            {
+                return urlStr.Replace("notka.duckdns.org", "notka.site", StringComparison.OrdinalIgnoreCase);
+            }
             return urlStr;
         }
 
@@ -135,7 +140,7 @@ public sealed class CoverCache : IDisposable
             try
             {
                 string decoded = Uri.UnescapeDataString(param);
-                return "https://notka.duckdns.org/img?u=" + Uri.EscapeDataString(decoded);
+                return "https://notka.site/img?u=" + Uri.EscapeDataString(decoded);
             }
             catch
             {
@@ -148,7 +153,7 @@ public sealed class CoverCache : IDisposable
         {
             try
             {
-                return "https://notka.duckdns.org/img?u=" + Uri.EscapeDataString(urlStr);
+                return "https://notka.site/img?u=" + Uri.EscapeDataString(urlStr);
             }
             catch
             {

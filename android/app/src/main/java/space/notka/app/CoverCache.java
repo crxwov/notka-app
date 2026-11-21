@@ -87,8 +87,11 @@ public class CoverCache {
         if (urlStr == null || urlStr.trim().isEmpty()) return null;
         String lower = urlStr.toLowerCase();
 
-        // If it's already an /img?u= proxy URL, use it directly
+        // If it's already an /img?u= proxy URL, use it directly (rewriting legacy host if needed)
         if (urlStr.contains("/img?u=")) {
+            if (urlStr.contains("notka.duckdns.org")) {
+                return urlStr.replace("notka.duckdns.org", "notka.site");
+            }
             return urlStr;
         }
 
@@ -100,7 +103,7 @@ public class CoverCache {
             if (amp != -1) param = param.substring(0, amp);
             try {
                 String decoded = URLDecoder.decode(param, "UTF-8");
-                return "https://notka.duckdns.org/img?u=" + URLEncoder.encode(decoded, "UTF-8");
+                return "https://notka.site/img?u=" + URLEncoder.encode(decoded, "UTF-8");
             } catch (Exception e) {
                 return urlStr;
             }
@@ -109,7 +112,7 @@ public class CoverCache {
         // In Russia, YouTube/Googleusercontent CDN IPs are blocked by DPI; route through server proxy
         if (lower.contains("googleusercontent.com") || lower.contains("ytimg.com") || lower.contains("ggpht.com")) {
             try {
-                return "https://notka.duckdns.org/img?u=" + URLEncoder.encode(urlStr, "UTF-8");
+                return "https://notka.site/img?u=" + URLEncoder.encode(urlStr, "UTF-8");
             } catch (Exception e) {
                 return urlStr;
             }

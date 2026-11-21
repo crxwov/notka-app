@@ -58,4 +58,4 @@ powershell -ExecutionPolicy Bypass -File desktop/build.ps1
 ```powershell
 .\desktop\bin\publish\Notka.exe http://localhost:8080/app/
 ```
-По умолчанию приложение подключается к продакшену `https://notka.duckdns.org/app/?source=desktop`.
+По умолчанию приложение подключается к продакшену `https://notka.site/app/?source=desktop`.

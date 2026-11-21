@@ -74,8 +74,8 @@ public sealed class MainForm : Form
         EnableDarkTitleBar();
 
         _startUrl = !string.IsNullOrWhiteSpace(startUrl)
-            ? startUrl
-            : "https://notka.duckdns.org/app/?source=desktop";
+            ? startUrl.Replace("notka.duckdns.org", "notka.site", StringComparison.OrdinalIgnoreCase)
+            : "https://notka.site/app/?source=desktop";
 
         _appDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

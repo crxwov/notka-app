@@ -84,7 +84,8 @@
     const session = activeSession;
     if (!session?.token || !session.user) return;
     try {
-      const response = await fetch('https://notka.duckdns.org/auth/avatar', {
+      const origin = (window.location.origin && window.location.origin.startsWith('http')) ? window.location.origin : 'https://notka.site';
+      const response = await fetch(`${origin}/auth/avatar`, {
         headers: { Authorization: 'Bearer ' + session.token },
         cache: 'no-store'
       });

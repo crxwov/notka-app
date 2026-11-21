@@ -17,9 +17,9 @@ public class WebAppInterface {
     private static final String KEY_APP_URL = "app_url";
     private static final String KEY_API_URL = "api_url";
 
-    public static final String DEFAULT_APP_URL = "https://notka.duckdns.org/app/?source=android";
-    public static final String DEFAULT_API_URL = "https://notka.duckdns.org";
-    public static final String APP_VERSION = "2.6.2";
+    public static final String DEFAULT_APP_URL = "https://notka.site/app/?source=android";
+    public static final String DEFAULT_API_URL = "https://notka.site";
+    public static final String APP_VERSION = "2.6.3";
 
     private final MainActivity activity;
     private final WebView webView;
@@ -35,7 +35,13 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public String getAppUrl() {
-        return prefs.getString(KEY_APP_URL, DEFAULT_APP_URL);
+        String url = prefs.getString(KEY_APP_URL, DEFAULT_APP_URL);
+        if (url != null && url.contains("notka.duckdns.org")) {
+            url = url.replace("notka.duckdns.org", "notka.site");
+            prefs.edit().putString(KEY_APP_URL, url).apply();
+            Log.i(TAG, "Migrated stored app URL to notka.site: " + url);
+        }
+        return url;
     }
 
     @JavascriptInterface
@@ -50,9 +56,14 @@ public class WebAppInterface {
     @JavascriptInterface
     public String getApiBaseUrl() {
         String url = prefs.getString(KEY_API_URL, DEFAULT_API_URL);
-        if (url == null || url.trim().isEmpty()) {
-            url = DEFAULT_API_URL;
+        if (url == null || url.trim().isEmpty() || url.contains("notka.duckdns.org")) {
+            if (url != null && url.contains("notka.duckdns.org")) {
+                url = url.replace("notka.duckdns.org", "notka.site");
+            } else {
+                url = DEFAULT_API_URL;
+            }
             prefs.edit().putString(KEY_API_URL, url).apply();
+            Log.i(TAG, "Migrated stored API base URL to notka.site: " + url);
         }
         return url;
     }
