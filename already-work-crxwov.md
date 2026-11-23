@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: active
+status: completed
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -28,4 +28,4 @@ status: active
 - Deployed left-to-right word fill from audio position, with a feathered edge and stable baseline. Single-word ad-libs over three seconds remain visible without an unreliable sweep. Chromium checked progress, seek, terminal word, and Right Foot Creep payload. Production hashes and health verified. Backup: /opt/notka/hotfix-backups/karaoke-sweep-WR1F94Pe. Authenticated playback unchecked.
 
 ## Uniform word fill
-- Active. Scope: cap visual word sweep duration, preserve provider boundaries and verify short words, pauses and seeks.
+- Deployed a 220 ms maximum left-to-right sweep per word from its provider start. Short words finish by their timestamp; completed words hold through the gap. Verified JS timing cases, patch replay, health and public asset hashes. Backup: /opt/notka/hotfix-backups/karaoke-even-G3wG6hAl. Authenticated playback unchecked.

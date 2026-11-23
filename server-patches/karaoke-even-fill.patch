@@ -1,0 +1,43 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10751,14 +10751,15 @@
+     for (let i = 0; i < spans.length; i++) {
+       const span = spans[i];
+       const { start, end } = words[i];
+-      const progress = Math.round(clamp((t - start) / (end - start), 0, 1) * 1000) / 10;
++      const fillEnd = Math.min(end, start + 0.22);
++      const progress = Math.round(clamp((t - start) / (fillEnd - start), 0, 1) * 1000) / 10;
+       if (span._lyricsFill !== progress) {
+         span._lyricsFill = progress;
+         span.style.setProperty("--lyric-fill", progress + "%");
+       }
+-      const sung = t >= end;
++      const sung = t >= fillEnd;
+       if (span._isSung === sung) continue;
+-      const justFinished = animate && span._isSung === false && sung && t - end < 0.12;
++      const justFinished = animate && span._isSung === false && sung && t - fillEnd < 0.12;
+       span._isSung = sung;
+       span.classList.toggle("is-sung", sung);
+       span.classList.toggle("is-newly-sung", justFinished);
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=488-karaoke-sweep"></script>
++<script src="app.js?v=489-karaoke-even"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v12";
++const CACHE = "notka-shell-v13";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
