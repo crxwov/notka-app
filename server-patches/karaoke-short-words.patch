@@ -1,0 +1,97 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10713,21 +10713,25 @@
+   function buildLyricsTimeline(lines) {
+     const timeline = lines.map((line, index) => {
+       const raw = line.words || [];
+-      const words = raw.map((word, i) => ({
+-        ...word,
+-        end: word.end_inferred ? Math.min(word.end, raw[i + 1]?.start ?? Infinity) : word.end,
+-      }));
++      const words = raw.map((word, i) => {
++        const end = word.end_inferred ? Math.min(word.end, raw[i + 1]?.start ?? Infinity) : word.end;
++        // With start-only data, vary the visual fill gently by word length without spanning a vocal gap.
++        const length = word.text.replace(/[^\p{L}\p{N}]/gu, "").length;
++        const fillEnd = word.end_inferred ? Math.min(end, word.start + Math.min(0.36, 0.12 + length * 0.024)) : end;
++        return { ...word, end, fillEnd };
++      });
+       // Metadata providers may give a short tag the whole gap up to the next verse.
+       const stretchedTag = line.is_bg && words.length === 1
+         && words[0].end_inferred && words[0].end - words[0].start > 3;
+       const valid = !stretchedTag && words.every(word => Number.isFinite(word.start)
+-        && Number.isFinite(word.end) && word.end - word.start >= 0.025);
++        && Number.isFinite(word.end) && word.end >= word.start);
+       const nextLead = lines.slice(index + 1)
+         .find(next => !next.is_bg && Number.isFinite(next.t) && next.t > line.t);
+       const start = valid && words.length ? words[0].start : line.t;
+       const end = valid && words.length ? Math.max(...words.map(word => word.end))
+         : Number.isFinite(line.end) && line.end > start ? line.end : (nextLead?.t ?? start + 4);
+-      return { start, end, words: valid ? words : [], isBg: !!line.is_bg,
++      const fillEnd = valid && words.length ? Math.max(...words.map(word => word.fillEnd)) : end;
++      return { start, end, fillEnd, words: valid ? words : [], isBg: !!line.is_bg,
+         enabled: !line.is_bg || (!stretchedTag && Number.isFinite(line.t)) };
+     });
+ 
+@@ -10751,14 +10755,13 @@
+     const spans = li.getElementsByClassName("lyrics-word");
+     for (let i = 0; i < spans.length; i++) {
+       const span = spans[i];
+-      const { start, end, end_inferred } = words[i];
+-      const fillEnd = end_inferred ? Math.min(end, start + 0.22) : end;
+-      const progress = Math.round(clamp((t - start) / (fillEnd - start), 0, 1) * 1000) / 10;
++      const { start, fillEnd } = words[i];
++      const sung = t >= fillEnd;
++      const progress = sung ? 100 : Math.round(clamp((t - start) / (fillEnd - start), 0, 1) * 1000) / 10;
+       if (span._lyricsFill !== progress) {
+         span._lyricsFill = progress;
+         span.style.setProperty("--lyric-fill", progress + "%");
+       }
+-      const sung = t >= fillEnd;
+       if (span._isSung === sung) continue;
+       const justFinished = animate && span._isSung === false && sung && t - fillEnd < 0.12;
+       span._isSung = sung;
+@@ -10778,7 +10781,7 @@
+       const row = lyricsTimeline[k];
+       if (!row.enabled || !Number.isFinite(row.start) || row.start > t) continue;
+       if (!row.isBg && (leadIdx < 0 || row.start >= lyricsTimeline[leadIdx].start)) leadIdx = k;
+-      if (row.isBg && t < row.end) bgIdx = k;
++      if (row.isBg && (bgIdx < 0 || row.start >= lyricsTimeline[bgIdx].start)) bgIdx = k;
+     }
+     const focusIdx = leadIdx >= 0 ? leadIdx : Math.max(0, bgIdx);
+     const lineChanged = focusIdx !== lyricsActive || jump;
+@@ -10786,10 +10789,10 @@
+       const row = lyricsTimeline[k];
+       const li = items[k];
+       // Keep the row readable until the final word's color transition has finished.
+-      const fadeTail = wordSync && row.words.length ? 0.26 : 0;
+-      const isAct = row.enabled && Number.isFinite(row.start) && t >= row.start && t < row.end + fadeTail
++      const displayEnd = wordSync && row.words.length ? row.fillEnd + 0.26 : row.end;
++      const isAct = row.enabled && Number.isFinite(row.start) && t >= row.start && t < displayEnd
+         && (row.isBg || row.words.length > 0 || k === leadIdx);
+-      const isPast = Number.isFinite(row.start) && t >= row.end + fadeTail;
++      const isPast = Number.isFinite(row.start) && t >= displayEnd;
+       const changed = li._lyricsActive !== isAct || li._lyricsPast !== isPast;
+       if (wordSync && (isAct || changed || lineChanged)) updateWordsForLine(li, row.words, t, !jump);
+       if (!lineChanged && !changed) continue;
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=490-karaoke-duration"></script>
++<script src="app.js?v=491-karaoke-pauses"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v14";
++const CACHE = "notka-shell-v15";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
