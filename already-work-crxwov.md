@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -23,3 +23,6 @@ status: completed
 
 ## Ad-lib labeling and final word
 - Deployed ad-lib role and timing correction. Verified token alignment, preserved alternate leads, removed guessed inline timing, and kept rows readable through final-word fade. 36 tests, Chromium timeline, health, public frontend hashes, and exact-track ad-lib timing passed. Backup: /opt/notka/hotfix-backups/karaoke-adlib-kHR5BHhl. Authenticated playback unchecked.
+
+## Left-to-right karaoke fill
+- Active. Scope: per-word audio progress, gradient rendering, browser checks, and scoped frontend release.
