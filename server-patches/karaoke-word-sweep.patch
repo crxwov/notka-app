@@ -1,0 +1,120 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10603,8 +10603,8 @@
+           span.className = "lyrics-word";
+           span.dataset.w = wi;
+           span.dataset.lyric = w.text;
+-          span.textContent = w.text + " ";
+-          li.appendChild(span);
++          span.textContent = w.text;
++          li.append(span, " ");
+         });
+       } else {
+         li.textContent = line.text;
+@@ -10717,7 +10717,9 @@
+         ...word,
+         end: Math.min(word.end, raw[i + 1]?.start ?? Infinity),
+       }));
+-      const valid = words.every(word => Number.isFinite(word.start)
++      // Metadata providers may give a short tag the whole gap up to the next verse.
++      const stretchedTag = line.is_bg && words.length === 1 && words[0].end - words[0].start > 3;
++      const valid = !stretchedTag && words.every(word => Number.isFinite(word.start)
+         && Number.isFinite(word.end) && word.end - word.start >= 0.025);
+       const nextLead = lines.slice(index + 1)
+         .find(next => !next.is_bg && Number.isFinite(next.t) && next.t > line.t);
+@@ -10725,7 +10727,7 @@
+       const end = valid && words.length ? words.at(-1).end
+         : Number.isFinite(line.end) && line.end > start ? line.end : (nextLead?.t ?? start + 4);
+       return { start, end, words: valid ? words : [], isBg: !!line.is_bg,
+-        enabled: !line.is_bg || Number.isFinite(line.t) };
++        enabled: !line.is_bg || (!stretchedTag && Number.isFinite(line.t)) };
+     });
+ 
+     // Providers can attach the same backing phrase to two adjacent lead rows.
+@@ -10748,9 +10750,15 @@
+     const spans = li.getElementsByClassName("lyrics-word");
+     for (let i = 0; i < spans.length; i++) {
+       const span = spans[i];
+-      const sung = t >= words[i].end;
++      const { start, end } = words[i];
++      const progress = Math.round(clamp((t - start) / (end - start), 0, 1) * 1000) / 10;
++      if (span._lyricsFill !== progress) {
++        span._lyricsFill = progress;
++        span.style.setProperty("--lyric-fill", progress + "%");
++      }
++      const sung = t >= end;
+       if (span._isSung === sung) continue;
+-      const justFinished = animate && span._isSung === false && sung && t - words[i].end < 0.12;
++      const justFinished = animate && span._isSung === false && sung && t - end < 0.12;
+       span._isSung = sung;
+       span.classList.toggle("is-sung", sung);
+       span.classList.toggle("is-newly-sung", justFinished);
+--- a/miniapp/styles.css
++++ b/miniapp/styles.css
+@@ -2220,12 +2220,25 @@
+   color: #fff;
+ }
+ @media (prefers-reduced-motion: no-preference) {
+-  .lyrics-word { transition: color 240ms cubic-bezier(0.35, 0, 0.2, 1); }
++  @supports (background-clip: text) {
++    .lyrics-word {
++      --lyric-fill: 0%;
++      --lyric-edge: calc(var(--lyric-fill) * 1.18);
++      background-image: linear-gradient(
++        to right,
++        #fff calc(var(--lyric-edge) - 18%),
++        rgba(255, 255, 255, 0.42) var(--lyric-edge)
++      );
++      background-clip: text;
++      -webkit-text-fill-color: transparent;
++    }
++  }
+   .lyrics-word.is-newly-sung::after {
+     content: attr(data-lyric) / "";
+     position: absolute;
+     inset: 0;
+     color: #fff;
++    -webkit-text-fill-color: currentColor;
+     text-shadow: 0 0 0.27em rgba(255, 255, 255, 0.64), 0 0 0.53em rgba(255, 255, 255, 0.28);
+     pointer-events: none;
+     user-select: none;
+@@ -2235,7 +2248,7 @@
+ }
+ @keyframes lyrics-word-bloom {
+   0%, 100% { opacity: 0; }
+-  38% { opacity: 0.75; }
++  38% { opacity: 0.34; }
+ }
+ /* a text without timings is simply readable from top to bottom, at the same size as a synced one */
+ .lyrics-lines:not(.is-synced) .lyrics-line { padding: 4px 0; opacity: 0.86; }
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -22,7 +22,7 @@
+      string forces it to fetch the real, current file. Bump this
+      number (or just change it) every time styles.css or app.js is
+      edited, otherwise Telegram may keep showing the old version. -->
+-<link rel="stylesheet" href="styles.css?v=232-karaoke-fade" />
++<link rel="stylesheet" href="styles.css?v=233-karaoke-sweep" />
+ <link rel="stylesheet" href="atmosphere.css?v=9" />
+ <link rel="stylesheet" href="events.css?v=23-min-row" />
+ <link rel="stylesheet" href="system.css?v=133-lyrics-heart" />
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=487-adlib-timing"></script>
++<script src="app.js?v=488-karaoke-sweep"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v11";
++const CACHE = "notka-shell-v12";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
