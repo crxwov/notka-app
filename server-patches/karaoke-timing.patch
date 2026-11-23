@@ -1,0 +1,336 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10462,41 +10462,6 @@
+     if (lyricsData) renderLyrics(lyricsData);
+   }
+   try { localStorage.removeItem("notka_lyr_shift"); } catch (e) { /* nothing kept */ }
+-  // audio.currentTime moves in steps on some phones (4 times a second): between the steps the time is carried on by the clock
+-  let clockAt = -1, clockPerf = 0, clockLast = -1;
+-  // время для текста: между обновлениями позиции досчитывается вперёд, но назад не идёт —
+-  // иначе после подвисания звука строка откатывалась на прошлую и текст уезжал назад (владелец 21.11).
+-  // Настоящая перемотка (seeked, новый трек — скачок больше секунды) время, конечно, сбрасывает.
+-  let clockLastCt = -1;
+-  function smoothTime() {
+-    if (audio.paused || audio.playbackRate === 0) {
+-      clockAt = audio.currentTime || 0;
+-      clockPerf = performance.now();
+-      clockLast = clockAt;
+-      clockLastCt = clockAt;
+-      return clockAt;
+-    }
+-    const ct = audio.currentTime || 0;
+-    const now = performance.now();
+-    if (clockAt < 0 || Math.abs(ct - clockLast) > 0.6) {
+-      clockAt = ct;
+-      clockPerf = now;
+-      clockLast = ct;
+-      clockLastCt = ct;
+-      return ct;
+-    }
+-    const rate = audio.playbackRate || 1;
+-    if (ct !== clockLastCt) {
+-      clockLastCt = ct;
+-      const measured = clockAt + (now - clockPerf) / 1000 * rate;
+-      clockAt = Math.abs(ct - measured) > 0.15 ? ct : (measured * 0.7 + ct * 0.3);
+-      clockPerf = now;
+-    }
+-    const elapsed = (now - clockPerf) / 1000 * rate;
+-    const v = clockAt + elapsed;
+-    clockLast = Math.max(v, clockLast);
+-    return clockLast;
+-  }
+   let lyricsFrame = 0;
+   function lyricsTick() {
+     lyricsFrame = 0;
+@@ -10509,9 +10474,9 @@
+   }
+   audio.addEventListener("play", startLyricsTick);
+   audio.addEventListener("playing", startLyricsTick);
+-  audio.addEventListener("seeked", () => { clockAt = -1; clockLast = -1; startLyricsTick(); });
++  audio.addEventListener("seeked", () => syncLyrics(true, true));
+   function lyricsNow() {
+-    return smoothTime() - lyricsShift;
++    return (audio.currentTime || 0) - lyricsShift;
+   }
+   function paintTranslation() {
+     const show = lyricsLab && !!lyricsTr && lyricsTr.trackId === lyricsTrackId && lyricsTr.lines.length > 0 && Store.getSetting("lyricsTr") === true;
+--- a/miniapp/styles.css
++++ b/miniapp/styles.css
+@@ -2235,19 +2235,6 @@
+ .lyrics-line.is-bg.is-active .lyrics-word.is-active {
+   text-decoration: underline solid rgba(255, 255, 255, 0.8) 0.08em;
+   text-underline-offset: 0.17em;
+-}
+-@media (prefers-reduced-motion: no-preference) {
+-  .lyrics-line .lyrics-word {
+-    transform: translateY(0);
+-    transition: transform 280ms cubic-bezier(0.32, 0, 0.3, 1);
+-  }
+-  .lyrics-line.is-active .lyrics-word.is-active {
+-    transform: translateY(-0.035em);
+-  }
+-  .lyrics-line.is-active .lyrics-word.is-sung,
+-  .lyrics-line.is-past .lyrics-word {
+-    transform: translateY(0);
+-  }
+ }
+ .lyrics-line.is-active .lyrics-word.is-sung {
+   color: #ffffff !important;
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -22,7 +22,7 @@
+      string forces it to fetch the real, current file. Bump this
+      number (or just change it) every time styles.css or app.js is
+      edited, otherwise Telegram may keep showing the old version. -->
+-<link rel="stylesheet" href="styles.css?v=229-karaoke-option" />
++<link rel="stylesheet" href="styles.css?v=230-karaoke-timing" />
+ <link rel="stylesheet" href="atmosphere.css?v=9" />
+ <link rel="stylesheet" href="events.css?v=23-min-row" />
+ <link rel="stylesheet" href="system.css?v=133-lyrics-heart" />
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=483-karaoke-option"></script>
++<script src="app.js?v=484-karaoke-timing"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v7";
++const CACHE = "notka-shell-v8";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
+--- a/music_resolver/services/lyrics.py
++++ b/music_resolver/services/lyrics.py
+@@ -151,9 +151,8 @@
+     return False
+ 
+ 
+-def _cache_path(title: str, artist: str, duration: float | None) -> Path:
+-    # v5: rich word-synced timings and background vocal adlib lines support
+-    key = f"v6|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}"
++def _cache_path(title: str, artist: str, duration: float | None, video_id: str | None = None) -> Path:
++    key = f"v7|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}|{video_id or ''}"
+     return _CACHE_DIR / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".json")
+ 
+ 
+@@ -237,60 +236,63 @@
+     except Exception:
+         return []
+ 
++    def read_line(el, is_bg=False):
++        begin = _parse_time_val(el.get("begin"))
++        end = _parse_time_val(el.get("end"))
++        words = []
++        parts = [el.text or ""]
++        backgrounds = []
++        for child in el:
++            role = next((v.lower() for k, v in child.attrib.items()
++                         if k.split("}")[-1] == "role"), "")
++            tail = child.tail or ""
++            if role in {"x-bg", "accompaniment", "background"}:
++                backgrounds.extend(read_line(child, is_bg=True))
++                parts.append(tail)
++                continue
++            if "translation" in role:
++                parts.append(tail)
++                continue
++            if child.tag.split("}")[-1] != "span":
++                parts.append(tail)
++                continue
++            text = ("".join(part.strip() for part in child.itertext())
++                    if len(child) else child.text or "")
++            start = _parse_time_val(child.get("begin"))
++            finish = _parse_time_val(child.get("end"))
++            if start is not None and text.strip():
++                finish = finish if finish is not None else round(start + 0.35, 3)
++                # TTML uses whitespace between words and adjacent timed spans for syllables.
++                if words and parts[-1] == "" and not text[0].isspace():
++                    words[-1]["text"] += text.strip()
++                    words[-1]["end"] = finish
++                else:
++                    words.append({"text": text.strip(), "start": start, "end": finish})
++            parts.extend((text, tail))
++
++        text = " ".join("".join(parts).split())
++        if not text:
++            return backgrounds
++        if is_bg and text.startswith("(") and text.endswith(")"):
++            text = text[1:-1]
++            for word in words:
++                word["text"] = word["text"].strip("()")
++            words = [word for word in words if word["text"]]
++        if begin is None and words:
++            begin = words[0]["start"]
++        if end is None and words:
++            end = words[-1]["end"]
++        return [{"t": begin, "end": end, "text": text, "words": words, "is_bg": is_bg},
++                *backgrounds]
++
+     lines: list[dict] = []
+     for el in root.iter():
+-        tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
+-        if tag != "p":
+-            continue
+-        p_begin = _parse_time_val(el.get("begin"))
+-        p_end = _parse_time_val(el.get("end"))
+-        p_is_bg = False
+-        for k, v in el.attrib.items():
+-            vl = str(v).lower()
+-            if "accompaniment" in vl or "background" in vl or (k.lower().endswith("agent") and vl in ("v2", "v3", "bg")):
+-                p_is_bg = True
+-                break
+-
+-        words: list[dict] = []
+-        full_text_parts = [el.text.strip()] if el.text and el.text.strip() else []
+-
+-        for child in el:
+-            ctag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+-            if ctag != "span":
+-                continue
+-            role = ""
+-            for k, v in child.attrib.items():
+-                if "role" in k.lower():
+-                    role = v.lower()
+-            if "translation" in role:
+-                continue
+-
+-            # A timed outer span is a word, even when it contains timed syllables.
+-            text = ("".join(part.strip() for part in child.itertext())
+-                    if len(child) else (child.text or "").strip())
+-            if not text:
+-                continue
+-            s_begin = _parse_time_val(child.get("begin"))
+-            s_end = _parse_time_val(child.get("end"))
+-            if s_begin is not None:
+-                words.append({
+-                    "text": text,
+-                    "start": s_begin,
+-                    "end": s_end if s_end is not None else round(s_begin + 0.35, 3),
+-                })
+-            full_text_parts.append(text)
+-            if child.tail and child.tail.strip():
+-                full_text_parts.append(child.tail.strip())
+-
+-        line_text = " ".join(full_text_parts) if full_text_parts else ("".join(el.itertext()).strip())
+-        if line_text:
+-            lines.append({
+-                "t": p_begin if p_begin is not None else (words[0]["start"] if words else 0.0),
+-                "end": p_end,
+-                "text": line_text,
+-                "words": words,
+-                "is_bg": p_is_bg,
+-            })
++        if el.tag.split("}")[-1] != "p":
++            continue
++        is_bg = any("accompaniment" in v.lower() or "background" in v.lower()
++                    or (k.lower().endswith("agent") and v.lower() in {"v2", "v3", "bg"})
++                    for k, v in el.attrib.items())
++        lines.extend(read_line(el, is_bg))
+     return _normalize_lines(lines)
+ 
+ 
+@@ -526,9 +528,9 @@
+             params_list.append({"v": video_id})
+         clean_title = _clean_title(title)
+         names = _artist_names(artist)
+-        if clean_title and names:
++        if not video_id and clean_title and names:
+             params_list.append({"song": clean_title, "artist": names[0]})
+-        elif clean_title:
++        elif not video_id and clean_title:
+             params_list.append({"song": clean_title, "artist": artist.strip()})
+ 
+         for params in params_list:
+@@ -538,6 +540,8 @@
+                     data = res.json()
+                     if isinstance(data, dict) and data.get("success"):
+                         payload = data.get("data") or {}
++                        if video_id and payload.get("videoId") != video_id:
++                            continue
+                         raw_ttml = payload.get("lyrics")
+                         if isinstance(raw_ttml, str) and raw_ttml.strip():
+                             lines = parse_ttml(raw_ttml)
+@@ -632,7 +636,7 @@
+     youtube_music_provider=None,
+     video_id: str | None = None,
+ ) -> dict:
+-    path = _cache_path(title, artist, duration)
++    path = _cache_path(title, artist, duration, video_id)
+     if path.exists():
+         try:
+             cached = json.loads(path.read_text(encoding="utf-8"))
+@@ -661,15 +665,23 @@
+         return found
+ 
+     result: dict | None = None
+-    try:
+-        result = await asyncio.wait_for(lrclib(), timeout=_LRCLIB_BUDGET_SECONDS)
+-    except (TimeoutError, httpx.HTTPError, ValueError):
+-        down = True
++    if video_id:
++        try:
++            exact = await _from_unison(video_id, search_title, search_artist, duration)
++            if exact and exact.get("syncType") == "word":
++                result = exact
++        except (TimeoutError, httpx.HTTPError, ValueError):
++            pass
++    if result is None:
++        try:
++            result = await asyncio.wait_for(lrclib(), timeout=_LRCLIB_BUDGET_SECONDS)
++        except (TimeoutError, httpx.HTTPError, ValueError):
++            down = True
+ 
+     # If LRCLIB gave nothing or only line-level sync, upgrade with word-level sources (Unison & AMLL)
+     if not down and (result is None or not result.get("synced") or result.get("syncType") != "word"):
+         try:
+-            unison_res = await _from_unison(video_id, search_title, search_artist, duration)
++            unison_res = await _from_unison(None, search_title, search_artist, duration)
+             if unison_res and unison_res.get("syncType") == "word":
+                 result = unison_res
+             elif unison_res and result is None:
+--- a/tests/test_lyrics_sync.py
++++ b/tests/test_lyrics_sync.py
+@@ -284,3 +284,35 @@
+     assert echo["words"] == original[2:4]
+     assert tag["t"] == 5
+     assert tag["words"] == original[5:]
++
++
++def test_ttml_adjacent_syllables_and_overlapping_background():
++    ttml = """<tt xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
++      <body><p begin="2.9s" end="5s"><span begin="2.9s" end="3.2s">So</span>
++      <span begin="3.8s" end="4s">rea</span><span begin="4s" end="4.4s">dy</span><span ttm:role="x-bg"><span begin="3.5s" end="3.8s">(hey)</span></span></p></body>
++      </tt>"""
++    lead, bg = lyrics.parse_ttml(ttml)
++    assert lead["text"] == "So ready"
++    assert lead["words"][1] == {"text": "ready", "start": 3.8, "end": 4.4}
++    assert bg["is_bg"]
++    assert bg["words"] == [{"text": "hey", "start": 3.5, "end": 3.8}]
++    assert bg["t"] == 3.5
++
++
++def test_exact_video_richsync_precedes_metadata_match(tmp_path, monkeypatch):
++    monkeypatch.setattr(lyrics, "_CACHE_DIR", tmp_path)
++    exact_line = {"t": 1, "text": "hello", "words": [{"text": "hello", "start": 1}]}
++
++    async def exact(video_id, *args):
++        assert video_id == "official"
++        return {"lines": [exact_line], "syncType": "word", "source": "unison"}
++
++    async def metadata(*args):
++        pytest.fail("Metadata fallback ran despite exact-video richsync")
++
++    monkeypatch.setattr(lyrics, "_from_unison", exact)
++    monkeypatch.setattr(lyrics, "_from_lrclib", metadata)
++    result = asyncio.run(lyrics.find_lyrics("Hello", "Artist", 120, video_id="official"))
++    assert result["source"] == "unison"
++    assert lyrics._cache_path("Hello", "Artist", 120, "official").exists()
++    assert not lyrics._cache_path("Hello", "Artist", 120, "other").exists()
