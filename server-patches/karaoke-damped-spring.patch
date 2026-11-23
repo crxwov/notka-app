@@ -1,0 +1,83 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10750,6 +10750,12 @@
+     return timeline;
+   }
+ 
++  function lyricSpring(elapsed) {
++    // Critical damping: the return follows the same spring without overshoot.
++    const phase = Math.max(0, elapsed) * 26;
++    return 1 - (1 + phase) * Math.exp(-phase);
++  }
++
+   function updateWordsForLine(li, words, t) {
+     const spans = li.getElementsByClassName("lyrics-word");
+     for (let i = 0; i < spans.length; i++) {
+@@ -10760,11 +10766,15 @@
+       if (span._lyricsFill !== progress) {
+         span._lyricsFill = progress;
+         span.style.setProperty("--lyric-position", (100 - progress) + "%");
+-        const singing = progress > 0 && progress < 100;
+-        const emphasis = singing ? Math.sin(Math.PI * Math.pow(progress / 100, 1.35)) ** 1.4 : 0;
+-        span.style.setProperty("--lyric-emphasis", emphasis.toFixed(3));
+-        span.classList.toggle("is-singing", singing);
+         span.classList.toggle("is-sung", sung);
++      }
++      const lift = t >= start && t < fillEnd + 0.26
++        ? lyricSpring(t - start) - lyricSpring(t - fillEnd) : 0;
++      const emphasis = lift > 0.012 ? Math.round(lift * 1000) / 1000 : 0;
++      if (span._lyricsEmphasis !== emphasis) {
++        span._lyricsEmphasis = emphasis;
++        span.style.setProperty("--lyric-emphasis", emphasis);
++        span.classList.toggle("is-settling-word", emphasis > 0);
+       }
+     }
+   }
+--- a/miniapp/styles.css
++++ b/miniapp/styles.css
+@@ -2235,10 +2235,10 @@
+     transform: translateY(0) scale(1);
+     transform-origin: center 75%;
+   }
+-  .lyrics-word.is-singing {
+-    transform: translateY(calc(-0.055em * var(--lyric-emphasis)))
+-      scale(calc(1 + 0.048 * var(--lyric-emphasis)));
+-    filter: drop-shadow(0 0 0.18em rgb(255 255 255 / calc(0.47 * var(--lyric-emphasis))));
++  .lyrics-word.is-settling-word {
++    transform: translateY(calc(-0.017em * var(--lyric-emphasis)))
++      scale(calc(1 + 0.018 * var(--lyric-emphasis)));
++    filter: drop-shadow(0 0 0.18em rgb(255 255 255 / calc(0.24 * var(--lyric-emphasis))));
+   }
+ }
+ /* a text without timings is simply readable from top to bottom, at the same size as a synced one */
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -22,7 +22,7 @@
+      string forces it to fetch the real, current file. Bump this
+      number (or just change it) every time styles.css or app.js is
+      edited, otherwise Telegram may keep showing the old version. -->
+-<link rel="stylesheet" href="styles.css?v=236-karaoke-motion" />
++<link rel="stylesheet" href="styles.css?v=237-karaoke-spring" />
+ <link rel="stylesheet" href="atmosphere.css?v=9" />
+ <link rel="stylesheet" href="events.css?v=23-min-row" />
+ <link rel="stylesheet" href="system.css?v=133-lyrics-heart" />
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=493-karaoke-motion"></script>
++<script src="app.js?v=494-karaoke-spring"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v18";
++const CACHE = "notka-shell-v19";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
