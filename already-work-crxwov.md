@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -47,3 +47,6 @@ status: completed
 
 ## Karaoke damped word spring
 - Deployed critically damped word motion, with up to 1.02 px lift at 60 px type and continuous return after fill completion. Normal and reduced-motion Chromium checks, short-word series, and public hashes passed. First deploy rolled back on transient origin health failure; retry succeeded. Backup: /opt/notka/hotfix-backups/karaoke-spring-ptwMFir5. Authenticated playback unchecked.
+
+## Softer karaoke sweep
+- Active. Scope: ease short word sweeps and lower motion amplitude. Preserve the audio clock and provider timings.
