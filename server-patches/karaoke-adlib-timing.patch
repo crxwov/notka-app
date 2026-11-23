@@ -1,0 +1,232 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10719,12 +10719,13 @@
+       }));
+       const valid = words.every(word => Number.isFinite(word.start)
+         && Number.isFinite(word.end) && word.end - word.start >= 0.025);
+-      const nextLead = !line.is_bg && lines.slice(index + 1)
++      const nextLead = lines.slice(index + 1)
+         .find(next => !next.is_bg && Number.isFinite(next.t) && next.t > line.t);
+       const start = valid && words.length ? words[0].start : line.t;
+       const end = valid && words.length ? words.at(-1).end
+         : Number.isFinite(line.end) && line.end > start ? line.end : (nextLead?.t ?? start + 4);
+-      return { start, end, words: valid ? words : [], isBg: !!line.is_bg, enabled: !line.is_bg || (valid && words.length > 0) };
++      return { start, end, words: valid ? words : [], isBg: !!line.is_bg,
++        enabled: !line.is_bg || Number.isFinite(line.t) };
+     });
+ 
+     // Providers can attach the same backing phrase to two adjacent lead rows.
+@@ -10774,9 +10775,11 @@
+     for (let k = 0; k < items.length; k++) {
+       const row = lyricsTimeline[k];
+       const li = items[k];
+-      const isAct = row.enabled && Number.isFinite(row.start) && t >= row.start && t < row.end
++      // Keep the row readable until the final word's color transition has finished.
++      const fadeTail = wordSync && row.words.length ? 0.26 : 0;
++      const isAct = row.enabled && Number.isFinite(row.start) && t >= row.start && t < row.end + fadeTail
+         && (row.isBg || row.words.length > 0 || k === leadIdx);
+-      const isPast = Number.isFinite(row.start) && t >= row.end;
++      const isPast = Number.isFinite(row.start) && t >= row.end + fadeTail;
+       const changed = li._lyricsActive !== isAct || li._lyricsPast !== isPast;
+       if (wordSync && (isAct || changed || lineChanged)) updateWordsForLine(li, row.words, t, !jump);
+       if (!lineChanged && !changed) continue;
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=486-karaoke-fade"></script>
++<script src="app.js?v=487-adlib-timing"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v10";
++const CACHE = "notka-shell-v11";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
+--- a/music_resolver/services/lyrics.py
++++ b/music_resolver/services/lyrics.py
+@@ -152,7 +152,7 @@
+ 
+ 
+ def _cache_path(title: str, artist: str, duration: float | None, video_id: str | None = None) -> Path:
+-    key = f"v7|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}|{video_id or ''}"
++    key = f"v8|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}|{video_id or ''}"
+     return _CACHE_DIR / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".json")
+ 
+ 
+@@ -184,28 +184,36 @@
+             continue
+ 
+         def lyric_chars(value):
+-            return sum(char.isalnum() for char in value)
++            return "".join(char for char in value.casefold() if char.isalnum())
+ 
+         boundaries = [
+-            (lyric_chars(text[:match.start()]), lyric_chars(text[:match.end()]))
++            (len(lyric_chars(text[:match.start()])), len(lyric_chars(text[:match.end()])))
+             for match in adlibs
+         ]
+         groups = [[] for _ in range(len(adlibs) + 1)]
++        raw_words = line.get("words") or []
++        if raw_words and "".join(lyric_chars(w.get("text", "")) for w in raw_words) != lyric_chars(text):
++            out.append({**line, "words": [], "is_bg": False})
++            continue
+         cursor = 0
+-        for word in line.get("words") or []:
++        for word in raw_words:
+             word_text = word.get("text", "")
+-            word_end = cursor + lyric_chars(word_text)
++            word_end = cursor + len(lyric_chars(word_text))
++            if any(cursor < edge < word_end for boundary in boundaries for edge in boundary):
++                break
+             group = next(
+                 (i for i, (start, end) in enumerate(boundaries, 1)
+                  if start <= cursor < end), 0
+             )
+             clean = word_text.replace("(", "").replace(")", "").strip()
+-            if clean:
++            if clean and lyric_chars(clean):
+                 groups[group].append({**word, "text": clean})
+             cursor = word_end
+-
+-        if cursor != lyric_chars(text):
+-            groups = [[] for _ in groups]
++        else:
++            cursor = len(lyric_chars(text))
++        if cursor != len(lyric_chars(text)):
++            out.append({**line, "words": [], "is_bg": False})
++            continue
+ 
+         main = " ".join(re.sub(r"\([^()]+\)", "", text).split())
+         main = re.sub(r"\s+([,.;:!?])", r"\1", main)
+@@ -215,16 +223,10 @@
+             adlib = match.group(1).strip()
+             if not adlib:
+                 continue
+-            t = line.get("t")
+-            if words:
+-                t = words[0]["start"]
+-            elif main and t is not None:
+-                offset = 1.2
+-                end = line.get("end")
+-                if end is not None and end > t:
+-                    offset = (end - t) * match.start() / len(text)
+-                t = round(t + offset, 2)
+-            out.append({**line, "t": t, "text": adlib[:1].upper() + adlib[1:],
++            # Inline parentheses supply text, but only the provider can supply their timing.
++            t = words[0]["start"] if words else (line.get("t") if not main else None)
++            end = words[-1].get("end") if words else (line.get("end") if not main else None)
++            out.append({**line, "t": t, "end": end, "text": adlib[:1].upper() + adlib[1:],
+                         "words": words, "is_bg": True})
+     return out
+ 
+@@ -235,6 +237,12 @@
+         root = ET.fromstring(xml_str)
+     except Exception:
+         return []
++
++    def vocal_role(el):
++        return next((v.lower() for k, v in el.attrib.items()
++                     if k.split("}")[-1] == "role"), "")
++
++    background_roles = {"x-bg", "accompaniment", "background", "backing-vocals"}
+ 
+     def read_line(el, is_bg=False):
+         begin = _parse_time_val(el.get("begin"))
+@@ -243,10 +251,9 @@
+         parts = [el.text or ""]
+         backgrounds = []
+         for child in el:
+-            role = next((v.lower() for k, v in child.attrib.items()
+-                         if k.split("}")[-1] == "role"), "")
++            role = vocal_role(child)
+             tail = child.tail or ""
+-            if role in {"x-bg", "accompaniment", "background"}:
++            if role in background_roles:
+                 backgrounds.extend(read_line(child, is_bg=True))
+                 parts.append(tail)
+                 continue
+@@ -263,7 +270,8 @@
+             if start is not None and text.strip():
+                 finish = finish if finish is not None else round(start + 0.35, 3)
+                 # TTML uses whitespace between words and adjacent timed spans for syllables.
+-                if words and parts[-1] == "" and not text[0].isspace():
++                if (words and parts[-1] == "" and not text[0].isspace()
++                        and not text.startswith("(") and not words[-1]["text"].endswith(")")):
+                     words[-1]["text"] += text.strip()
+                     words[-1]["end"] = finish
+                 else:
+@@ -289,9 +297,8 @@
+     for el in root.iter():
+         if el.tag.split("}")[-1] != "p":
+             continue
+-        is_bg = any("accompaniment" in v.lower() or "background" in v.lower()
+-                    or (k.lower().endswith("agent") and v.lower() in {"v2", "v3", "bg"})
+-                    for k, v in el.attrib.items())
++        # A TTML agent identifies a singer, including alternate lead singers in duets.
++        is_bg = vocal_role(el) in background_roles
+         lines.extend(read_line(el, is_bg))
+     return _normalize_lines(lines)
+ 
+@@ -338,7 +345,10 @@
+                     if idx + 1 < len(raw_words) and isinstance(raw_words[idx + 1], dict)
+                     else None
+                 )
+-                if next_start is not None:
++                explicit_end = w.get("end_ms")
++                if explicit_end is not None and explicit_end > w_start_ms:
++                    w_end = round(explicit_end / 1000, 3)
++                elif next_start is not None:
+                     w_end = round(next_start / 1000, 3)
+                 elif end_ms is not None:
+                     w_end = round(end_ms / 1000, 3)
+--- a/tests/test_lyrics_sync.py
++++ b/tests/test_lyrics_sync.py
+@@ -242,7 +242,7 @@
+     # Line 3: adlib split
+     assert normalized[2]["text"] == "Damn, Trgc made that?"
+     assert normalized[2]["is_bg"] is True
+-    assert normalized[2]["t"] == 4.1
++    assert normalized[2]["t"] is None
+     # Line 4: whole line in parens
+     assert normalized[3]["text"] == "Yeah, yeah"
+     assert normalized[3]["is_bg"] is True
+@@ -316,3 +316,29 @@
+     assert result["source"] == "unison"
+     assert lyrics._cache_path("Hello", "Artist", 120, "official").exists()
+     assert not lyrics._cache_path("Hello", "Artist", 120, "other").exists()
++
++
++def test_ttml_alternate_lead_and_explicit_adlib():
++    ttml = """<tt xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
++    <body><p begin="1s" end="3s" ttm:agent="v2">
++    <span begin="1s" end="2s">Lead</span>
++    <span ttm:role="x-bg"><span begin="1.4s" end="1.7s">(hey)</span></span>
++    </p></body></tt>"""
++    lead, bg = lyrics.parse_ttml(ttml)
++    assert lead["text"] == "Lead" and not lead["is_bg"]
++    assert bg["is_bg"] and bg["t"] == 1.4 and bg["end"] == 1.7
++    assert bg["words"] == [{"text": "hey", "start": 1.4, "end": 1.7}]
++
++
++def test_adlib_alignment_rejects_same_length_different_words():
++    line = {"text": "sing (hey)", "t": 1, "words": [
++        {"text": "sing", "start": 1, "end": 2},
++        {"text": "bye", "start": 2, "end": 3},
++    ]}
++    assert lyrics._normalize_lines([line]) == [{**line, "words": [], "is_bg": False}]
++
++
++def test_adlib_without_timing_does_not_borrow_lead_window():
++    lead, bg = lyrics._normalize_lines([{"text": "sing (hey)", "t": 1, "end": 3}])
++    assert lead["t"] == 1 and lead["end"] == 3
++    assert bg["is_bg"] and bg["t"] is None and bg["end"] is None
