@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -20,3 +20,6 @@ status: completed
 
 ## Karaoke word animation
 - Deployed 240 ms whole-word fade and 460 ms glow at completion. Chromium verified intermediate brightness, stable geometry, final white, and no glow on seek. Public assets and health verified. Backup: /opt/notka/hotfix-backups/karaoke-fade-KnlTsJET. Authenticated playback remains unchecked.
+
+## Ad-lib labeling and final word
+- Active. Scope: TTML vocal roles, verified parenthetical alignment, terminal word fade. Validate parser and intermediate browser state.
