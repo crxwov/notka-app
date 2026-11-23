@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -11,3 +11,6 @@ status: completed
 
 ## Karaoke opt-in
 - Deployed default-off karaoke setting and softer word transitions. Preserved synced line display and lyric parsing. Chromium fixture verified default, opt-in, transition, and restoration. Public health and asset hashes verified. Backup: /opt/notka/hotfix-backups/karaoke-option-f1OTz16R. Authenticated playback remains unchecked.
+
+## Karaoke timing correction
+- Active. Exact-video provider priority, TTML word and background timing, playback clock and steady text. Validate against the reference track before rollout.
