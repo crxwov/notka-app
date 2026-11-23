@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -35,3 +35,6 @@ status: completed
 
 ## Short word timestamps and vocal gaps
 - Deployed short/zero duration word handling and separate visual end for inferred timings. Restored word mode on 11 Hatër rows. Verified real payload, zero-duration case, inferred pause cutoffs, production health and public hashes. Backup: /opt/notka/hotfix-backups/karaoke-pauses-Bu9oMFod. Authenticated playback unchecked.
+
+## Karaoke visual finish
+- Active. Scope: visual styling of the word sweep only. Check intermediate render and reduce-motion fallback before frontend deployment.
