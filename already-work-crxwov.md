@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -44,3 +44,6 @@ status: completed
 
 ## Spicy Lyrics-inspired word animation
 - Deployed original analog of Spicy Lyrics 1c02f47 word behavior: fixed-width neutral sweep, time-linked lift, scale and soft in-flight glow. Chromium verified progression, settle, seek and reduced motion. Hashes and health passed. Backup: /opt/notka/hotfix-backups/karaoke-motion-cXHaRnjP. Track playback and split-letter parity unchecked.
+
+## Karaoke damped word spring
+- Active. Replace per-word sine bump with the damped spring response used by the reference family. Bound rise and avoid vertical jumps on short words.
