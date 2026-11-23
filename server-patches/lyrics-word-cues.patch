@@ -1,0 +1,366 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10732,10 +10732,10 @@
+     lyricsSelfScrollAt = Date.now();
+     lyricsBox.scrollTop = to;
+     const dist = lyricsBox.scrollTop - from; // at the end of the text the box may stop short of `to`
+-    if (instant || Math.abs(dist) < 2 || !lyricsList.animate) return;
+-    const ms = clamp(520 + Math.abs(dist) * 0.55, 620, 1150);
++    if (instant || Math.abs(dist) < 2 || matchMedia("(prefers-reduced-motion: reduce)").matches || !lyricsList.animate) return;
++    const ms = clamp(260 + Math.abs(dist) * 0.35, 300, 560);
+     const g = lyricsList.animate([{ transform: `translateY(${dist.toFixed(1)}px)` }, { transform: "translateY(0)" }],
+-      { duration: ms, easing: "cubic-bezier(0.65, 0, 0.35, 1)" }); // ease-in-out-cubic, as before
++      { duration: ms, easing: "cubic-bezier(0.22, 0.75, 0.25, 1)" });
+     lyricsGlide = g;
+     g.onfinish = () => { if (lyricsGlide === g) lyricsGlide = null; };
+   }
+@@ -10748,9 +10748,10 @@
+       if (!span) continue;
+       const word = words[w];
+       const start = word.start;
+-      const end = word.end != null ? word.end : (start + 0.35);
++      const nextStart = words[w + 1]?.start ?? Infinity;
++      const end = Math.min(word.end ?? start + 0.35, nextStart);
+       let p = 0;
+-      if (t <= start) p = 0;
++      if (t < start) p = 0;
+       else if (t >= end) p = 1;
+       else p = (t - start) / Math.max(0.01, end - start);
+ 
+@@ -10761,7 +10762,7 @@
+         span.style.setProperty("--karaoke-progress", pctStr);
+       }
+       const isPast = p >= 1;
+-      const isActive = p > 0 && p < 1;
++      const isActive = t >= start && !isPast;
+       if (span._isPast !== isPast) {
+         span._isPast = isPast;
+         span.classList.toggle("is-sung", isPast);
+@@ -10877,8 +10878,17 @@
+       }
+ 
+       if (!quotePicking && (jump || (!lyricsHandDown && Date.now() - lyricsTouchedAt >= 6000))) {
+-        const top = focusIdx < 0 ? 0 : Math.max(0, items[focusIdx].offsetTop - lyricsBox.clientHeight * 0.3);
+-        glideLyrics(top, instant);
++        if (items[focusIdx]) {
++          const box = lyricsBox.getBoundingClientRect();
++          const cover = $("player-art").getBoundingClientRect();
++          const target = document.body.classList.contains("lyrics-cover") && cover.height
++            ? cover.top + cover.height / 2 - box.top
++            : lyricsBox.clientHeight / 2;
++          lyricsList.style.paddingBlockStart = `${Math.max(0, target)}px`;
++          lyricsList.style.paddingBlockEnd = `${Math.max(0, lyricsBox.clientHeight - target)}px`;
++          const row = items[focusIdx];
++          glideLyrics(row.offsetTop + row.offsetHeight / 2 - target, instant);
++        }
+       }
+     } else {
+       // Background lines may start or end during the same main line
+@@ -10886,6 +10896,7 @@
+         const isAct = activeSet.has(k);
+         if (items[k].classList.contains("is-active") !== isAct) {
+           items[k].classList.toggle("is-active", isAct);
++          items[k].classList.toggle("is-past", k < focusIdx && !isAct);
+           if (!isAct && k <= focusIdx) {
+             setWordsState(items[k], lines[k], true);
+           }
+--- a/miniapp/styles.css
++++ b/miniapp/styles.css
+@@ -2154,6 +2154,7 @@
+ }
+ .lyrics::-webkit-scrollbar { display: none; }
+ body.lyrics-open .player-art { opacity: 0; transform: scale(0.8); filter: blur(16px); pointer-events: none; }
++#player-lyrics:has(> .lyrics-lines.is-synced) { padding-block: 0; }
+ .lyrics-lines { list-style: none; margin: 0; padding: 0; }
+ .lyrics-line {
+   font-size: 30px;
+@@ -2183,7 +2184,7 @@
+ 
+ /* Background vocal / ad-lib lines (Apple Music style: smaller, tucked under lead line) */
+ .lyrics-line.is-bg {
+-  font-size: 19px !important;
++  font-size: clamp(22px, 1.85vw, 28px) !important;
+   line-height: 1.28 !important;
+   font-weight: 600 !important;
+   letter-spacing: -0.01em !important;
+@@ -2233,6 +2234,19 @@
+   -webkit-background-clip: text !important;
+   background-clip: text !important;
+   transform: none;
++}
++.lyrics-line.is-bg.is-active .lyrics-word.is-active {
++  text-decoration: underline solid rgba(255, 255, 255, 0.8) 0.08em;
++  text-underline-offset: 0.17em;
++}
++@media (prefers-reduced-motion: no-preference) {
++  .lyrics-line.is-active .lyrics-word.is-active {
++    animation: lyrics-word-lift 200ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
++  }
++}
++@keyframes lyrics-word-lift {
++  0%, 100% { transform: translateY(0); }
++  35% { transform: translateY(-0.12em); }
+ }
+ .lyrics-line.is-active .lyrics-word.is-sung {
+   color: #ffffff !important;
+@@ -2328,7 +2342,7 @@
+ @media (prefers-reduced-motion: reduce) { body.lyrics-lab .lyrics-lines.is-synced .lyrics-line { transition: opacity 0.35s var(--ease-out); } }
+ @media (max-height: 700px) {
+   .lyrics-line { font-size: 26px; padding: 6px 0; }
+-  .lyrics-line.is-bg { font-size: 16px !important; padding: 3px 0 !important; margin-top: -4px !important; margin-bottom: 10px !important; }
++  .lyrics-line.is-bg { font-size: 19px !important; padding: 3px 0 !important; margin-top: -4px !important; margin-bottom: 10px !important; }
+ }
+ 
+ /* ==========================================================
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -22,7 +22,7 @@
+      string forces it to fetch the real, current file. Bump this
+      number (or just change it) every time styles.css or app.js is
+      edited, otherwise Telegram may keep showing the old version. -->
+-<link rel="stylesheet" href="styles.css?v=227-adlibs-smooth" />
++<link rel="stylesheet" href="styles.css?v=228-word-cues" />
+ <link rel="stylesheet" href="atmosphere.css?v=9" />
+ <link rel="stylesheet" href="events.css?v=23-min-row" />
+ <link rel="stylesheet" href="system.css?v=133-lyrics-heart" />
+@@ -1671,7 +1671,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=481-adlibs-smooth"></script>
++<script src="app.js?v=482-word-cues"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v5";
++const CACHE = "notka-shell-v6";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
+--- a/music_resolver/services/lyrics.py
++++ b/music_resolver/services/lyrics.py
+@@ -153,7 +153,7 @@
+ 
+ def _cache_path(title: str, artist: str, duration: float | None) -> Path:
+     # v5: rich word-synced timings and background vocal adlib lines support
+-    key = f"v5|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}"
++    key = f"v6|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}"
+     return _CACHE_DIR / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".json")
+ 
+ 
+@@ -175,78 +175,58 @@
+ 
+ 
+ def _normalize_lines(raw_lines: list[dict]) -> list[dict]:
+-    """Normalize lyrics lines, splitting trailing parenthetical ad-libs (e.g. '(woo)')
+-    or whole-line background vocals into secondary lines marked with is_bg=True."""
++    """Move parenthetical vocals below the lead while keeping provider timing."""
+     out: list[dict] = []
+     for line in raw_lines:
+         text = str(line.get("text") or "").strip()
+-        if not text:
+-            out.append({**line, "is_bg": False})
+-            continue
+-
+-        # Whole line in parens, e.g. "(yeah, yeah)", "(whoa)", "(Cap)"
+-        m_whole = re.match(r"^\(([^()]+)\)$", text)
+-        if m_whole:
+-            adlib = m_whole.group(1).strip()
+-            if adlib:
+-                adlib = adlib[0].upper() + adlib[1:]
+-            words = list(line.get("words") or [])
+-            for w in words:
+-                w["text"] = w.get("text", "").replace("(", "").replace(")", "").strip()
+-            words = [w for w in words if w.get("text")]
+-            out.append({
+-                **line,
+-                "text": adlib or text,
+-                "words": words,
+-                "is_bg": True,
+-            })
+-            continue
+-
+-        # Trailing parenthetical ad-lib, e.g. "Main vocal line (damn, Trgc made that?)"
+-        m_trail = re.search(r"\s+\(([^()]+)\)$", text)
+-        if m_trail:
+-            main_text = text[:m_trail.start()].strip()
+-            adlib_text = m_trail.group(1).strip()
+-            if adlib_text:
+-                adlib_text = adlib_text[0].upper() + adlib_text[1:]
+-
+-            words = list(line.get("words") or [])
+-            main_words: list[dict] = []
+-            adlib_words: list[dict] = []
++        adlibs = list(re.finditer(r"\(([^()]+)\)", text))
++        if not adlibs or line.get("is_bg"):
++            out.append({**line, "is_bg": bool(line.get("is_bg"))})
++            continue
++
++        def lyric_chars(value):
++            return sum(char.isalnum() for char in value)
++
++        boundaries = [
++            (lyric_chars(text[:match.start()]), lyric_chars(text[:match.end()]))
++            for match in adlibs
++        ]
++        groups = [[] for _ in range(len(adlibs) + 1)]
++        cursor = 0
++        for word in line.get("words") or []:
++            word_text = word.get("text", "")
++            word_end = cursor + lyric_chars(word_text)
++            group = next(
++                (i for i, (start, end) in enumerate(boundaries, 1)
++                 if start <= cursor < end), 0
++            )
++            clean = word_text.replace("(", "").replace(")", "").strip()
++            if clean:
++                groups[group].append({**word, "text": clean})
++            cursor = word_end
++
++        if cursor != lyric_chars(text):
++            groups = [[] for _ in groups]
++
++        main = " ".join(re.sub(r"\([^()]+\)", "", text).split())
++        main = re.sub(r"\s+([,.;:!?])", r"\1", main)
++        if main:
++            out.append({**line, "text": main, "words": groups[0], "is_bg": False})
++        for match, words in zip(adlibs, groups[1:]):
++            adlib = match.group(1).strip()
++            if not adlib:
++                continue
++            t = line.get("t")
+             if words:
+-                split_idx = len(words)
+-                for idx, w in enumerate(words):
+-                    if "(" in w.get("text", ""):
+-                        split_idx = idx
+-                        break
+-                main_words = words[:split_idx]
+-                adlib_words = words[split_idx:]
+-                for w in adlib_words:
+-                    w["text"] = w.get("text", "").replace("(", "").replace(")", "").strip()
+-                adlib_words = [w for w in adlib_words if w.get("text")]
+-
+-            t_main = line.get("t")
+-            t_adlib = adlib_words[0]["start"] if adlib_words else (round(t_main + 1.2, 2) if t_main is not None else None)
+-
+-            out.append({
+-                **line,
+-                "text": main_text,
+-                "words": main_words,
+-                "is_bg": False,
+-            })
+-            out.append({
+-                "t": t_adlib,
+-                "end": line.get("end"),
+-                "text": adlib_text,
+-                "words": adlib_words,
+-                "is_bg": True,
+-            })
+-            continue
+-
+-        out.append({
+-            **line,
+-            "is_bg": bool(line.get("is_bg")),
+-        })
++                t = words[0]["start"]
++            elif main and t is not None:
++                offset = 1.2
++                end = line.get("end")
++                if end is not None and end > t:
++                    offset = (end - t) * match.start() / len(text)
++                t = round(t + offset, 2)
++            out.append({**line, "t": t, "text": adlib[:1].upper() + adlib[1:],
++                        "words": words, "is_bg": True})
+     return out
+ 
+ 
+@@ -272,9 +252,9 @@
+                 break
+ 
+         words: list[dict] = []
+-        full_text_parts: list[str] = []
+-
+-        for child in el.iter():
++        full_text_parts = [el.text.strip()] if el.text and el.text.strip() else []
++
++        for child in el:
+             ctag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+             if ctag != "span":
+                 continue
+@@ -285,16 +265,9 @@
+             if "translation" in role:
+                 continue
+ 
+-            # If child has nested spans with timestamps, let inner spans provide tokens
+-            has_timed_children = any(
+-                _parse_time_val(grand.get("begin")) is not None
+-                for grand in child
+-                if (grand.tag.split("}")[-1] if "}" in grand.tag else grand.tag) == "span"
+-            )
+-            if has_timed_children:
+-                continue
+-
+-            text = (child.text or "").strip()
++            # A timed outer span is a word, even when it contains timed syllables.
++            text = ("".join(part.strip() for part in child.itertext())
++                    if len(child) else (child.text or "").strip())
+             if not text:
+                 continue
+             s_begin = _parse_time_val(child.get("begin"))
+@@ -306,6 +279,8 @@
+                     "end": s_end if s_end is not None else round(s_begin + 0.35, 3),
+                 })
+             full_text_parts.append(text)
++            if child.tail and child.tail.strip():
++                full_text_parts.append(child.tail.strip())
+ 
+         line_text = " ".join(full_text_parts) if full_text_parts else ("".join(el.itertext()).strip())
+         if line_text:
+--- a/tests/test_lyrics_sync.py
++++ b/tests/test_lyrics_sync.py
+@@ -124,13 +124,11 @@
+     parsed = lyrics.parse_ttml(SAMPLE_TTML_SYLLABLE_SYNC)
+     assert len(parsed) == 1
+     words = parsed[0]["words"]
+-    # Should extract inner syllable spans with timings
+-    assert len(words) == 4
+-    assert [w["text"] for w in words] == ["Ne", "ver", "gon", "na"]
+-    assert words[0]["start"] == 5.0
+-    assert words[0]["end"] == 5.4
+-    assert words[1]["start"] == 5.4
+-    assert words[1]["end"] == 6.0
++    assert parsed[0]["text"] == "Never gonna"
++    assert words == [
++        {"text": "Never", "start": 5.0, "end": 6.0},
++        {"text": "gonna", "start": 6.0, "end": 7.5},
++    ]
+ 
+ 
+ def test_parse_lyricsfile():
+@@ -270,3 +268,19 @@
+     assert parsed[0]["is_bg"] is False
+     assert parsed[1]["is_bg"] is True
+ 
++
++
++def test_inline_adlibs_keep_following_lead_and_provider_timing():
++    tokens = ["feel", "it", "feel", "it", "yeah", "woo"]
++    original = [{"text": word, "start": idx, "end": idx + .5}
++                for idx, word in enumerate(tokens)]
++    lead, echo, tag = lyrics._normalize_lines([{
++        "t": 0, "end": 6, "text": "feel it (feel it), yeah (woo)", "words": original
++    }])
++    assert lead["text"] == "feel it, yeah"
++    assert lead["words"] == [original[0], original[1], original[4]]
++    assert echo["text"] == "Feel it"
++    assert echo["t"] == 2
++    assert echo["words"] == original[2:4]
++    assert tag["t"] == 5
++    assert tag["words"] == original[5:]
