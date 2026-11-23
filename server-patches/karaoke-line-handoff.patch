@@ -1,0 +1,100 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10703,9 +10703,9 @@
+     lyricsBox.scrollTop = to;
+     const dist = lyricsBox.scrollTop - from; // at the end of the text the box may stop short of `to`
+     if (instant || Math.abs(dist) < 2 || matchMedia("(prefers-reduced-motion: reduce)").matches || !lyricsList.animate) return;
+-    const ms = clamp(260 + Math.abs(dist) * 0.35, 300, 560);
++    const ms = clamp(410 + Math.abs(dist) * 0.55, 460, 780);
+     const g = lyricsList.animate([{ transform: `translateY(${dist.toFixed(1)}px)` }, { transform: "translateY(0)" }],
+-      { duration: ms, easing: "cubic-bezier(0.22, 0.75, 0.25, 1)" });
++      { duration: ms, easing: "cubic-bezier(0.28, 0.1, 0.22, 1)" });
+     lyricsGlide = g;
+     g.onfinish = () => { if (lyricsGlide === g) lyricsGlide = null; };
+   }
+@@ -10763,13 +10763,20 @@
+       const { start, fillEnd } = words[i];
+       const sung = t >= fillEnd;
+       // Keep the vocal onset, but give sub-frame timings a visible soft transition.
+-      const duration = Math.max(0.1, fillEnd - start);
++      const duration = Math.max(0.14, fillEnd - start);
+       const fraction = clamp((t - start) / duration, 0, 1);
+       const eased = fraction * fraction * (3 - 2 * fraction);
+       const progress = Math.round(eased * 1000) / 10;
+       if (span._lyricsFill !== progress) {
+         span._lyricsFill = progress;
+         span.style.setProperty("--lyric-position", (100 - progress) + "%");
++      }
++      const fadeStart = Math.max(start + duration, words[i + 1]?.start ?? fillEnd) + 0.045;
++      const fade = clamp((t - fadeStart) / 0.34, 0, 1);
++      const light = Math.round((1 - fade * fade * (3 - 2 * fade)) * 1000) / 1000;
++      if (span._lyricsLight !== light) {
++        span._lyricsLight = light;
++        span.style.setProperty("--lyric-light", 0.42 + 0.58 * light);
+       }
+       if (span._lyricsSung !== sung) {
+         span._lyricsSung = sung;
+@@ -10810,7 +10817,9 @@
+         && (row.isBg || row.words.length > 0 || k === leadIdx);
+       const isPast = Number.isFinite(row.start) && t >= displayEnd;
+       const changed = li._lyricsActive !== isAct || li._lyricsPast !== isPast;
+-      if (wordSync && (isAct || changed || lineChanged)) updateWordsForLine(li, row.words, t);
++      const trailing = wordSync && row.words.length > 0 && t >= row.start && t < displayEnd + 0.4;
++      if (wordSync && (trailing || li._lyricsTrailing || changed || lineChanged)) updateWordsForLine(li, row.words, t);
++      li._lyricsTrailing = trailing;
+       if (!lineChanged && !changed) continue;
+       li._lyricsActive = isAct;
+       li._lyricsPast = isPast;
+--- a/miniapp/styles.css
++++ b/miniapp/styles.css
+@@ -2219,12 +2219,18 @@
+   color: #fff;
+ }
+ @media (prefers-reduced-motion: no-preference) {
++  body.lyrics-open .lyrics .lyrics-lines.is-synced .lyrics-line {
++    transition: opacity 560ms cubic-bezier(0.22, 0.55, 0.32, 1),
++      transform 640ms cubic-bezier(0.22, 0.55, 0.32, 1),
++      filter 560ms ease;
++  }
++  .lyrics-word.is-sung { color: rgb(255 255 255 / var(--lyric-light, 1)); }
+   @supports (background-clip: text) {
+     .lyrics-word {
+       --lyric-feather: 0.88em;
+       background: linear-gradient(
+         to right,
+-        #fff calc(50% - var(--lyric-feather) / 2),
++        rgb(255 255 255 / var(--lyric-light, 1)) calc(50% - var(--lyric-feather) / 2),
+         rgba(255, 255, 255, 0.42) calc(50% + var(--lyric-feather) / 2)
+       ) var(--lyric-position, 100%) center / calc(200% + var(--lyric-feather)) 100% no-repeat;
+       background-clip: text;
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -22,7 +22,7 @@
+      string forces it to fetch the real, current file. Bump this
+      number (or just change it) every time styles.css or app.js is
+      edited, otherwise Telegram may keep showing the old version. -->
+-<link rel="stylesheet" href="styles.css?v=238-karaoke-soft" />
++<link rel="stylesheet" href="styles.css?v=239-karaoke-flow" />
+ <link rel="stylesheet" href="atmosphere.css?v=9" />
+ <link rel="stylesheet" href="events.css?v=23-min-row" />
+ <link rel="stylesheet" href="system.css?v=133-lyrics-heart" />
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=495-karaoke-soft"></script>
++<script src="app.js?v=496-karaoke-flow"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v20";
++const CACHE = "notka-shell-v21";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
