@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -29,3 +29,6 @@ status: completed
 
 ## Uniform word fill
 - Deployed a 220 ms maximum left-to-right sweep per word from its provider start. Short words finish by their timestamp; completed words hold through the gap. Verified JS timing cases, patch replay, health and public asset hashes. Backup: /opt/notka/hotfix-backups/karaoke-even-G3wG6hAl. Authenticated playback unchecked.
+
+## Provider word duration
+- Active. Distinguish explicit word ends from inferred gaps. Preserve real vocal holds and cap only unverified fills. Verify parsed and rendered timings.
