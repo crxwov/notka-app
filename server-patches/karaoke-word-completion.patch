@@ -1,0 +1,371 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10417,6 +10417,7 @@
+   let lyricsOpen = false;
+   let lyricsTrackId = null; // whose text is on screen (or being fetched)
+   let lyricsData = null;
++  let lyricsTimeline = [];
+   let lyricsActive = -1;
+   let lyricsTouchedAt = 0;
+   let lyricsHandDown = false; // a finger / mouse button is on the text right now
+@@ -10580,8 +10581,9 @@
+     lyricsList.innerHTML = "";
+     lyricsList.classList.toggle("is-synced", !!data.synced);
+     // Выделение по словам — только там, где есть полные привязки (syncType === "word")
++    lyricsTimeline = buildLyricsTimeline(data.lines);
+     const hasWordSync = Store.getSetting("lyricsKaraoke") === true
+-      && data.synced && data.syncType === "word" && data.lines.some(line => line.words?.length);
++      && data.synced && data.syncType === "word" && lyricsTimeline.some(row => row.words.length);
+     lyricsList.classList.toggle("is-word-synced", hasWordSync);
+     $("lyrics-plain-tag").hidden = !!data.synced || !data.lines.length;
+     $("lyrics-note").textContent = data.lines.length ? "" : "Для этого трека текста пока нет.";
+@@ -10592,7 +10594,8 @@
+       const li = document.createElement("li");
+       li.className = "lyrics-line" + (line.is_bg ? " is-bg" : "");
+       li.dataset.i = i;
+-      const words = hasWordSync ? line.words : null;
++      li.hidden = !!lyricsTimeline[i].duplicate;
++      const words = hasWordSync ? lyricsTimeline[i].words : null;
+       if (words && words.length) {
+         li.classList.add("has-words");
+         words.forEach((w, wi) => {
+@@ -10706,144 +10709,89 @@
+     lyricsGlide = g;
+     g.onfinish = () => { if (lyricsGlide === g) lyricsGlide = null; };
+   }
+-  function updateWordsForLine(li, line, t) {
+-    if (!line.words || !line.words.length) return;
+-    const words = line.words;
++  function buildLyricsTimeline(lines) {
++    const timeline = lines.map((line, index) => {
++      const raw = line.words || [];
++      const words = raw.map((word, i) => ({
++        ...word,
++        end: Math.min(word.end, raw[i + 1]?.start ?? Infinity),
++      }));
++      const valid = words.every(word => Number.isFinite(word.start)
++        && Number.isFinite(word.end) && word.end - word.start >= 0.025);
++      const nextLead = !line.is_bg && lines.slice(index + 1)
++        .find(next => !next.is_bg && Number.isFinite(next.t) && next.t > line.t);
++      const start = valid && words.length ? words[0].start : line.t;
++      const end = valid && words.length ? words.at(-1).end
++        : Number.isFinite(line.end) && line.end > start ? line.end : (nextLead?.t ?? start + 4);
++      return { start, end, words: valid ? words : [], isBg: !!line.is_bg, enabled: !line.is_bg || (valid && words.length > 0) };
++    });
++
++    // Providers can attach the same backing phrase to two adjacent lead rows.
++    const backing = new Map();
++    timeline.forEach((row, index) => {
++      if (!row.isBg || !row.enabled) return;
++      const key = lines[index].text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
++      const prior = backing.get(key);
++      if (prior && Math.abs(prior.start - row.start) < 0.12 && Math.abs(prior.end - row.end) < 0.2) {
++        row.enabled = false;
++        row.duplicate = true;
++      } else {
++        backing.set(key, row);
++      }
++    });
++    return timeline;
++  }
++
++  function updateWordsForLine(li, words, t) {
+     const spans = li.getElementsByClassName("lyrics-word");
+-    for (let w = 0; w < words.length; w++) {
+-      const span = spans[w];
+-      if (!span) continue;
+-      const word = words[w];
+-      const start = word.start;
+-      const nextStart = words[w + 1]?.start ?? Infinity;
+-      const end = Math.min(word.end ?? start + 0.35, nextStart);
+-      let p = 0;
+-      if (t < start) p = 0;
+-      else if (t >= end) p = 1;
+-      else p = (t - start) / Math.max(0.01, end - start);
+-
+-      const pct = Math.min(100, Math.max(0, p * 100));
+-      const pctStr = pct.toFixed(1) + "%";
+-      if (span._lastPct !== pctStr) {
+-        span._lastPct = pctStr;
+-        span.style.setProperty("--karaoke-progress", pctStr);
+-      }
+-      const isPast = p >= 1;
+-      const isActive = t >= start && !isPast;
+-      if (span._isPast !== isPast) {
+-        span._isPast = isPast;
+-        span.classList.toggle("is-sung", isPast);
+-      }
+-      if (span._isActive !== isActive) {
+-        span._isActive = isActive;
+-        span.classList.toggle("is-active", isActive);
+-      }
+-    }
+-  }
+-
+-  function setWordsState(li, line, isPast) {
+-    if (!line.words || !line.words.length) return;
+-    const spans = li.getElementsByClassName("lyrics-word");
+-    const pctStr = isPast ? "100%" : "0%";
+-    for (let w = 0; w < line.words.length; w++) {
+-      const span = spans[w];
+-      if (!span) continue;
+-      if (span._lastPct !== pctStr) {
+-        span._lastPct = pctStr;
+-        span.style.setProperty("--karaoke-progress", pctStr);
+-      }
+-      if (span._isPast !== isPast) {
+-        span._isPast = isPast;
+-        span.classList.toggle("is-sung", isPast);
+-      }
+-      if (span._isActive) {
+-        span._isActive = false;
+-        span.classList.remove("is-active");
+-      }
++    for (let i = 0; i < spans.length; i++) {
++      const span = spans[i];
++      const sung = t >= words[i].end;
++      if (span._isSung === sung) continue;
++      span._isSung = sung;
++      span.classList.toggle("is-sung", sung);
+     }
+   }
+ 
+   function syncLyrics(jump, instant) {
+     if (!lyricsOpen || !lyricsData || !lyricsData.synced || currentScreen !== "player") return;
+-    const lines = lyricsData.lines;
+     const t = lyricsNow();
+-
+-    // 1. Find active lead line
++    const items = lyricsList.children;
++    const wordSync = lyricsList.classList.contains("is-word-synced");
+     let leadIdx = -1;
+-    for (let k = 0; k < lines.length; k++) {
+-      if (!lines[k].is_bg && lines[k].t != null && lines[k].t <= t) {
+-        leadIdx = k;
+-      }
+-    }
+-
+-    // 2. Compute active set of lines (lead line + concurrent background vocals)
+-    const activeSet = new Set();
+-    if (leadIdx >= 0) {
+-      const lead = lines[leadIdx];
+-      let nextLeadT = Infinity;
+-      for (let nl = leadIdx + 1; nl < lines.length; nl++) {
+-        if (!lines[nl].is_bg && lines[nl].t != null) { nextLeadT = lines[nl].t; break; }
+-      }
+-      const leadEnd = lead.end != null ? (lead.end + 0.35) : Math.min(lead.t + 7.0, nextLeadT);
+-      if (t <= leadEnd) {
+-        activeSet.add(leadIdx);
+-      }
+-    }
+-
+-    // Check background / ad-lib lines overlapping with current time t
+-    for (let k = 0; k < lines.length; k++) {
+-      if (lines[k].is_bg && lines[k].t != null) {
+-        const bgStart = lines[k].t;
+-        let bgEnd;
+-        if (lines[k].words && lines[k].words.length) {
+-          const wLast = lines[k].words[lines[k].words.length - 1];
+-          bgEnd = (wLast.end != null ? wLast.end : wLast.start + 0.35) + 0.3;
+-        } else if (lines[k].end != null) {
+-          bgEnd = lines[k].end + 0.3;
+-        } else {
+-          bgEnd = bgStart + 2.8;
+-        }
+-        if (t >= bgStart && t <= bgEnd) {
+-          activeSet.add(k);
+-        }
+-      }
+-    }
+-
+-    // Fallback if no lead line was marked active
+-    if (activeSet.size === 0) {
+-      let i = -1;
+-      while (i + 1 < lines.length && lines[i + 1].t != null && lines[i + 1].t <= t) i++;
+-      if (i >= 0) activeSet.add(i);
+-    }
+-
+-    const items = lyricsList.children;
+-    const focusIdx = leadIdx >= 0 ? leadIdx : (activeSet.values().next().value || 0);
++    let bgIdx = -1;
++    for (let k = 0; k < lyricsTimeline.length; k++) {
++      const row = lyricsTimeline[k];
++      if (!row.enabled || !Number.isFinite(row.start) || row.start > t) continue;
++      if (!row.isBg && (leadIdx < 0 || row.start >= lyricsTimeline[leadIdx].start)) leadIdx = k;
++      if (row.isBg && t < row.end) bgIdx = k;
++    }
++    const focusIdx = leadIdx >= 0 ? leadIdx : Math.max(0, bgIdx);
+     const lineChanged = focusIdx !== lyricsActive || jump;
++    for (let k = 0; k < items.length; k++) {
++      const row = lyricsTimeline[k];
++      const li = items[k];
++      const isAct = row.enabled && Number.isFinite(row.start) && t >= row.start && t < row.end
++        && (row.isBg || row.words.length > 0 || k === leadIdx);
++      const isPast = Number.isFinite(row.start) && t >= row.end;
++      const changed = li._lyricsActive !== isAct || li._lyricsPast !== isPast;
++      if (wordSync && (isAct || changed || lineChanged)) updateWordsForLine(li, row.words, t);
++      if (!lineChanged && !changed) continue;
++      li._lyricsActive = isAct;
++      li._lyricsPast = isPast;
++      li.classList.toggle("is-active", isAct);
++      li.classList.toggle("is-past", isPast);
++      const d = k - focusIdx;
++      const lo = isAct ? 1 : d < 0 ? Math.max(0.2, 0.42 + d * 0.06) : Math.max(0.26, 0.58 - d * 0.08);
++      li.style.setProperty("--lo", lo.toFixed(2));
++      if (lyricsLab) {
++        const distance = Math.abs(d);
++        li.style.filter = isAct || distance <= 1 ? "" : `blur(${Math.min(2.6, (distance - 1) * 0.9).toFixed(1)}px)`;
++      } else if (li.style.filter) li.style.filter = "";
++    }
+ 
+     if (lineChanged) {
+       lyricsActive = focusIdx;
+-      for (let k = 0; k < items.length; k++) {
+-        const isAct = activeSet.has(k);
+-        const isPast = k < focusIdx && !isAct;
+-        items[k].classList.toggle("is-active", isAct);
+-        items[k].classList.toggle("is-past", isPast);
+-        const d = k - focusIdx;
+-        const lo = isAct ? 1 : d < 0 ? Math.max(0.2, 0.42 + d * 0.06) : Math.max(0.26, 0.58 - d * 0.08);
+-        items[k].style.setProperty("--lo", lo.toFixed(2));
+-        if (lyricsLab) {
+-          const dd = Math.abs(k - Math.max(0, focusIdx));
+-          const bl = isAct || dd <= 1 ? 0 : Math.min(2.6, (dd - 1) * 0.9);
+-          const want = bl ? `blur(${bl.toFixed(1)}px)` : "";
+-          if (items[k].style.filter !== want) items[k].style.filter = want;
+-        } else if (items[k].style.filter) items[k].style.filter = "";
+-
+-        if (isPast) {
+-          setWordsState(items[k], lines[k], true);
+-        } else if (k > focusIdx && !isAct) {
+-          setWordsState(items[k], lines[k], false);
+-        }
+-      }
+-
+       if (!quotePicking && (jump || (!lyricsHandDown && Date.now() - lyricsTouchedAt >= 6000))) {
+         if (items[focusIdx]) {
+           const box = lyricsBox.getBoundingClientRect();
+@@ -10856,26 +10804,6 @@
+           const row = items[focusIdx];
+           glideLyrics(row.offsetTop + row.offsetHeight / 2 - target, instant);
+         }
+-      }
+-    } else {
+-      // Background lines may start or end during the same main line
+-      for (let k = 0; k < items.length; k++) {
+-        const isAct = activeSet.has(k);
+-        if (items[k].classList.contains("is-active") !== isAct) {
+-          items[k].classList.toggle("is-active", isAct);
+-          items[k].classList.toggle("is-past", k < focusIdx && !isAct);
+-          if (!isAct && k <= focusIdx) {
+-            setWordsState(items[k], lines[k], true);
+-          }
+-        }
+-      }
+-    }
+-
+-    // Update word progress for all currently active lines
+-    if (!lyricsList.classList.contains("is-word-synced")) return;
+-    for (const actIdx of activeSet) {
+-      if (actIdx >= 0 && actIdx < items.length && lines[actIdx].words && lines[actIdx].words.length) {
+-        updateWordsForLine(items[actIdx], lines[actIdx], t);
+       }
+     }
+   }
+--- a/miniapp/styles.css
++++ b/miniapp/styles.css
+@@ -2210,56 +2210,17 @@
+ }
+ 
+ .lyrics-word {
+-  --karaoke-progress: 0%;
+   display: inline-block;
+   white-space: pre-wrap;
+-  color: rgba(255, 255, 255, 0.4) !important;
+-  -webkit-text-fill-color: rgba(255, 255, 255, 0.4) !important;
+-  background: none !important;
+-  -webkit-background-clip: initial !important;
+-  background-clip: initial !important;
+-  transform: none;
+-}
+-.lyrics-line.is-active .lyrics-word.is-active {
+-  color: transparent !important;
+-  -webkit-text-fill-color: transparent !important;
+-  background-image: linear-gradient(
+-    90deg,
+-    #ffffff calc(var(--karaoke-progress) * 1.24 - 24%),
+-    rgba(255, 255, 255, 0.4) calc(var(--karaoke-progress) * 1.24)
+-  ) !important;
+-  -webkit-background-clip: text !important;
+-  background-clip: text !important;
+-  transform: none;
+-}
+-.lyrics-line.is-bg.is-active .lyrics-word.is-active {
+-  text-decoration: underline solid rgba(255, 255, 255, 0.8) 0.08em;
+-  text-underline-offset: 0.17em;
+-}
+-.lyrics-line.is-active .lyrics-word.is-sung {
+-  color: #ffffff !important;
+-  -webkit-text-fill-color: #ffffff !important;
+-  background: none !important;
+-  -webkit-background-clip: initial !important;
+-  background-clip: initial !important;
+-  transform: none;
+-}
+-.lyrics-line.is-past .lyrics-word {
+-  color: inherit !important;
+-  -webkit-text-fill-color: inherit !important;
+-  background: none !important;
+-  -webkit-background-clip: initial !important;
+-  background-clip: initial !important;
+-  transform: none;
+-}
+-.perf-lite .lyrics-word.is-active {
+-  transform: none !important;
++  color: rgba(255, 255, 255, 0.42);
++  -webkit-text-fill-color: currentColor;
++  transition: color 110ms ease-out;
++}
++.lyrics-word.is-sung {
++  color: #fff;
+ }
+ @media (prefers-reduced-motion: reduce) {
+-  .lyrics-word {
+-    transform: none !important;
+-    transition: none !important;
+-  }
++  .lyrics-word { transition: none; }
+ }
+ /* a text without timings is simply readable from top to bottom, at the same size as a synced one */
+ .lyrics-lines:not(.is-synced) .lyrics-line { padding: 4px 0; opacity: 0.86; }
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -22,7 +22,7 @@
+      string forces it to fetch the real, current file. Bump this
+      number (or just change it) every time styles.css or app.js is
+      edited, otherwise Telegram may keep showing the old version. -->
+-<link rel="stylesheet" href="styles.css?v=230-karaoke-timing" />
++<link rel="stylesheet" href="styles.css?v=231-karaoke-words" />
+ <link rel="stylesheet" href="atmosphere.css?v=9" />
+ <link rel="stylesheet" href="events.css?v=23-min-row" />
+ <link rel="stylesheet" href="system.css?v=133-lyrics-heart" />
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=484-karaoke-timing"></script>
++<script src="app.js?v=485-karaoke-words"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v8";
++const CACHE = "notka-shell-v9";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
