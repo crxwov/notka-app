@@ -1,8 +1,10 @@
 # Current work — crxwov
 
 participant: crxwov
-status: active
-branch: crxwov/lyrics-word-cues
+status: completed
 
-## Scope
-Production revision 5f14cf8: lyric parsing and player karaoke rendering only. Split inline ad-libs with provider timing, give each word a short lift, and follow the lead vocal at the cover midpoint. Ship a scoped patch after parser and frontend checks.
+## Karaoke follow-up
+- Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
+- Verified 31 Python tests, JavaScript syntax, word transitions and backward seek, patch applicability, production health, and public asset hashes on notka.site.
+- Deployed five runtime files. Backup: /opt/notka/hotfix-backups/lyrics-word-cues-d2NuMgEZ. Authenticated playback and visual acceptance remain unchecked.
+- Artifact: server-patches/lyrics-word-cues.patch.
