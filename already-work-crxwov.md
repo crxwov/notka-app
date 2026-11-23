@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -38,3 +38,6 @@ status: completed
 
 ## Karaoke visual finish
 - Deployed a wider soft gradient edge, masked glint that follows the edge, and restrained finish glow. Chromium preview, geometry, reduced-motion behavior, and public assets verified. Timing logic unchanged. Backup: /opt/notka/hotfix-backups/karaoke-polish-0y55wDCF. Authenticated playback unchecked.
+
+## Studio equalizer
+- Active. Approved Simple + Studio modes. Scope: shared web sound settings and DSP, preserve saved presets, measure response and peak margin, verify playback paths.
