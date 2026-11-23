@@ -1,0 +1,142 @@
+--- a/miniapp/app.js
++++ b/miniapp/app.js
+@@ -10715,16 +10715,17 @@
+       const raw = line.words || [];
+       const words = raw.map((word, i) => ({
+         ...word,
+-        end: Math.min(word.end, raw[i + 1]?.start ?? Infinity),
++        end: word.end_inferred ? Math.min(word.end, raw[i + 1]?.start ?? Infinity) : word.end,
+       }));
+       // Metadata providers may give a short tag the whole gap up to the next verse.
+-      const stretchedTag = line.is_bg && words.length === 1 && words[0].end - words[0].start > 3;
++      const stretchedTag = line.is_bg && words.length === 1
++        && words[0].end_inferred && words[0].end - words[0].start > 3;
+       const valid = !stretchedTag && words.every(word => Number.isFinite(word.start)
+         && Number.isFinite(word.end) && word.end - word.start >= 0.025);
+       const nextLead = lines.slice(index + 1)
+         .find(next => !next.is_bg && Number.isFinite(next.t) && next.t > line.t);
+       const start = valid && words.length ? words[0].start : line.t;
+-      const end = valid && words.length ? words.at(-1).end
++      const end = valid && words.length ? Math.max(...words.map(word => word.end))
+         : Number.isFinite(line.end) && line.end > start ? line.end : (nextLead?.t ?? start + 4);
+       return { start, end, words: valid ? words : [], isBg: !!line.is_bg,
+         enabled: !line.is_bg || (!stretchedTag && Number.isFinite(line.t)) };
+@@ -10750,8 +10751,8 @@
+     const spans = li.getElementsByClassName("lyrics-word");
+     for (let i = 0; i < spans.length; i++) {
+       const span = spans[i];
+-      const { start, end } = words[i];
+-      const fillEnd = Math.min(end, start + 0.22);
++      const { start, end, end_inferred } = words[i];
++      const fillEnd = end_inferred ? Math.min(end, start + 0.22) : end;
+       const progress = Math.round(clamp((t - start) / (fillEnd - start), 0, 1) * 1000) / 10;
+       if (span._lyricsFill !== progress) {
+         span._lyricsFill = progress;
+--- a/miniapp/index.html
++++ b/miniapp/index.html
+@@ -1675,7 +1675,7 @@
+ <script src="mix.js?v=8"></script>
+ 
+ <script src="feedback.js?v=1"></script>
+-<script src="app.js?v=489-karaoke-even"></script>
++<script src="app.js?v=490-karaoke-duration"></script>
+ <script src="motion.js?v=5"></script>
+ </body>
+ </html>
+--- a/miniapp/sw.js
++++ b/miniapp/sw.js
+@@ -1,7 +1,7 @@
+ // Сервис-воркер Нотки для приложений вне Telegram (Android, ПК, установленная с сайта версия).
+ // Интерфейс открывается и без интернета: при каждом открытии с сетью файлы /app/ берутся свежими с сервера
+ // и копия обновляется («сначала сеть»), без сети — отдаётся сохранённая копия. Музыку и запросы к API не трогаем.
+-const CACHE = "notka-shell-v13";
++const CACHE = "notka-shell-v14";
+ const CORE = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+ 
+ self.addEventListener("install", (e) => {
+--- a/music_resolver/services/lyrics.py
++++ b/music_resolver/services/lyrics.py
+@@ -152,7 +152,7 @@
+ 
+ 
+ def _cache_path(title: str, artist: str, duration: float | None, video_id: str | None = None) -> Path:
+-    key = f"v8|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}|{video_id or ''}"
++    key = f"v9|{_norm(title)}|{_norm(artist)}|{round(duration or 0)}|{video_id or ''}"
+     return _CACHE_DIR / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".json")
+ 
+ 
+@@ -268,14 +268,17 @@
+             start = _parse_time_val(child.get("begin"))
+             finish = _parse_time_val(child.get("end"))
+             if start is not None and text.strip():
+-                finish = finish if finish is not None else round(start + 0.35, 3)
++                timing = {"end": finish} if finish is not None and finish > start else {
++                    "end": round(start + 0.35, 3), "end_inferred": True
++                }
+                 # TTML uses whitespace between words and adjacent timed spans for syllables.
+                 if (words and parts[-1] == "" and not text[0].isspace()
+                         and not text.startswith("(") and not words[-1]["text"].endswith(")")):
+                     words[-1]["text"] += text.strip()
+-                    words[-1]["end"] = finish
++                    words[-1].pop("end_inferred", None)
++                    words[-1].update(timing)
+                 else:
+-                    words.append({"text": text.strip(), "start": start, "end": finish})
++                    words.append({"text": text.strip(), "start": start, **timing})
+             parts.extend((text, tail))
+ 
+         text = " ".join("".join(parts).split())
+@@ -346,7 +349,8 @@
+                     else None
+                 )
+                 explicit_end = w.get("end_ms")
+-                if explicit_end is not None and explicit_end > w_start_ms:
++                end_inferred = explicit_end is None or explicit_end <= w_start_ms
++                if not end_inferred:
+                     w_end = round(explicit_end / 1000, 3)
+                 elif next_start is not None:
+                     w_end = round(next_start / 1000, 3)
+@@ -354,7 +358,10 @@
+                     w_end = round(end_ms / 1000, 3)
+                 else:
+                     w_end = round(w_start + 0.35, 3)
+-                words.append({"text": w_text, "start": w_start, "end": w_end})
++                word = {"text": w_text, "start": w_start, "end": w_end}
++                if end_inferred:
++                    word["end_inferred"] = True
++                words.append(word)
+ 
+         out.append({
+             "t": t if t is not None else (words[0]["start"] if words else None),
+@@ -393,6 +400,7 @@
+                     "text": w_text,
+                     "start": round(w_sec, 2),
+                     "end": round(next_w_sec, 2) if next_w_sec is not None else round(w_sec + 0.35, 2),
++                    "end_inferred": True,
+                 })
+             clean_text = " ".join(w["text"] for w in words)
+         else:
+--- a/tests/test_lyrics_sync.py
++++ b/tests/test_lyrics_sync.py
+@@ -148,6 +148,21 @@
+     assert line1["words"][4]["text"] == "love"
+     assert line1["words"][4]["start"] == 20.51
+     assert line1["words"][4]["end"] == 21.504  # line end_ms
++    assert line1["words"][4]["end_inferred"] is True
++    assert line1["words"][0]["end_inferred"] is True
++
++
++def test_lyricsfile_word_end_is_explicit():
++    parsed = lyrics.parse_lyricsfile("""lines:
++      - text: sung now
++        start_ms: 1000
++        end_ms: 6000
++        words:
++          - {text: sung, start_ms: 1000, end_ms: 2100}
++          - {text: now, start_ms: 2400}
++    """)
++    assert parsed[0]["words"][0] == {"text": "sung", "start": 1, "end": 2.1}
++    assert parsed[0]["words"][1]["end_inferred"] is True
+ 
+ 
+ def test_parse_enhanced_lrc():
