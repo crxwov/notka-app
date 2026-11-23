@@ -1,7 +1,7 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -50,3 +50,6 @@ status: completed
 
 ## Softer karaoke sweep
 - Deployed softened sweep, 100 ms minimum visual duration, subtler glow and 0.42 px maximum lift at 60 px. Verified intermediate frames, short words, seek, reduced motion, origin health and public hashes. Backup: /opt/notka/hotfix-backups/karaoke-soft-tQ7rDDlV. Authenticated playback unchecked.
+
+## Karaoke line handoff and trailing fade
+- Active. Soften vertical handoff and fade word illumination behind the audio-timed foreground. Preserve reduced motion and text readability.
