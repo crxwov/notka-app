@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: active
-updated_at_utc: 2026-11-25T21:32:16Z
+status: completed
+updated_at_utc: 2026-11-25T21:34:16Z
 agent: Codex
 branch: main
 
@@ -67,4 +67,6 @@ branch: main
 ## YouTube provider rollout
 - Authorized production rollout of youtube-download-retry.patch. Scope: one provider file and restart of notka. No other service or repository changes.
 - Baseline is byte-identical to 7091560; origin health is good. Leksik's latest scoped work is completed.
-- Next: verify uploaded bytes, back up the current file, perform guarded replacement, run health and playback probes.
+- Result: deployed exactly one file, restarted notka, and verified expected hash df36ec32213588f3fa05179713c8893d9fa7c593ae9faa76416af989f8589bc8. Backup: /opt/notka/hotfix-backups/youtube-download-retry-fYuE9yr0.
+- Validation: origin and public health OK, unit active, no error-priority journal entries in the post-restart check. Public YouTube Music cold prepare succeeded in 21.6 s; start and seek returned 206 and 64 KiB each. Broader smoke succeeded functionally, but two searches exceeded 8 s (one already exceeded it before rollout).
+- Next: runtime rollout complete. Patch remains local in canonical notka-app, and no runtime code was pushed.
