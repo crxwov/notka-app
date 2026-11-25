@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: active
-updated_at_utc: 2026-11-25T21:54:04Z
+status: completed
+updated_at_utc: 2026-11-25T21:56:51Z
 agent: Codex
 branch: main
 
@@ -73,4 +73,6 @@ branch: main
 ## Cold playback follow-up
 - Scope: measure public cold first bytes and validate the provider's route metadata and duplicate download behavior after the deployed patch.
 - Evidence: public prepare 21.6 s, live resolve budget 10 s, foreground full download 11.4 s with no slot wait.
-- Next: characterize actual play path, correct provider route handling in isolated snapshot and check regressions before any production change.
+- Verified public first bytes in 29.9 s and 35.9 s on distinct cold tracks. Provider manager logged 15 s resolve timeouts. One foreground download logged 19.2 s after the 10 s prepare lookup budget, with no slot wait.
+- Prepared server-patches/youtube-cold-start-route.patch locally against current production bytes. It reports the actual lookup route and removes repeated identical cookie download/lookup attempts. 21 tests pass, including three new regressions, and replay matches the tested provider byte for byte.
+- Cold latency is unresolved. No new rollout. The measured sequential resolve/download fallback remains; any change to how these two operations share a startup budget requires separate validation.
