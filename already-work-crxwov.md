@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: active
-updated_at_utc: 2026-11-25T21:28:36Z
+status: completed
+updated_at_utc: 2026-11-25T21:30:57Z
 agent: Codex
 branch: main
 
@@ -61,4 +61,6 @@ branch: main
 - Scope: local server patch for music_resolver/providers/youtube_common.py against Leksik's 7091560. No production changes or credentials.
 - Acceptance: only an actual sign-in refusal refreshes the timer, cookie download tries the other route after a transient failure, and local regression checks pass.
 - Baseline: both failures reproduced with stubbed calls. Leksik's latest coordination record marks his task completed.
-- Next: reproduce in regression checks, patch, verify against the exact source.
+- Result: server-patches/youtube-download-retry.patch prepared locally. Real sign-in refusal starts the monotonic window; successful cookie requests do not extend it. Both route orders retry the other route, and ordinary download remains available when preferred cookies fail.
+- Verification: 20 pytest cases including four regressions, nine cookie checks, and byte-for-byte patch replay against 7091560 for LF and CRLF.
+- Next: production deployment and a live playback check require separate release authorization. No code was pushed.
