@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
-updated_at_utc: 2026-11-25T21:30:57Z
+status: active
+updated_at_utc: 2026-11-25T21:32:16Z
 agent: Codex
 branch: main
 
@@ -64,3 +64,7 @@ branch: main
 - Result: server-patches/youtube-download-retry.patch prepared locally. Real sign-in refusal starts the monotonic window; successful cookie requests do not extend it. Both route orders retry the other route, and ordinary download remains available when preferred cookies fail.
 - Verification: 20 pytest cases including four regressions, nine cookie checks, and byte-for-byte patch replay against 7091560 for LF and CRLF.
 - Next: production deployment and a live playback check require separate release authorization. No code was pushed.
+## YouTube provider rollout
+- Authorized production rollout of youtube-download-retry.patch. Scope: one provider file and restart of notka. No other service or repository changes.
+- Baseline is byte-identical to 7091560; origin health is good. Leksik's latest scoped work is completed.
+- Next: verify uploaded bytes, back up the current file, perform guarded replacement, run health and playback probes.
