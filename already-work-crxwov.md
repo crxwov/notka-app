@@ -1,7 +1,10 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
+status: active
+updated_at_utc: 2026-11-25T21:28:36Z
+agent: Codex
+branch: main
 
 ## Karaoke follow-up
 - Scoped production patch against deployed web revision 5f14cf8. Inline parenthetical vocals now retain provider timing below the lead, TTML syllables join into whole words, words get a brief lift, and the active lead follows the cover midpoint.
@@ -53,3 +56,9 @@ status: completed
 
 ## Karaoke line handoff and trailing fade
 - Deployed slower centered line handoff, eased vertical and opacity transitions, and per-word trailing illumination fade. Chromium verified an interrupted glide, intermediate word fading, seek and reduced motion. Public asset hashes and origin health passed. Backup: /opt/notka/hotfix-backups/karaoke-handoff-JeDLHFBj. Authenticated playback unchecked.
+
+## YouTube download retry
+- Scope: local server patch for music_resolver/providers/youtube_common.py against Leksik's 7091560. No production changes or credentials.
+- Acceptance: only an actual sign-in refusal refreshes the timer, cookie download tries the other route after a transient failure, and local regression checks pass.
+- Baseline: both failures reproduced with stubbed calls. Leksik's latest coordination record marks his task completed.
+- Next: reproduce in regression checks, patch, verify against the exact source.
