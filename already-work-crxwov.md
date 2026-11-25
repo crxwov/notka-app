@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
-updated_at_utc: 2026-11-25T21:34:16Z
+status: active
+updated_at_utc: 2026-11-25T21:54:04Z
 agent: Codex
 branch: main
 
@@ -70,3 +70,7 @@ branch: main
 - Result: deployed exactly one file, restarted notka, and verified expected hash df36ec32213588f3fa05179713c8893d9fa7c593ae9faa76416af989f8589bc8. Backup: /opt/notka/hotfix-backups/youtube-download-retry-fYuE9yr0.
 - Validation: origin and public health OK, unit active, no error-priority journal entries in the post-restart check. Public YouTube Music cold prepare succeeded in 21.6 s; start and seek returned 206 and 64 KiB each. Broader smoke succeeded functionally, but two searches exceeded 8 s (one already exceeded it before rollout).
 - Next: runtime rollout complete. Patch remains local in canonical notka-app, and no runtime code was pushed.
+## Cold playback follow-up
+- Scope: measure public cold first bytes and validate the provider's route metadata and duplicate download behavior after the deployed patch.
+- Evidence: public prepare 21.6 s, live resolve budget 10 s, foreground full download 11.4 s with no slot wait.
+- Next: characterize actual play path, correct provider route handling in isolated snapshot and check regressions before any production change.
