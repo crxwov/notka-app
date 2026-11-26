@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T17:29:22Z
+updated_at_utc: 2026-11-26T17:31:14Z
 agent: Codex
 branch: main
 
@@ -111,3 +111,5 @@ branch: main
 
 - Confirmed: cold matched iTunes 1802175541 takes 5.37 s prepare / 6.45 s first bytes; YouTube cold sample 2.27 s. Some client slow-start reports show server 0-112 ms but client 14-30 s, so network/client contention also matters.
 - Scope refined: api/routes.py reuse known/ensured iTunes YouTube match via existing relay; miniapp/app.js stop speculative next-track and artwork warming before playback, cancel obsolete in-flight pieces, use native fetch priority. No layout/design changes. Existing Android/Windows load common remote UI; verify owning sources before claiming compatibility.
+
+- Regression confirmed: two frontend startup/cancellation checks fail on baseline and pass on candidate; two iTunes relay checks fail on baseline, all five match checks pass after minimal fix. Full route regression checks and public measurements pending.
