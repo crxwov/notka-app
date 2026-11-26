@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
-updated_at_utc: 2026-11-26T16:25:24Z
+status: active
+updated_at_utc: 2026-11-26T17:19:29Z
 agent: Codex
 branch: main
 
@@ -100,3 +100,11 @@ branch: main
 - Result: deployed two files; backup /opt/notka/hotfix-backups/youtube-cookie-alert-g79juxu_. Live internal admin summary returns no YouTube alert; historical 172 failed / 343 successful counts preserved.
 - Verification: six regression tests; five reproduced failures on baseline; three full-module/admin scenarios; patch replay byte-identical; public health OK. Two public audio starts and two seeks returned 206 / 65536 bytes, first bytes in 190-357 ms.
 - Artifacts: server-patches/youtube-cookie-alert.patch and youtube-cookie-alert-check.py. Runtime code not pushed. Scope completed; no current reservation. Authenticated browser rendering and device playback not tested; intermittent upstream refusals remain possible and still trigger a current auth alert.
+
+## Playback latency continuation
+- User reports slow starts on all clients and requests continuation of the authorized incident repair.
+- Scope: read-only client/startup tracing; minimal server routes/Finland relay correction if confirmed. Preserve audio identity, cached files, fallback, cookies and previous alert fix.
+- Evidence: iTunes resolves take 5-8 s and bypass Finland; occasional Finland 502 falls back to slow extraction. No claim that these explain every reported delay yet.
+- Acceptance: reproduce slow public prepare/start, reduce cold latency with exact-track identity and seek verified, preserve both client contracts.
+- Stages: diagnosis active; regression/fix pending; rollout pending.
+- Next: measure representative uncached YouTube and iTunes requests and inspect client prepare ordering.
