@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T17:28:49Z
+updated_at_utc: 2026-11-26T17:29:22Z
 agent: Codex
 branch: main
 
@@ -108,3 +108,6 @@ branch: main
 - Acceptance: reproduce slow public prepare/start, reduce cold latency with exact-track identity and seek verified, preserve both client contracts.
 - Stages: diagnosis active; regression/fix pending; rollout pending.
 - Next: measure representative uncached YouTube and iTunes requests and inspect client prepare ordering.
+
+- Confirmed: cold matched iTunes 1802175541 takes 5.37 s prepare / 6.45 s first bytes; YouTube cold sample 2.27 s. Some client slow-start reports show server 0-112 ms but client 14-30 s, so network/client contention also matters.
+- Scope refined: api/routes.py reuse known/ensured iTunes YouTube match via existing relay; miniapp/app.js stop speculative next-track and artwork warming before playback, cancel obsolete in-flight pieces, use native fetch priority. No layout/design changes. Existing Android/Windows load common remote UI; verify owning sources before claiming compatibility.
