@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T06:27:49Z
+updated_at_utc: 2026-11-26T06:33:12Z
 agent: Codex
 branch: main
 
@@ -80,4 +80,4 @@ branch: main
 - User selected fl-vpn. Scope: loopback YouTube range relay on fl-vpn, restricted SSH link, and optional live routing for YouTube on Notka. No VPN changes.
 - Acceptance: cold playable M4A prefix in about two seconds, verified seek, warm/parallel request handling, no new disk audio cache, preserved fallback and unaffected providers.
 - Baseline: five Finland cold tracks delivered in 1.07–1.28 s. German endpoint did not resolve the same five. Current Notka route samples reached 30–36 s on fallback.
-- Next: build and verify the isolated relay and origin patch, then validate through notka.site.
+- In progress: edge and restricted link active. Five cold prefixes through origin loopback took 1.14–1.52 s with seek; 18 route tests passed. Exact origin patch is being rolled out with backup and health rollback. Next: public cold playback, cache checks, and persistence.
