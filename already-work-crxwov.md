@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T17:37:15Z
+updated_at_utc: 2026-11-26T17:39:08Z
 agent: Codex
 branch: main
 
@@ -122,3 +122,5 @@ branch: main
 - Deployed four files with backup /opt/notka/hotfix-backups/playback-start-priority-al9fbtmj; public UI hashes verified. Cold iTunes starts improved to 3.129 s / 1.889 s, prepare 1.493 s / 1.310 s, exact audio and seek verified with no audio cache before/after. One new YouTube sample hit a Finland read timeout; investigating before claiming latency resolved.
 
 - Public four-track verification: all exact-audio/seek/AAC decode checks passed without audio disk cache; first bytes 3.129/1.889 s (iTunes), 14.173/1.924 s (YouTube). Remaining tail is real relay extraction delay. Diagnostic skip-webpage experiment failed with guest sign-in refusal and was NOT deployed; webpage is required for current guest session. Investigating reusable guest context instead of masking the timeout.
+
+- Relay tail diagnosis: normal yt-dlp repeats webpage then player API; skipping webpage alone triggers guest sign-in refusal. Captured guest visitor context plus yt-dlp native visitor_data/player_skip works without account cookies (0.288-0.332 s extraction). Scope extends to existing Finland relay file only, with ten-minute in-memory context reuse and normal extraction fallback. No VPN changes or stored login/session credentials.
