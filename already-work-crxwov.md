@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T17:32:40Z
+updated_at_utc: 2026-11-26T17:33:48Z
 agent: Codex
 branch: main
 
@@ -116,3 +116,5 @@ branch: main
 
 - Candidate ready: matched iTunes uses existing Finland relay (SoundCloud matches retain existing route); active relay sessions keep original audio after catalog rematch. UI schedules next-track preparation/artwork after current sound starts; obsolete pieces abort on existing watchdog; background prepare/warm uses low fetch priority. Frontend cache version update included.
 - Full current server source snapshot copied into ignored verification directory. Native source routes Android and Windows to common remote /app/. Route regression run active.
+
+- Verified 17 full route cases and seven standalone behavior/match checks, JS syntax, and patch application. Four-file candidate includes cache version bump; no frontend design changes. Scoped production deploy active with exact hash guards, backup and automatic rollback.
