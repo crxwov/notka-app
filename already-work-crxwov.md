@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: active
-updated_at_utc: 2026-11-26T06:33:12Z
+status: completed
+updated_at_utc: 2026-11-26T06:34:18Z
 agent: Codex
 branch: main
 
@@ -80,4 +80,6 @@ branch: main
 - User selected fl-vpn. Scope: loopback YouTube range relay on fl-vpn, restricted SSH link, and optional live routing for YouTube on Notka. No VPN changes.
 - Acceptance: cold playable M4A prefix in about two seconds, verified seek, warm/parallel request handling, no new disk audio cache, preserved fallback and unaffected providers.
 - Baseline: five Finland cold tracks delivered in 1.07–1.28 s. German endpoint did not resolve the same five. Current Notka route samples reached 30–36 s on fallback.
-- In progress: edge and restricted link active. Five cold prefixes through origin loopback took 1.14–1.52 s with seek; 18 route tests passed. Exact origin patch is being rolled out with backup and health rollback. Next: public cold playback, cache checks, and persistence.
+- Deployed: loopback relay on fl-vpn and restricted Notka SSH link. Both services active and enabled. Notka uses the relay for uncached YouTube ranges and retains its existing fallback for initial failures.
+- Verification: 18 route tests passed. Five cold prefixes over the private link took 1.14–1.52 s. Public Notka first audio bytes on three cold tracks took 1.45, 1.59 and 1.73 s; their 64 KiB M4A prefixes took 1.50–1.78 s. Each seek returned 206 and all three had no local audio cache file before or after. Live logs verified Finland routing. Health, app and the preexisting cached range passed.
+- Rollback: /opt/notka/hotfix-backups/finland-audio-relay-V2A8DdZY and disable 91-finland-audio-relay.conf. Local artifacts: server-patches/finland-audio-relay.py and finland-audio-routes.patch. Native-client playback was not tested; no runtime code pushed.
