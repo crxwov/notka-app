@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T16:20:07Z
+updated_at_utc: 2026-11-26T16:21:22Z
 agent: Codex
 branch: main
 
@@ -90,3 +90,5 @@ branch: main
 - Stages: diagnosis active; regression/fix pending; production verification pending.
 - Acceptance: validate current cookie route, classify real failure, keep genuine auth warnings, verify playback and seek.
 - Next: isolated cookie extraction probes and inspect recent failure classes.
+
+- Diagnosis confirmed: cookie extraction for 6_ESpGfPP20 succeeded in 5.01 s; daily failures include generic extraction failures, alert persists despite 343 cookie successes. Minimal fix: track consecutive sign-in refusals since cookie success, expire after ten minutes, leave daily counters unchanged. Regression and scoped two-file rollout next.
