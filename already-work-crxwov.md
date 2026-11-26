@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T16:23:06Z
+updated_at_utc: 2026-11-26T16:24:01Z
 agent: Codex
 branch: main
 
@@ -94,3 +94,5 @@ branch: main
 - Diagnosis confirmed: cookie extraction for 6_ESpGfPP20 succeeded in 5.01 s; daily failures include generic extraction failures, alert persists despite 343 cookie successes. Minimal fix: track consecutive sign-in refusals since cookie success, expire after ten minutes, leave daily counters unchanged. Regression and scoped two-file rollout next.
 
 - Regression: five failures reproduced on production baseline; all six checks pass on candidate. Two-file patch prepared, syntax valid. Next: full-module import and admin summary validation in an isolated process, then atomic deployment with hash guard and automatic rollback.
+
+- Full candidate imports and actual admin summary passed three scenarios in isolated server process; daily metrics untouched. Deployment authorized; two exact hashes guarded, backup and rollback prepared. No API/auth contract or client changes.
