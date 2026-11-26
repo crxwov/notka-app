@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
-updated_at_utc: 2026-11-26T06:34:18Z
+status: active
+updated_at_utc: 2026-11-26T16:20:07Z
 agent: Codex
 branch: main
 
@@ -83,3 +83,10 @@ branch: main
 - Deployed: loopback relay on fl-vpn and restricted Notka SSH link. Both services active and enabled. Notka uses the relay for uncached YouTube ranges and retains its existing fallback for initial failures.
 - Verification: 18 route tests passed. Five cold prefixes over the private link took 1.14–1.52 s. Public Notka first audio bytes on three cold tracks took 1.45, 1.59 and 1.73 s; their 64 KiB M4A prefixes took 1.50–1.78 s. Each seek returned 206 and all three had no local audio cache file before or after. Live logs verified Finland routing. Health, app and the preexisting cached range passed.
 - Rollback: /opt/notka/hotfix-backups/finland-audio-relay-V2A8DdZY and disable 91-finland-audio-relay.conf. Local artifacts: server-patches/finland-audio-relay.py and finland-audio-routes.patch. Native-client playback was not tested; no runtime code pushed.
+## YouTube incident 2026-11-26
+- Authorized by crxwov: urgent diagnosis, minimal fix and scoped production rollout despite missing/stale coordination records; do not replace other work.
+- Scope: YouTube provider failure classification and admin cookie alert, regression checks, one scoped runtime patch. Preserve Finland relay, cookies and daily metrics.
+- Evidence: 172 failed and 343 successful cookie attempts today; current playback works. Alert is based on cumulative daily counts; exact failure cause under investigation.
+- Stages: diagnosis active; regression/fix pending; production verification pending.
+- Acceptance: validate current cookie route, classify real failure, keep genuine auth warnings, verify playback and seek.
+- Next: isolated cookie extraction probes and inspect recent failure classes.
