@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T17:33:48Z
+updated_at_utc: 2026-11-26T17:35:13Z
 agent: Codex
 branch: main
 
@@ -118,3 +118,5 @@ branch: main
 - Full current server source snapshot copied into ignored verification directory. Native source routes Android and Windows to common remote /app/. Route regression run active.
 
 - Verified 17 full route cases and seven standalone behavior/match checks, JS syntax, and patch application. Four-file candidate includes cache version bump; no frontend design changes. Scoped production deploy active with exact hash guards, backup and automatic rollback.
+
+- Deployed four files with backup /opt/notka/hotfix-backups/playback-start-priority-al9fbtmj; public UI hashes verified. Cold iTunes starts improved to 3.129 s / 1.889 s, prepare 1.493 s / 1.310 s, exact audio and seek verified with no audio cache before/after. One new YouTube sample hit a Finland read timeout; investigating before claiming latency resolved.
