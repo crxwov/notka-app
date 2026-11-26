@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: active
-updated_at_utc: 2026-11-26T17:41:01Z
+status: completed
+updated_at_utc: 2026-11-26T17:43:30Z
 agent: Codex
 branch: main
 
@@ -126,3 +126,9 @@ branch: main
 - Relay tail diagnosis: normal yt-dlp repeats webpage then player API; skipping webpage alone triggers guest sign-in refusal. Captured guest visitor context plus yt-dlp native visitor_data/player_skip works without account cookies (0.288-0.332 s extraction). Scope extends to existing Finland relay file only, with ten-minute in-memory context reuse and normal extraction fallback. No VPN changes or stored login/session credentials.
 
 - Guest-context candidate: four regressions pass (two fail on baseline). Six real isolated Finland lookups returned valid 64 KiB M4A and seek; first bytes 0.456-2.256 s, including previously slow 3JZ_D3ELwOQ. Normal extraction remains fallback; context never leaves RAM. Deploying one relay file with hash guard, backup and bootstrap health check.
+
+- Completed: four origin files deployed (backup /opt/notka/hotfix-backups/playback-start-priority-al9fbtmj) and one Finland relay file deployed (backup /opt/notka-audio-relay/guest-context-backup-4m0num85). Guest session context remains RAM-only; normal extraction fallback preserved.
+- Final public checks: eight uncached tracks (two iTunes, six YouTube) delivered first bytes in 716-1319 ms; no audio cache before/after each. Exact matched audio, 206 seek, first AAC frame decoding, public UI hashes and public health passed. A separately cached formerly slow sample returned first bytes in 1516 ms; do not count it as cold evidence.
+- Checks: 17 route regression cases, seven startup/match checks, four guest-context checks; targeted failures reproduced before fixes. Patch applicability/replay verified. Evidence: .notka-local/playback-latency/verification-after.json and verification-cold.json (private).
+- Artifacts: server-patches/playback-start-priority.patch, finland-audio-guest-context.patch, updated finland-audio-relay.py and regression checks. Runtime source not pushed; only coordination status published. No current reservation.
+- Limit: native devices/user network not directly tested. Reload common remote UI to receive v498-playback-priority. Intermittent upstream/network delays remain possible; do not promise a universal latency bound.
