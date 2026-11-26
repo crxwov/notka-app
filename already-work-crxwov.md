@@ -1,8 +1,8 @@
 # Current work — crxwov
 
 participant: crxwov
-status: completed
-updated_at_utc: 2026-11-25T21:56:51Z
+status: active
+updated_at_utc: 2026-11-26T06:27:49Z
 agent: Codex
 branch: main
 
@@ -76,3 +76,8 @@ branch: main
 - Verified public first bytes in 29.9 s and 35.9 s on distinct cold tracks. Provider manager logged 15 s resolve timeouts. One foreground download logged 19.2 s after the 10 s prepare lookup budget, with no slot wait.
 - Prepared server-patches/youtube-cold-start-route.patch locally against current production bytes. It reports the actual lookup route and removes repeated identical cookie download/lookup attempts. 21 tests pass, including three new regressions, and replay matches the tested provider byte for byte.
 - Cold latency is unresolved. No new rollout. The measured sequential resolve/download fallback remains; any change to how these two operations share a startup budget requires separate validation.
+## Finland cold playback relay
+- User selected fl-vpn. Scope: loopback YouTube range relay on fl-vpn, restricted SSH link, and optional live routing for YouTube on Notka. No VPN changes.
+- Acceptance: cold playable M4A prefix in about two seconds, verified seek, warm/parallel request handling, no new disk audio cache, preserved fallback and unaffected providers.
+- Baseline: five Finland cold tracks delivered in 1.07–1.28 s. German endpoint did not resolve the same five. Current Notka route samples reached 30–36 s on fallback.
+- Next: build and verify the isolated relay and origin patch, then validate through notka.site.
