@@ -2,7 +2,7 @@
 
 participant: crxwov
 status: active
-updated_at_utc: 2026-11-26T17:31:14Z
+updated_at_utc: 2026-11-26T17:32:40Z
 agent: Codex
 branch: main
 
@@ -113,3 +113,6 @@ branch: main
 - Scope refined: api/routes.py reuse known/ensured iTunes YouTube match via existing relay; miniapp/app.js stop speculative next-track and artwork warming before playback, cancel obsolete in-flight pieces, use native fetch priority. No layout/design changes. Existing Android/Windows load common remote UI; verify owning sources before claiming compatibility.
 
 - Regression confirmed: two frontend startup/cancellation checks fail on baseline and pass on candidate; two iTunes relay checks fail on baseline, all five match checks pass after minimal fix. Full route regression checks and public measurements pending.
+
+- Candidate ready: matched iTunes uses existing Finland relay (SoundCloud matches retain existing route); active relay sessions keep original audio after catalog rematch. UI schedules next-track preparation/artwork after current sound starts; obsolete pieces abort on existing watchdog; background prepare/warm uses low fetch priority. Frontend cache version update included.
+- Full current server source snapshot copied into ignored verification directory. Native source routes Android and Windows to common remote /app/. Route regression run active.
